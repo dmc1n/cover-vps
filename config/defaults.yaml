@@ -27,7 +27,13 @@ seams:
   seam_tolerance_mm: 1.0         # allowed seam length mismatch before ease is recorded
   lap_rule: upper_over_lower     # water run-off; on vertical seams: front over side
 
-welding:
+construction:                    # how panels are joined; a dropdown per model in the web app
+  method: double_stitch          # double_stitch | welded   (double stitching is today's practice)
+
+stitching:                       # used when construction.method is double_stitch
+  allowance_mm: 15               # to confirm; seam allowance for the double-stitched seam
+
+welding:                         # used when construction.method is welded
   overlap_mm: 30                 # to confirm; carried by the upper (lap-side) panel only
   guide_line: true               # pen line on the under panel where the upper edge lands
 
