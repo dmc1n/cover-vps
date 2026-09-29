@@ -1,0 +1,12 @@
+{
+  "format_version": 1,
+  "id": "acrylic-300",
+  "name": "100% acrylic canvas, approx. 300 g/m2",
+  "status": "placeholder",
+  "stretch_pct": { "warp": 0.5, "weft": 1.0, "bias": 3.0 },
+  "weld_shrinkage_pct": { "along": 0.2, "across": 0.5 },
+  "thickness_mm": 0.6,
+  "max_allowed_stretch_pct": 2.0,
+  "roll_width_mm": 1500,
+  "source": "placeholder values, replace after swatch tests (docs/CALIBRATION.md, milestone M8)"
+}
