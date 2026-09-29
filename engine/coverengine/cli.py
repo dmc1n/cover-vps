@@ -83,6 +83,14 @@ def _cmd_info(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_testsheet(args: argparse.Namespace) -> int:
+    from coverengine.export.testsheet import write_all
+
+    for path in write_all(args.out):
+        print(path)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cover", description="Cover pattern engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -101,6 +109,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("info", help="size, triangle count and area of a mesh file")
     p.add_argument("mesh", type=Path)
     p.set_defaults(handler=_cmd_info)
+
+    p = sub.add_parser("testsheet", help="write the M0 machine test sheet DXF files")
+    p.add_argument("--out", type=Path, default=Path("testdata/machine"))
+    p.set_defaults(handler=_cmd_testsheet)
 
     return parser
 

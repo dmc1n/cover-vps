@@ -1,0 +1,57 @@
+# M0 machine test sheet: geometry and variants (fixture data; mm, origin bottom left).
+# Sheet extent about 1100 x 560 mm.
+# Generated with `make testsheets` into testdata/machine/testsheet-*.dxf.
+# What each item tests is on the checklist, docs/reports/M0-machine-checklist.md.
+
+format_version: 1
+title: COVER ENGINE TEST SHEET
+
+cut:
+  - {id: R1, type: rect, at: [20, 20], size: [1000, 100]}                 # scale strip
+  - {id: R2, type: rect, at: [20, 160], size: [200, 200]}                 # square
+  - {id: R3, type: rounded_rect, at: [260, 160], size: [120, 60], radius: 10}   # bulge corners
+  - {id: O1, type: circle_entity, center: [520, 260], radius: 100}        # DXF CIRCLE
+  - {id: O2, type: circle_bulge, center: [760, 260], radius: 100}         # 2 bulge arcs
+  - {id: O3, type: circle_segments, center: [1000, 260], radius: 100, segments: 72}
+
+pen:
+  # labels (id + nominal size) at two text heights
+  - {type: text, at: [40, 80], height: 15, text: R1 1000 X 100}
+  - {type: text, at: [40, 40], height: 8, text: SMALL TEXT 8 MM - SCALE STRIP R1}
+  - {type: text, at: [45, 300], height: 12, text: R2 200 X 200}
+  - {type: text, at: [45, 280], height: 8, text: PEN LINE 20 INSIDE}
+  - {type: text, at: [270, 185], height: 8, text: R3 120X60 R10}
+  - {type: text, at: [450, 255], height: 15, text: O1 CIRCLE}
+  - {type: text, at: [690, 255], height: 15, text: O2 BULGE}
+  - {type: text, at: [925, 255], height: 15, text: O3 72 SEG}
+  - {type: text, at: [470, 225], height: 8, text: D200 ENTITY}
+  - {type: text, at: [715, 225], height: 8, text: D200 2 ARCS}
+  - {type: text, at: [945, 225], height: 8, text: D200 LINES}
+  # 10 mm ticks pointing inward along every edge of R2, every 50 mm
+  - {type: edge_ticks, rect: [20, 160, 200, 200], spacing: 50, length: 10}
+  # pen-to-knife offset: closed line 20 mm inside R2 (clear of the 10 mm ticks)
+  - {type: inset_rect, rect: [20, 160, 200, 200], inset: 20}
+  # curved guide lines: true ARC entity and the same arc as 32 straight segments
+  - {type: arc, center: [480, 400], radius: 100, start_deg: 30, end_deg: 150}
+  - {type: arc_segments, center: [780, 400], radius: 100, start_deg: 30, end_deg: 150, segments: 32}
+  - {type: text, at: [430, 415], height: 8, text: G1 ARC}
+  - {type: text, at: [720, 415], height: 8, text: G2 LINES}
+  # 100 mm scale bar with 10 mm ticks
+  - {type: scale_bar, at: [20, 420], length: 100, tick_spacing: 10, tick: 5, major_tick: 10}
+  - {type: text, at: [20, 440], height: 8, text: 100 MM}
+  # sheet title and variant id (the variant text is appended by the generator)
+  - {type: title, at: [20, 530], height: 20}
+
+variants:
+  - {id: A, file: testsheet-A-named-layers.dxf, dxf_version: R2010, cut_layer: CUT, pen_layer: PEN,
+     colors: bylayer, text: text, note: LAYERS CUT PEN}
+  - {id: B, file: testsheet-B-layers-0-1.dxf, dxf_version: R2010, cut_layer: "0", pen_layer: "1",
+     colors: bylayer, text: text, note: LAYERS 0 AND 1}
+  - {id: C, file: testsheet-C-stroked-text.dxf, dxf_version: R2010, cut_layer: CUT, pen_layer: PEN,
+     colors: bylayer, text: strokes, note: TEXT AS LINES}
+  - {id: D, file: testsheet-D-colours-only.dxf, dxf_version: R2010, cut_layer: "0", pen_layer: "0",
+     colors: entity, text: text, note: LAYER 0 RED CUT BLUE PEN}
+  - {id: A12, file: testsheet-A-R12.dxf, dxf_version: R12, cut_layer: CUT, pen_layer: PEN,
+     colors: bylayer, text: text, note: OLD FORMAT R12}
+
+colors: {cut: 1, pen: 5}   # AutoCAD colour index: 1 red, 5 blue
