@@ -76,6 +76,13 @@ def _cmd_params(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_info(args: argparse.Namespace) -> int:
+    from coverengine.io.info import format_info, mesh_info
+
+    print(format_info(mesh_info(args.mesh)))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cover", description="Cover pattern engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -90,6 +97,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true", help="machine-readable output")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_params)
+
+    p = sub.add_parser("info", help="size, triangle count and area of a mesh file")
+    p.add_argument("mesh", type=Path)
+    p.set_defaults(handler=_cmd_info)
 
     return parser
 
