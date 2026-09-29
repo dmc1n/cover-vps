@@ -1,9 +1,9 @@
 # Cover pattern engine
 
 Internal tool that turns a 3D model of a piece of outdoor furniture into machine-ready 2D
-cutting patterns for a hot-air-welded acrylic cover. Users load a model in a web dashboard,
-adjust the cover for that model (fit, seams, hem, features) and download a DXF for the cutting
-table.
+cutting patterns for a stitched or hot-air-welded acrylic cover. Users load a model in a web
+dashboard, adjust the cover for that model (fit, seams, hem, features) and download a DXF for
+the cutting table.
 
 Why: Inventor's flat pattern only unfolds developable sheet-metal geometry and Blender's UV
 unwrap optimises for texturing, not for weldable, dimensionally accurate panels. The 3D-to-2D
@@ -20,18 +20,19 @@ and the direction.
   very detailed assemblies with slats, screws and cushions. The engine must cope with dirty
   triangle soups, not just clean meshes.
 - Fabric: 100 % acrylic canvas, roll width 1500 mm, no direction constraint on panel rotation.
-- Construction: hot-air welded overlap seams, 100 % waterproof. No stitching anywhere.
+- Construction: chosen per model (`construction.method`, ADR-020). Today panels are joined by
+  double stitching; hot-air welded overlap seams (100 % waterproof) are the other option.
 - Machine: CNC cutting table with its own nesting software. It imports DXF and has a pen for
   drawing on the fabric. We export panels, labels and weld guide lines; the machine nests.
 - Fit tolerance: ±5 mm.
 - Users: internal only, a handful of people. UI in English, units mm.
 - Team: Claude Code is the only developer. The owner is product manager, machine operator and
-  tester. Speed matters: aim for the earliest possible welded sample, then iterate.
+  tester. Speed matters: aim for the earliest possible sewn or welded sample, then iterate.
 
 ## Success criterion for version 1
 
 A new furniture model goes from imported 3D file to machine-ready DXF in under one hour of
-operator time, and the first welded cover fits within ±5 mm with at most one correction round.
+operator time, and the first finished cover fits within ±5 mm with at most one correction round.
 This target is ours; if reality differs, change it in docs/DECISIONS.md with the reason.
 
 ## Still to confirm with the owner (Claude Code asks when a milestone needs it)
@@ -39,8 +40,10 @@ This target is ours; if reality differs, change it in docs/DECISIONS.md with the
 Each assumption below is a key in `config/defaults.yaml`; confirming or changing it is a
 one-line edit there.
 
-- Weld overlap width (`welding.overlap_mm`). Assumed 30 mm, carried entirely by the upper
-  (outer) panel.
+- Double-stitched seam construction (`stitching.*`): seam type, allowance width (assumed
+  15 mm), allowance on one or both panels, whether cut notches are acceptable for stitching.
+- Weld overlap width (`welding.overlap_mm`), for models set to welded. Assumed 30 mm, carried
+  entirely by the upper (outer) panel.
 - Hem construction (`hem.*`, `hull.hem_height_mm`). Assumed a welded hem with a drawcord or
   elastic channel, 50 mm allowance, hem edge 50 mm above the ground.
 - Standard features: drawcord hem, wind straps with buckles, air vents, handles. Which are
@@ -48,7 +51,7 @@ one-line edit there.
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
   or needs stroked lines, arc support). Learned in M0 by cutting a test sheet.
 - Sample models: 3 to 5 representative STEP or STL files in `testdata/models/` (later).
-- GitHub organisation and repository, Cloudflare account and preferred Access login method.
+- Cloudflare account and preferred Access login method. (GitHub: `dmc1n/cover-vps`, in use.)
 - Measured fabric values (stretch, weld shrinkage) from swatch tests in M8. Placeholders until
   then, clearly marked.
 
@@ -78,8 +81,8 @@ sample many weeks earlier. The compiled geometry libraries are the same either w
 browser-side compute or a sellable product is ever needed, the Python engine and its golden
 tests become the specification for a port.
 
-Pipeline: import → drape hull (cover surface) → seams and patches → flatten → welded finishing →
-DXF export. Nesting is the machine's job.
+Pipeline: import → drape hull (cover surface) → seams and patches → flatten → finishing
+(stitched or welded allowances, pen marks) → DXF export. Nesting is the machine's job.
 
 ## Repository layout
 
@@ -91,9 +94,9 @@ config/defaults.yaml      every default parameter, commented; the only place num
 apps/api/                 FastAPI app, SQLite migrations, job runner, Dockerfile
 apps/web/                 React app
 deploy/                   docker-compose.yml, reverse proxy config, cloudflared, backup scripts
-testdata/                 models/ fabrics/ golden/ generated/
+testdata/                 models/ fabrics/ golden/ generated/ machine/, shapes.yaml, generate.py
 docs/                     PLAN.md DECISIONS.md FORMATS.md CALIBRATION.md LICENSES.md reports/ handbook/
-scripts/                  setup-vps.sh and utilities
+scripts/                  setup-vps.sh, licenses.py (regenerates docs/LICENSES.md) and utilities
 ```
 
 ## Domain rules the engine must respect
@@ -109,13 +112,14 @@ scripts/                  setup-vps.sh and utilities
    difference is recorded as explicit ease on that seam. Never a silent mismatch.
 5. No panel may be wider than `usable_width_mm` (default 1480) in its narrowest orientation.
    Panel rotation is free. Violations are reported together with a proposed split.
-6. Welded seams: the overlap allowance is added to one panel only, the `lap_side`. For water
+6. Seam allowances follow `construction.method` (per model). Stitched seams: rules to be
+   confirmed with the owner before M5 (`stitching.*`). Welded seams: the overlap allowance is added to one panel only, the `lap_side`. For water
    run-off the upper panel laps over the lower one; on vertical seams the default is the panel
    facing the front of the furniture. The under panel receives a weld guide line on the PEN
    layer where the upper panel's raw edge must land.
 7. Nothing is cut into the fabric except the outline and deliberate openings. Labels, mate
    references, alignment ticks, fold lines and UP arrows go on the PEN layer. No cut notches.
-8. Welded seams prefer gentle curvature. Seams with a radius below `min_weld_radius_mm`
+8. Seams, welded ones especially, prefer gentle curvature. Seams with a radius below `min_weld_radius_mm`
    (default 150, to confirm at the machine) are flagged in the UI and the report.
 9. The fabric profile (stretch warp, weft and bias, weld shrinkage, thickness) is an input to
    flattening and allowances. `testdata/fabrics/acrylic-300.json` holds clearly marked
@@ -150,9 +154,9 @@ company default never breaks a test by accident.
 ## Data model (details in docs/FORMATS.md)
 
 - `Model`: imported files, canonical mesh, metadata, unit and up-axis decisions.
-- `CoverDefinition`: hull parameters (`clearance_mm`, `bridge_gap_mm`, `hem_height_mm`,
-  smoothing), seam graph or template id, features (hem channel, straps, vents, handles),
-  fabric profile id, allowance rules, roll width.
+- `CoverDefinition`: a sparse `parameters` tree with the registry keys this model changes
+  (hull, construction method, hem, allowances, ...), plus hull masks, seam graph or template id
+  and the feature list (hem channel, straps, vents, handles).
 - `PatternSet`: panels plus metadata (model version, engine version, parameter hash, stretch
   summary, fabric estimate).
 - `Panel`: id, name, quantity, mirror flag, outline (closed polyline in mm), edges (kind = seam
@@ -168,6 +172,10 @@ make demo       full pipeline on the procedural chair, DXF and SVG written to ou
 cover run <model> [--set key=value ...]     import → hull → cut → flatten → export in one go
 cover params <model>                        effective parameters and where each comes from
 cover diff a.json b.json                    panel dimensions that changed by more than 1 mm
+cover info <mesh>                           size, triangles, area; analytic check for test shapes
+cover testsheet --out DIR                   M0 machine test sheet DXFs
+make shapes     procedural test shapes into testdata/generated/
+make testsheets regenerate testdata/machine/*.dxf (a test checks they are current)
 make api-dev    uvicorn with reload         make web-dev   Vite dev server
 make deploy     build images and `docker compose up -d` on this server
 make backup     push the data directory to R2 with rclone

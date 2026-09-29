@@ -20,6 +20,20 @@ trial override. Keys use dotted paths (`hull.clearance_mm`). Every `PatternSet` 
 `parameters` (the full effective set) and `parameter_hash`, so any pattern can be reproduced and
 `cover diff` can attribute a dimension change to the parameter that caused it.
 
+Rules (ADR-017), implemented in `engine/coverengine/params/registry.py`:
+
+- Every scalar leaf is a parameter; an override of a key that does not exist is an error.
+- Types follow the default. Integers on keys ending `_mm`, `_pct`, `_deg` accept decimals;
+  other integers (counts) do not; booleans are `true`/`false`.
+- A comment with `a | b | c` that contains the default makes the key a choice (dropdown).
+- A comment with "to confirm" or "TODO" marks an unconfirmed assumption (`*` in `cover params`).
+- The comment (including indented continuation lines) is the tooltip text in the web app.
+- `parameter_hash` = SHA-256 of `json.dumps(values, sort_keys=True, separators=(",", ":"))`
+  over the flat dotted-key mapping.
+
+`cover params --json` prints `{"parameters": <tree>, "parameter_sources": {key: default |
+preset | model | trial}, "parameter_hash": ...}`.
+
 ## Model (M1)
 
 `models/<id>/model.glb` (canonical mesh, may be a triangle soup) and `model.json`:
@@ -37,24 +51,28 @@ trial override. Keys use dotted paths (`hull.clearance_mm`). Every `PatternSet` 
 
 ## CoverDefinition (M2–M5)
 
+`models/<id>/cover.json`. `parameters` is a sparse tree with exactly the registry keys; it holds
+only the values this model changes (ADR-018). Structural per-model data sits beside it.
+
 ```json
 {
   "format_version": 1,
   "model_id": "lounge-chair-a12",
-  "hull": { "clearance_mm": 10, "bridge_gap_mm": 60, "hem_height_mm": 50,
-            "resolution_mm": 5, "smoothing": 0.5, "sweep_down": true,
-            "masks": [ { "type": "box", "min": [..], "max": [..], "mode": "exclude" } ] },
+  "parameters": {
+    "hull": { "clearance_mm": 12, "bridge_gap_mm": 60 },
+    "construction": { "method": "welded" },
+    "hem": { "type": "elastic_channel" }
+  },
+  "hull_masks": [ { "type": "box", "min": [..], "max": [..], "mode": "exclude" } ],
   "seams": { "template": "chair", "graph": null, "symmetry_plane": { "point": [0,0,0], "normal": [1,0,0] } },
-  "fabric_profile": "acrylic-300",
-  "welding": { "overlap_mm": 30, "min_weld_radius_mm": 150, "seam_tolerance_mm": 1.0 },
-  "hem": { "type": "drawcord_channel", "allowance_mm": 50, "cord_exits": 2 },
-  "features": [ { "type": "strap_mark", "count": 4 }, { "type": "vent", "count": 2 } ],
-  "roll": { "width_mm": 1500, "usable_width_mm": 1480 }
+  "features": [ { "type": "strap_mark", "count": 4 }, { "type": "vent", "count": 2 } ]
 }
 ```
 
 `hull.sweep_down: true` is the drape hull (fabric hangs from the widest point); `false` gives a
-fitted shell for cushion-like objects.
+fitted shell for cushion-like objects. `construction.method` selects the joining method per
+model: `double_stitch` (current practice) or `welded` (ADR-020). The shape of the `features`
+list and how it relates to the `features.*` counts is settled in M5.
 
 ## Seam graph (M3)
 
@@ -112,13 +130,13 @@ vertices. Ticks are paired across mates by id.
   "stretch_pct": { "warp": 0.5, "weft": 1.0, "bias": 3.0 },
   "weld_shrinkage_pct": { "along": 0.2, "across": 0.5 },
   "thickness_mm": 0.6,
-  "max_allowed_stretch_pct": 2.0,
-  "roll_width_mm": 1500,
   "source": "placeholder values, replace after swatch tests (docs/CALIBRATION.md)"
 }
 ```
 
-`status` must be `measured` before a pattern set is marked production.
+`status` must be `measured` before a pattern set is marked production. The profile holds only
+measured material properties; limits such as `fabric.max_allowed_stretch_pct` and the roll width
+are registry parameters (ADR-018).
 
 ## Exports (M5)
 
@@ -133,3 +151,35 @@ vertices. Ticks are paired across mates by id.
 - SVG preview at 1:1 mm (`width="...mm"`), groups `cut` and `pen`.
 - PDF cutting list: table of panels (id, name, quantity, bounding box, area), total fabric
   estimate, model name, revision, date.
+
+## Procedural test shapes (M0)
+
+`testdata/generate.py` (`make shapes`) writes `testdata/generated/<name>.stl` (binary STL, fixed
+80-byte header `coverengine testshape <name>`) and `<name>.json`:
+
+```json
+{
+  "format_version": 1, "engine_version": "0.1.0", "name": "cylinder", "units": "mm",
+  "exact": { "radius_mm": { "value": 250.0, "measure": "half_size_x" },
+             "bbox_min_x_mm": { "value": -250.0, "measure": "bbox_min_x" }, "...": {} },
+  "reference": { "area_mm2": 942477.796 },
+  "notes": {},
+  "mesh": { "vertices": 832, "faces": 1536 }
+}
+```
+
+`exact` values are measured by `cover info` from the mesh with the named measure
+(`bbox_min_<axis>`, `bbox_max_<axis>`, `size_<axis>`, `half_size_<axis>`) and must match within
+1e-6 mm. `reference` values belong to the continuous surface; the mesh only approximates them.
+Dimensions come from `testdata/shapes.yaml` (ADR-019).
+
+## Machine test sheets (M0)
+
+`cover testsheet` (`make testsheets`) writes `testdata/machine/testsheet-*.dxf` from
+`testdata/machine/testsheet.yaml`: variants A (layers CUT/PEN, TEXT), B (layers 0/1), C (text
+as single-stroke lines), D (all on layer 0, red = cut, blue = pen, colour per entity), A-R12
+(variant A as DXF R12; R12 has no unit header). Cut: 1000 × 100 strip R1, 200 × 200 square R2,
+120 × 60 rounded rectangle R3 (bulge corners, r 10), circle Ø200 as CIRCLE (O1), two bulge arcs
+(O2) and 72 segments (O3). Pen: labels at 15/12 and 8 mm, 10 mm ticks every 50 mm on R2, a pen
+line 20 mm inside R2, a guide arc as ARC (G1) and as 32 segments (G2), a 100 mm scale bar.
+Sheet about 1100 × 560 mm. The results of cutting them decide `export.*`.

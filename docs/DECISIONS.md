@@ -129,3 +129,76 @@ Alternatives: constants in code with a config file for a few chosen values (reje
 value not exposed becomes a developer task later).
 Consequences: some parameters will exist before anyone needs to change them; that is the
 cheaper failure mode.
+
+## ADR-016 — Tooling for the Python engine (M0)
+
+Decision: a uv workspace (root `pyproject.toml`, package in `engine/`, API joins in M6) with
+`uv.lock` pinning every version; Python 3.12 is a uv-managed interpreter, so no system package
+is needed. CLI on `argparse` (no extra dependency). Parameters read with `ruamel.yaml` in safe
+mode (YAML 1.2: `on`/`no` stay strings). Lint `ruff`, types `mypy` in lenient mode, hooks via
+`pre-commit` using the project's own locked tools. CI: GitHub Actions running `make test`.
+Alternatives: Poetry (slower, no workspace); typer/click (nicer help, one more dependency).
+Consequences: `make setup` is one `uv sync`; the same lockfile builds the Docker image in M6.
+
+## ADR-017 — Parameter registry rules (M0)
+
+Decision: every scalar leaf of `config/defaults.yaml` is a parameter addressed by its dotted
+path. Overrides (preset, model, trial) may only set existing keys; an unknown key is an error
+with a "did you mean" hint, never silently ignored. Types follow the default: booleans stay
+booleans, integers on keys ending `_mm`, `_pct` or `_deg` accept decimals (measurements),
+other integers (counts, iterations) do not. A comment containing `a | b | c` with the default
+among the options makes the key a choice (a dropdown in the web app); a comment containing "to
+confirm" or "TODO" marks an assumption, shown as `*` by `cover params`. The parameter hash is
+the SHA-256 of the canonical JSON of all effective values.
+The no-literals test scans `engine/coverengine` (not `params/` or tests) and exempts 0, 1, 2
+and -1, which are indices, halves and pairs far more often than parameters. Anything else that
+equals a default must go through the registry or carry `# param-ok: <reason>`. Fixture
+geometry (test shapes, test sheets) lives in YAML under `testdata/`, not in code.
+Consequences: if the owner changes a default to a value that happens to appear in code, the
+test fails and the code is fixed or marked; that is intended.
+
+## ADR-018 — One home for each number: registry versus fabric profile (M0)
+
+Context: `max_allowed_stretch_pct` and the roll width were in both `config/defaults.yaml` and
+the fabric profile JSON, and FORMATS.md grouped `min_weld_radius_mm` and `seam_tolerance_mm`
+under `welding` while the registry has them under `seams`.
+Decision: the fabric profile holds only measured material properties (stretch, weld shrinkage,
+thickness). Limits and roll width are parameters and live only in the registry. A
+CoverDefinition stores its per-model values as a sparse `parameters` tree using exactly the
+registry keys; structural per-model data (masks, seam graph, feature list) sits beside it.
+Consequences: one place to change each number; the fabric JSON and FORMATS.md were updated.
+
+## ADR-019 — Test shapes and STL precision (M0)
+
+Context: acceptance asks `cover info` to match analytic dimensions within 1e-6 mm, but STL
+stores 32-bit floats (about 3e-5 mm resolution at 500 mm).
+Decision: shape dimensions are whole numbers in `testdata/shapes.yaml`, round shapes use
+segment counts that are multiples of 4 and exact quarter-turn sines and cosines, so every
+extreme vertex is exactly representable. The sidecar lists values `cover info` can measure
+exactly (bounding box, radius, height) separately from continuous-surface references (area).
+The tilted chair back is the one shape with irrational extremes; it is checked at 1e-4 mm.
+Furniture primitives are overlapping, un-merged boxes to behave like CAD triangle soups.
+
+## ADR-020 — Joining method is a per-model choice; double stitching today (M0)
+
+Context: the owner reported during M0 that covers are currently joined by double stitching,
+and wants to choose the joining method per model. CLAUDE.md and ADR-011 assumed hot-air welding
+only.
+Decision: new parameter `construction.method` (`double_stitch` | `welded`, default
+`double_stitch`), overridable per model and shown as a dropdown in the web app. Welding keeps its
+own block (`welding.*`); stitching gets `stitching.*`, starting with `stitching.allowance_mm`
+(15 mm, to confirm). ADR-011's lap side, guide line and pen-mark rules apply to welded seams;
+the stitched seam construction (seam type, allowance on one or both panels, whether notches are
+acceptable) is to be confirmed with the owner before M5.
+Consequences: finishing (M5) implements both allowance rules behind one switch; flattening,
+seam matching and the roll-width check are unaffected.
+
+## ADR-021 — Machine test sheets and pen text (M0)
+
+Decision: five test sheet variants generated from `testdata/machine/testsheet.yaml`: named
+layers CUT/PEN (A), layers 0/1 (B), text as single-stroke lines (C), colour only on layer 0 (D)
+and variant A in DXF R12. Each has a 1000 mm scale strip, a square with 10 mm ticks and a pen
+line 20 mm inside (pen-to-knife offset), a rounded rectangle with bulge corners, and one circle
+three ways (CIRCLE entity, bulge polyline, 72 segments). Stroked text uses our own
+single-stroke font (`export/strokefont.py`): outline fonts drawn with a pen give hollow double
+lines. DXF output is byte-deterministic (fixed ezdxf metadata, sorted CLASSES section).
