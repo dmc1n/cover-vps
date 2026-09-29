@@ -1,0 +1,35 @@
+# Skeleton for M6 (not deployed yet). Everything is reachable only through the Cloudflare
+# Tunnel; no ports are published on the host. Secrets come from deploy/.env (git-ignored).
+name: cover
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      COVER_DATA_DIR: /data
+      COVER_DEFAULTS: /app/config/defaults.yaml
+    volumes:
+      - ${COVER_DATA_DIR:-../data}:/data
+    expose:
+      - "8000"
+
+  web:
+    build:
+      context: ../apps/web
+    restart: unless-stopped
+    depends_on:
+      - api
+    expose:
+      - "8080"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest   # pin to a release tag when deploying in M6
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in deploy/.env}
+    depends_on:
+      - web
