@@ -16,7 +16,7 @@ pen position. Use paper or scrap fabric. Sheet size about 1100 × 560 mm.
 ## At the computer
 
 1. Import **A**. Note: does it open? Which layers or colours does the software offer to map to
-   knife and pen? Does it show the size about 1100 × 560 (not 43 × 22, which would be inches)?
+   knife and pen? Does it show the size as about 1100 × 560 mm? (If it shows 1100 × 560 inches, about 28 m wide, the units were read wrong.)
 2. Import **B**, **C**, **D** and **A-R12** the same way. Only note what is different from A.
 3. Pick the variant that needed the least manual setup. Map cut → knife and pen → pen.
 
