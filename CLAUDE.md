@@ -47,11 +47,10 @@ one-line edit there.
 - Hem construction (`hem.*`, `hull.hem_height_mm`). Assumed a welded hem with a drawcord or
   elastic channel, 50 mm allowance, hem edge 50 mm above the ground.
 - Standard features: drawcord hem, wind straps with buckles, handles: which are standard,
-  which optional per model? Air vents are standard (owner, 2026-09-30): 25 x 22 cm (W x H) with
-  a plastic insert that keeps them open, one per full metre of each side's length, at least one
-  per side, 25 cm above the ground (`features.vent_*`). Still open: whether 25 cm is to the
-  bottom edge or the centre, what counts as a "side" on curved covers, spacing, and the vent's
-  construction (the reference images did not arrive).
+  which optional per model? Air vents are standard (owner, 2026-09-30): 25 x 22 cm (W x H), bottom
+  edge 5 cm above the lower end of the cover, one per full metre of hem length, spread evenly,
+  at least one. Built as a cut opening with a hood of extra fabric holding a plastic insert
+  that keeps it open, and a membrane inside against dirt (`features.vent_*`, pieces in M5).
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
   or needs stroked lines, arc support). Learned in M0 by cutting a test sheet.
 - Sample models: 3 to 5 representative STEP or STL files in `testdata/models/` (git-ignored,
