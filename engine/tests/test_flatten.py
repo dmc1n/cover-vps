@@ -302,3 +302,22 @@ def test_batch_reports_changes(covers: dict[str, Any], tmp_path: Path, capsys: A
     assert code == 0 and "== chair:" in out and "1 of 1 model(s) done" in out
     assert [r["number"] for r in revisions(root / "chair")] == [1, 2]
     assert revisions(root / "chair")[-1]["status"] == "checked"
+
+
+def test_report_grades_models(covers: dict[str, Any], tmp_path: Path, capsys: Any) -> None:
+    from coverengine.catalogue import grade
+
+    root = tmp_path / "models"
+    shutil.copytree(covers["root"] / "box_with_legs", root / "box")
+    (root / "empty").mkdir()
+    (root / "empty" / "cover.json").write_text("{}")
+    assert main(["flatten", str(root / "box")]) == 0
+    assert main(["export", str(root / "box")]) == 0
+    g = grade(root / "box")
+    assert g["grade"] in ("ready", "check") and g["panels"] == 5
+    assert grade(root / "empty")["grade"] == "failed"
+    capsys.readouterr()
+    assert main(["report", "--models", str(root), "--out", str(tmp_path / "rep")]) == 0
+    assert "2 models" in capsys.readouterr().out
+    assert (tmp_path / "rep" / "catalogue.pdf").read_bytes().startswith(b"%PDF")
+    assert "box" in (tmp_path / "rep" / "catalogue.csv").read_text()

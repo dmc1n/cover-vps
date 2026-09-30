@@ -198,6 +198,8 @@ cover export models/<id>/                    finished pieces → cut.dxf, cut.sv
                                              (and a revision in revisions/<n>/)
 cover model models/<id>/ [--family F --status S --tags a,b --notes ...]   catalogue info, revisions
 cover batch [--family F | --ids a,b] [--steps hull,cut,flatten,export] [--set ...]  many models, what changed
+cover improve models/<id>/ [--rounds 4]      take seam proposals while they lower the worst stretch
+cover report [--models DIR --tag T --out DIR]  catalogue report: every model ready / check / failed
 make e2e        the web app flow in a real browser (Playwright in Docker)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs

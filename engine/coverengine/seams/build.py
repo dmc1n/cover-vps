@@ -64,6 +64,7 @@ TOP_REGION, SKIRT_REGION, WALL_REGION = 0, 1, 2
 SLIVER_SEAM_MM = 10.0  # param-ok: geometric tolerance
 # Roll-width splits per panel before giving up (each halves the width).
 MAX_ROLL_SPLITS = 4
+PROPOSALS_JSON = "proposals.json"  # proposed seams accepted by cover improve
 MM_PER_CM = 10.0  # param-ok: unit conversion
 # Smoothing a jittery wall seam in place: passes, and how far a face may turn (cosine).
 SMOOTH_PASSES = 30  # param-ok: iterations
@@ -257,7 +258,11 @@ def _cut_cover(
 
     # 3. top seams from seams.json
     top_lines: list[list[list[float]]] = []
-    wanted = (manual or {}).get("top_seams") or []
+    wanted = list((manual or {}).get("top_seams") or [])
+    # seams the program proposed and `cover improve` accepted (kept apart from seams.json)
+    accepted = model_dir / PROPOSALS_JSON
+    if accepted.is_file():
+        wanted += json.loads(accepted.read_text(encoding="utf-8")).get("top_seams", [])
     for i, pts in enumerate(wanted):
         xy = np.asarray(pts, dtype=np.float64)[:, :2]
         cut = apply(cut, line_seam(f"top-{i + 1}", "top", xy, 0), snap)

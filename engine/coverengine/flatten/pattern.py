@@ -45,6 +45,10 @@ WIGGLE_CORNER_GAP_MM = 100.0  # param-ok: measurement definition
 WIGGLE_MIN_TURNS = 4  # param-ok: measurement definition
 # A proposed seam runs this far past the panel so it meets the seams round it (mm).
 PROPOSAL_OVERSHOOT_MM = 10.0  # param-ok: geometric reach (the cut runs on 50 mm more)
+# A stretched area counts as a fold (a seam along it) when it is this much longer than wide
+# and has at least this many faces.
+FOLD_ELONGATION = 2.5  # param-ok: geometric rule
+FOLD_MIN_FACES = 12  # param-ok: geometric rule
 # The UP arrow sits this many label heights above the label.
 ARROW_ABOVE_LABEL = 2.5  # param-ok: layout
 
@@ -243,9 +247,10 @@ def wiggle(points: Array) -> float:
 def propose_seam(
     flat: Flat, boundary: Array, worst: Array, area: Array, level: float
 ) -> Array | None:
-    """A straight seam (in plan, mm) that splits a panel through where it stretches most: across
-    the panel's longer plan extent, through the area-weighted centre of the faces stretching more
-    than `level`, cut to the panel and run a little on so it meets the seams round it."""
+    """A straight seam (in plan, mm) that splits a panel through where it stretches most, through
+    the area-weighted centre of the faces stretching more than `level`: along that area if it is
+    a long strip (a fold), otherwise across the panel's longer plan extent; cut to the panel and
+    run a little on so it meets the seams round it."""
     tri = flat.vertices[flat.faces]
     xy = tri[:, :, :2].mean(axis=1)
     hot = worst >= level
@@ -255,6 +260,13 @@ def propose_seam(
     pts = flat.vertices[:, :2] - flat.vertices[:, :2].mean(axis=0)
     _, _, axes = np.linalg.svd(pts, full_matrices=False)
     across = np.array([-axes[0][1], axes[0][0]])  # perpendicular to the long axis
+    # where the stretch lies in a long strip (a fold, between a seat and a back), the seam
+    # follows the strip instead
+    spread = xy[hot] - centre
+    if len(spread) >= FOLD_MIN_FACES:
+        _, sv, hot_axes = np.linalg.svd(spread * np.sqrt(area[hot])[:, None], full_matrices=False)
+        if sv[1] > 0 and sv[0] / sv[1] >= FOLD_ELONGATION:
+            across = hot_axes[0]
     footprint = shapely.Polygon(boundary[:, :2]).buffer(0)  # the panel seen from above
     reach = float(np.ptp(pts, axis=0).max()) * 2
     line = shapely.LineString([centre - across * reach, centre + across * reach])

@@ -22,6 +22,8 @@ from coverengine.params import (
 Handler = Callable[[argparse.Namespace], int]
 MM_PER_CM = 10  # param-ok: unit conversion
 SHOW_REVISIONS = 5  # param-ok: CLI display
+IMPROVE_ROUNDS = 4  # param-ok: CLI default, rounds of seam proposals
+IMPROVE_GAIN = 0.1  # param-ok: CLI default, a round must lower the worst stretch by 10 %
 
 
 def _add_param_args(p: argparse.ArgumentParser) -> None:
@@ -303,6 +305,86 @@ def _cmd_batch(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def _cmd_improve(args: argparse.Namespace) -> int:
+    """Take the program's seam proposals round by round while they lower the worst stretch."""
+    import json as _json
+
+    from coverengine.seams.build import PROPOSALS_JSON
+
+    d: Path = args.model
+    store = d / PROPOSALS_JSON
+    extra = [x for s in args.overrides for x in ("--set", s)]
+
+    def worst() -> float:
+        doc = _json.loads((d / "pattern.json").read_text(encoding="utf-8"))
+        return float(max(p["stretch"]["quantile_pct"] for p in doc["panels"]))
+
+    def run(*steps: str) -> int:
+        for st in steps:
+            code = main([st, str(d), *extra])
+            if code:
+                return code
+        return 0
+
+    if not (d / "pattern.json").is_file() and run("cut", "flatten"):
+        return 1
+    best = worst()
+    print(f"improve {d.name}: worst stretch {best:.1f} %")
+    for round_ in range(1, args.rounds + 1):
+        doc = _json.loads((d / "pattern.json").read_text(encoding="utf-8"))
+        props = [p["points"] for p in doc.get("proposals", [])]
+        if not props:
+            print("  no more proposals")
+            break
+        before = store.read_text(encoding="utf-8") if store.is_file() else None
+        taken = _json.loads(before)["top_seams"] if before else []
+        store.write_text(_json.dumps({"top_seams": taken + props}, indent=1) + "\n")
+        code = run("cut", "flatten")
+        now = worst() if code == 0 else float("inf")
+        if now > best * (1 - args.gain):
+            print(f"  round {round_}: {now:.1f} % - not better, left out")
+            if before is None:
+                store.unlink()
+            else:
+                store.write_text(before)
+            run("cut", "flatten")
+            break
+        print(
+            f"  round {round_}: {len(props)} seam(s) taken, worst stretch {best:.1f} -> {now:.1f} %"
+        )
+        best = now
+    return run("export") if args.export else 0
+
+
+def _cmd_report(args: argparse.Namespace) -> int:
+    """A catalogue report: every model graded ready / check / failed (CSV and PDF)."""
+    import csv
+
+    from coverengine.catalogue import grade, info
+
+    dirs = sorted(d for d in args.models.iterdir() if d.is_dir())
+    if args.tag:
+        dirs = [d for d in dirs if args.tag in info(d)["tags"]]
+    rows = [grade(d) for d in dirs if (d / "model.json").is_file() or (d / "cover.json").is_file()]
+    args.out.mkdir(parents=True, exist_ok=True)
+    fields = ["id", "grade", "family", "status", "panels", "max_stretch_pct", "max_ease_mm",
+              "max_wiggle_mm", "roll_length_mm", "proposals", "reasons"]  # fmt: skip
+    with (args.out / "catalogue.csv").open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(fields)
+        for r in rows:
+            w.writerow([("; ".join(r[f]) if f == "reasons" else r.get(f, "")) for f in fields])
+    from coverengine.export.report import write_report
+
+    write_report(args.out / "catalogue.pdf", rows, args.title or args.models.name)
+    counts = {g: sum(r["grade"] == g for r in rows) for g in ("ready", "check", "failed")}
+    print(
+        f"{len(rows)} models: {counts['ready']} ready, {counts['check']} to check, "
+        f"{counts['failed']} failed -> {args.out / 'catalogue.pdf'}, catalogue.csv"
+    )
+    return 0
+
+
 def _cmd_drawing(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -506,6 +588,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--threshold", type=float, default=1.0, help="report changes above (mm)")
     p.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
     p.set_defaults(handler=_cmd_batch)
+
+    p = sub.add_parser("improve", help="take seam proposals while they lower the stretch")
+    p.add_argument("model", type=Path, help="model directory (after cover flatten)")
+    p.add_argument("--rounds", type=int, default=IMPROVE_ROUNDS, help="rounds at most")
+    p.add_argument("--gain", type=float, default=IMPROVE_GAIN, help="least gain per round")
+    p.add_argument("--no-export", dest="export", action="store_false")
+    p.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
+    p.set_defaults(handler=_cmd_improve)
+
+    p = sub.add_parser("report", help="catalogue report: every model ready / check / failed")
+    p.add_argument("--models", type=Path, default=Path("models"), help="models folder")
+    p.add_argument("--tag", help="only models with this tag")
+    p.add_argument("--title", help="title of the report")
+    p.add_argument("--out", type=Path, default=Path("out/report"), help="output folder")
+    p.set_defaults(handler=_cmd_report)
 
     p = sub.add_parser("drawing", help="size drawing of the cover and its panels (sizes.pdf)")
     p.add_argument("model", type=Path, help="model directory with patterns (cover flatten)")

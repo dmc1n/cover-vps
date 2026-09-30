@@ -148,3 +148,52 @@ def compare_files(a: Path, b: Path, threshold_mm: float = 1.0) -> dict[str, Any]
         json.loads(b.read_text(encoding="utf-8")),
         threshold_mm,
     )
+
+
+# A cover is "ready" when every piece is within the stretch limit, every edge is a smooth line
+# and no seam's two sides differ by more than READY_EASE_MM; otherwise "check" with the reasons.
+READY_EASE_MM = 5.0
+
+
+def grade(model_dir: Path) -> dict[str, Any]:
+    """How far a model's cover is: ready, check (with reasons) or failed (with the step)."""
+    out: dict[str, Any] = {"id": model_dir.name, **info(model_dir)}
+    steps = ["model.json", "hull.json", "panels.json", "pattern.json", "finished.json"]
+    missing = [s for s in steps if not (model_dir / s).is_file()]
+    if missing:
+        out.update(grade="failed", reasons=[f"no {missing[0]}"])
+        return out
+    pattern = json.loads((model_dir / "pattern.json").read_text(encoding="utf-8"))
+    finished = json.loads((model_dir / "finished.json").read_text(encoding="utf-8"))
+    limit = float(pattern["parameters"]["fabric"]["max_allowed_stretch_pct"])
+    wiggle_limit = float(pattern["parameters"]["seams"]["max_wiggle_mm"])
+    panels = pattern["panels"]
+    stretch = max(p["stretch"]["quantile_pct"] for p in panels)
+    ease = max((e.get("ease_mm", 0.0) for p in panels for e in p["edges"]), default=0.0)
+    wiggle = max((e.get("wiggle_mm", 0.0) for p in panels for e in p["edges"]), default=0.0)
+    reasons = []
+    if stretch > limit:
+        worst = max(panels, key=lambda p: p["stretch"]["quantile_pct"])
+        reasons.append(f"{worst['name']} stretches {stretch:.1f} %")
+    if wiggle > wiggle_limit:
+        reasons.append(f"an edge zig-zags {wiggle:.1f} mm")
+    if ease > READY_EASE_MM:
+        reasons.append(f"a seam's sides differ by {ease:.0f} mm")
+    vents = [w for w in finished.get("warnings", []) if "air vent" in w]
+    if vents:
+        reasons.append(f"{len(vents)} air vent(s) do not fit")
+    if not all(p["fits_roll"] for p in panels):
+        reasons.append("a piece is wider than the roll")
+    size = json.loads((model_dir / "model.json").read_text(encoding="utf-8")).get("size_mm")
+    out.update(
+        grade="ready" if not reasons else "check",
+        reasons=reasons,
+        panels=len(panels),
+        max_stretch_pct=round(stretch, 2),
+        max_ease_mm=round(ease, 1),
+        max_wiggle_mm=round(wiggle, 1),
+        roll_length_mm=(finished.get("sheet") or {}).get("roll_length_mm"),
+        size_mm=size,
+        proposals=len(pattern.get("proposals", [])),
+    )
+    return out
