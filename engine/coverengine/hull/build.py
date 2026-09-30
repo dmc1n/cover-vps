@@ -17,6 +17,7 @@ import numpy as np
 import pymeshlab
 import trimesh
 from numpy.typing import NDArray
+from scipy.ndimage import binary_fill_holes
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 from trimesh.grouping import group_rows
@@ -154,6 +155,14 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
     bridged = HeightMap(close(hm.z, bridge_r, h), hm.x0, hm.y0, h)
     top, wall = solid_field(bridged, c, model_v, model_f, str(params["hull.edge"]))
     covered = (top > hem) & (wall > 0)
+    # a cover has no holes seen from above: an area the furniture encloses (the frame of a
+    # folding chair) is spanned by the top, not left as a tube down to the floor
+    filled = binary_fill_holes(covered)
+    holes = filled & ~covered
+    if holes.any():
+        wall = np.where(holes, np.maximum(wall, h), wall)
+        top = np.where(holes, np.maximum(top, hem + h), top)
+        covered = filled
     min_slope = _p(params, "hull.min_slope_deg")
     patch = _p(params, "hull.flat_patch_mm")
     held: support.Support | None = None

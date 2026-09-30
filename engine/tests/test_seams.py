@@ -31,6 +31,7 @@ SEAMS = {
     "seams.skirt_seam": "level",
     "seams.skirt_height_mm": 0,
     "seams.skirt_below_rim_mm": -3,
+    "seams.min_skirt_height_mm": 150,
     "seams.rim_smoothing_mm": 200,
     "seams.wall_min_mm": 20,
     "seams.wall_min_length_mm": 300,

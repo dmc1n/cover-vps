@@ -169,8 +169,9 @@ def _cut_cover(
     level_skirt = params["seams.skirt_seam"] == "level"
     if level_skirt:
         chosen = skirt_height > 0
-        if not chosen:  # automatic
-            skirt_height = lowest_edge - below - hem_z
+        if not chosen:  # automatic, but never lower than the minimum (splayed legs: the
+            # cover runs down to the feet there and has no upright part to put a seam on)
+            skirt_height = max(lowest_edge - below - hem_z, _p(params, "seams.min_skirt_height_mm"))
         if chosen and hem_z + skirt_height > lowest_edge - below:
             warnings.append(
                 f"the skirt seam ({skirt_height / MM_PER_CM:.1f} cm above the hem) climbs onto "

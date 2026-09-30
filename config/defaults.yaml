@@ -52,6 +52,8 @@ seams:
                                  # just below the rounded top edge, smoothed (for comparison)
   skirt_height_mm: 0             # level skirt height above the hem; 0 = automatic, just below the
                                  # lowest point of the top edge. Set per model to match a cover
+  min_skirt_height_mm: 150       # to confirm; the automatic skirt is at least this high (where
+                                 # legs splay out, the cover runs down to the feet)
   skirt_below_rim_mm: -3         # the level skirt seam runs this far below where the top edge
                                  # starts to round over (negative: that far up the rounding, so the
                                  # top panel does not reach down onto the upright part)

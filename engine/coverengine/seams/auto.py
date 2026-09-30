@@ -241,7 +241,7 @@ def rim_profile(mesh: Any, line: Outline, inset_mm: float, smoothing_mm: float) 
     # above the edge it is lowered by the largest overshoot nearby, itself averaged
     smooth = average(running(low, np.median))
     smooth = smooth - average(running(np.maximum(smooth - low, 0.0), np.max))
-    height: Array = np.array(smooth, dtype=np.float64)
+    height: Array = np.maximum(np.array(smooth, dtype=np.float64), float(v[:, 2].min()))
     at: Array = np.asarray((idx + 0.5) * step, dtype=np.float64)  # param-ok: bin centres
     return RimProfile(at, height, line.length)
 

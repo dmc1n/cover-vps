@@ -217,7 +217,9 @@ def straight_hem(cover: Cover) -> tuple[float, Array]:
 
 def panel_width(cover: Cover, name: str) -> float:
     """Typical width of a flat panel: the median width across its long axis."""
-    poly = shapely.Polygon(_panel_doc(cover, name)["outline_mm"])
+    poly = shapely.Polygon(_panel_doc(cover, name)["outline_mm"]).buffer(0)
+    if isinstance(poly, shapely.MultiPolygon):
+        poly = max(poly.geoms, key=lambda g: g.area)
     rect = np.asarray(poly.minimum_rotated_rectangle.exterior.coords)[:3]
     a, b = rect[1] - rect[0], rect[2] - rect[1]
     axis = a if np.linalg.norm(a) >= np.linalg.norm(b) else b
