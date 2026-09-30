@@ -353,3 +353,14 @@ def test_preview_shows_where_water_stays(models: Path, tmp_path: Path) -> None:
         write_hull(models / name, build_hull(models / name, params()), out)
         scene = trimesh.load(out / "preview.glb", force="scene")
         assert ("water" in scene.geometry) is expected, name
+
+
+@pytest.mark.parametrize("name", SHAPES)
+def test_hem_is_one_loop_without_cracks(hulls: dict[str, Any], name: str) -> None:
+    """The only boundary is the hem: one loop, the same with or without welding points."""
+    mesh = hulls[name].mesh
+    welded = trimesh.Trimesh(mesh.vertices, mesh.faces, process=True)
+    for m in (mesh, welded):
+        edges = m.edges_sorted[group_rows(m.edges_sorted, require_count=1)]
+        assert len(np.unique(edges)) == len(edges)  # a simple loop: every hem point has two
+    assert len(welded.vertices) == len(mesh.vertices)

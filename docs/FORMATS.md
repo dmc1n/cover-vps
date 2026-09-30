@@ -120,7 +120,7 @@ looking at in any glTF viewer. Not read by the engine.
   "mesh": { "vertices": 40768, "triangles": 80955 },
   "area_m2": 6.494158,
   "bbox_mm": [[-1190.115, -716.182, 50.0], [1190.113, 715.99, 919.402]],
-  "hem": { "height_mm": 50.0, "length_mm": 6415.053 },
+  "hem": { "height_mm": 50.0, "length_mm": 6302.4 },
   "distance_to_model_mm": { "min": 10.0, "mean_at_vertices": 15.511, "clearance": 10.0 },
   "clearance_repair": { "vertices_moved": 20226, "max_move_mm": 3.665 },
   "ridges": { "chains": 43, "length_mm": 806.1, "angle_deg": 40.0 },
@@ -176,20 +176,63 @@ fitted shell for cushion-like objects. `construction.method` selects the joining
 model: `double_stitch` (current practice) or `welded` (ADR-020). The shape of the `features`
 list and how it relates to the `features.*` counts is settled in M5.
 
-## Seam graph (M3)
+## Seams and panels (M3)
+
+`cover cut models/<id>/ [--seams FILE]` writes `panels.glb`, `panels.json` and `seams.auto.json`.
+
+`seams.json` (optional, in the model directory; written by hand or copied from
+`seams.auto.json`) replaces the automatic seams it names. Floor-plan coordinates in mm (as in
+`model.glb`: x across, y front to back with the front at −y):
 
 ```json
 {
   "format_version": 1,
-  "seams": [
-    { "id": "left-corner",
-      "anchors": [ { "face": 1234, "bary": [0.2, 0.3, 0.5] }, { "face": 2201, "bary": [1, 0, 0] } ],
-      "closed": false, "lap_side": "auto" }
-  ]
+  "skirt_seams": [[731.8, -699.4], [1182.8, 325.7]],
+  "top_seams": [[[-500.0, 0.0], [0.0, 40.0], [500.0, 0.0]]]
 }
 ```
 
-`lap_side` is `auto` (engine decides by height and front/side rule), or a patch id.
+- `skirt_seams`: points; each gives a vertical skirt seam at the nearest point of the outline.
+  Omit the key to keep the automatic ones, give `[]` for none (a ring then stays one piece,
+  which fails as not a disk).
+- `top_seams`: polylines across the top; each cuts the top along that line (extended a little
+  so it reaches the edge). Omit the key for none.
+- `seams.auto.json` also lists `level_seams_mm`, the heights of automatic level splits. They
+  are not read back; to fix them, draw them as `top_seams`.
+
+`panels.json`:
+
+```json
+{
+  "format_version": 1, "engine_version": "0.1.0", "model_id": "blocchi-2seater-moon-right",
+  "panels": [
+    { "id": "P1", "name": "skirt-front", "region": "skirt", "area_m2": 0.8612,
+      "flat_width_mm": 404.6, "flat_length_mm": 2611.2, "fits_roll": true, "triangles": 5402,
+      "seams": ["skirt-front/skirt-back", "skirt-front/top-1"] }
+  ],
+  "seams": [
+    { "id": "skirt-front/top-1", "kind": "skirt", "panels": ["skirt-front", "top-1"],
+      "length_mm": 2588.1, "lap_side": "top-1", "min_radius_mm": 62.0 }
+  ],
+  "tight_seams": ["skirt-front/top-1"],
+  "hem_length_mm": 6302.4, "area_m2": 6.0386,
+  "parameters": { "seams.corner_angle_deg": 45, "...": "..." },
+  "parameter_sources": { "...": "..." },
+  "warnings": []
+}
+```
+
+- Panel names: `top` (or `top-1`, `top-2`, … from front to back), `skirt` (one all round) or
+  `skirt-<front|right|back|left>[-n]` by the direction the panel faces.
+- `flat_width_mm` × `flat_length_mm`: the panel laid flat (quick estimate, the exact pattern is
+  M4), width in its narrowest orientation; `fits_roll` compares it with `roll.usable_width_mm`.
+- Seam `kind`: `skirt` (skirt to top), `corner` (vertical in the skirt), `top` (from
+  `seams.json`), `level` (a roll split at constant height), `roll` (a straight roll split).
+  `lap_side` is the panel that laps over the other. `min_radius_mm` is the tightest curve away
+  from the seam's ends (null if straight).
+
+`panels.glb`: the furniture (grey) and every panel as its own coloured mesh named after the
+panel, same mm/Z-up convention as `model.glb`.
 
 ## PatternSet and Panel (M4–M5)
 

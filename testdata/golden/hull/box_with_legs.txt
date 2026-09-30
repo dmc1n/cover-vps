@@ -1,6 +1,6 @@
 model       box_with_legs
 resolution  5 mm
-triangles   24648
+triangles   24656
 area        2.389 m2
 bbox min    -411.0 -310.8 50.0 mm
 bbox max    411.0 310.8 711.1 mm

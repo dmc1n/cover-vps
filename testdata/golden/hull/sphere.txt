@@ -4,6 +4,6 @@ triangles   12654
 area        1.094 m2
 bbox min    -310.3 -310.4 50.0 mm
 bbox max    310.4 310.3 610.0 mm
-hem         2.05 m at 50 mm
+hem         1.96 m at 50 mm
 distance    min 10.00 mm (clearance 10)
-ridges      8
+ridges      0

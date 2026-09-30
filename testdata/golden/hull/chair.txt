@@ -1,6 +1,6 @@
 model       chair
 resolution  5 mm
-triangles   20654
+triangles   20664
 area        1.971 m2
 bbox min    -260.6 -325.3 50.0 mm
 bbox max    260.6 324.9 953.3 mm

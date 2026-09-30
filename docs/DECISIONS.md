@@ -343,6 +343,54 @@ Implementation (M2 revision):
   followed), for fitted cases.
 - Blocchi against the reference (`testdata/reference/blocchi-2seater-moon-right.json`, seam to
   seam): height 870 vs 880 mm, a flat band on top 262 mm wide (reference band 330 mm), hem
-  6.42 vs 6.68 m. The flat band between the two back cushions (0.14 m2) is reported as
+  6.30 vs 6.68 m (first reported as 6.42 m: hairline cracks along the hem were counted twice;
+  fixed in M3 by welding the remeshed hull). The flat band between the two back cushions (0.14 m2) is reported as
   holding water; the owner's cover has the same band. Open question to the owner. Skirt
   heights depend on the seam line and are compared in M3.
+
+## ADR-026 — Seams as cuts along scalar fields; automatic seam rules (M3)
+
+Decision:
+- A seam is the zero set of a scalar field on the hull (a distance in mm), limited to a set of
+  faces: the skirt seam is the inward distance to the outline minus `seams.skirt_seam_inset_mm`,
+  a vertical seam is a vertical plane through an outline point normal to the outline, a top
+  seam is the signed distance to a floor-plan polyline, and a level seam is `z − z0`. Faces the
+  seam crosses are split; each new vertex lies on the seam and is shared by both faces of its
+  edge, and neighbouring faces that share a cut edge are split too (no T-junctions). Vertices
+  closer than `seams.snap_mm`, measured along the surface, are moved onto the seam along the
+  surface, so no slivers form and every other vertex is clearly on one side. A seam's edges are
+  recorded when it is cut (both ends on the seam, the faces beside it on opposite sides) and
+  updated when a later seam splits them. Judging sides after the fact failed on tight curves and
+  near snapped points.
+- Panels are the pieces between seam edges; the surface is then "unzipped" along all seams
+  (faces on opposite sides of a seam edge stop sharing its vertices), so a skirt ring cut once
+  is one disk. Every panel must be a disk (one boundary loop, Euler characteristic 1). Slivers
+  below 100 mm² where seams meet are merged into a neighbour.
+- Region labels (top or skirt) come from the pieces the skirt seam makes and are inherited
+  through later splits. Classifying faces by position near the skirt seam was ambiguous.
+- Automatic seams: the skirt seam all round; vertical seams at outline corners (turn above
+  `seams.corner_angle_deg` within `seams.corner_window_mm`, notches narrower than half the window
+  smoothed out first, the seam at the middle of the bend where half the turn is done) and equal
+  splits of stretches longer than `seams.max_skirt_panel_mm`; one seam at the back if there are
+  no corners. A top panel wider than `roll.usable_width_mm` when flattened (quick LSCM, scaled
+  to the true area, rotating calipers) is split. First a level seam `seams.band_drop_mm` below
+  its highest point is tried (the band along a backrest), then one at half its area; level seams
+  let the upper panel lap over the lower. If neither leaves only disks, the split is a straight
+  seam along the panel's long axis. A seam along where the tensioned top leaves the furniture
+  was tried for the band; on the Blocchi that strip is an island and did not give disks.
+- Manual seams (`seams.json`): `skirt_seams` (floor-plan points on the outline) and `top_seams`
+  (floor-plan polylines). This replaces the geodesic anchors of the original plan: every seam of a
+  tensioned cover lies on a graph surface or a vertical wall, so floor-plan coordinates are exact
+  and match a plan-view editor (M6). `seams.auto.json` writes the seams used in the same format.
+- Lap side: the top over the skirt; the higher panel over the lower on top and level seams; on
+  vertical seams the panel facing the front. Tight curves (radius below
+  `seams.min_weld_radius_mm`, seam ends excluded) are listed in `panels.json` and warned about
+  when `construction.method` is `welded`.
+- Symmetric furniture (height map equal to its mirror image within 0.5 mm) gets a mirrored hull
+  (the x ≥ 0 half and its mirror image, welded at x = 0, before the clearance repair), so
+  mirrored panels are equal (box and chair 0.0 %, table 0.06 %).
+- While building M3, the remesher's duplicate points turned out to leave hairline cracks along
+  the hem that were counted as hem length. The hull is now welded after remeshing (Blocchi hem
+  6.30 m, first reported as 6.42 m).
+Better alternatives, not built yet: automatic band seams that follow the owner's Blocchi
+layout; a geodesic seam editor on the surface.

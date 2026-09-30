@@ -2,8 +2,8 @@ model       cone
 resolution  5 mm
 triangles   5985
 area        0.576 m2
-bbox min    -286.3 -286.3 50.0 mm
-bbox max    286.3 286.3 610.4 mm
-hem         1.86 m at 50 mm
+bbox min    -286.2 -286.2 50.0 mm
+bbox max    286.2 286.2 610.4 mm
+hem         1.81 m at 50 mm
 distance    min 10.00 mm (clearance 10)
-ridges      22
+ridges      6

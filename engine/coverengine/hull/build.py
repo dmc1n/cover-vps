@@ -181,6 +181,11 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
         mesh, plane_normal=[0.0, 0.0, 1.0], plane_origin=[0.0, 0.0, hem], cap=False
     )
     mesh = _remesh(mesh, params)
+    # the remesher can leave duplicate points (hairline cracks); weld them, or the cracks count
+    # as hem and the cover is not one closed surface
+    mesh = trimesh.Trimesh(mesh.vertices, mesh.faces, process=True)
+    mesh.update_faces(mesh.nondegenerate_faces())
+    mesh.remove_unreferenced_vertices()
     hem_vertices = _boundary_vertices(mesh)
     v = np.asarray(mesh.vertices).copy()
     v[hem_vertices, 2] = hem  # the hem edge lies exactly at hem height

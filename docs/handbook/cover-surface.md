@@ -10,7 +10,7 @@ uv run cover hull models/blocchi-2seater-moon-right
 ```
 cover surface -> models/blocchi-2seater-moon-right/hull.glb (view it with .../preview.glb)
 settings clearance 10 mm, bridge gap 60 mm, hem 50 mm above the floor
-size     2381 x 1432 x 869 mm, fabric area 6.04 m2, hem length 6.42 m
+size     2381 x 1432 x 869 mm, fabric area 6.04 m2, hem length 6.30 m
 distance closest 10.0 mm from the furniture (clearance 10 mm)
 ridges   77 sharp ridges (seam candidates for the next step)
 water    would stay on the top (see warning)
