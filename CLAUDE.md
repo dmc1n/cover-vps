@@ -51,7 +51,8 @@ one-line edit there.
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
   or needs stroked lines, arc support). Learned in M0 by cutting a test sheet.
 - Sample models: 3 to 5 representative STEP or STL files in `testdata/models/` (git-ignored,
-  because the repository is public). M1 is verified on synthetic assemblies until they arrive.
+  because the repository is public). One so far: the Blocchi 2-seater, a mesh saved as STEP
+  (ADR-023). More detailed CAD samples (curved tubes, bolts) still wanted.
 - Cloudflare account and preferred Access login method. (GitHub: `dmc1n/cover-vps`, in use.)
 - Measured fabric values (stretch, weld shrinkage) from swatch tests in M8. Placeholders until
   then, clearly marked.

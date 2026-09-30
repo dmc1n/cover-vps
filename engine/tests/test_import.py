@@ -280,3 +280,91 @@ def test_2000_part_assembly_under_two_minutes(tmp_path: Path) -> None:
     assert m["parts"]["kept"] == CHAIR_PARTS
     assert m["parts"]["dropped_small"] == spec["screws"] + spec["washers"]
     assert elapsed < 120, f"import took {elapsed:.1f} s"
+
+
+def _signed_volume(p: Any) -> float:
+    tri = p.vertices[p.faces]
+    return float(np.einsum("ij,ij->i", tri[:, 0], np.cross(tri[:, 1], tri[:, 2])).sum()) / 6
+
+
+def test_faceted_step_matches_opencascade(generated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The fast reader for meshes saved as STEP gives what OpenCascade gives, orientation too."""
+    from coverengine.io import cad
+    from coverengine.io.faceted_step import read_faceted_step
+
+    src = generated / "chair_faceted.step"
+    fast = read_faceted_step(src)
+    assert fast is not None and fast.facets == 72 and fast.mm_per_unit == 1.0
+    monkeypatch.setattr(cad, "read_faceted_step", lambda path: None)
+    slow = cad.load_cad(
+        src,
+        PARAMS["import.deflection_mm"],
+        PARAMS["import.angular_deflection_deg"],
+        PARAMS["import.sew_tolerance_mm"],
+    )
+    assert len(fast.parts) == len(slow.parts) == 6
+    for a, b in zip(
+        sorted(fast.parts, key=lambda p: tuple(p.bounds[0])),
+        sorted(slow.parts, key=lambda p: tuple(p.bounds[0])),
+        strict=True,
+    ):
+        # OpenCascade's triangles come through 32-bit floats
+        assert np.array(a.bounds) == pytest.approx(np.array(b.bounds), abs=1e-4)
+        assert _signed_volume(a) == pytest.approx(_signed_volume(b), rel=1e-6)
+        assert _signed_volume(a) > 0  # faces point outward
+
+
+def test_faceted_step_imports_like_the_stl(generated: Path, tmp_path: Path) -> None:
+    faceted = run(generated / "chair_faceted.step", tmp_path / "f")
+    stl = run(generated / "chair.stl", tmp_path / "s")
+    assert faceted["parts"]["kept"] == stl["parts"]["kept"] == 6
+    assert np.array(faceted["bbox_mm"]) == pytest.approx(np.array(stl["bbox_mm"]), abs=1e-3)
+
+
+def test_faceted_reader_declines_curved_cad(generated: Path) -> None:
+    from coverengine.io.faceted_step import read_faceted_step
+
+    assert read_faceted_step(generated / "chair_assembly.step") is None  # assembly, cylinders
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # the owner's first real file: a unit named METRE, defined as 1 mm
+        (
+            b"#13=(CONVERSION_BASED_UNIT('METRE',#20)LENGTH_UNIT()NAMED_UNIT(#21));\n"
+            b"#20=LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.0),#28);\n"
+            b"#28= (NAMED_UNIT(#21)LENGTH_UNIT()SI_UNIT(.MILLI.,.METRE.));\n",
+            ("METRE", 1.0),
+        ),
+        # OpenCascade's inch files: bare value, entity spread over lines
+        (
+            b"#28 = ( CONVERSION_BASED_UNIT('INCH',#30) LENGTH_UNIT() NAMED_UNIT(\n  #29) );\n"
+            b"#30 = LENGTH_MEASURE_WITH_UNIT(25.4,#31);\n"
+            b"#31 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );\n",
+            ("INCH", 25.4),
+        ),
+        (b"#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );\n", ("millimetre", 1.0)),
+        (b"#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT($,.METRE.) );\n", ("metre", 1000.0)),
+        (
+            b"#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );\n"
+            b"#2 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT($,.METRE.) );\n",
+            None,  # two different units: no single answer
+        ),
+        (b"#1 = CARTESIAN_POINT('',(0.,0.,0.));\n", None),
+    ],
+)
+def test_step_length_unit(text: bytes, expected: tuple[str, float] | None) -> None:
+    from coverengine.io.faceted_step import step_length_unit
+
+    assert step_length_unit(text) == expected
+
+
+def test_unit_name_contradicting_definition_warns() -> None:
+    from coverengine.io.model_io import _cad_units
+
+    u = _cad_units("METRE", 1.0, None)
+    assert (u.detected, u.used, u.scale) == ("mm", "mm", 1.0)
+    assert "names its unit 'METRE' but defines it as 1 mm" in u.warnings[0]
+    fixed = _cad_units("METRE", 1.0, "m")
+    assert (fixed.used, fixed.scale, fixed.mm_per_file_unit) == ("m", 1000.0, 1000.0)

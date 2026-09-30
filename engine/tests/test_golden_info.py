@@ -20,6 +20,7 @@ SOURCES = [f"{n}.stl" for n in BUILDERS] + [
     "chair_assembly.step",
     "chair_assembly-inch.step",
     "chair_assembly.iges",
+    "chair_faceted.step",
 ]
 
 

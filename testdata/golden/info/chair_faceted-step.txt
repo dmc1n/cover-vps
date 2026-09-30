@@ -1,0 +1,13 @@
+model       chair_faceted-step
+source      chair_faceted.step (step), sha256 0bcf4b187567
+units       mm (file declares mm)
+placement   up z, front -y, raised by 0.000 mm
+parts       6 kept, 0 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    48
+triangles   72
+bbox min    -250.000 -314.023 0.000 mm
+bbox max    250.000 314.023 942.963 mm
+size        500.000 x 628.047 x 942.963 mm
+area        1.441600 m2
+warnings    none

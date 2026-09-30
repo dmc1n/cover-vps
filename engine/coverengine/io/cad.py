@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import math
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
 
 from coverengine.errors import CoverError
+from coverengine.io.faceted_step import read_faceted_step, step_length_unit
 from coverengine.io.parts import Part, split_bodies, unique_paths
 
 Array = NDArray[np.float64]
@@ -28,10 +29,23 @@ STL_RECORD = np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("attr", "<u2")])
 IGES_SUFFIXES = (".iges", ".igs")
 
 
+# IGES global section unit flag -> mm per unit (IGES 5.3, section 2.2.4.3)
+IGES_UNIT_FLAG_MM = {
+    1: 25.4,  # inch
+    2: 1.0,  # mm
+    4: 304.8,  # foot
+    6: 1000.0,  # metre
+    8: 0.0254,  # param-ok: IGES unit flag 8 = mil
+    9: 1e-3,  # micron
+    10: 10.0,  # param-ok: IGES unit flag 10 = cm
+}
+
+
 @dataclass
 class CadModel:
     parts: list[Part]
-    units_declared: list[str] = field(default_factory=list)  # unit names as written in the file
+    unit_name: str | None  # the length unit's name as written in the file
+    mm_per_unit: float | None  # what the file defines one unit as; OpenCascade converted by it
 
 
 def _quiet() -> None:
@@ -100,7 +114,8 @@ def _triangles(shape: object, scratch: Path) -> tuple[Array, IntArray]:
     return vertices, faces
 
 
-def _read_document(path: Path) -> tuple[object, list[str]]:
+def _read_document(path: Path) -> tuple[object, str | None, float | None]:
+    """The XCAF document, the file's length unit name and its size in mm."""
     from OCP.IFSelect import IFSelect_ReturnStatus
     from OCP.TCollection import TCollection_ExtendedString
     from OCP.TDocStd import TDocStd_Document
@@ -108,7 +123,8 @@ def _read_document(path: Path) -> tuple[object, list[str]]:
     _quiet()
     doc = TDocStd_Document(TCollection_ExtendedString("XmlOcaf"))
     suffix = path.suffix.lower()
-    units: list[str] = []
+    name: str | None = None
+    mm: float | None = None
     if suffix in STEP_SUFFIXES:
         from OCP.collections import Sequence_TCollection_AsciiString as Names
         from OCP.STEPCAFControl import STEPCAFControl_Reader
@@ -120,7 +136,12 @@ def _read_document(path: Path) -> tuple[object, list[str]]:
             raise CoverError(f"{path}: not a readable STEP file ({status.name})")
         lengths, angles, solid_angles = Names(), Names(), Names()
         reader.ChangeReader().FileUnits(lengths, angles, solid_angles)
-        units = [str(lengths.Value(i).ToCString()) for i in range(1, lengths.Length() + 1)]
+        if lengths.Length() > 0:
+            name = str(lengths.Value(1).ToCString())
+        # OpenCascade converts by the unit's definition, which can differ from its name
+        unit = step_length_unit(path.read_bytes())
+        if unit is not None:
+            name, mm = unit
     elif suffix in IGES_SUFFIXES:
         from OCP.IGESCAFControl import IGESCAFControl_Reader
 
@@ -129,12 +150,14 @@ def _read_document(path: Path) -> tuple[object, list[str]]:
         status = reader.ReadFile(str(path))
         if status != IFSelect_ReturnStatus.IFSelect_RetDone:
             raise CoverError(f"{path}: not a readable IGES file ({status.name})")
-        units = [str(reader.IGESModel().GlobalSection().UnitName().ToCString())]
+        header = reader.IGESModel().GlobalSection()
+        name = str(header.UnitName().ToCString())
+        mm = IGES_UNIT_FLAG_MM.get(int(header.UnitFlag()))
     else:
         raise CoverError(f"{path}: not a STEP or IGES file")
     if not reader.Transfer(doc):
         raise CoverError(f"{path}: OpenCascade could not convert the file's geometry")
-    return doc, units
+    return doc, name, mm
 
 
 def _sew(shape: object, tolerance_mm: float) -> object:
@@ -156,7 +179,11 @@ def load_cad(
     from OCP.TopLoc import TopLoc_Location
     from OCP.XCAFDoc import XCAFDoc_DocumentTool
 
-    doc, units = _read_document(path)
+    if path.suffix.lower() in STEP_SUFFIXES:
+        faceted = read_faceted_step(path)
+        if faceted is not None:
+            return CadModel(faceted.parts, faceted.unit_name, faceted.mm_per_unit)
+    doc, unit_name, mm_per_unit = _read_document(path)
     sew = path.suffix.lower() in IGES_SUFFIXES
     tool = XCAFDoc_DocumentTool.ShapeTool_s(doc.Main())  # type: ignore[attr-defined]
     shapes: dict[str, object] = {}  # distinct part shapes by label entry
@@ -207,4 +234,4 @@ def load_cad(
             moved = body.transformed(matrix)
             moved.path = part_path + body.path  # body paths are "" or "/1", "/2", ...
             parts.append(moved)
-    return CadModel(parts, units)
+    return CadModel(parts, unit_name, mm_per_unit)

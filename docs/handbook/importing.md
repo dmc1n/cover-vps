@@ -77,6 +77,11 @@ in cm it would be 197 x 247 x 371 mm (--units cm); in inch it would be 500 x 628
 Pick the one that matches the real furniture and import again with `--units inch`. The import
 never switches units by itself.
 
+Some files state a wrong unit. The first real sofa we imported calls its unit "METRE" but
+defines it as 1 mm, while its numbers are metres. The import then warns that the name and the
+definition disagree, and the size warning suggests `--units m`. Trust the size: a two-seater
+sofa is about 2 m wide, not 2 mm.
+
 ## Lying down or facing the wrong way
 
 The model should stand upright with its front toward you in the viewer. If a file was drawn
@@ -89,10 +94,17 @@ differently:
 
 Open `model.glb` after the import to check.
 
+## Meshes saved as STEP
+
+Some manufacturers send a mesh saved as STEP instead of real CAD data (in Drive the file looks
+like any other `.stp`). The import recognises these and reads them quickly: the 208 MB Blocchi
+sofa takes about 20 seconds. Such files have no part names: the parts are called `Root/1`,
+`Root/2`, … Look at `parts.json` for their sizes to tell the cushions from the frame.
+
 ## If the import fails
 
 - "all N parts were dropped": everything was smaller than `--min-part-mm` or excluded. Often
-  the units are wrong; try `--units inch` or `--units m`.
+  the units are wrong; the message then suggests the right `--units`.
 - "not a readable STEP file": the file is damaged or not really STEP. Ask the manufacturer
   for a fresh export.
 

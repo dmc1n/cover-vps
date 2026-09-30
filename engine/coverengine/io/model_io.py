@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -96,38 +97,52 @@ def remembered_exclusions(out_dir: Path) -> list[str]:
     return [str(p) for p in doc.get("parts", {}).get("exclude", [])]
 
 
-def _units(
-    fmt: str, declared: list[str] | str | None, override: str | None, default_units: str
-) -> tuple[str | None, str, float, list[str]]:
-    """(units declared by the file, units used, scale of loaded values to mm, warnings)."""
+@dataclass
+class Units:
+    detected: str | None  # what the file declares (unit id, or "<n> mm" if not a common unit)
+    used: str  # what was applied
+    scale: float  # loaded values -> mm
+    mm_per_file_unit: float  # after --units; what one number in the file became
+    warnings: list[str]
+
+
+def _unit_label(mm: float) -> str:
+    for u, value in UNIT_MM.items():
+        if math.isclose(mm, value, rel_tol=1e-9):
+            return u
+    return f"{mm:g} mm"
+
+
+def _cad_units(name: str | None, mm_per_unit: float | None, override: str | None) -> Units:
+    """STEP and IGES: OpenCascade already converted to mm by the file's unit definition."""
     warnings: list[str] = []
-    if override is not None and override not in UNIT_MM:
-        raise CoverError(f"unknown unit {override!r}; use one of mm | cm | m | inch")
-    if fmt in ("step", "iges"):
-        names = declared if isinstance(declared, list) else []
-        ids = [unit_id(n) for n in names]
-        if len(set(names)) > 1:
-            warnings.append(
-                f"file declares several length units ({', '.join(names)}); used the first"
-            )
-        detected = ids[0] if ids and ids[0] else (names[0] if names else None)
-        # OpenCascade already converted from the declared unit to mm
-        if override is None:
-            return detected, detected or "mm", 1.0, warnings
-        if detected not in UNIT_MM:
-            raise CoverError(f"file declares unit {detected!r}; --units cannot be applied to it")
-        if override != detected:
-            warnings.append(
-                f"file declares {detected}; treated as {override} as requested (--units)"
-            )
-        return detected, override, UNIT_MM[override] / UNIT_MM[detected], warnings
-    detected = declared if isinstance(declared, str) else None
-    used = override or detected or default_units
-    if override and detected and override != detected:
+    if mm_per_unit is None:
+        if override is not None:
+            raise CoverError(f"file declares unit {name!r}; --units cannot be applied to it")
+        return Units(name, "mm", 1.0, 1.0, [f"file unit {name!r} unknown; assumed mm"])
+    detected = _unit_label(mm_per_unit)
+    named = unit_id(name) if name else None
+    if named is not None and named != detected:
         warnings.append(
-            f"{fmt} files are in {detected}; treated as {override} as requested (--units)"
+            f"the file names its unit {name!r} but defines it as {mm_per_unit:g} mm; the "
+            "definition was used"
         )
-    return detected, used, UNIT_MM[used], warnings
+    if override is None:
+        return Units(detected, detected, 1.0, mm_per_unit, warnings)
+    if override != detected:
+        warnings.append(f"file declares {detected}; treated as {override} as requested (--units)")
+    return Units(detected, override, UNIT_MM[override] / mm_per_unit, UNIT_MM[override], warnings)
+
+
+def _mesh_units(fmt: str, declared: str | None, override: str | None, default: str) -> Units:
+    """STL, OBJ, PLY store no unit; glTF is metres by definition."""
+    used = override or declared or default
+    warnings = []
+    if override and declared and override != declared:
+        warnings.append(
+            f"{fmt} files are in {declared}; treated as {override} as requested (--units)"
+        )
+    return Units(declared, used, UNIT_MM[used], UNIT_MM[used], warnings)
 
 
 def import_model(
@@ -150,6 +165,8 @@ def import_model(
         up_axis = "y" if src.suffix.lower() in GLTF_SUFFIXES else "z"
     front = str(params["import.front"])
 
+    if units is not None and units not in UNIT_MM:
+        raise CoverError(f"unknown unit {units!r}; use one of mm | cm | m | inch")
     if fmt in ("step", "iges"):
         cad = load_cad(
             src,
@@ -157,13 +174,16 @@ def import_model(
             float(params["import.angular_deflection_deg"]),
             float(params["import.sew_tolerance_mm"]),
         )
-        raw_parts, declared = cad.parts, cad.units_declared
-        declared_arg: list[str] | str | None = declared
+        raw_parts = cad.parts
+        unit = _cad_units(cad.unit_name, cad.mm_per_unit, units)
     else:
         mesh = load_mesh_parts(src)
-        raw_parts, declared_arg = mesh.parts, mesh.units_declared
-    detected, used, scale, warnings = _units(
-        fmt, declared_arg, units, str(params["import.default_units"])
+        raw_parts = mesh.parts
+        unit = _mesh_units(fmt, mesh.units_declared, units, str(params["import.default_units"]))
+    detected, used, scale, warnings = unit.detected, unit.used, unit.scale, unit.warnings
+    plausible = (
+        float(params["import.min_plausible_size_mm"]),
+        float(params["import.max_plausible_size_mm"]),
     )
 
     orient = np.eye(4)
@@ -172,10 +192,16 @@ def import_model(
     classify(parts, min_part_mm, patterns)
     kept = [p for p in parts if p.status == KEPT]
     if not kept:
-        raise CoverError(
+        msg = (
             f"{src}: all {len(parts)} parts were dropped (smaller than {min_part_mm:g} mm or "
-            "excluded); check the units or lower --min-part-mm"
+            "excluded)"
         )
+        lo, hi = _extent(parts)
+        hint = plausibility_warning(
+            [float(x) for x in hi - lo], used, *plausible, mm_per_unit=unit.mm_per_file_unit
+        )
+        notes = [*warnings, hint or "check --min-part-mm and --exclude"]
+        raise CoverError("; ".join([msg, *notes]))
     lo, hi = _extent(kept)
     shift = np.eye(4)
     shift[:3, 3] = ground_translation((lo, hi))
@@ -186,10 +212,7 @@ def import_model(
 
     size: Array = hi - lo
     warning = plausibility_warning(
-        [float(x) for x in size],
-        used,
-        float(params["import.min_plausible_size_mm"]),
-        float(params["import.max_plausible_size_mm"]),
+        [float(x) for x in size], used, *plausible, mm_per_unit=unit.mm_per_file_unit
     )
     if warning:
         warnings.append(warning)

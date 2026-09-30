@@ -207,3 +207,45 @@ def write_assemblies(out_dir: Path, config: Mapping[str, Any] | None = None) -> 
         if not spec["on_demand"]
         for p in write_assembly(name, out_dir, cfg)
     ]
+
+
+def write_faceted(shape_name: str, path: Path, config: Mapping[str, Any] | None = None) -> Path:
+    """A procedural shape as a faceted STEP file: one planar face per triangle."""
+    from OCP.BRep import BRep_Builder
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_MakePolygon
+    from OCP.gp import gp_Pnt
+    from OCP.Interface import Interface_Static
+    from OCP.STEPControl import STEPControl_AsIs, STEPControl_Controller, STEPControl_Writer
+    from OCP.TopoDS import TopoDS_Shell
+
+    from coverengine.io.cad import _quiet
+    from coverengine.testshapes import build_all
+
+    _quiet()
+    (shape,) = [s for s in build_all(config) if s.name == shape_name]
+    builder = BRep_Builder()
+    shell = TopoDS_Shell()  # one shell of loose faces, like a mesh exporter writes
+    builder.MakeShell(shell)
+    for tri in shape.faces:
+        a, b, c = (gp_Pnt(*map(float, shape.vertices[i])) for i in tri)
+        polygon = BRepBuilderAPI_MakePolygon(a, b, c, True)
+        builder.Add(shell, BRepBuilderAPI_MakeFace(polygon.Wire(), True).Face())
+    STEPControl_Controller.Init_s()
+    Interface_Static.SetCVal_s("write.step.unit", "MM")  # the setting is global and sticky
+    writer = STEPControl_Writer()
+    writer.Transfer(shell, STEPControl_AsIs)
+    writer.Write(str(path))
+    text = path.read_text(encoding="utf-8")
+    text = re.sub(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", FIXED_STEP_TIME, text, count=1)
+    # the product name carries a counter that grows with every write in one process
+    text = re.sub(r"Open CASCADE STEP translator [\d.]+ \d+", shape_name, text)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def write_faceted_all(out_dir: Path, config: Mapping[str, Any] | None = None) -> list[Path]:
+    cfg = config or load_config()
+    return [
+        write_faceted(str(shape), out_dir / name, cfg)
+        for name, shape in cfg.get("faceted", {}).items()
+    ]

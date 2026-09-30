@@ -64,3 +64,8 @@ assemblies:
     screws: 1000
     washers: 1000
     on_demand: true
+
+# Meshes saved as STEP: one flat face per triangle and no curved geometry, as some exporters
+# write them (M1: the owner's first real file was one). Read by the fast faceted-STEP reader.
+faceted:
+  chair_faceted.step: chair                # file -> furniture shape above

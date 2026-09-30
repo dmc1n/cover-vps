@@ -241,3 +241,29 @@ Decision:
 Better alternatives, not built yet: skip meshing parts whose B-rep bounding box is already
 below `min_part_mm`; faster vertex welding than `np.unique(axis=0)` (most of the remaining time on
 very large meshes); a per-model up/front choice saved in `cover.json` once the web app exists.
+
+## ADR-023 — Faceted STEP files and unit definitions (M1, first real model)
+
+Context: the owner's first real file, "Blocchi - 2 seater moon Right.stp" (208 MB, written by
+"Spatial InterOp 3D"), is a mesh saved as STEP: 99,098 planar four-sided faces with straight
+edges, one product, no curved geometry. OpenCascade needed 155 s and 4.3 GB to read it (122 s
+of that converting facets into B-rep faces; disabling colours, layers or shape healing made no
+difference). The file also names its length unit "METRE" but defines it as 1 mm, while the
+coordinates are in metres (the sofa is 2.36 m wide) and the model is Y-up. The import read it as
+a 2 mm sofa and dropped every part, and the unit hint was never shown, because the
+all-parts-dropped error came first.
+Decision:
+- A fast reader (`io/faceted_step.py`) reads faceted STEP files straight from the text: points,
+  vertices, edges, loops and planar faces. Each loop is fan-triangulated, reversed once for each
+  of the bound and face orientation flags that disagrees with the plane. It only takes files it
+  can read exactly: no curved surfaces or curves, no assemblies or transforms, one bound per
+  face, one length unit. Anything else goes to OpenCascade. On the real file: 18 s and 1.5 GB.
+  A test checks that it matches OpenCascade (bounds and signed volume per part) on a faceted
+  chair.
+- The STEP length unit comes from its definition in the file (`step_length_unit`), which is
+  what OpenCascade converts by. When the name says otherwise, a warning says so. `--units`
+  rescales relative to the definition. IGES uses the unit flag of its global section.
+- The all-parts-dropped error includes the unit warnings and the size hint.
+Consequences: fan triangulation assumes convex facets, which mesh exporters write; a non-convex
+facet would be triangulated wrongly (none found so far). Faceted files carry no part names
+beyond the product name; parts are the connected bodies (`Root/1` … `Root/10` here).

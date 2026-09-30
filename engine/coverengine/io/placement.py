@@ -6,6 +6,7 @@ front of the furniture toward -Y. Unit heuristics only warn; they never change t
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -98,17 +99,24 @@ def ground_translation(bounds: tuple[Array, Array]) -> Array:
 
 
 def plausibility_warning(
-    size_mm: Sequence[float], units_used: str, min_mm: float, max_mm: float
+    size_mm: Sequence[float],
+    units_used: str,
+    min_mm: float,
+    max_mm: float,
+    mm_per_unit: float | None = None,
 ) -> str | None:
-    """Warn when the model's largest dimension is implausible, naming the unit that would fit."""
+    """Warn when the model's largest dimension is implausible, naming the units that would fit.
+
+    `mm_per_unit` is what one number in the file became (default: the size of `units_used`).
+    """
     largest = max(size_mm)
     if min_mm <= largest <= max_mm:
         return None
-    here = UNIT_MM[units_used]
+    here = mm_per_unit if mm_per_unit is not None else UNIT_MM[units_used]
     fits = [
         u
         for u in SUGGESTED_UNITS
-        if u != units_used and min_mm <= largest * UNIT_MM[u] / here <= max_mm
+        if not math.isclose(UNIT_MM[u], here) and min_mm <= largest * UNIT_MM[u] / here <= max_mm
     ]
     dims = " x ".join(f"{s:.0f}" for s in size_mm)
     what = "small" if largest < min_mm else "large"
