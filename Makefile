@@ -1,5 +1,5 @@
 # Cover pattern engine — see CLAUDE.md "Commands".
-.PHONY: setup test lint shapes testsheets golden demo api-dev web-dev web-build deploy backup
+.PHONY: setup test lint shapes testsheets golden demo api-dev web-dev web-build e2e deploy backup
 
 UV ?= uv
 RUN := $(UV) run
@@ -43,8 +43,14 @@ web-dev:
 web-build:
 	cd apps/web && npm install --no-audit --no-fund && npm run build
 
+# the whole flow in a real browser (Playwright in Docker)
+e2e:
+	scripts/e2e.sh
+
 deploy:
 	docker compose -f deploy/docker-compose.yml up -d --build app
 
+# the data directory to ~/backups (and to R2 when COVER_BACKUP_REMOTE is set); restore:
+#   tar -xzf ~/backups/cover-data-<date>.tar.gz -C <new data dir>
 backup:
-	@echo "make backup arrives in M6"; exit 2
+	scripts/backup.sh
