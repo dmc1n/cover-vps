@@ -1,0 +1,13 @@
+model       plate-stl
+source      plate.stl (stl), sha256 c2a2668a49e5
+units       mm (file declares no unit)
+placement   up z, front -y, raised by 0.000 mm
+parts       1 kept, 0 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    273
+triangles   480
+bbox min    -500.000 -300.000 0.000 mm
+bbox max    500.000 300.000 0.000 mm
+size        1000.000 x 600.000 x 0.000 mm
+area        0.600000 m2
+warnings    none

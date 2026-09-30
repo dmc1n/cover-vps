@@ -1,0 +1,13 @@
+model       torus_segment-stl
+source      torus_segment.stl (stl), sha256 4b0e80b20431
+units       mm (file declares no unit)
+placement   up z, front -y, raised by 0.000 mm
+parts       1 kept, 0 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    600
+triangles   1152
+bbox min    -250.000 -250.000 0.000 mm
+bbox max    250.000 250.000 200.000 mm
+size        500.000 x 500.000 x 200.000 mm
+area        0.393482 m2
+warnings    none

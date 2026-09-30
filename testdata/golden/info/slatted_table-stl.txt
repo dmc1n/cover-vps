@@ -1,0 +1,13 @@
+model       slatted_table-stl
+source      slatted_table.stl (stl), sha256 2bae5dc9a53b
+units       mm (file declares no unit)
+placement   up z, front -y, raised by 0.000 mm
+parts       15 kept, 0 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    120
+triangles   180
+bbox min    -800.000 -440.000 0.000 mm
+bbox max    800.000 440.000 740.000 mm
+size        1600.000 x 880.000 x 740.000 mm
+area        4.287200 m2
+warnings    none

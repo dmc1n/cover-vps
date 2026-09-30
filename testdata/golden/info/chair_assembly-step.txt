@@ -1,0 +1,13 @@
+model       chair_assembly-step
+source      chair_assembly.step (step), sha256 15334f0d94c9
+units       mm (file declares mm)
+placement   up z, front -y, raised by 0.000 mm
+parts       7 kept, 12 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    56
+triangles   84
+bbox min    -250.000 -314.023 0.000 mm
+bbox max    250.000 314.023 942.963 mm
+size        500.000 x 628.047 x 942.963 mm
+area        1.975200 m2
+warnings    none

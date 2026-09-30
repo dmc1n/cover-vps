@@ -164,11 +164,18 @@ def write_document(doc: Any, path: Path, unit: str) -> None:
     elif suffix == ".iges":
         IGESControl_Controller.Init_s()
         Interface_Static.SetCVal_s("write.iges.unit", _unit_name(unit))
+
         writer = IGESCAFControl_Writer()
         # IGES has no assembly tree and the writer orders its name entities differently on
         # every run; without names the file is reproducible (IGES imports carry no names anyway)
         writer.SetNameMode(False)
         writer.Transfer(doc)
+        # the author defaults to the login name, which differs between machines
+        from OCP.TCollection import TCollection_HAsciiString
+
+        header = writer.Model().GlobalSection()
+        header.SetAuthorName(TCollection_HAsciiString("coverengine"))
+        writer.Model().SetGlobalSection(header)
         writer.Write(str(path))
         # global section dates (fixed-column format: replace with the same length)
         text = path.read_text(encoding="ascii")

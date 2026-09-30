@@ -1,0 +1,13 @@
+model       l_lounge-stl
+source      l_lounge.stl (stl), sha256 55dde5b394ff
+units       mm (file declares no unit)
+placement   up z, front -y, raised by 0.000 mm
+parts       1 kept, 0 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    14
+triangles   24
+bbox min    -1000.000 -700.000 0.000 mm
+bbox max    1000.000 700.000 700.000 mm
+size        2000.000 x 1400.000 x 700.000 mm
+area        12.440000 m2
+warnings    none

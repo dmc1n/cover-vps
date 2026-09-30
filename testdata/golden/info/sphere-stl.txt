@@ -1,0 +1,13 @@
+model       sphere-stl
+source      sphere.stl (stl), sha256 705420e46cce
+units       mm (file declares no unit)
+placement   up z, front -y, raised by 0.000 mm
+parts       1 kept, 0 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    1986
+triangles   3968
+bbox min    -300.000 -300.000 0.000 mm
+bbox max    300.000 300.000 600.000 mm
+size        600.000 x 600.000 x 600.000 mm
+area        1.128704 m2
+warnings    none

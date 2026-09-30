@@ -1,0 +1,13 @@
+model       box_with_legs-stl
+source      box_with_legs.stl (stl), sha256 88f6dfdad284
+units       mm (file declares no unit)
+placement   up z, front -y, raised by 0.000 mm
+parts       5 kept, 0 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    40
+triangles   60
+bbox min    -400.000 -300.000 0.000 mm
+bbox max    400.000 300.000 700.000 mm
+size        800.000 x 600.000 x 700.000 mm
+area        2.340000 m2
+warnings    none

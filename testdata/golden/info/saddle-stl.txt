@@ -1,0 +1,13 @@
+model       saddle-stl
+source      saddle.stl (stl), sha256 ae67ca985ce9
+units       mm (file declares no unit)
+placement   up z, front -y, raised by 0.000 mm
+parts       1 kept, 0 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    1089
+triangles   2048
+bbox min    -400.000 -400.000 0.000 mm
+bbox max    400.000 400.000 160.000 mm
+size        800.000 x 800.000 x 160.000 mm
+area        0.672929 m2
+warnings    none

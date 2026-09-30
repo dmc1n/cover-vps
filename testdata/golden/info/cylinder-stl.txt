@@ -1,0 +1,13 @@
+model       cylinder-stl
+source      cylinder.stl (stl), sha256 1ff9212c071f
+units       mm (file declares no unit)
+placement   up z, front -y, raised by 0.000 mm
+parts       1 kept, 0 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    832
+triangles   1536
+bbox min    -250.000 -250.000 0.000 mm
+bbox max    250.000 250.000 600.000 mm
+size        500.000 x 500.000 x 600.000 mm
+area        0.942099 m2
+warnings    none

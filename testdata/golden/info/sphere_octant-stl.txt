@@ -1,0 +1,13 @@
+model       sphere_octant-stl
+source      sphere_octant.stl (stl), sha256 a80765703b1b
+units       mm (file declares no unit)
+placement   up z, front -y, raised by 0.000 mm
+parts       1 kept, 0 dropped as smaller than 8 mm, 0 excluded by name
+exclude     none
+vertices    601
+triangles   1128
+bbox min    -150.000 -150.000 0.000 mm
+bbox max    150.000 150.000 300.000 mm
+size        300.000 x 300.000 x 300.000 mm
+area        0.141246 m2
+warnings    none

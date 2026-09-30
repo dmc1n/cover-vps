@@ -1,5 +1,5 @@
 # Cover pattern engine — see CLAUDE.md "Commands".
-.PHONY: setup test lint shapes testsheets demo api-dev web-dev deploy backup
+.PHONY: setup test lint shapes testsheets golden demo api-dev web-dev deploy backup
 
 UV ?= uv
 RUN := $(UV) run
@@ -22,6 +22,9 @@ shapes:
 
 testsheets:
 	$(RUN) cover testsheet --out testdata/machine
+
+golden:
+	COVER_UPDATE_GOLDEN=1 $(RUN) pytest -q engine/tests/test_golden_info.py
 
 demo:
 	@echo "make demo arrives in M4 (full pipeline on the procedural chair)"; exit 2
