@@ -148,6 +148,7 @@ def split_positions(line: Outline, corner_s: list[float], max_panel_mm: float) -
 
 
 def skirt_seam(line: Outline, inset_mm: float) -> Seam:
+    """The seam between skirt and top: the level `inset_mm` inside the outline."""
     return Seam(
         id="skirt",
         kind="skirt",

@@ -234,35 +234,54 @@ list and how it relates to the `features.*` counts is settled in M5.
 `panels.glb`: the furniture (grey) and every panel as its own coloured mesh named after the
 panel, same mm/Z-up convention as `model.glb`.
 
-## PatternSet and Panel (M4–M5)
+## PatternSet (M4) — `pattern.json`
+
+`cover flatten models/<id>/` writes `pattern.json`, `pattern.dxf`, `pattern.svg` and
+`pattern-stretch.svg`. M4 patterns have no seam allowances (paper test); M5 adds them.
 
 ```json
 {
-  "format_version": 1,
-  "model_id": "lounge-chair-a12", "revision": 3, "parameter_hash": "...",
-  "parameters": { "hull": { "clearance_mm": 10, "bridge_gap_mm": 60, "...": "..." }, "welding": { "overlap_mm": 30 }, "...": "..." },
-  "parameter_sources": { "hull.clearance_mm": "model", "welding.overlap_mm": "default" },
-  "fabric_profile": "acrylic-300",
-  "summary": { "panels": 6, "max_stretch_pct": 1.8, "fabric_length_mm_est": 3200 },
+  "format_version": 1, "engine_version": "0.1.0",
+  "model_id": "chair", "model_sha256": "…",
+  "parameter_hash": "…", "parameters": { "hull": { "clearance_mm": 10, "...": "..." } },
+  "parameter_sources": { "hull.clearance_mm": "default", "...": "..." },
+  "fabric_profile": "acrylic-300", "fabric_compensation": false,
+  "summary": { "panels": 5, "max_stretch_pct": 1.1, "fabric_area_m2": 1.97, "hem_length_mm": 2324.1 },
+  "sheet": { "sheet_mm": [2915.0, 906.0], "placements": { "top": [0.0, 0.0] } },
   "panels": [
-    { "id": "P1", "name": "top", "quantity": 1, "mirror": false,
-      "outline_mm": [[0,0],[1200,0],[1200,800],[0,800]],
+    { "id": "P3", "name": "top", "quantity": 1, "mirror": false,
+      "outline_mm": [[0.0, 0.0], [521.3, 0.0], "..."],
       "edges": [
-        { "range": [0,1], "kind": "seam", "mate": { "panel": "P2", "edge": 0 },
-          "lap_side": "P1", "overlap_mm": 30, "length_3d_mm": 1200.4, "length_2d_mm": 1200.1, "ease_mm": 0.0 },
-        { "range": [2,3], "kind": "hem", "allowance_mm": 50 }
+        { "range": [0, 57], "kind": "seam", "seam": "skirt-front/top", "mate": "skirt-front",
+          "lap_side": "top", "length_3d_mm": 507.45, "length_2d_mm": 507.43, "ease_mm": 0.66 },
+        { "range": [57, 60], "kind": "hem", "length_3d_mm": 12.1, "length_2d_mm": 12.1 }
       ],
-      "pen": [ { "type": "label", "at": [600,400], "text": "P1 top  A12 r3" },
-               { "type": "guide_line", "points": [[..],[..]], "for_mate": "P2" },
-               { "type": "tick", "at": [300,0], "dir": [0,1], "pair": "P2:t1" },
-               { "type": "arrow_up", "at": [600,700] } ],
-      "stretch": { "max_pct": 1.2, "mean_pct": 0.4, "area_pct": 0.3 } }
-  ]
+      "pen": [ { "type": "label", "at": [260.0, 410.0], "text": "TOP" },
+               { "type": "arrow_up", "at": [260.0, 447.5], "length": 60 },
+               { "type": "tick", "at": [300.0, 0.0], "dir": [0.0, 1.0], "length": 10, "pair": "skirt-front/top:t1" },
+               { "type": "seam_label", "at": [253.0, 25.0], "text": "TO SKIRT-FRONT" } ],
+      "stretch": { "max_pct": 17.4, "quantile_pct": 1.06, "max_stretch_pct": 17.4,
+                   "max_compression_pct": 8.2, "mean_pct": 0.2, "area_pct": 0.01 },
+      "flat_width_mm": 521.3, "flat_length_mm": 826.0, "fits_roll": true, "solver_iterations": 0 }
+  ],
+  "warnings": []
 }
 ```
 
-`outline_mm` is the raw panel; export adds allowances from `edges`. `range` indexes outline
-vertices. Ticks are paired across mates by id.
+- `outline_mm`: the panel laid flat, counter-clockwise, in mm, starting at the origin; +Y is up
+  on the furniture. `edges[].range` indexes outline points (first and last point of the run).
+- `edges[].kind`: `seam` (with `seam`, `mate`, `lap_side`, `ease_mm`) or `hem`. `ease_mm` is
+  the difference between the 2D lengths of the seam's two sides.
+- `pen`: `label` (panel name), `arrow_up`, `tick` (matching mark; the other side of the seam has
+  the same `pair`), `seam_label` (the panel to join along that seam).
+- `stretch`: `quantile_pct` is the stretch not exceeded over `flatten.stretch_quantile` of the
+  area (the value checked against the limit); `max_pct` is the absolute maximum.
+- `pattern.dxf`: panels on one sheet, `export.sheet_spacing_mm` apart, cut outline as closed
+  LWPOLYLINE on the cut layer, labels, arrows and marks on the pen layer, M0 conventions
+  (`export.*`). `pattern.svg` is the same at 1:1 mm; `pattern-stretch.svg` colours each triangle
+  by stretch (red) or compression (blue), full colour at 2 %.
+
+Seam allowances, hem, vents and final panel data (M5) extend this format.
 
 ## Fabric profile (M4 placeholder, M8 measured)
 

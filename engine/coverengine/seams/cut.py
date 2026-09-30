@@ -271,4 +271,6 @@ def unzip(mesh: trimesh.Trimesh, cut_edges: IntArray) -> trimesh.Trimesh:
     _, first, new_index = np.unique(comp, return_index=True, return_inverse=True)
     corners = f.ravel()
     vertices = np.asarray(mesh.vertices)[corners[first]]
-    return trimesh.Trimesh(vertices, new_index.reshape(n, 3), process=False)
+    opened = trimesh.Trimesh(vertices, new_index.reshape(n, 3), process=False)
+    opened.metadata["original_vertex"] = corners[first]  # opened vertex -> vertex before
+    return opened

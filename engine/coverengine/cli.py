@@ -193,6 +193,102 @@ def _cmd_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_flatten(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from coverengine.export.pattern import write_all
+    from coverengine.flatten.pattern import PATTERN_JSON, build_patterns, pattern_set
+
+    cover_json = args.model / "cover.json"
+    params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    patterns, cut_report = build_patterns(args.model, params)
+    doc, warnings = pattern_set(args.model, params, patterns, cut_report)
+    out = args.out or args.model
+    out.mkdir(parents=True, exist_ok=True)
+    doc["sheet"] = write_all(out, patterns, params)
+    (out / PATTERN_JSON).write_text(
+        _json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(f"patterns -> {out / 'pattern.dxf'}, pattern.svg, pattern-stretch.svg, pattern.json")
+    for p in doc["panels"]:
+        fits = "fits the roll" if p["fits_roll"] else "TOO WIDE for the roll"
+        print(
+            f"  {p['name']:<16} {p['flat_width_mm']:6.0f} x {p['flat_length_mm']:6.0f} mm   "
+            f"stretch {p['stretch']['quantile_pct']:4.2f} % (max {p['stretch']['max_pct']:.1f} % "
+            f"in a small spot)   {fits}"
+        )
+    sheet_w, sheet_h = doc["sheet"]["sheet_mm"]
+    worst = max(
+        (e["ease_mm"] for p in doc["panels"] for e in p["edges"] if "ease_mm" in e), default=0.0
+    )
+    print(f"seams  largest difference between the two sides of a seam: {worst:.1f} mm")
+    print(
+        f"fabric {doc['summary']['fabric_area_m2']:.2f} m2 without allowances, "
+        f"sheet {sheet_w:.0f} x {sheet_h:.0f} mm"
+    )
+    for w in warnings:
+        print(f"warning: {w}", file=sys.stderr)
+    return 0
+
+
+def _cmd_run(args: argparse.Namespace) -> int:
+    """import -> hull -> cut -> flatten in one go."""
+    out = args.out or Path("models") / args.file.stem.lower().replace(" ", "-")
+    steps = [
+        ["import", str(args.file), "--out", str(out)]
+        + (["--units", args.units] if args.units else [])
+        + (["--up", args.up] if args.up else []),
+        ["hull", str(out)],
+        ["cut", str(out)],
+        ["flatten", str(out)],
+    ]
+    extra = [x for s in args.overrides for x in ("--set", s)]
+    for step in steps:
+        print(f"== cover {step[0]}")
+        code = main([*step, *extra] if step[0] != "import" else step)
+        if code:
+            return code
+    return 0
+
+
+def _cmd_diff(args: argparse.Namespace) -> int:
+    import json as _json
+
+    a = _json.loads(args.a.read_text(encoding="utf-8"))
+    b = _json.loads(args.b.read_text(encoding="utf-8"))
+    pa = {p["name"]: p for p in a["panels"]}
+    pb = {p["name"]: p for p in b["panels"]}
+    changed = 0
+    for name in sorted(set(pa) | set(pb)):
+        if name not in pa or name not in pb:
+            print(f"  {name:<16} {'new' if name in pb else 'gone'}")
+            changed += 1
+            continue
+        da = (pa[name]["flat_width_mm"], pa[name]["flat_length_mm"])
+        db = (pb[name]["flat_width_mm"], pb[name]["flat_length_mm"])
+        move = max(abs(x - y) for x, y in zip(da, db, strict=True))
+        if move > args.threshold:
+            print(f"  {name:<16} {da[0]:.0f} x {da[1]:.0f} -> {db[0]:.0f} x {db[1]:.0f} mm")
+            changed += 1
+    flat_a = _flatten_tree(a.get("parameters", {}))
+    flat_b = _flatten_tree(b.get("parameters", {}))
+    for key in sorted(set(flat_a) | set(flat_b)):
+        if flat_a.get(key) != flat_b.get(key):
+            print(f"  setting {key}: {flat_a.get(key)} -> {flat_b.get(key)}")
+    print(f"{changed} panel(s) changed by more than {args.threshold:g} mm")
+    return 0
+
+
+def _flatten_tree(tree: dict[str, object], prefix: str = "") -> dict[str, object]:
+    out: dict[str, object] = {}
+    for k, v in tree.items():
+        if isinstance(v, dict):
+            out.update(_flatten_tree(v, f"{prefix}{k}."))
+        else:
+            out[f"{prefix}{k}"] = v
+    return out
+
+
 def _cmd_testsheet(args: argparse.Namespace) -> int:
     from coverengine.export.testsheet import write_all
 
@@ -258,6 +354,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_cut)
+
+    p = sub.add_parser("flatten", help="flat patterns of every panel (DXF, SVG, pattern.json)")
+    p.add_argument("model", type=Path, help="model directory with panels (cover cut)")
+    p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_flatten)
+
+    p = sub.add_parser("run", help="import, cover, seams and patterns in one go")
+    p.add_argument("file", type=Path, help="3D file (STEP, IGES, STL, ...)")
+    p.add_argument("--out", type=Path, help="model directory (default: models/<file name>)")
+    p.add_argument("--units", choices=SUGGESTED_UNITS)
+    p.add_argument("--up")
+    p.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
+    p.set_defaults(handler=_cmd_run)
+
+    p = sub.add_parser("diff", help="panels whose size changed between two pattern.json files")
+    p.add_argument("a", type=Path)
+    p.add_argument("b", type=Path)
+    p.add_argument("--threshold", type=float, default=1.0, help="mm (default 1)")
+    p.set_defaults(handler=_cmd_diff)
 
     p = sub.add_parser("info", help="size, triangle count and area of a mesh file or model")
     p.add_argument("mesh", type=Path)

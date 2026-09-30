@@ -20,7 +20,7 @@ from skimage.measure import marching_cubes
 
 from coverengine.errors import CoverError
 from coverengine.hull.heightmap import HeightMap
-from coverengine.hull.morphology import dilate
+from coverengine.hull.morphology import dilate, dilate_cylinder
 
 Array = NDArray[np.float64]
 IntArray = NDArray[np.int64]
@@ -56,12 +56,19 @@ def exact_floor_distance(
 
 
 def solid_field(
-    bridged: HeightMap, clearance_mm: float, vertices: Array, faces: IntArray
+    bridged: HeightMap, clearance_mm: float, vertices: Array, faces: IntArray, edge: str = "sharp"
 ) -> tuple[Array, Array]:
-    """(top, wall) maps of the offset solid, on the bridged height map's grid."""
+    """(top, wall) maps of the offset solid, on the bridged height map's grid.
+
+    edge "sharp": the clearance is a vertical cylinder (the top rises by it, the walls move out
+    by it), so the top meets the skirt in a crease like a sewn cover; "rounded": a ball, which
+    rounds every top edge with the clearance as radius."""
     h = bridged.h
-    top = dilate(bridged.z, clearance_mm, h)
-    band = dilate(bridged.z, clearance_mm + BAND_CELLS * h, h)
+    grow = dilate_cylinder if edge == "sharp" else dilate
+    top = grow(bridged.z, clearance_mm, h)
+    band = grow(bridged.z, clearance_mm + BAND_CELLS * h, h)
+    if edge == "sharp":
+        band = band - BAND_CELLS * h  # the band only extends the footprint, not the height
     top = np.where(np.isfinite(top), top, np.where(np.isfinite(band), band, -FAR_MM))
     grid_distance = ndimage.distance_transform_edt(~bridged.footprint, sampling=h)
     near = grid_distance <= clearance_mm + (BAND_CELLS + 1) * h

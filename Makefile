@@ -26,9 +26,10 @@ testsheets:
 golden:
 	COVER_UPDATE_GOLDEN=1 $(RUN) pytest -q engine/tests/test_golden_info.py
 	COVER_UPDATE_GOLDEN=1 $(RUN) pytest -q engine/tests/test_hull.py -k golden
+	COVER_UPDATE_GOLDEN=1 $(RUN) pytest -q engine/tests/test_flatten.py -k golden
 
-demo:
-	@echo "make demo arrives in M4 (full pipeline on the procedural chair)"; exit 2
+demo: shapes
+	$(RUN) cover run testdata/generated/chair.stl --out out/chair
 
 api-dev:
 	@echo "make api-dev arrives in M6"; exit 2

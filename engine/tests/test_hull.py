@@ -24,6 +24,7 @@ HULL = {
     "hull.resolution_mm": 5,
     "hull.smoothing": 0.5,
     "hull.sweep_down": True,
+    "hull.edge": "rounded",
     "hull.target_edge_length_mm": 15,
     "hull.smoothing_max_iterations": 20,
     "hull.remesh_passes": 5,
@@ -98,7 +99,8 @@ def test_table_top_is_flat_when_gaps_are_bridged(hulls: dict[str, Any]) -> None:
 def test_draped_table_follows_slats_with_small_bridge(models: Path) -> None:
     slats, gaps, height = slat_and_gap_centres()
     mesh = build_hull(
-        models / "slatted_table", params(bridge_gap_mm=10, clearance_mm=12, top="draped")
+        models / "slatted_table",
+        params(bridge_gap_mm=10, clearance_mm=12, top="draped", edge="rounded"),
     ).mesh
     over_slats = top_profile(mesh, 0.0, slats)
     over_gaps = top_profile(mesh, 0.0, gaps)

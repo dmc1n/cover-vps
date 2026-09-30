@@ -394,3 +394,41 @@ Decision:
   6.30 m, first reported as 6.42 m).
 Better alternatives, not built yet: automatic band seams that follow the owner's Blocchi
 layout; a geodesic seam editor on the surface.
+
+## ADR-027 — Flattening, stretch and seam lengths (M4)
+
+Decision:
+- Each panel (from `panels.npz`, the unzipped cover written by `cover cut`) is flattened from the
+  conformal map (LSCM, scaled to the true area). That map is exact for developable panels, and
+  such panels are done with no further iteration. Otherwise the start is refined with SLIM on
+  the symmetric Dirichlet energy until it improves by less than `flatten.slim_tolerance`.
+  If the LSCM start folds, a Tutte map (boundary on a circle) is used instead. Panels above
+  `flatten.max_triangles` are simplified first with their outline kept exactly (a 200k-triangle
+  panel: 2.7 s). Up on the furniture points to +Y in the pattern; for a horizontal panel,
+  the back does.
+- Stretch per triangle comes from the singular values of the 3D-to-2D map. The limit
+  (`fabric.max_allowed_stretch_pct`) applies to `flatten.stretch_quantile` (99.5 %) of each
+  panel's area. Every tight cover has corner points where three surfaces meet (the back
+  corners of a chair top); fabric cannot lie flat there without easing, and a few cm² at such
+  points stretch far above the limit. The maximum is still reported.
+- Seam lengths: both sides of every seam are compared in 2D; the difference is recorded as
+  `ease_mm` and warned about above `seams.seam_tolerance_mm`. Matching marks every
+  `pen.tick_spacing_mm` are placed by position along the seam in 3D, so both sides get marks
+  at the same places, paired by id.
+- Found while measuring seam lengths: the rounded rim that the ball-shaped clearance gives every
+  top edge cannot lie flat where two rims meet. Putting the skirt seam 1 mm inside the outline
+  (`seams.skirt_seam_inset_mm`, was 5) keeps the rim out of the skirt panels. The seam sides then
+  agree within 1.1–1.9 mm on the test chair, box and L-lounge (were up to 6 mm). A sharp-edged
+  clearance (`hull.edge: sharp`, a vertical cylinder instead of a ball, with the crease
+  re-sharpened after meshing) is better on boxy furniture (box 0.3 mm). But it breaks on rounded
+  tops, where there is no crease, such as the Blocchi base, so it is an option and not the
+  default.
+- Bridging also closes the outline seen from above along straight lines in four directions, so
+  slat gaps that reach the edge of a table no longer leave notches in the skirt.
+- Fabric compensation (`flatten.fabric_compensation`) stays off until the fabric profile is
+  measured (M8).
+Consequences and open points: domes (the sphere test shape) and the back of the Blocchi sofa are
+curved in two directions; a single panel there stretches far beyond the limit (15 % on the
+Blocchi's back half, a 150 mm seam mismatch). They need more seams. The Blocchi needs the owner's
+seam layout (the band along the back); an automatic stretch-driven seam proposal is a later
+step.

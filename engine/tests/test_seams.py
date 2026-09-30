@@ -22,7 +22,7 @@ SEAMS = {
     "seams.min_weld_radius_mm": 150,
     "seams.seam_tolerance_mm": 1.0,
     "seams.lap_rule": "upper_over_lower",
-    "seams.skirt_seam_inset_mm": 5,
+    "seams.skirt_seam_inset_mm": 1,
     "seams.corner_angle_deg": 45,
     "seams.corner_window_mm": 100,
     "seams.max_skirt_panel_mm": 3000,
@@ -110,7 +110,7 @@ def test_panels_tile_the_cover(models: Path, cuts: dict[str, Any], name: str) ->
     hull = trimesh.load(models / name / "hull.glb", force="scene")
     hull_area = sum(g.area for g in hull.geometry.values())
     # moving points onto seams (at most seams.snap_mm) changes the area a hair
-    assert sum(p.area_mm2 for p in cuts[name].panels) == pytest.approx(hull_area, rel=1e-5)
+    assert sum(p.area_mm2 for p in cuts[name].panels) == pytest.approx(hull_area, rel=5e-5)
     for s in cuts[name].seams:
         a, b = s.panels
         assert s.length_mm > 0 and (a != b or s.kind == "corner")

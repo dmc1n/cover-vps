@@ -1,9 +1,9 @@
 model       l_lounge
 resolution  5 mm
-triangles   66945
-area        6.644 m2
+triangles   66802
+area        6.631 m2
 bbox min    -1011.0 -710.9 50.0 mm
 bbox max    1011.0 711.1 711.0 mm
-hem         6.85 m at 50 mm
+hem         6.83 m at 50 mm
 distance    min 10.00 mm (clearance 10)
-ridges      53
+ridges      58

@@ -52,6 +52,10 @@ WATER_RGBA = (220, 30, 30, 255)  # param-ok: display colour
 WATER_LIFT_MM = 2.0
 # A face counts as part of the top when its normal points up at least this much (cosine).
 WATER_FACING_UP = 0.3
+# Points within this many grid cells of the crease between skirt and top are made sharp.
+CREASE_CELLS = 2
+# ... but only where the top next to the skirt is flatter than this (a real crease).
+CREASE_MAX_SLOPE_DEG = 60.0  # param-ok: geometric threshold
 # A model counts as mirror-symmetric when its height map differs from its mirror by less (mm).
 SYMMETRY_MM = 0.5  # param-ok: geometric tolerance, not a setting
 # Resolution steps when the grid is made coarser to fit max_grid_cells.
@@ -148,7 +152,7 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
 
     hm = rasterize(model_v, model_f, h, margin)
     bridged = HeightMap(close(hm.z, bridge_r, h), hm.x0, hm.y0, h)
-    top, wall = solid_field(bridged, c, model_v, model_f)
+    top, wall = solid_field(bridged, c, model_v, model_f, str(params["hull.edge"]))
     covered = (top > hem) & (wall > 0)
     min_slope = _p(params, "hull.min_slope_deg")
     patch = _p(params, "hull.flat_patch_mm")
@@ -189,6 +193,8 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
     hem_vertices = _boundary_vertices(mesh)
     v = np.asarray(mesh.vertices).copy()
     v[hem_vertices, 2] = hem  # the hem edge lies exactly at hem height
+    if params["hull.edge"] == "sharp":
+        v = _sharpen(v, top, wall, bridged.xs, bridged.ys, h, hem_vertices)
     mesh.vertices = v
     # symmetric furniture: build one half and mirror it, so mirrored panels are equal
     symmetric = _mirror_symmetric(hm)
@@ -267,6 +273,57 @@ def _water_faces(
     j = np.clip(np.rint((c[:, 1] - y0) / h).astype(np.int64), 0, water.problem.shape[1] - 1)
     up = mesh.face_normals[:, 2] > WATER_FACING_UP
     return np.flatnonzero(up & water.problem[i, j])
+
+
+def _sharpen(
+    v: Array, top: Array, wall: Array, xs: Array, ys: Array, h: float, hem_vertices: IntArray
+) -> Array:
+    """Make the crease between the skirt and the top sharp again. Meshing and smoothing round
+    it over a few cells; such a lip cannot lie flat in either panel. Points near the crease move
+    onto the nearer of the two surfaces: the wall (outward, until the wall field is 0) or the
+    top (to its height)."""
+    from scipy.interpolate import RegularGridInterpolator
+
+    top_ok = np.where(np.abs(top) < FAR_MM / 2, top, np.nan)
+    at_top = RegularGridInterpolator((xs, ys), top_ok, bounds_error=False, fill_value=np.nan)
+    at_wall = RegularGridInterpolator((xs, ys), wall, bounds_error=False, fill_value=np.nan)
+    out = v.copy()
+    xy = v[:, :2]
+    dw = at_wall(xy)  # distance inside the outline (the wall field is 0 on the skirt)
+    tz = at_top(xy)
+    zone = CREASE_CELLS * h
+    # only where there is a crease: next to the skirt the top is clearly less steep than a wall
+    # (a rounded top that curves smoothly into the skirt, like a dome, is left alone)
+    gx, gy = np.gradient(np.where(np.isfinite(top_ok), top_ok, np.nan), h)
+    steep = RegularGridInterpolator(
+        (xs, ys), np.hypot(gx, gy), bounds_error=False, fill_value=np.nan
+    )
+    inner = xy + 0.0  # the slope is read one zone further in, on the top itself
+    grad_w = np.column_stack(
+        [
+            (at_wall(xy + [h / 2, 0.0]) - at_wall(xy - [h / 2, 0.0])) / h,
+            (at_wall(xy + [0.0, h / 2]) - at_wall(xy - [0.0, h / 2])) / h,
+        ]
+    )
+    norm = np.linalg.norm(grad_w, axis=1, keepdims=True)
+    inner = xy + np.where(norm > 0, grad_w / np.maximum(norm, 1e-12), 0.0) * zone
+    crease = steep(inner) < math.tan(math.radians(CREASE_MAX_SLOPE_DEG))
+    near = np.isfinite(dw) & np.isfinite(tz) & (dw < zone) & (v[:, 2] > tz - zone) & crease
+    near[hem_vertices] = False
+    if not near.any():
+        return out
+    to_wall = near & (np.maximum(dw, 0.0) < (tz - v[:, 2]))
+    to_top = near & ~to_wall
+    out[to_top, 2] = tz[to_top]
+    # onto the wall: step outward along the wall field's gradient by its value
+    step = h / 2
+    gx = (at_wall(xy + [step, 0.0]) - at_wall(xy - [step, 0.0])) / (2 * step)
+    gy = (at_wall(xy + [0.0, step]) - at_wall(xy - [0.0, step])) / (2 * step)
+    g2 = np.maximum(gx**2 + gy**2, 1e-12)
+    ok = to_wall & np.isfinite(g2)
+    out[ok, 0] -= (dw * gx / g2)[ok]
+    out[ok, 1] -= (dw * gy / g2)[ok]
+    return out
 
 
 def _mirror_symmetric(hm: HeightMap) -> bool:

@@ -19,6 +19,9 @@ hull:                            # the cover surface (drape hull)
   resolution_mm: 5               # grid resolution; smaller is slower and more exact
   smoothing: 0.5                 # 0 = follow every detail, 1 = maximum smoothing
   sweep_down: true               # fabric hangs from the widest point; false = fitted shell
+  edge: rounded                  # rounded | sharp   where the top meets the skirt: rounded with the
+                                 # clearance as radius, or a crease (boxy furniture only: it
+                                 # fails on rounded tops)
   top: tensioned                 # tensioned | draped   tensioned: pulled tight in straight lines
                                  # between high points, sheds water (rule 12); draped: follows
                                  # recesses wider than bridge_gap_mm
@@ -41,7 +44,7 @@ seams:
   min_weld_radius_mm: 150        # to confirm at the machine (weld curvature test, M8)
   seam_tolerance_mm: 1.0         # allowed seam length mismatch before ease is recorded
   lap_rule: upper_over_lower     # water run-off; on vertical seams: front over side
-  skirt_seam_inset_mm: 5         # the skirt seam runs this far inside the outline, just above
+  skirt_seam_inset_mm: 1         # the skirt seam runs this far inside the outline, just above
                                  # where the vertical skirt ends
   corner_angle_deg: 45           # the skirt gets a vertical seam where its outline turns more
   corner_window_mm: 100          # ... than this within this length
@@ -86,8 +89,14 @@ roll:
 
 flatten:
   solver: slim                   # slim | arap
-  iterations: 50
+  iterations: 50                 # most SLIM iterations per panel
+  slim_tolerance: 0.0000001      # stop when the energy improves by less than this fraction
+  max_triangles: 50000           # denser panels are simplified first (outline kept exactly)
   panel_tolerance_mm: 2.5        # per-panel error budget behind the ±5 mm cover tolerance
+  fabric_compensation: false     # to confirm: scale for fabric stretch; on once the profile is
+                                 # measured (M8)
+  stretch_quantile: 0.995        # the stretch limit applies to this share of each panel's area;
+                                 # the rest (spots at corners of the cover) eases in
 
 export:
   cut_layer: CUT                 # TODO from the M0 machine test

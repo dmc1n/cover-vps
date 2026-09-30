@@ -48,6 +48,7 @@ PANELS_GLB, PANELS_JSON, SEAMS_AUTO_JSON, SEAMS_JSON = (
     "seams.auto.json",
     "seams.json",
 )
+PANELS_NPZ = "panels.npz"  # the unzipped cover, panel labels and seam edges, for flattening
 TOP, SKIRT = "top", "skirt"
 # A seam with the same panel on both sides and shorter than this is a merged sliver's rest (mm).
 SLIVER_SEAM_MM = 10.0  # param-ok: geometric tolerance
@@ -64,6 +65,9 @@ class Cut:
     report: dict[str, Any]
     warnings: list[str] = field(default_factory=list)
     mesh: trimesh.Trimesh | None = None
+    opened: trimesh.Trimesh | None = None  # the cover unzipped along all seams
+    labels: IntArray | None = None  # panel index per face
+    seam_edges: dict[tuple[int, int], int] = field(default_factory=dict)  # edge -> seam index
 
 
 def _p(params: EffectiveParams, key: str) -> float:
@@ -349,6 +353,7 @@ def _assemble(
             key = (kinds[sid], min(a, b), max(a, b))
             groups.setdefault(key, []).append((e[0], e[1]))
     infos: list[SeamInfo] = []
+    edge_seam: dict[tuple[int, int], int] = {}
     v = np.asarray(mesh.vertices)
     for (kind, a, b), chain in sorted(groups.items()):
         order = _ordered(np.array(chain))
@@ -360,6 +365,8 @@ def _assemble(
         infos.append(
             SeamInfo(f"{names[a]}/{names[b]}", kind, (a, b), length, lap, min_radius(pts), pts)
         )
+        for e in chain:
+            edge_seam[(min(e), max(e))] = len(infos) - 1
         result[a].seams.append(infos[-1].id)
         if b != a:
             result[b].seams.append(infos[-1].id)
@@ -420,7 +427,7 @@ def _assemble(
         "level_seams_mm": [round(z, 1) for z in levels],
     }
     report["seams_used"] = seams_used
-    return Cut(result, infos, report, warnings, mesh)
+    return Cut(result, infos, report, warnings, mesh, opened, lab, edge_seam)
 
 
 def _lap(kind: str, a: Panel, b: Panel) -> int:
@@ -440,6 +447,17 @@ def _lap(kind: str, a: Panel, b: Panel) -> int:
 def write_cut(model_dir: Path, result: Cut, out_dir: Path | None = None) -> Path:
     out = out_dir or model_dir
     out.mkdir(parents=True, exist_ok=True)
+    assert result.opened is not None and result.labels is not None
+    edges = sorted(result.seam_edges.items())
+    np.savez_compressed(
+        out / PANELS_NPZ,
+        vertices=np.asarray(result.opened.vertices, dtype=np.float64),
+        faces=np.asarray(result.opened.faces, dtype=np.int64),
+        labels=result.labels,
+        original_vertex=np.asarray(result.opened.metadata["original_vertex"], dtype=np.int64),
+        seam_edges=np.array([e for e, _ in edges], dtype=np.int64).reshape(-1, 2),
+        seam_index=np.array([i for _, i in edges], dtype=np.int64),
+    )
     report = dict(result.report)
     seams_used = report.pop("seams_used")
     (out / PANELS_JSON).write_text(
