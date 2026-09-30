@@ -298,11 +298,15 @@ def _write_json(path: Path, doc: dict[str, Any]) -> None:
 
 
 def _glb(parts: Sequence[Part]) -> bytes:
+    return glb_bytes([(p.path, trimesh.Trimesh(p.vertices, p.faces, process=False)) for p in parts])
+
+
+def glb_bytes(meshes: Sequence[tuple[str, trimesh.Trimesh]]) -> bytes:
+    """A GLB with canonical mm Z-up meshes under the glTF (metres, Y up) root node."""
     scene = trimesh.Scene()
     scene.graph.update(frame_from=scene.graph.base_frame, frame_to=ROOT_NODE, matrix=_TO_GLTF)
-    for p in parts:
-        mesh = trimesh.Trimesh(p.vertices, p.faces, process=False)
-        scene.add_geometry(mesh, node_name=p.path, geom_name=p.path, parent_node_name=ROOT_NODE)
+    for name, mesh in meshes:
+        scene.add_geometry(mesh, node_name=name, geom_name=name, parent_node_name=ROOT_NODE)
     data = scene.export(file_type="glb")
     assert isinstance(data, bytes)
     return data

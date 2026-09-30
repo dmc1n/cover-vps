@@ -20,6 +20,12 @@ hull:                            # the cover surface (drape hull)
   smoothing: 0.5                 # 0 = follow every detail, 1 = maximum smoothing
   sweep_down: true               # fabric hangs from the widest point; false = fitted shell
   target_edge_length_mm: 15      # mesh density of the hull
+  smoothing_max_iterations: 20   # smoothing passes at smoothing = 1 (Taubin, keeps the volume)
+  remesh_passes: 5               # rounds of even remeshing towards target_edge_length_mm
+  remesh_max_deviation_mm: 0.5   # remeshing may move the surface at most this far
+  clearance_passes: 10           # rounds of pushing the hull out where it is closer than
+                                 # clearance_mm to the furniture
+  max_grid_cells: 60000000       # above this the grid is made coarser (with a warning)
 
 seams:
   ridge_angle_deg: 40            # hull edges sharper than this become seam candidates

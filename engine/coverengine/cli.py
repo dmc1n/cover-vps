@@ -123,6 +123,41 @@ def _cmd_import(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_hull(args: argparse.Namespace) -> int:
+    from coverengine.hull.build import build_hull, write_hull
+
+    shortcuts = {
+        "hull.clearance_mm": args.clearance,
+        "hull.bridge_gap_mm": args.bridge_gap,
+        "hull.hem_height_mm": args.hem_height,
+        "hull.resolution_mm": args.resolution,
+    }
+    args.overrides = [f"{k}={v}" for k, v in shortcuts.items() if v is not None] + args.overrides
+    cover_json = args.model / "cover.json"
+    params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    hull = build_hull(args.model, params)
+    out = write_hull(args.model, hull, args.out)
+    r = hull.report
+    lo, hi = r["bbox_mm"]
+    size = " x ".join(f"{b - a:.0f}" for a, b in zip(lo, hi, strict=True))
+    dist = r["distance_to_model_mm"]
+    p = r["parameters"]
+    print(f"cover surface -> {out / 'hull.glb'} (view it with {out / 'preview.glb'})")
+    settings = (
+        f"clearance {p['hull.clearance_mm']:g} mm, bridge gap {p['hull.bridge_gap_mm']:g} mm, "
+        f"hem {p['hull.hem_height_mm']:g} mm above the floor"
+    )
+    hem_m = r["hem"]["length_mm"] / 1000
+    print(f"settings {settings}")
+    print(f"size     {size} mm, fabric area {r['area_m2']:.2f} m2, hem length {hem_m:.2f} m")
+    closest = f"{dist['min']:.1f} mm from the furniture (clearance {dist['clearance']:g} mm)"
+    print(f"distance closest {closest}")
+    print(f"ridges   {r['ridges']['chains']} sharp ridges (seam candidates for the next step)")
+    for w in hull.warnings:
+        print(f"warning: {w}", file=sys.stderr)
+    return 0
+
+
 def _cmd_testsheet(args: argparse.Namespace) -> int:
     from coverengine.export.testsheet import write_all
 
@@ -171,6 +206,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_param_args(p)
     p.set_defaults(handler=_cmd_import)
+
+    p = sub.add_parser("hull", help="the cover surface (drape hull) of an imported model")
+    p.add_argument("model", type=Path, help="model directory written by cover import")
+    p.add_argument("--clearance", type=float, help="mm between furniture and fabric")
+    p.add_argument("--bridge-gap", type=float, help="gaps narrower than this (mm) are spanned")
+    p.add_argument("--hem-height", type=float, help="hem edge above the floor (mm)")
+    p.add_argument("--resolution", type=float, help="grid size (mm); smaller is slower, finer")
+    p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_hull)
 
     p = sub.add_parser("info", help="size, triangle count and area of a mesh file or model")
     p.add_argument("mesh", type=Path)

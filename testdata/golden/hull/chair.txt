@@ -1,0 +1,9 @@
+model       chair
+resolution  5 mm
+triangles   19646
+area        1.851 m2
+bbox min    -262.1 -325.2 50.0 mm
+bbox max    261.8 327.2 953.8 mm
+hem         2.39 m at 50 mm
+distance    min 10.00 mm (clearance 10)
+ridges      41

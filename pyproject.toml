@@ -38,3 +38,7 @@ files = ["engine/coverengine"]
 
 [tool.pytest.ini_options]
 testpaths = ["engine/tests"]
+filterwarnings = [
+  # scikit-image's marching cubes on numpy 2.5; harmless, fixed upstream
+  "ignore:Setting the shape on a NumPy array has been deprecated:DeprecationWarning",
+]
