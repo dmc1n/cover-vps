@@ -192,6 +192,7 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
         )
     mesh = mesh_solid(top, wall, hm.x0, hm.y0, h, hem)
     mesh = trimesh.Trimesh(mesh.vertices, mesh.faces, process=True)  # weld duplicate vertices
+    mesh = _one_piece(mesh)
     iterations = round(_p(params, "hull.smoothing") * _p(params, "hull.smoothing_max_iterations"))
     if iterations > 0:
         trimesh.smoothing.filter_taubin(mesh, lamb=TAUBIN[0], nu=TAUBIN[1], iterations=iterations)
@@ -338,6 +339,16 @@ def _sharpen(
     out[ok, 0] -= (dw * gx / g2)[ok]
     out[ok, 1] -= (dw * gy / g2)[ok]
     return out
+
+
+def _one_piece(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
+    """The cover is one piece of surface: loose fragments (a few mm2 left by meshing small
+    gaps) are dropped, the largest connected part is kept."""
+    parts = mesh.split(only_watertight=False)
+    if len(parts) <= 1:
+        return mesh
+    keep = max(parts, key=lambda m: float(m.area))
+    return trimesh.Trimesh(keep.vertices, keep.faces, process=True)
 
 
 def _mirror_symmetric(hm: HeightMap) -> bool:
