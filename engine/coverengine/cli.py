@@ -20,6 +20,7 @@ from coverengine.params import (
 )
 
 Handler = Callable[[argparse.Namespace], int]
+MM_PER_CM = 10  # param-ok: unit conversion
 
 
 def _add_param_args(p: argparse.ArgumentParser) -> None:
@@ -169,6 +170,29 @@ def _cmd_hull(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_cut(args: argparse.Namespace) -> int:
+    from coverengine.seams.build import cut_cover, write_cut
+
+    cover_json = args.model / "cover.json"
+    params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    result = cut_cover(args.model, params, args.seams)
+    out = write_cut(args.model, result, args.out)
+    r = result.report
+    print(f"panels -> {out / 'panels.glb'} (each panel in its own colour)")
+    for p in r["panels"]:
+        fits = "fits the roll" if p["fits_roll"] else "TOO WIDE for the roll"
+        print(
+            f"  {p['name']:<16} {p['area_m2']:6.3f} m2   flat {p['flat_width_mm']:6.0f} x "
+            f"{p['flat_length_mm']:6.0f} mm   {fits}"
+        )
+    print(f"seams  {len(r['seams'])}, hem {r['hem_length_mm'] / 1000:.2f} m")
+    for s in r["seams"]:
+        print(f"  {s['id']:<34} {s['length_mm'] / MM_PER_CM:7.1f} cm   {s['lap_side']} laps over")
+    for w in result.warnings:
+        print(f"warning: {w}", file=sys.stderr)
+    return 0
+
+
 def _cmd_testsheet(args: argparse.Namespace) -> int:
     from coverengine.export.testsheet import write_all
 
@@ -227,6 +251,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_hull)
+
+    p = sub.add_parser("cut", help="divide the cover surface into panels with seams")
+    p.add_argument("model", type=Path, help="model directory with hull.glb (cover hull)")
+    p.add_argument("--seams", type=Path, help="seam file (default: seams.json in the model dir)")
+    p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_cut)
 
     p = sub.add_parser("info", help="size, triangle count and area of a mesh file or model")
     p.add_argument("mesh", type=Path)

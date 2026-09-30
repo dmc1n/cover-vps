@@ -52,6 +52,8 @@ WATER_RGBA = (220, 30, 30, 255)  # param-ok: display colour
 WATER_LIFT_MM = 2.0
 # A face counts as part of the top when its normal points up at least this much (cosine).
 WATER_FACING_UP = 0.3
+# A model counts as mirror-symmetric when its height map differs from its mirror by less (mm).
+SYMMETRY_MM = 0.5  # param-ok: geometric tolerance, not a setting
 # Resolution steps when the grid is made coarser to fit max_grid_cells.
 COARSEN_STEP_MM = 0.5  # param-ok: rounding step for the coarsened resolution
 
@@ -183,6 +185,11 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
     v = np.asarray(mesh.vertices).copy()
     v[hem_vertices, 2] = hem  # the hem edge lies exactly at hem height
     mesh.vertices = v
+    # symmetric furniture: build one half and mirror it, so mirrored panels are equal
+    symmetric = _mirror_symmetric(hm)
+    if symmetric:
+        mesh = _mirrored(mesh, _p(params, "seams.snap_mm"))
+        hem_vertices = _boundary_vertices(mesh)
     fit = clearance.enforce(
         mesh, model_v, model_f, c, int(params["hull.clearance_passes"]), hem_vertices
     )
@@ -235,6 +242,7 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
             "automatic": held.automatic,
         },
         "masks": len(masks.load_masks(model_dir)),
+        "mirrored": symmetric,
         "parameters": {k: params[k] for k in keys},
         "parameter_sources": {k: params.source(k) for k in keys},
         "parameter_hash": params.hash(),
@@ -254,6 +262,41 @@ def _water_faces(
     j = np.clip(np.rint((c[:, 1] - y0) / h).astype(np.int64), 0, water.problem.shape[1] - 1)
     up = mesh.face_normals[:, 2] > WATER_FACING_UP
     return np.flatnonzero(up & water.problem[i, j])
+
+
+def _mirror_symmetric(hm: HeightMap) -> bool:
+    """Is the furniture symmetric about x = 0 (its height map equals its mirror image)?"""
+    if not np.allclose(hm.xs[::-1], -hm.xs, atol=1e-9):
+        return False
+    z, mirror = hm.z, hm.z[::-1, :]
+    same_footprint = np.array_equal(np.isfinite(z), np.isfinite(mirror))
+    both = np.isfinite(z) & np.isfinite(mirror)
+    return bool(
+        same_footprint and both.any() and np.abs(z[both] - mirror[both]).max() < SYMMETRY_MM
+    )
+
+
+def _mirrored(mesh: trimesh.Trimesh, snap_mm: float) -> trimesh.Trimesh:
+    """The x >= 0 half of the cover and its mirror image, joined at x = 0, so mirrored panels
+    come out exactly equal."""
+    v = np.asarray(mesh.vertices, dtype=np.float64).copy()
+    v[np.abs(v[:, 0]) < snap_mm, 0] = 0.0  # no slivers along the cut
+    half = trimesh.Trimesh(v, mesh.faces, process=False)
+    half = trimesh.intersections.slice_mesh_plane(
+        half, plane_normal=[1.0, 0.0, 0.0], plane_origin=[0.0, 0.0, 0.0], cap=False
+    )
+    hv = np.asarray(half.vertices).copy()
+    hv[np.abs(hv[:, 0]) < 1e-9, 0] = 0.0
+    other = hv * np.array([-1.0, 1.0, 1.0])
+    faces = np.asarray(half.faces)
+    joined = trimesh.Trimesh(
+        np.vstack([hv, other]),
+        np.vstack([faces, faces[:, ::-1] + len(hv)]),  # mirroring flips the winding back
+        process=True,  # welds the shared vertices on x = 0
+    )
+    joined.update_faces(joined.nondegenerate_faces())
+    joined.remove_unreferenced_vertices()
+    return joined
 
 
 def _coloured(mesh: trimesh.Trimesh, rgba: tuple[int, int, int, int]) -> trimesh.Trimesh:

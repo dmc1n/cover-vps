@@ -1,9 +1,9 @@
 model       chair_faceted
 resolution  5 mm
-triangles   20310
+triangles   20654
 area        1.971 m2
-bbox min    -260.8 -325.3 50.0 mm
-bbox max    260.6 324.9 953.4 mm
-hem         2.39 m at 50 mm
+bbox min    -260.6 -325.3 50.0 mm
+bbox max    260.6 324.9 953.3 mm
+hem         2.32 m at 50 mm
 distance    min 10.00 mm (clearance 10)
-ridges      46
+ridges      38

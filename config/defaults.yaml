@@ -41,6 +41,15 @@ seams:
   min_weld_radius_mm: 150        # to confirm at the machine (weld curvature test, M8)
   seam_tolerance_mm: 1.0         # allowed seam length mismatch before ease is recorded
   lap_rule: upper_over_lower     # water run-off; on vertical seams: front over side
+  skirt_seam_inset_mm: 5         # the skirt seam runs this far inside the outline, just above
+                                 # where the vertical skirt ends
+  corner_angle_deg: 45           # the skirt gets a vertical seam where its outline turns more
+  corner_window_mm: 100          # ... than this within this length
+  max_skirt_panel_mm: 3000       # to confirm; longer skirt stretches are split into equal parts
+  snap_mm: 1                     # points closer than this to a seam are moved onto it
+  band_drop_mm: 20               # a top too wide for the roll is first split this far below its
+                                 # highest point (the band on top of a backrest), then at half
+                                 # height; level seams let the upper panel lap over the lower
 
 construction:                    # how panels are joined; a dropdown per model in the web app
   method: double_stitch          # double_stitch | welded   (double stitching is today's practice)
