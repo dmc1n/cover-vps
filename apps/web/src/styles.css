@@ -91,3 +91,4 @@ textarea.notes { width: 100%; box-sizing: border-box; min-height: 44px; border: 
 .batch .jobstep { margin-right: 6px; }
 svg.plan .proposal polyline { fill: none; stroke: #e07a14; stroke-dasharray: 14 8; cursor: pointer; }
 svg.plan .proposal text { fill: #b85f00; cursor: pointer; }
+.badge.grade-ready { background: #d8f0de; color: var(--ok); } .badge.grade-check { background: #fff1d6; color: var(--warn); } .badge.grade-failed { background: #fbdada; color: var(--bad); }

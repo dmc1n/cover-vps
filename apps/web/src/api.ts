@@ -37,6 +37,8 @@ export interface ModelBrief {
   panels?: number;
   max_stretch_pct?: number;
   warnings: string[];
+  grade: "ready" | "check" | "failed";
+  reasons: string[];
 }
 
 export interface JobStep {

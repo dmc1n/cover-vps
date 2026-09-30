@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from coverengine.catalogue import compare_files, info, revisions
+from coverengine.catalogue import compare_files, grade, info, revisions
 from coverengine.params import Registry, resolve_model
 
 # Files a model folder may hold, by step; the web app offers these for viewing and download.
@@ -100,6 +100,8 @@ class Store:
         for name in ("hull.json", "panels.json", "pattern.json", "finished.json"):
             warnings += (_read(d / name) or {}).get("warnings", [])
         out["warnings"] = warnings
+        g = grade(d)
+        out["grade"], out["reasons"] = g["grade"], g.get("reasons", [])
         if brief:
             return out
         hull = _read(d / "hull.json")

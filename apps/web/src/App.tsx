@@ -39,6 +39,7 @@ function ModelList() {
   const [query, setQuery] = useState("");
   const [family, setFamily] = useState("");
   const [status, setStatus] = useState("");
+  const [grade, setGrade] = useState("");
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const load = useCallback(() => {
     api.models().then(setModels).catch((e) => setError(String(e)));
@@ -49,14 +50,24 @@ function ModelList() {
     (m) =>
       (!q || m.id.includes(q) || m.tags.some((t) => t.toLowerCase().includes(q)) || m.notes.toLowerCase().includes(q)) &&
       (!family || (m.family ?? "") === (family === "-" ? "" : family)) &&
-      (!status || m.status === status),
+      (!status || m.status === status) &&
+      (!grade || m.grade === grade),
   );
   const families = [...new Set((models ?? []).map((m) => m.family).filter(Boolean))] as string[];
   const selected = shown.filter((m) => picked[m.id]);
   return (
     <>
       <Upload />
-      <h2>Models</h2>
+      <h2>
+        Models{" "}
+        {models && (
+          <span className="muted">
+            ({models.length}: {models.filter((m) => m.grade === "ready").length} ready,{" "}
+            {models.filter((m) => m.grade === "check").length} to check,{" "}
+            {models.filter((m) => m.grade === "failed").length} failed)
+          </span>
+        )}
+      </h2>
       {error && <p className="error">{error}</p>}
       <div className="row">
         <input className="search" placeholder="Search name, tag or note…" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -66,6 +77,12 @@ function ModelList() {
           {families.map((f) => (
             <option key={f}>{f}</option>
           ))}
+        </select>
+        <select value={grade} onChange={(e) => setGrade(e.target.value)}>
+          <option value="">any cover</option>
+          <option value="ready">ready</option>
+          <option value="check">to check</option>
+          <option value="failed">failed</option>
         </select>
         <select value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">any status</option>
@@ -91,6 +108,7 @@ function ModelList() {
                 />
               </th>
               <th>Model</th>
+              <th>Cover</th>
               <th>Family</th>
               <th>Status</th>
               <th>Size (cm)</th>
@@ -113,6 +131,9 @@ function ModelList() {
                       {t}
                     </span>
                   ))}
+                </td>
+                <td title={m.reasons.join("\n")}>
+                  <span className={`badge grade-${m.grade}`}>{m.grade}</span>
                 </td>
                 <td>{m.family ?? ""}</td>
                 <td>
