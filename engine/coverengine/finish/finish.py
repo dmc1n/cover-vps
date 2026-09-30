@@ -104,7 +104,10 @@ def cut_outline(outline: Array, edges: list[dict[str, Any]], distances: list[flo
         # the outline runs counter-clockwise: outside is on the right (negative side)
         strip = line.buffer(-d, single_sided=True, cap_style="flat", join_style="mitre")
         parts.append(strip)
-    grown = shapely.unary_union(parts)
+    try:
+        grown = shapely.unary_union(parts)
+    except shapely.errors.GEOSException:  # an outline that touches itself: repair and retry
+        grown = shapely.unary_union([shapely.make_valid(g).buffer(0) for g in parts])
     if isinstance(grown, shapely.MultiPolygon):
         grown = max(grown.geoms, key=lambda g: g.area)
     grown = shapely.Polygon(grown.exterior).simplify(SIMPLIFY_MM)
