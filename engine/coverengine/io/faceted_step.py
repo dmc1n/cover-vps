@@ -37,7 +37,7 @@ _SI_PREFIX_MM = {
     b"$": 1000.0,
     b".MILLI.": 1.0,
     b".CENTI.": 10.0,  # param-ok: centimetre
-    b".DECI.": 100.0,
+    b".DECI.": 100.0,  # param-ok: decimetre
     b".MICRO.": 1e-3,
     b".KILO.": 1e6,
 }

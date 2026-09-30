@@ -124,7 +124,7 @@ def format_info(info: MeshInfo) -> str:
         for name, value, measured in info.references:
             extra = ""
             if measured is not None and value:
-                extra = f"  mesh {measured:.3f}  ({(measured - value) / value * 100:+.3f} %)"
+                extra = f"  mesh {measured:.3f}  ({(measured - value) / value:+.3%})"
             lines.append(f"  {name} {value:.3f}{extra}")
     return "\n".join(lines)
 
