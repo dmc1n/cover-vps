@@ -1,8 +1,7 @@
 # The cover surface
 
-After a model is imported (`importing.md`), `cover hull` works out the shape of the cover: the
-surface a tight fabric cover takes over the furniture. Seams and flat patterns are cut from this
-surface in the next steps.
+After a model is imported (`importing.md`), `cover hull` works out the shape of the cover.
+Seams and flat patterns are cut from this surface in the next steps.
 
 ```
 uv run cover hull models/blocchi-2seater-moon-right
@@ -11,12 +10,22 @@ uv run cover hull models/blocchi-2seater-moon-right
 ```
 cover surface -> models/blocchi-2seater-moon-right/hull.glb (view it with .../preview.glb)
 settings clearance 10 mm, bridge gap 60 mm, hem 50 mm above the floor
-size     2380 x 1432 x 869 mm, fabric area 6.49 m2, hem length 6.42 m
+size     2381 x 1432 x 869 mm, fabric area 6.04 m2, hem length 6.42 m
 distance closest 10.0 mm from the furniture (clearance 10 mm)
-ridges   43 sharp ridges (seam candidates for the next step)
+ridges   77 sharp ridges (seam candidates for the next step)
+water    would stay on the top (see warning)
 ```
 
 It takes from a few seconds (a chair) to under a minute (a large sofa).
+
+## What the cover looks like
+
+- **Pulled tight on top.** The top runs in straight lines between the highest parts of the
+  furniture, from the front edge of a seat straight up to the top of the back. It never sags
+  into a seat or a recess, so water can run off. That is the rule for every cover.
+- **Straight down at the sides.** Below the widest point the cover hangs vertically to the hem,
+  so legs and undercuts are hidden.
+- **Open at the bottom**, with a straight hem at the hem height.
 
 ## Look at it
 
@@ -27,40 +36,65 @@ laptop and drag it onto gltf-viewer.donmccurdy.com (run this on the laptop, not 
 scp dev@168.119.50.82:~/cover-pattern-engine/models/blocchi-2seater-moon-right/preview.glb ~/Downloads/
 ```
 
-Check three things:
-1. The cover hangs straight down from the widest point, with legs and undercuts hidden.
-2. Gaps you want spanned (slats, the gap between cushions) are spanned, and recesses you want
-   followed (seat to backrest) are followed.
-3. The bottom edge is at the right height.
+## Does water run off?
 
-## The three settings
+Every run checks the top for two things:
+- **hollows:** spots lower than everything around them;
+- **flat patches:** areas flatter than 5° (`hull.min_slope_deg`) and at least 10 cm across
+  (`hull.flat_patch_mm`). The crest of a backrest and the rim of the cover do not count; water
+  runs off them.
+
+If water would stay, the output says so and the warning gives the place (x, y in mm; x runs
+across, y from front to back, the front at negative y).
+
+## Tables and other flat tops: the balloon
+
+A flat top holds water. Put a balloon under the cover so the fabric forms a tent:
+
+```
+uv run cover hull models/<table> --set hull.support=balloon
+```
+
+```
+water    runs off
+support  balloon 69 mm high (automatic), radius 150 mm, centred at x 0, y 0
+```
+
+The program places the balloon under the middle of the flat area and finds the lowest height
+at which the whole top sheds water. That height is the one to use in the workshop. To use a
+fixed height instead: `--set hull.support_height_mm=100`. To keep the balloon for that model,
+put it in the model's `cover.json`:
+
+```json
+{ "format_version": 1, "parameters": { "hull": { "support": "balloon" } } }
+```
+
+## The settings
 
 | setting | flag | default | what it does |
 |---|---|---|---|
 | clearance | `--clearance 10` | 10 mm | gap between furniture and fabric everywhere. Raise it for a looser cover. |
-| bridge gap | `--bridge-gap 60` | 60 mm | gaps narrower than this are spanned. Wider recesses are followed. |
 | hem height | `--hem-height 50` | 50 mm | how high above the floor the cover ends. |
+| bridge gap | `--bridge-gap 60` | 60 mm | slots in the outline seen from above (between slats, between two seat units) narrower than this are closed. |
+| balloon | `--set hull.support=balloon` | none | tent support for flat tops (above). |
 
-A flag changes the value for that run only ("trial"). To keep a value for one model, put it
-in the model's `cover.json`:
+A flag changes the value for that run only ("trial"). To keep a value for one model, put it in
+the model's `cover.json`:
 
 ```json
-{ "format_version": 1, "parameters": { "hull": { "clearance_mm": 15, "bridge_gap_mm": 80 } } }
+{ "format_version": 1, "parameters": { "hull": { "clearance_mm": 15 } } }
 ```
 
 To change it for every model, edit `config/defaults.yaml` (see `parameters.md`).
 
-About the bridge gap: the fabric is modelled as a ball of half the bridge gap rolling over
-the furniture. A gap much narrower than the setting is spanned flat. A gap close to the
-setting still sags a little (a 20 mm slat gap sags about 1 mm at the default 60 mm). A gap wider
-than the setting is followed.
+The old behaviour, where the cover follows the seat instead of spanning it, is still available
+with `--set hull.top=draped`. It holds water on most furniture, so use it only for special cases.
 
 ## Leaving something out, or filling a gap
 
 Some things should not shape the cover, for example a parasol pole or a cable. Others should
-be covered as if they were solid, for example a gap you want closed. Add boxes to `cover.json`
-(coordinates in mm, as in `model.glb`: x across, y front to back with the front at -y,
-z up from the floor):
+be covered as if they were solid. Add boxes to `cover.json` (coordinates in mm, as in
+`model.glb`: x across, y front to back with the front at -y, z up from the floor):
 
 ```json
 {
@@ -78,8 +112,9 @@ part of the furniture.
 
 ## Reading the check
 
-- **closest:** never below the clearance. If it is, a warning says so. Tell Claude Code.
+- **closest:** never below the clearance. If it is, a warning says so; tell Claude Code.
 - **fabric area:** the cover surface without seam allowances. Real fabric use is higher.
 - **ridges:** sharp edges of the cover, where seams will most likely go (next step).
+- **water:** runs off, or where it would stay.
 
 Everything is also written to `hull.json` next to the model.

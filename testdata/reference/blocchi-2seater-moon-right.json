@@ -1,0 +1,21 @@
+{
+  "format_version": 1,
+  "model_id": "blocchi-2seater-moon-right",
+  "source": "owner's fitting cover drawing 'Cover 110' (testdata/models/cover.pdf, not in git), 2026-09-30",
+  "measured": "seam to seam, on the finished cover (owner)",
+  "fabric": "WeatherMax, charcoal",
+  "features": { "air_pockets": 4, "tie_downs": "elastic", "grommets": null, "bottom": "open" },
+  "dimensions_mm": {
+    "total_height": 880,
+    "skirt_height_front": 406,
+    "skirt_height_end": 406,
+    "top_band_width": 330,
+    "top_band_width_side_view": 331,
+    "side_length_bottom": 1419,
+    "plan_extent_a": 1970,
+    "plan_extent_b": 1924,
+    "back_top_seam_length": 1859.4,
+    "bottom_circumference": 6679.7
+  },
+  "shape": "top runs straight from the front edge of the base to the top of the back; a band along the top of the back; vertical skirt all round; open at the bottom"
+}

@@ -124,6 +124,10 @@ looking at in any glTF viewer. Not read by the engine.
   "distance_to_model_mm": { "min": 10.0, "mean_at_vertices": 15.511, "clearance": 10.0 },
   "clearance_repair": { "vertices_moved": 20226, "max_move_mm": 3.665 },
   "ridges": { "chains": 43, "length_mm": 806.1, "angle_deg": 40.0 },
+  "top": "tensioned",
+  "drainage": { "drains": false, "hollow_area_mm2": 0.0, "flat_area_mm2": 110000.0,
+                "worst_location_mm": [114.0, 198.0] },
+  "support": null,
   "masks": 0,
   "parameters": { "hull.clearance_mm": 10, "...": "..." },
   "parameter_sources": { "hull.clearance_mm": "default", "...": "..." },
@@ -137,6 +141,13 @@ looking at in any glTF viewer. Not read by the engine.
   largest push.
 - `ridges`: connected chains of edges sharper than `seams.ridge_angle_deg`, the seam
   candidates for M3.
+- `top`: `tensioned` (straight between high points, sheds water) or `draped`.
+- `drainage`: does water run off (CLAUDE.md rule 12)? Hollows deeper than 1 mm and flat
+  patches (slope below `hull.min_slope_deg`, at least `hull.flat_patch_mm` across, not at the
+  edge), with the centre of the largest problem area.
+- `support`: `null`, or the balloon used: `{"kind": "balloon", "centre_mm": [x, y],
+  "radius_mm": 150, "height_mm": 69.4, "automatic": true}`. Height is above the cover top it
+  lifts.
 - `cover.json` may carry `hull_masks`: `{"type": "box", "min": [x, y, z], "max": [x, y, z],
   "mode": "exclude" | "solid"}` in canonical model coordinates.
 

@@ -323,3 +323,26 @@ bridge gap no longer decides whether a recess is followed. Flat tops get a raise
 areas flatter than a minimum slope). Details follow in the revised M2 plan.
 Consequences: the M2 acceptance "chair hull follows the seat" is replaced by "spans the seat
 and drains". The slatted-table tests change once the tent support exists.
+
+Implementation (M2 revision):
+- `hull.top: tensioned` (default): the top is the upper convex envelope of the bridged,
+  clearance-dilated height map, clipped to the planform (the Qhull upper hull of the grid
+  points, interpolated on its triangles). This is a sheet pulled infinitely tight: straight
+  lines between high points, vertical walls up to it, and concave, so it never has a hollow.
+  A minimal-surface membrane with the edge held at the furniture was tried first; it sagged
+  between the front edge and the back, because it was held at seat height along the sides
+  (the owner's side panels rise with the slope).
+- Run-off check (`hull/drainage.py`): a priority flood from the planform edge finds hollows
+  deeper than 1 mm. The slope map finds flat patches (slope < `hull.min_slope_deg`, 5 to
+  confirm) at least `hull.flat_patch_mm` across and not at the edge, so crests and edges do
+  not count. The result is in `hull.json` (`drainage`), plus a CLI line and a warning.
+- `hull.support: balloon`: a dome of `hull.support_radius_mm` (150, to confirm) under the
+  centre of the largest flat patch. Its height is `hull.support_height_mm`, or when that is 0,
+  the lowest that sheds water (bisection). The slatted test table needs 69 mm.
+- `hull.top: draped` keeps the ADR-024 behaviour (recesses wider than the bridge gap are
+  followed), for fitted cases.
+- Blocchi against the reference (`testdata/reference/blocchi-2seater-moon-right.json`, seam to
+  seam): height 870 vs 880 mm, a flat band on top 262 mm wide (reference band 330 mm), hem
+  6.42 vs 6.68 m. The flat band between the two back cushions (0.14 m2) is reported as
+  holding water; the owner's cover has the same band. Open question to the owner. Skirt
+  heights depend on the seam line and are compared in M3.
