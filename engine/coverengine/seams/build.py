@@ -127,6 +127,26 @@ def _read_manual(model_dir: Path, path: Path | None) -> dict[str, Any] | None:
 
 
 def cut_cover(model_dir: Path, params: EffectiveParams, seams_file: Path | None = None) -> Cut:
+    """Seams and panels of the cover. If wall panels leave a panel that cannot lie flat in one
+    piece, the cover is cut again without walls (the top then wraps down to the skirt there) and
+    a warning says so."""
+    try:
+        return _cut_cover(model_dir, params, seams_file, walls_allowed=True)
+    except CoverError as exc:
+        if "not a disk" not in str(exc):
+            raise
+        result = _cut_cover(model_dir, params, seams_file, walls_allowed=False)
+        if result.report.get("walls_tried"):
+            result.warnings.append(
+                f"wall panels were left out ({exc}); the top panels reach down to the skirt"
+            )
+            result.report["warnings"] = result.warnings
+        return result
+
+
+def _cut_cover(
+    model_dir: Path, params: EffectiveParams, seams_file: Path | None, walls_allowed: bool
+) -> Cut:
     hull_path = model_dir / HULL_GLB
     if not hull_path.is_file():
         raise CoverError(f"no cover surface at {hull_path} (run cover hull first)")
@@ -184,6 +204,7 @@ def cut_cover(model_dir: Path, params: EffectiveParams, seams_file: Path | None 
     # chair), the upright part between becomes a wall panel, so the top never wraps down over
     # its edge; a wall ends in a short upright line where the edge comes down again
     walls: list[tuple[float, float]] = []
+    walls_tried = False
     if level_skirt:
         walls = auto.wall_ranges(
             rim,
@@ -191,6 +212,8 @@ def cut_cover(model_dir: Path, params: EffectiveParams, seams_file: Path | None 
             _p(params, "seams.wall_min_mm"),
             _p(params, "seams.wall_min_length_mm"),
         )
+    if walls and not walls_allowed:
+        walls, walls_tried = [], True
     if walls:
         cut = apply(cut, auto.wall_seam(line, rim, inset, walls, TOP_REGION), snap)
     reach = _p(params, "seams.corner_window_mm")
@@ -267,6 +290,7 @@ def cut_cover(model_dir: Path, params: EffectiveParams, seams_file: Path | None 
 
     result = _assemble(model_dir, cut, params, positions, line, top_lines, levels, warnings)
     result.report["skirt_height_mm"] = [round(h, 1) for h in heights]  # lowest, highest
+    result.report["walls_tried"] = walls_tried
     return result
 
 
