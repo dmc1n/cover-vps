@@ -193,6 +193,23 @@ def _cmd_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_drawing(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from coverengine.export.drawing import SIZES_PDF, write_drawing
+    from coverengine.flatten.pattern import PATTERN_JSON
+
+    pattern = args.model / PATTERN_JSON
+    if not pattern.is_file():
+        raise CoverError(f"no {PATTERN_JSON} in {args.model} (run cover flatten first)")
+    cover_json = args.model / "cover.json"
+    params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    doc = _json.loads(pattern.read_text(encoding="utf-8"))
+    out = write_drawing(args.model, doc, params, args.out or args.model / SIZES_PDF)
+    print(f"size drawing -> {out}")
+    return 0
+
+
 def _cmd_flatten(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -209,7 +226,13 @@ def _cmd_flatten(args: argparse.Namespace) -> int:
     (out / PATTERN_JSON).write_text(
         _json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(f"patterns -> {out / 'pattern.dxf'}, pattern.svg, pattern-stretch.svg, pattern.json")
+    from coverengine.export.drawing import SIZES_PDF, write_drawing
+
+    write_drawing(args.model, doc, params, out / SIZES_PDF)
+    print(
+        f"patterns -> {out / 'pattern.dxf'}, pattern.svg, pattern-stretch.svg, pattern.json, "
+        f"{SIZES_PDF}"
+    )
     for p in doc["panels"]:
         fits = "fits the roll" if p["fits_roll"] else "TOO WIDE for the roll"
         print(
@@ -360,6 +383,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_flatten)
+
+    p = sub.add_parser("drawing", help="size drawing of the cover and its panels (sizes.pdf)")
+    p.add_argument("model", type=Path, help="model directory with patterns (cover flatten)")
+    p.add_argument("--out", type=Path, help="PDF file (default: sizes.pdf in the model dir)")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_drawing)
 
     p = sub.add_parser("run", help="import, cover, seams and patterns in one go")
     p.add_argument("file", type=Path, help="3D file (STEP, IGES, STL, ...)")

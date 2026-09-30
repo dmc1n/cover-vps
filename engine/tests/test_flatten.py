@@ -8,6 +8,7 @@ import pytest
 import shapely
 import trimesh
 from coverengine.cli import main
+from coverengine.export.drawing import load_cover, measure, skirt_heights, write_drawing
 from coverengine.export.pattern import write_all
 from coverengine.flatten.pattern import build_patterns, pattern_set
 from coverengine.flatten.solve import flatten, singular_values
@@ -196,7 +197,8 @@ def test_cli_run_and_diff(
 ) -> None:
     src = covers["root"] / "generated" / "chair.stl"
     assert main(["run", str(src), "--out", str(tmp_path / "a")]) == 0
-    for f in ("model.glb", "hull.glb", "panels.json", "pattern.dxf", "pattern.svg", "pattern.json"):
+    files = ("model.glb", "hull.glb", "panels.json", "pattern.dxf", "pattern.json", "sizes.pdf")
+    for f in files:
         assert (tmp_path / "a" / f).is_file(), f
     assert (
         main(["run", str(src), "--out", str(tmp_path / "b"), "--set", "hull.clearance_mm=20"]) == 0
@@ -209,3 +211,30 @@ def test_cli_run_and_diff(
     text = capsys.readouterr().out
     assert "hull.clearance_mm" in text and "panel(s) changed" in text
     assert not text.strip().endswith("0 panel(s) changed by more than 1 mm")
+
+
+def test_size_drawing(covers: dict[str, Any], tmp_path: Path) -> None:
+    root = covers["root"] / "box_with_legs"
+    _, doc, _ = covers["box_with_legs"]
+    a = write_drawing(root, doc, params(), tmp_path / "a.pdf")
+    b = write_drawing(root, doc, params(), tmp_path / "b.pdf")
+    data = a.read_bytes()
+    assert data.startswith(b"%PDF") and data == b.read_bytes()  # same input, same file
+    pages = data.count(b"/Type /Page") - data.count(b"/Type /Pages")
+    assert pages == 2 + len(doc["panels"])  # drawing, sizes, one page per panel
+
+
+def test_drawing_sizes_agree(covers: dict[str, Any]) -> None:
+    root = covers["root"] / "box_with_legs"
+    _, doc, _ = covers["box_with_legs"]
+    cover = load_cover(root, doc, params())
+    skirts = [n for n, r in zip(cover.names, cover.regions, strict=True) if r == "skirt"]
+    hem = sum(measure(cover, f"hem_length:{n}") or 0.0 for n in skirts)
+    assert hem == pytest.approx(measure(cover, "hem_length"), rel=0.01)
+    height = measure(cover, "total_height")
+    assert height == pytest.approx(float(cover.vertices[:, 2].max()) - cover.hem_z)
+    for n in skirts:
+        middle, low, high = skirt_heights(cover, n)
+        assert 0 < low <= middle <= high < height
+    turned = load_cover(root, doc, params(**{"drawing.plan_rotation_deg": 90}))
+    assert measure(turned, "plan_extent_a") == pytest.approx(measure(cover, "plan_extent_b"))

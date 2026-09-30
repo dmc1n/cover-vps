@@ -189,7 +189,8 @@ cover diff a.json b.json                    panel dimensions that changed by mor
 cover import <file> --out models/<id>/      STEP/IGES/STL/OBJ/PLY/GLB → model.glb, model.json, parts.json
 cover hull models/<id>/ [--clearance N ...]  drape hull → hull.glb, hull.json, preview.glb
 cover cut models/<id>/ [--seams FILE]        seams and panels → panels.glb, panels.json
-cover flatten models/<id>/                   flat patterns → pattern.dxf, pattern.svg, pattern.json
+cover flatten models/<id>/                   flat patterns → pattern.dxf, pattern.svg, pattern.json, sizes.pdf
+cover drawing models/<id>/                   size drawing of cover and panels → sizes.pdf
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/

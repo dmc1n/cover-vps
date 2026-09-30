@@ -106,6 +106,10 @@ export:
   sheet_spacing_mm: 20           # spacing between panels on the export sheet
   dxf_version: R2010
 
+drawing:
+  plan_rotation_deg: 0           # sizes.pdf: turn the top view counter-clockwise by this angle, so
+                                 # it matches the workshop drawing of the model
+
 pen:
   label_height_mm: 15
   tick_length_mm: 10

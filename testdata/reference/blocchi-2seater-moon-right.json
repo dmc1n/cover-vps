@@ -24,5 +24,44 @@
     "back_top_seam_length": 1859.4,
     "bottom_circumference": 6679.7
   },
-  "shape": "top runs straight from the front edge of the base to the top of the back; a band along the top of the back; vertical skirt all round; open at the bottom"
+  "shape": "top runs straight from the front edge of the base to the top of the back; a band along the top of the back; vertical skirt all round; open at the bottom",
+  "compare": {
+    "total_height": {
+      "label": "Total height (hem to top)",
+      "measure": "total_height"
+    },
+    "skirt_height_front": {
+      "label": "Skirt height, front",
+      "measure": "skirt_height:skirt-front"
+    },
+    "skirt_height_end": {
+      "label": "Skirt height, straight end",
+      "measure": "skirt_height:skirt-right"
+    },
+    "top_band_width": {
+      "label": "Band along the back, width",
+      "measure": "panel_width:top-3"
+    },
+    "side_length_bottom": {
+      "label": "Straight end, length at the bottom",
+      "measure": "straight_hem"
+    },
+    "plan_extent_a": {
+      "label": "Top view, across",
+      "measure": "plan_extent_a"
+    },
+    "plan_extent_b": {
+      "label": "Top view, depth",
+      "measure": "plan_extent_b"
+    },
+    "back_top_seam_length": {
+      "label": "Band, back seam (cushion circumference)",
+      "measure": "seam_length:top-5/top-3"
+    },
+    "bottom_circumference": {
+      "label": "Hem length (bottom circumference)",
+      "measure": "hem_length"
+    }
+  },
+  "compare_note": "how each size is measured on the calculated cover (sizes.pdf, export/drawing.py measure())"
 }

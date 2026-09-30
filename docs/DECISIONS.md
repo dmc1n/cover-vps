@@ -432,3 +432,27 @@ curved in two directions; a single panel there stretches far beyond the limit (1
 Blocchi's back half, a 150 mm seam mismatch). They need more seams. The Blocchi needs the owner's
 seam layout (the band along the back); an automatic stretch-driven seam proposal is a later
 step.
+
+## ADR-028 — Size drawing as a PDF (M4)
+
+Status: accepted, 2026-09-30.
+
+The owner checks a calculated cover against covers that fit by their sizes, from a workshop
+drawing (top view, side view, 3D view, dimensions seam to seam, title block). `sizes.pdf` gives
+the same for every calculated cover, plus size tables and one page per flat panel, and is the
+printable view the dashboard will offer.
+
+- Drawn with matplotlib (already a dependency): vector lines, text and dimensions; the shaded
+  surfaces are rasterised inside the PDF (200 dpi) to keep the file small (about 1.2 MB for the
+  Blocchi). Hidden seams are left out by face orientation (the cover's faces point outward); a
+  full hidden-line pass is not needed for these near-convex shapes.
+- Built only from files on disk, so the web app can redraw it without recomputing. No creation
+  date in the PDF (deterministic output).
+- Sizes are measured by named rules (`measure()` in `export/drawing.py`); a reference cover's
+  `compare` map names the rule for each of its sizes, so a new reference needs no code.
+- The top view can be turned per model (`drawing.plan_rotation_deg`) to match the owner's drawing.
+
+Found with it: on the Blocchi, the skirt seam is not at a constant height (25–41 cm above the hem
+along the front) and zig-zags by 2–4 cm where the rounded top meets the vertical skirt. That
+explains most of the seam differences between panels on the skirt seams.
+

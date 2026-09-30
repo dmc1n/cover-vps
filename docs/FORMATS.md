@@ -283,6 +283,32 @@ panel, same mm/Z-up convention as `model.glb`.
 
 Seam allowances, hem, vents and final panel data (M5) extend this format.
 
+`sizes.pdf` (`export/drawing.py`, `cover drawing`) is the size drawing built from `panels.npz`,
+`panels.json`, `hull.json` and `pattern.json`: overview views, size tables and one page per flat
+panel, in cm, seam to seam. The PDF has no creation date, so the same input gives the same file.
+
+### Reference cover (`testdata/reference/<id>.json` or `models/<id>/reference.json`)
+
+Sizes of a cover that fits, measured seam to seam, for comparison in `sizes.pdf`:
+
+```json
+{
+  "model_id": "blocchi-2seater-moon-right",
+  "dimensions_mm": { "total_height": 880, "bottom_circumference": 6679.7 },
+  "compare": {
+    "total_height": { "label": "Total height (hem to top)", "measure": "total_height" },
+    "bottom_circumference": { "label": "Hem length", "measure": "hem_length" }
+  }
+}
+```
+
+`compare` maps a reference size to a measurement of the calculated cover:
+`total_height` (top above the hem), `plan_extent_a` / `plan_extent_b` (top view across and
+depth, after `drawing.plan_rotation_deg`), `hem_length`, `hem_length:<panel>`, `straight_hem`
+(longest straight run of the hem in plan), `skirt_height:<panel>` (middle of the panel's hem),
+`skirt_lowest:<panel>`, `skirt_highest:<panel>`, `panel_width:<panel>` (median width of the flat
+panel across its length), `seam_length:<seam id>` (on the cover).
+
 ## Fabric profile (M4 placeholder, M8 measured)
 
 ```json
