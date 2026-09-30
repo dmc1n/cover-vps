@@ -195,6 +195,10 @@ cover cut models/<id>/ [--seams FILE]        seams and panels → panels.glb, pa
 cover flatten models/<id>/                   flat patterns → pattern.dxf, pattern.svg, pattern.json, sizes.pdf
 cover drawing models/<id>/                   size drawing of cover and panels → sizes.pdf
 cover export models/<id>/                    finished pieces → cut.dxf, cut.svg, cutting-list.pdf, finished.json
+                                             (and a revision in revisions/<n>/)
+cover model models/<id>/ [--family F --status S --tags a,b --notes ...]   catalogue info, revisions
+cover batch [--family F | --ids a,b] [--steps hull,cut,flatten,export] [--set ...]  many models, what changed
+make e2e        the web app flow in a real browser (Playwright in Docker)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/

@@ -532,3 +532,21 @@ Status: accepted, 2026-09-30 (built while the owner was offline; plan in docs/pl
 - Headless browser checks run in the official Playwright Docker image (the server lacks the
   browser's system libraries and we have no root).
 
+## ADR-032 — Families, status, revisions and batch (M7)
+
+Status: accepted, 2026-09-30 (built while the owner was offline).
+
+- A model's family is a field in its `cover.json`; the preset `config/presets/<family>.yaml`
+  is parameter layer 2 for every command and the web app (`resolve_model`). An explicit
+  `--preset` still wins. Unknown families are an error, not ignored.
+- Status, tags and notes live in `cover.json` too: the model folder stays the one place that
+  describes a model, for the command line and the web app alike.
+- Revisions are copies of the small result files (pattern, finished pieces, DXF, settings,
+  seams) per export, not of the meshes: about 100 kB per revision. Comparing two revisions uses
+  the same rule as `cover diff` (panels changed by more than 1 mm, settings that differ), now in
+  `catalogue.compare`.
+- Batch runs are the same steps per model, one after the other (CLI `cover batch`, web: select
+  models, "Run these"); the report per model is the comparison with its previous revision.
+- The first preset is `table` (balloon under the cover, owner's rule). Other families wait for
+  the owner's list (question 16).
+

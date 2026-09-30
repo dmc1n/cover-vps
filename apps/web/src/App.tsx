@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, cm, fileUrl, Job, ModelBrief, ModelDetail, Scalar, Step, STEP_LABEL, STEPS } from "./api";
+import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
 import { Viewer } from "./Viewer";
@@ -35,14 +36,45 @@ export function App() {
 function ModelList() {
   const [models, setModels] = useState<ModelBrief[] | null>(null);
   const [error, setError] = useState("");
-  useEffect(() => {
+  const [query, setQuery] = useState("");
+  const [family, setFamily] = useState("");
+  const [status, setStatus] = useState("");
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const load = useCallback(() => {
     api.models().then(setModels).catch((e) => setError(String(e)));
   }, []);
+  useEffect(load, [load]);
+  const q = query.toLowerCase();
+  const shown = (models ?? []).filter(
+    (m) =>
+      (!q || m.id.includes(q) || m.tags.some((t) => t.toLowerCase().includes(q)) || m.notes.toLowerCase().includes(q)) &&
+      (!family || (m.family ?? "") === (family === "-" ? "" : family)) &&
+      (!status || m.status === status),
+  );
+  const families = [...new Set((models ?? []).map((m) => m.family).filter(Boolean))] as string[];
+  const selected = shown.filter((m) => picked[m.id]);
   return (
     <>
       <Upload />
       <h2>Models</h2>
       {error && <p className="error">{error}</p>}
+      <div className="row">
+        <input className="search" placeholder="Search name, tag or note…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <select value={family} onChange={(e) => setFamily(e.target.value)}>
+          <option value="">all families</option>
+          <option value="-">no family</option>
+          {families.map((f) => (
+            <option key={f}>{f}</option>
+          ))}
+        </select>
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">any status</option>
+          <option>draft</option>
+          <option>checked</option>
+          <option>production</option>
+        </select>
+      </div>
+      {selected.length > 0 && <BatchBar selected={selected} onDone={load} />}
       {!models ? (
         <p className="muted">Loading…</p>
       ) : !models.length ? (
@@ -51,7 +83,16 @@ function ModelList() {
         <table className="list">
           <thead>
             <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  checked={shown.length > 0 && shown.every((m) => picked[m.id])}
+                  onChange={(e) => setPicked(Object.fromEntries(shown.map((m) => [m.id, e.target.checked])))}
+                />
+              </th>
               <th>Model</th>
+              <th>Family</th>
+              <th>Status</th>
               <th>Size (cm)</th>
               <th>Steps done</th>
               <th>Panels</th>
@@ -60,10 +101,22 @@ function ModelList() {
             </tr>
           </thead>
           <tbody>
-            {models.map((m) => (
+            {shown.map((m) => (
               <tr key={m.id} onClick={() => (window.location.hash = `#/model/${m.id}`)}>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={!!picked[m.id]} onChange={(e) => setPicked({ ...picked, [m.id]: e.target.checked })} />
+                </td>
                 <td>
                   <a href={`#/model/${m.id}`}>{m.id}</a>
+                  {m.tags.map((t) => (
+                    <span key={t} className="badge">
+                      {t}
+                    </span>
+                  ))}
+                </td>
+                <td>{m.family ?? ""}</td>
+                <td>
+                  <span className={`badge status-${m.status}`}>{m.status}</span>
                 </td>
                 <td>{m.size_mm ? m.size_mm.map((v) => (v / 10).toFixed(0)).join(" × ") : "–"}</td>
                 <td>
@@ -149,7 +202,7 @@ function Upload() {
   );
 }
 
-type Tab = "3d" | "seams" | "patterns" | "sizes" | "cut" | "settings" | "files" | "log";
+type Tab = "3d" | "seams" | "patterns" | "sizes" | "cut" | "settings" | "revisions" | "files" | "log";
 const TABS: [Tab, string][] = [
   ["3d", "3D"],
   ["seams", "Seams"],
@@ -157,6 +210,7 @@ const TABS: [Tab, string][] = [
   ["sizes", "Size drawing"],
   ["cut", "Cut pieces"],
   ["settings", "Settings"],
+  ["revisions", "Revisions"],
   ["files", "Downloads"],
   ["log", "Warnings and log"],
 ];
@@ -226,6 +280,7 @@ function ModelPage({ id }: { id: string }) {
           </button>
         </div>
       </section>
+      <ModelInfo key={`${model.id}-${model.family}-${model.status}`} model={model} onSaved={load} />
       {job && <JobBar job={job} />}
       {error && <p className="error">{error}</p>}
       {model.diff && (model.diff.panels.length > 0 || model.diff.settings.length > 0) && (
@@ -263,6 +318,7 @@ function ModelPage({ id }: { id: string }) {
         {tab === "sizes" && <Pdf id={id} name="sizes.pdf" has={has("sizes.pdf")} stamp={stamp} />}
         {tab === "cut" && <CutPieces model={model} stamp={stamp} />}
         {tab === "settings" && <Settings id={id} onRun={(steps, trial) => run(steps, trial)} />}
+        {tab === "revisions" && <Revisions model={model} />}
         {tab === "files" && <Files model={model} />}
         {tab === "log" && <Log model={model} job={job} />}
       </section>

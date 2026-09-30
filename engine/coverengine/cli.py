@@ -14,13 +14,14 @@ from coverengine.io.placement import SUGGESTED_UNITS
 from coverengine.params import (
     EffectiveParams,
     Registry,
-    load_cover_definition_layer,
     load_yaml_layer,
     parse_set,
+    resolve_model,
 )
 
 Handler = Callable[[argparse.Namespace], int]
 MM_PER_CM = 10  # param-ok: unit conversion
+SHOW_REVISIONS = 5  # param-ok: CLI display
 
 
 def _add_param_args(p: argparse.ArgumentParser) -> None:
@@ -37,10 +38,15 @@ def _add_param_args(p: argparse.ArgumentParser) -> None:
 
 
 def resolve_params(args: argparse.Namespace, cover_definition: Path | None) -> EffectiveParams:
+    """Defaults, the family preset (`--preset`, or the family named in the model's cover.json),
+    the model's cover.json, then `--set`."""
     registry = Registry.load(args.defaults)
     preset = load_yaml_layer(args.preset) if args.preset else None
-    model = load_cover_definition_layer(cover_definition) if cover_definition else None
-    return registry.resolve(preset=preset, model=model, trial=parse_set(args.overrides))
+    trial = parse_set(args.overrides)
+    if cover_definition is not None:
+        model_dir = cover_definition if cover_definition.is_dir() else cover_definition.parent
+        return resolve_model(model_dir, trial, registry, preset)
+    return registry.resolve(preset=preset, trial=trial)
 
 
 def _fmt(value: object) -> str:
@@ -220,9 +226,81 @@ def _cmd_export(args: argparse.Namespace) -> int:
         print(f"  {pc['id']:<4} {pc['name']:<16} x{pc['quantity']}  {w:6.0f} x {h:6.0f} mm")
     length = finished["sheet"]["roll_length_mm"]
     print(f"fabric about {length / 1000:.2f} m of roll")
+    if out.resolve() == args.model.resolve():
+        from coverengine.catalogue import save_revision
+
+        rev = save_revision(args.model, parse_set(args.overrides))
+        print(f"revision {rev['number']}" + (" (trial settings)" if rev["trial"] else ""))
     for w in warnings:
         print(f"warning: {w}", file=sys.stderr)
     return 0
+
+
+def _cmd_model(args: argparse.Namespace) -> int:
+    from coverengine.catalogue import info, revisions, set_info
+
+    changes: dict[str, object] = {}
+    if args.family is not None:
+        changes["family"] = args.family
+    if args.status is not None:
+        changes["status"] = args.status
+    if args.tags is not None:
+        changes["tags"] = [t for t in args.tags.split(",")]
+    if args.notes is not None:
+        changes["notes"] = args.notes
+    doc = set_info(args.model, changes) if changes else info(args.model)
+    tags = ", ".join(doc["tags"]) or "-"
+    print(f"{args.model.name}: family {doc['family'] or '-'}, status {doc['status']}, tags {tags}")
+    if doc["notes"]:
+        print(f"  notes: {doc['notes']}")
+    for r in revisions(args.model)[-args.revisions :] if args.revisions else []:
+        trial = " trial " + ",".join(r["trial"]) if r["trial"] else ""
+        print(
+            f"  revision {r['number']:>3}  {r['panels']} panels, stretch "
+            f"{r['max_stretch_pct']:.1f} %, {r['warnings']} warnings{trial}"
+        )
+    return 0
+
+
+def _cmd_batch(args: argparse.Namespace) -> int:
+    """Run steps on many models (one family, a list, or all) and report what changed."""
+    from coverengine.catalogue import compare_files, info, revisions
+
+    root: Path = args.models
+    dirs = sorted(d for d in root.iterdir() if (d / "model.json").is_file())
+    if args.ids:
+        wanted = set(args.ids.split(","))
+        dirs = [d for d in dirs if d.name in wanted]
+    if args.family:
+        dirs = [d for d in dirs if info(d)["family"] == args.family]
+    if not dirs:
+        raise CoverError("no models match")
+    steps = args.steps.split(",")
+    extra = [x for s in args.overrides for x in ("--set", s)]
+    failed = 0
+    for d in dirs:
+        before = revisions(d)
+        code = 0
+        for step in steps:
+            code = main([step, str(d), *extra])
+            if code:
+                break
+        after = revisions(d)
+        if code:
+            failed += 1
+            print(f"== {d.name}: FAILED at {step}")
+            continue
+        if before and after and after[-1]["number"] != before[-1]["number"]:
+            prev = d / "revisions" / f"{before[-1]['number']:03d}" / "pattern.json"
+            diff = compare_files(prev, d / "pattern.json", args.threshold)
+            n = len(diff["panels"]) if diff else 0
+            print(f"== {d.name}: {n} panel(s) changed by more than {args.threshold:g} mm")
+            if diff:
+                _print_diff(diff, args.threshold)
+        else:
+            print(f"== {d.name}: done")
+    print(f"{len(dirs) - failed} of {len(dirs)} model(s) done")
+    return 1 if failed else 0
 
 
 def _cmd_drawing(args: argparse.Namespace) -> int:
@@ -310,39 +388,27 @@ def _cmd_run(args: argparse.Namespace) -> int:
 def _cmd_diff(args: argparse.Namespace) -> int:
     import json as _json
 
+    from coverengine.catalogue import compare
+
     a = _json.loads(args.a.read_text(encoding="utf-8"))
     b = _json.loads(args.b.read_text(encoding="utf-8"))
-    pa = {p["name"]: p for p in a["panels"]}
-    pb = {p["name"]: p for p in b["panels"]}
-    changed = 0
-    for name in sorted(set(pa) | set(pb)):
-        if name not in pa or name not in pb:
-            print(f"  {name:<16} {'new' if name in pb else 'gone'}")
-            changed += 1
-            continue
-        da = (pa[name]["flat_width_mm"], pa[name]["flat_length_mm"])
-        db = (pb[name]["flat_width_mm"], pb[name]["flat_length_mm"])
-        move = max(abs(x - y) for x, y in zip(da, db, strict=True))
-        if move > args.threshold:
-            print(f"  {name:<16} {da[0]:.0f} x {da[1]:.0f} -> {db[0]:.0f} x {db[1]:.0f} mm")
-            changed += 1
-    flat_a = _flatten_tree(a.get("parameters", {}))
-    flat_b = _flatten_tree(b.get("parameters", {}))
-    for key in sorted(set(flat_a) | set(flat_b)):
-        if flat_a.get(key) != flat_b.get(key):
-            print(f"  setting {key}: {flat_a.get(key)} -> {flat_b.get(key)}")
-    print(f"{changed} panel(s) changed by more than {args.threshold:g} mm")
+    _print_diff(compare(a, b, args.threshold), args.threshold)
     return 0
 
 
-def _flatten_tree(tree: dict[str, object], prefix: str = "") -> dict[str, object]:
-    out: dict[str, object] = {}
-    for k, v in tree.items():
-        if isinstance(v, dict):
-            out.update(_flatten_tree(v, f"{prefix}{k}."))
+def _print_diff(d: dict[str, object], threshold: float) -> None:
+    panels = d["panels"]
+    settings = d["settings"]
+    assert isinstance(panels, list) and isinstance(settings, list)
+    for p in panels:
+        if p["change"] == "size":
+            (w0, l0), (w1, l1) = p["before_mm"], p["after_mm"]
+            print(f"  {p['name']:<16} {w0:.0f} x {l0:.0f} -> {w1:.0f} x {l1:.0f} mm")
         else:
-            out[f"{prefix}{k}"] = v
-    return out
+            print(f"  {p['name']:<16} {p['change']}")
+    for st in settings:
+        print(f"  setting {st['key']}: {st['before']} -> {st['after']}")
+    print(f"{len(panels)} panel(s) changed by more than {threshold:g} mm")
 
 
 def _cmd_testsheet(args: argparse.Namespace) -> int:
@@ -422,6 +488,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_export)
+
+    p = sub.add_parser("model", help="a model's family, status, tags, notes and revisions")
+    p.add_argument("model", type=Path, help="model directory")
+    p.add_argument("--family", help="family (a preset in config/presets/); '' for none")
+    p.add_argument("--status", choices=["draft", "checked", "production"])
+    p.add_argument("--tags", help="comma-separated tags ('' for none)")
+    p.add_argument("--notes", help="notes for the machine operator")
+    p.add_argument("--revisions", type=int, default=SHOW_REVISIONS, help="show the last N")
+    p.set_defaults(handler=_cmd_model)
+
+    p = sub.add_parser("batch", help="run steps on many models and report what changed")
+    p.add_argument("--models", type=Path, default=Path("models"), help="models folder")
+    p.add_argument("--family", help="only models of this family")
+    p.add_argument("--ids", help="only these models (comma-separated)")
+    p.add_argument("--steps", default="hull,cut,flatten,export", help="steps to run")
+    p.add_argument("--threshold", type=float, default=1.0, help="report changes above (mm)")
+    p.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
+    p.set_defaults(handler=_cmd_batch)
 
     p = sub.add_parser("drawing", help="size drawing of the cover and its panels (sizes.pdf)")
     p.add_argument("model", type=Path, help="model directory with patterns (cover flatten)")

@@ -106,3 +106,24 @@ def test_plan_view_and_hand_placed_seams(chair: dict[str, Any]) -> None:
     job = chair["app"].state.jobs.wait(r.json()["job"]["id"], RUN_TIMEOUT_S)
     m = c.get(f"/api/models/{chair['id']}").json()
     assert sum(1 for q in m["cut"]["panels"] if q["region"] == "top") == 1
+
+
+def test_family_status_revisions_and_batch(chair: dict[str, Any]) -> None:
+    c: TestClient = chair["client"]
+    assert "table" in c.get("/api/families").json()
+    r = c.put(f"/api/models/{chair['id']}/info", json={"status": "checked", "tags": ["test"]})
+    assert r.status_code == 200 and r.json()["status"] == "checked"
+    assert c.put(f"/api/models/{chair['id']}/info", json={"status": "nope"}).status_code == 400
+    listing = c.get("/api/models").json()
+    assert listing[0]["status"] == "checked" and listing[0]["tags"] == ["test"]
+    m = c.get(f"/api/models/{chair['id']}").json()
+    assert m["revisions"], "every export keeps a revision"
+    n = m["revisions"][-1]["number"]
+    assert c.get(f"/api/models/{chair['id']}/revisions/{n}/cut.dxf").status_code == 200
+    r = c.post("/api/batch", json={"model_ids": [chair["id"]], "steps": ["export"]})
+    assert r.status_code == 200, r.text
+    job = chair["app"].state.jobs.wait(r.json()["jobs"][0]["id"], RUN_TIMEOUT_S)
+    assert job["status"] == "done"
+    m2 = c.get(f"/api/models/{chair['id']}").json()
+    assert m2["revisions"][-1]["number"] == n + 1
+    assert c.post("/api/batch", json={"family": "table"}).status_code == 400  # none of them

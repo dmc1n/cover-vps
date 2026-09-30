@@ -285,3 +285,51 @@ def load_cover_definition_layer(path: Path | str) -> dict[str, Any]:
     if not isinstance(params, Mapping):
         raise ParamError(f"{p}: 'parameters' must be an object")
     return dict(params)
+
+
+def presets_dir() -> Path:
+    return repo_root() / "config" / "presets"
+
+
+def read_cover_definition(model_dir: Path) -> dict[str, Any]:
+    """A model's `cover.json` (empty if it has none)."""
+    p = model_dir / "cover.json"
+    if not p.is_file():
+        return {}
+    data = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(data, Mapping):
+        raise ParamError(f"{p}: must be an object")
+    return dict(data)
+
+
+def family_preset(family: str | None) -> dict[str, Any] | None:
+    """The family's preset (`config/presets/<family>.yaml`), layer 2."""
+    if not family:
+        return None
+    p = presets_dir() / f"{family}.yaml"
+    if not p.is_file():
+        raise ParamError(f"no preset for family {family!r} (config/presets/{family}.yaml)")
+    return load_yaml_layer(p)
+
+
+def list_families() -> list[str]:
+    d = presets_dir()
+    return sorted(p.stem for p in d.glob("*.yaml")) if d.is_dir() else []
+
+
+def resolve_model(
+    model_dir: Path,
+    trial: Mapping[str, Any] | None = None,
+    registry: Registry | None = None,
+    preset: Mapping[str, Any] | None = None,
+) -> EffectiveParams:
+    """The effective parameters of a model: defaults, its family's preset (unless `preset` is
+    given), its own `cover.json`, then the trial overrides."""
+    reg = registry or Registry.load()
+    cover = read_cover_definition(model_dir)
+    layer = cover.get("parameters") or None
+    if layer is not None and not isinstance(layer, Mapping):
+        raise ParamError(f"{model_dir / 'cover.json'}: 'parameters' must be an object")
+    if preset is None:
+        preset = family_preset(cover.get("family"))
+    return reg.resolve(preset=preset, model=layer, trial=trial)

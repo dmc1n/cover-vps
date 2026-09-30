@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from coverengine.params import Registry
-from coverengine.params.registry import load_cover_definition_layer
+from coverengine.catalogue import compare_files, info, revisions
+from coverengine.params import Registry, resolve_model
 
 # Files a model folder may hold, by step; the web app offers these for viewing and download.
 STEP_FILES = {
@@ -87,6 +87,7 @@ class Store:
         files = sorted(f for f in ALLOWED if (d / f).is_file())
         done = [s for s in STEPS if all((d / f).is_file() for f in STEP_FILES[s][:1])]
         out: dict[str, Any] = {"id": model_id, "steps_done": done, "files": files}
+        out.update(info(d))
         model = _read(d / "model.json")
         if model:
             out["size_mm"] = model.get("size_mm")
@@ -142,15 +143,12 @@ class Store:
                 ],
                 "sheet": finished.get("sheet"),
             }
-        out["diff"] = diff(d / "pattern.prev.json", d / "pattern.json")
+        out["diff"] = compare_files(d / "pattern.prev.json", d / "pattern.json")
+        out["revisions"] = revisions(d)
         return out
 
     def parameters(self, model_id: str, trial: dict[str, Any] | None = None) -> dict[str, Any]:
-        d = self.model_dir(model_id)
-        registry = Registry.load()
-        cover = d / "cover.json"
-        model = load_cover_definition_layer(cover) if cover.is_file() else None
-        eff = registry.resolve(model=model, trial=trial)
+        eff = resolve_model(self.model_dir(model_id), trial)
         return {"values": eff.flat(), "sources": eff.sources()}
 
     def save_parameters(self, model_id: str, values: dict[str, Any]) -> dict[str, Any]:
@@ -160,9 +158,7 @@ class Store:
         registry = Registry.load()
         clean: dict[str, Any] = {}
         for key, value in values.items():
-            v = registry.coerce(key, value, "web")
-            if v != registry.specs[key].default:
-                clean[key] = v
+            clean[key] = registry.coerce(key, value, "web")
         path = d / "cover.json"
         doc = _read(path) or {"format_version": 1, "model_id": model_id}
         tree: dict[str, Any] = {}
@@ -198,39 +194,3 @@ def registry_specs() -> list[dict[str, Any]]:
         }
         for s in registry.specs.values()
     ]
-
-
-def diff(old: Path, new: Path, threshold_mm: float = 1.0) -> dict[str, Any] | None:
-    """What changed between two PatternSets: panels whose flat size moved more than the
-    threshold, and the settings that differ (as `cover diff`)."""
-    a, b = _read(old), _read(new)
-    if not a or not b:
-        return None
-    pa = {p["name"]: p for p in a["panels"]}
-    pb = {p["name"]: p for p in b["panels"]}
-    panels = []
-    for name in sorted(set(pa) | set(pb)):
-        if name not in pa or name not in pb:
-            panels.append({"name": name, "change": "new" if name in pb else "gone"})
-            continue
-        da = (pa[name]["flat_width_mm"], pa[name]["flat_length_mm"])
-        db = (pb[name]["flat_width_mm"], pb[name]["flat_length_mm"])
-        if max(abs(x - y) for x, y in zip(da, db, strict=True)) > threshold_mm:
-            panels.append({"name": name, "change": "size", "before_mm": da, "after_mm": db})
-    fa, fb = _flat(a.get("parameters", {})), _flat(b.get("parameters", {}))
-    settings = [
-        {"key": k, "before": fa.get(k), "after": fb.get(k)}
-        for k in sorted(set(fa) | set(fb))
-        if fa.get(k) != fb.get(k)
-    ]
-    return {"panels": panels, "settings": settings}
-
-
-def _flat(tree: dict[str, Any], prefix: str = "") -> dict[str, Any]:
-    out: dict[str, Any] = {}
-    for k, v in tree.items():
-        if isinstance(v, dict):
-            out.update(_flat(v, f"{prefix}{k}."))
-        else:
-            out[f"{prefix}{k}"] = v
-    return out

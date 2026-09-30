@@ -10,8 +10,26 @@ export const STEP_LABEL: Record<Step, string> = {
   export: "Cut pieces",
 };
 
+export type Status = "draft" | "checked" | "production";
+
+export interface Revision {
+  number: number;
+  time: number;
+  parameter_hash: string;
+  trial: string[];
+  status: Status;
+  panels: number;
+  max_stretch_pct: number;
+  roll_length_mm: number | null;
+  warnings: number;
+}
+
 export interface ModelBrief {
   id: string;
+  family: string | null;
+  status: Status;
+  tags: string[];
+  notes: string;
   steps_done: Step[];
   files: string[];
   size_mm?: number[];
@@ -78,6 +96,7 @@ export interface ModelDetail extends ModelBrief {
   finished?: { pieces: Piece[]; sheet?: { roll_length_mm: number } };
   diff?: Diff | null;
   job?: Job | null;
+  revisions?: Revision[];
 }
 
 export type Scalar = string | number | boolean;
@@ -129,6 +148,21 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ steps, trial }),
     }).then((r) => json<Job>(r)),
+  families: () => fetch("/api/families").then((r) => json<string[]>(r)),
+  setInfo: (id: string, info: Partial<Pick<ModelBrief, "family" | "status" | "tags" | "notes">>) =>
+    fetch(`/api/models/${id}/info`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(info),
+    }).then((r) => json<Pick<ModelBrief, "family" | "status" | "tags" | "notes">>(r)),
+  compare: (id: string, a: number, b: number) =>
+    fetch(`/api/models/${id}/compare?a=${a}&b=${b}`).then((r) => json<Diff>(r)),
+  batch: (model_ids: string[], steps: Step[] | null) =>
+    fetch("/api/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model_ids, steps }),
+    }).then((r) => json<{ jobs: Job[] }>(r)),
   upload: (file: File, units: string, up: string) => {
     const form = new FormData();
     form.append("file", file);
@@ -143,3 +177,5 @@ export const api = {
 export const fileUrl = (id: string, name: string) => `/api/models/${id}/files/${name}`;
 
 export const cm = (mm: number) => `${(mm / 10).toFixed(1)} cm`;
+
+export const revisionUrl = (id: string, n: number, name: string) => `/api/models/${id}/revisions/${n}/${name}`;

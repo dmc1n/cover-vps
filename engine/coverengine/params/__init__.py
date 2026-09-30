@@ -9,6 +9,7 @@ from coverengine.params.registry import (
     load_cover_definition_layer,
     load_yaml_layer,
     parse_set,
+    resolve_model,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "load_cover_definition_layer",
     "load_yaml_layer",
     "parse_set",
+    "resolve_model",
 ]

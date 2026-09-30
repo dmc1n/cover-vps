@@ -82,3 +82,10 @@ svg.plan .handle { fill: #fff; stroke: var(--accent); stroke-width: 3; cursor: g
 svg.plan .skirt-handle { fill: #e0147a; stroke: #fff; stroke-width: 2; cursor: grab; }
 svg.plan .panel-name { fill: #1d2230; text-anchor: middle; pointer-events: none; opacity: 0.8; }
 button.active-mode { background: #dbe4ff; border-color: var(--accent); }
+
+input.search { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; min-width: 260px; }
+.info label { font-size: 14px; }
+.info input { padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; }
+textarea.notes { width: 100%; box-sizing: border-box; min-height: 44px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 14px; }
+.badge.status-draft { background: #eceef3; } .badge.status-checked { background: #dbe4ff; } .badge.status-production { background: #d8f0de; }
+.batch .jobstep { margin-right: 6px; }

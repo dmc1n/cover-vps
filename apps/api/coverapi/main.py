@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import Any
 
 from coverengine import __version__
-from coverengine.params.registry import ParamError, repo_root
+from coverengine.catalogue import KEPT, compare_files, info, revision_file, set_info
+from coverengine.errors import CoverError
+from coverengine.params.registry import ParamError, list_families, repo_root
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,6 +32,20 @@ class RunRequest(BaseModel):
 
 class ParametersRequest(BaseModel):
     values: dict[str, Any]
+
+
+class InfoRequest(BaseModel):
+    family: str | None = None
+    status: str | None = None
+    tags: list[str] | None = None
+    notes: str | None = None
+
+
+class BatchRequest(BaseModel):
+    model_ids: list[str] | None = None
+    family: str | None = None
+    steps: list[str] | None = None
+    trial: dict[str, Any] = {}
 
 
 class SeamsRequest(BaseModel):
@@ -145,6 +161,55 @@ def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
             save_seams(d, {"skirt_seams": req.skirt_seams, "top_seams": req.top_seams})
         job = jobs.submit(JobSpec(model_id, ["cut", "flatten", "export"], {})) if req.run else None
         return {"saved": not req.automatic, "job": job}
+
+    @app.get("/api/families")
+    def families() -> list[str]:
+        return list_families()
+
+    @app.put("/api/models/{model_id}/info")
+    def model_info(model_id: str, req: InfoRequest) -> dict[str, Any]:
+        d = model_or_404(model_id)
+        changes = {k: v for k, v in req.model_dump().items() if k in req.model_fields_set}
+        try:
+            return set_info(d, changes)
+        except CoverError as exc:
+            raise HTTPException(400, str(exc)) from None
+
+    @app.get("/api/models/{model_id}/compare")
+    def compare_revisions(model_id: str, a: int, b: int) -> dict[str, Any]:
+        d = model_or_404(model_id)
+        out = compare_files(
+            revision_file(d, a, "pattern.json"), revision_file(d, b, "pattern.json")
+        )
+        if out is None:
+            raise HTTPException(404, "no such revisions")
+        return out
+
+    @app.get("/api/models/{model_id}/revisions/{number}/{name}")
+    def revision(model_id: str, number: int, name: str) -> FileResponse:
+        d = model_or_404(model_id)
+        if name not in KEPT:
+            raise HTTPException(404, f"no file {name!r}")
+        path = revision_file(d, number, name)
+        if not path.is_file():
+            raise HTTPException(404, f"revision {number} has no {name}")
+        return FileResponse(path, media_type=MEDIA.get(path.suffix, "application/octet-stream"))
+
+    @app.post("/api/batch")
+    def batch(req: BatchRequest) -> dict[str, Any]:
+        ids = req.model_ids or [m["id"] for m in store.list_models()]
+        if req.family:
+            ids = [i for i in ids if info(store.model_dir(i))["family"] == req.family]
+        ids = [i for i in ids if (store.model_dir(i) / "model.json").is_file()]
+        if not ids:
+            raise HTTPException(400, "no models match")
+        steps = req.steps or STEPS[1:]
+        try:
+            for i in ids:
+                store.parameters(i, trial=req.trial)
+            return {"jobs": [jobs.submit(JobSpec(i, steps, req.trial)) for i in ids]}
+        except (ParamError, ValueError) as exc:
+            raise HTTPException(400, str(exc)) from None
 
     @app.get("/api/jobs/{job_id}")
     def job(job_id: str) -> dict[str, Any]:

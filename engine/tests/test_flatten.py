@@ -1,4 +1,5 @@
 import json
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -7,6 +8,7 @@ import numpy as np
 import pytest
 import shapely
 import trimesh
+from coverengine.catalogue import revisions
 from coverengine.cli import main
 from coverengine.export.drawing import load_cover, measure, skirt_heights, write_drawing
 from coverengine.export.pattern import write_all
@@ -277,3 +279,26 @@ def test_chair_back_is_a_wall(covers: dict[str, Any]) -> None:
     assert any(n.startswith("wall") for n in names)
     top = next(p for p in patterns if p.name == "top")
     assert all(e.get("mate", "") != "skirt-back" for e in top.edges)  # no wrap down the back
+
+
+def test_batch_reports_changes(covers: dict[str, Any], tmp_path: Path, capsys: Any) -> None:
+    root = tmp_path / "models"
+    shutil.copytree(covers["root"] / "chair", root / "chair")
+    assert main(["batch", "--models", str(root), "--steps", "flatten,export"]) == 0
+    assert main(["model", str(root / "chair"), "--status", "checked"]) == 0
+    capsys.readouterr()
+    code = main(
+        [
+            "batch",
+            "--models",
+            str(root),
+            "--steps",
+            "flatten,export",
+            "--set",
+            "flatten.max_triangles=2000",
+        ]
+    )
+    out = capsys.readouterr().out
+    assert code == 0 and "== chair:" in out and "1 of 1 model(s) done" in out
+    assert [r["number"] for r in revisions(root / "chair")] == [1, 2]
+    assert revisions(root / "chair")[-1]["status"] == "checked"

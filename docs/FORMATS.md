@@ -176,6 +176,15 @@ fitted shell for cushion-like objects. `construction.method` selects the joining
 model: `double_stitch` (current practice) or `welded` (ADR-020). The shape of the `features`
 list and how it relates to the `features.*` counts is settled in M5.
 
+### Catalogue fields and revisions (M7)
+
+`cover.json` may also hold `"family"` (a preset `config/presets/<family>.yaml`, parameter layer
+2), `"status"` (`draft` | `checked` | `production`), `"tags"` (list of strings) and `"notes"`
+(text for the machine operator). Every `cover export` into the model folder keeps a revision:
+`revisions/<nnn>/` with `pattern.json`, `finished.json`, `cut.dxf`, `cover.json`, `seams.json`,
+listed in `revisions/index.json` (`number`, `time`, `parameter_hash`, `trial` = the keys set
+with `--set`, `status`, `panels`, `max_stretch_pct`, `roll_length_mm`, `warnings`).
+
 ## Seams and panels (M3)
 
 `cover cut models/<id>/ [--seams FILE]` writes `panels.glb`, `panels.json` and `seams.auto.json`.
