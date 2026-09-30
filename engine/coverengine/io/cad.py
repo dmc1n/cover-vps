@@ -9,6 +9,7 @@ is reported so `model.json` can record it.
 from __future__ import annotations
 
 import math
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -22,6 +23,8 @@ Array = NDArray[np.float64]
 IntArray = NDArray[np.int64]
 
 STEP_SUFFIXES = (".step", ".stp")
+STL_HEADER_BYTES = 80
+STL_RECORD = np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("attr", "<u2")])
 IGES_SUFFIXES = (".iges", ".igs")
 
 
@@ -62,41 +65,39 @@ def _matrix(location: object) -> Array:
     return m
 
 
-def _tessellate(shape: object, deflection_mm: float, angle_deg: float) -> tuple[Array, IntArray]:
-    from OCP.BRep import BRep_Tool
+def _mesh_all(shapes: list[object], deflection_mm: float, angle_deg: float) -> None:
+    """Mesh every distinct shape in one parallel run (parallelism is per face, so meshing
+    shapes one by one would leave one-face parts such as tubes on a single core). The result
+    does not depend on the number of threads (checked with 1 to 8 cores, ADR-022)."""
+    from OCP.BRep import BRep_Builder
     from OCP.BRepMesh import BRepMesh_IncrementalMesh
-    from OCP.TopAbs import TopAbs_FACE, TopAbs_REVERSED
-    from OCP.TopExp import TopExp_Explorer
-    from OCP.TopLoc import TopLoc_Location
-    from OCP.TopoDS import TopoDS
+    from OCP.TopoDS import TopoDS_Compound
 
-    # relative=False: absolute deflection in mm; parallel=False keeps the output deterministic
-    BRepMesh_IncrementalMesh(shape, deflection_mm, False, math.radians(angle_deg), False)
-    verts: list[Array] = []
-    faces: list[IntArray] = []
-    offset = 0
-    explorer = TopExp_Explorer(shape, TopAbs_FACE)
-    while explorer.More():
-        face = TopoDS.Face(explorer.Current())
-        loc = TopLoc_Location()
-        tri = BRep_Tool.Triangulation_s(face, loc)
-        if tri is not None and tri.NbTriangles() > 0:
-            trsf = loc.Transformation()
-            nodes = (tri.Node(i).Transformed(trsf) for i in range(1, tri.NbNodes() + 1))
-            v = np.array([(p.X(), p.Y(), p.Z()) for p in nodes], dtype=np.float64)
-            t = np.array(
-                [tri.Triangle(i).Get() for i in range(1, tri.NbTriangles() + 1)], dtype=np.int64
-            )
-            t -= 1
-            if face.Orientation() == TopAbs_REVERSED:
-                t = t[:, ::-1]
-            verts.append(v)
-            faces.append(t + offset)
-            offset += len(v)
-        explorer.Next()
-    if not faces:
+    builder = BRep_Builder()
+    compound = TopoDS_Compound()
+    builder.MakeCompound(compound)
+    for shape in shapes:
+        builder.Add(compound, shape)
+    # relative=False: deflection is absolute, in mm
+    BRepMesh_IncrementalMesh(compound, deflection_mm, False, math.radians(angle_deg), True)
+
+
+def _triangles(shape: object, scratch: Path) -> tuple[Array, IntArray]:
+    """Triangles of a meshed shape. OpenCascade writes them as binary STL, read back with numpy,
+    which keeps the per-triangle work in compiled code."""
+    from OCP.StlAPI import StlAPI_Writer
+
+    writer = StlAPI_Writer()
+    writer.ASCIIMode = False
+    stl = scratch / "part.stl"
+    if not writer.Write(shape, str(stl)):
         return np.zeros((0, 3)), np.zeros((0, 3), dtype=np.int64)
-    return np.vstack(verts), np.vstack(faces)
+    data = stl.read_bytes()
+    count = int(np.frombuffer(data, dtype="<u4", count=1, offset=STL_HEADER_BYTES)[0])
+    records = np.frombuffer(data, dtype=STL_RECORD, count=count, offset=STL_HEADER_BYTES + 4)
+    vertices = records["v"].reshape(-1, 3).astype(np.float64)
+    faces = np.arange(len(vertices), dtype=np.int64).reshape(-1, 3)
+    return vertices, faces
 
 
 def _read_document(path: Path) -> tuple[object, list[str]]:
@@ -158,7 +159,7 @@ def load_cad(
     doc, units = _read_document(path)
     sew = path.suffix.lower() in IGES_SUFFIXES
     tool = XCAFDoc_DocumentTool.ShapeTool_s(doc.Main())  # type: ignore[attr-defined]
-    meshes: dict[str, tuple[Array, IntArray]] = {}
+    shapes: dict[str, object] = {}  # distinct part shapes by label entry
     placed: list[tuple[str, str, Array]] = []  # (path, prototype entry, transform)
 
     def entry(label: TDF_Label) -> str:
@@ -184,25 +185,26 @@ def load_cad(
                 walk(ref, loc.Multiplied(tool.GetLocation_s(child)), here, child_name)
             return
         key = entry(label)
-        if key not in meshes:
+        if key not in shapes:
             shape = tool.GetShape_s(label)
-            if sew:
-                shape = _sew(shape, sew_tolerance_mm)
-            meshes[key] = _tessellate(shape, deflection_mm, angular_deflection_deg)
+            shapes[key] = _sew(shape, sew_tolerance_mm) if sew else shape
         placed.append((here, key, _matrix(loc)))
 
     roots = Sequence_TDF_Label()
     tool.GetFreeShapes(roots)
     for root in roots:
         walk(root, TopLoc_Location(), "", _label_name(root) or "part")
+    _mesh_all(list(shapes.values()), deflection_mm, angular_deflection_deg)
+    with tempfile.TemporaryDirectory(prefix="coverengine-") as tmp:
+        meshes = {key: _triangles(shape, Path(tmp)) for key, shape in shapes.items()}
 
+    # split each distinct shape once; placed copies only move its bodies
+    bodies = {key: split_bodies("", v, f) for key, (v, f) in meshes.items()}
+    paths = unique_paths(p for p, _, _ in placed)
     parts: list[Part] = []
-    for part_path, (_, key, matrix) in zip(
-        unique_paths(p for p, _, _ in placed), placed, strict=True
-    ):
-        v, f = meshes[key]
-        if len(f) == 0:
-            continue
-        v = v @ matrix[:3, :3].T + matrix[:3, 3]
-        parts.extend(split_bodies(part_path, v, f))
+    for part_path, (_, key, matrix) in zip(paths, placed, strict=True):
+        for body in bodies[key]:
+            moved = body.transformed(matrix)
+            moved.path = part_path + body.path  # body paths are "" or "/1", "/2", ...
+            parts.append(moved)
     return CadModel(parts, units)
