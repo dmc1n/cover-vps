@@ -4,11 +4,14 @@ One list, kept current. Each question says what the program does meanwhile (the 
 work does not wait. Answers go into `config/defaults.yaml` (one line each) or a model's
 `cover.json`, and are recorded in `docs/DECISIONS.md`.
 
-Last updated: 2026-09-30 (evening, owner offline).
+Last updated: 2026-10-01 (night run, owner offline). New: questions 18–23 (the SUNS catalogue).
 
 ## Most important
 
-1. **Is the Blocchi 3D file the sofa your cover fits?** The model is 207 × 170 cm from above
+1. **Is the Blocchi 3D file the sofa your cover fits?** *New:* the SUNS model on 3D Warehouse
+   (GLB) fits your cover much better than the STEP we had: top of the cover 88.1 cm above the
+   floor (your 88.0), depth 192.8 cm (192.4), hem 659 cm (668). Shall we use the SUNS models
+   from now on? The earlier note, for the record: The model is 207 × 170 cm from above
    and 91 cm high; your cover is 197 × 192 cm and 88 cm high, with a hem 38 cm longer. Please
    measure the real sofa: length and depth from above, the length of the straight end, total
    height, height of the top edge at the front middle and at both ends, seat height at the
@@ -74,3 +77,27 @@ Last updated: 2026-09-30 (evening, owner offline).
 
 17. **Swatch test:** can you cut and weld the swatches from `docs/CALIBRATION.md` when we get
     there?
+
+## The SUNS catalogue (new, 1 October)
+
+18. **Seam layout per family:** sofas and chairs need seams along their folds (the top
+    stretches 8–35 % in one piece). For each kind (lounge sofa, lounge chair, dining chair,
+    lounger), where do you put the seams? For example "a band along the top of the back, 30 cm
+    wide; the arm tops as separate pieces; a seam along the front edge of the seat". One
+    drawing per family, like your Blocchi drawing, is enough. *Meanwhile:* the program's own
+    proposals (`cover improve`), which halve the stretch but do not reach 2 %.
+19. **Round tables of 150–170 cm** are wider than the roll (148 cm) in one piece. Split along
+    the diameter, or a round middle piece with a ring round it? *Meanwhile:* reported.
+20. **44 SUNS products need a 3D Warehouse login** to download (list in
+    `~/suns/needs_login.txt` on the server). A login for the program, or will you download them
+    once (the GLB, "Download → glTF")?
+21. **Sets** (99 entries: lounge sets, dining sets): a cover per product in the set (the
+    products are also in the catalogue on their own), or covers for whole sets too?
+    *Meanwhile:* single products only.
+22. **Tables: balloon or frame?** A ridge frame (a gable-roof cover) is now possible
+    (`hull.support: frame`). On the test tables the balloon was as good or better. Which do you
+    use? *Meanwhile:* balloon.
+23. **Vents on low skirts** (question 4 again, with numbers): on almost all SUNS seating the
+    skirt is 15–24 cm and the vents (28.5 cm with allowance) do not fit. Raise the skirt to at
+    least 30 cm when there are vents, put vents on the back only, or make them smaller?
+
