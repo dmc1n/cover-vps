@@ -28,6 +28,8 @@ BOUNDARY_WEIGHT = 1000.0  # param-ok: pymeshlab weight
 ISOMETRY = 4.0  # param-ok: s1^2 + s1^-2 + s2^2 + s2^-2 at s = 1
 # SLIM iterations per convergence check.
 ITERATIONS_PER_CHECK = 3
+# Triangles smaller than this share of the largest are left out of the up direction.
+DEGENERATE = 1e-12
 # A panel counts as horizontal (no "up" along the fabric) below this mean height gradient.
 FLAT_GRADIENT = 0.1  # param-ok: geometric threshold
 
@@ -167,9 +169,10 @@ def _orient(v: Array, f: IntArray, uv: Array) -> Array:
         e1, e2 = uv[f[:, 1]] - uv[f[:, 0]], uv[f[:, 2]] - uv[f[:, 0]]
         d = np.stack([values[f[:, 1]] - values[f[:, 0]], values[f[:, 2]] - values[f[:, 0]]], 1)
         m = np.stack([e1, e2], 1)  # rows: edges in 2D
-        g = np.linalg.solve(m, d[:, :, None])[:, :, 0]
         area = np.abs(_signed_areas(uv, f))
-        return (g * area[:, None]).sum(0) / area.sum()
+        ok = area > area.max() * DEGENERATE  # triangles of no size carry no weight anyway
+        g = np.linalg.solve(m[ok], d[ok][:, :, None])[:, :, 0]
+        return (g * area[ok, None]).sum(0) / area[ok].sum()
 
     g = gradient(v[:, 2])
     if np.linalg.norm(g) < FLAT_GRADIENT:
