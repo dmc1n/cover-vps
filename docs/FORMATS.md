@@ -98,6 +98,48 @@ Parts may overlap: the canonical mesh is a triangle soup (ADR-022).
   `excluded` (`rule` is the matching pattern).
 - `volume_mm3`: only for closed bodies, else `null`.
 
+## Hull (M2)
+
+`cover hull models/<id>/` writes three files next to the model (or into `--out`).
+
+`hull.glb`: the cover surface as one mesh named `hull`, same convention as `model.glb` (canonical
+mm Z-up coordinates under the root node `cover_model_mm_zup`, whose transform converts to glTF's
+metres and Y up). The surface is open at the bottom; the hem boundary lies exactly at
+`hull.hem_height_mm`. Faces point outward, away from the furniture.
+
+`preview.glb`: two meshes, `furniture` (grey, opaque) and `cover` (blue, see-through), for
+looking at in any glTF viewer. Not read by the engine.
+
+`hull.json`:
+
+```json
+{
+  "format_version": 1, "engine_version": "0.1.0",
+  "model_id": "blocchi-2seater-moon-right", "model_sha256": "e33986d6…",
+  "resolution_used_mm": 5.0,
+  "mesh": { "vertices": 40768, "triangles": 80955 },
+  "area_m2": 6.494158,
+  "bbox_mm": [[-1190.115, -716.182, 50.0], [1190.113, 715.99, 919.402]],
+  "hem": { "height_mm": 50.0, "length_mm": 6415.053 },
+  "distance_to_model_mm": { "min": 10.0, "mean_at_vertices": 15.511, "clearance": 10.0 },
+  "clearance_repair": { "vertices_moved": 20226, "max_move_mm": 3.665 },
+  "ridges": { "chains": 43, "length_mm": 806.1, "angle_deg": 40.0 },
+  "masks": 0,
+  "parameters": { "hull.clearance_mm": 10, "...": "..." },
+  "parameter_sources": { "hull.clearance_mm": "default", "...": "..." },
+  "parameter_hash": "…",
+  "warnings": []
+}
+```
+
+- `distance_to_model_mm.min`: exact minimum over vertices, face centres and edge midpoints.
+- `clearance_repair`: how many vertices were pushed outward to keep the clearance, and the
+  largest push.
+- `ridges`: connected chains of edges sharper than `seams.ridge_angle_deg`, the seam
+  candidates for M3.
+- `cover.json` may carry `hull_masks`: `{"type": "box", "min": [x, y, z], "max": [x, y, z],
+  "mode": "exclude" | "solid"}` in canonical model coordinates.
+
 ## CoverDefinition (M2–M5)
 
 `models/<id>/cover.json`. `parameters` is a sparse tree with exactly the registry keys; it holds

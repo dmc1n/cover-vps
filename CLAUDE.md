@@ -176,11 +176,12 @@ cover run <model> [--set key=value ...]     import → hull → cut → flatten 
 cover params <model>                        effective parameters and where each comes from
 cover diff a.json b.json                    panel dimensions that changed by more than 1 mm
 cover import <file> --out models/<id>/      STEP/IGES/STL/OBJ/PLY/GLB → model.glb, model.json, parts.json
+cover hull models/<id>/ [--clearance N ...]  drape hull → hull.glb, hull.json, preview.glb
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/
 make testsheets regenerate testdata/machine/*.dxf (a test checks they are current)
-make golden     regenerate testdata/golden/info/ (golden `cover info` output), then review the diff
+make golden     regenerate testdata/golden/info/ and hull/ (golden outputs), then review the diff
 make api-dev    uvicorn with reload         make web-dev   Vite dev server
 make deploy     build images and `docker compose up -d` on this server
 make backup     push the data directory to R2 with rclone

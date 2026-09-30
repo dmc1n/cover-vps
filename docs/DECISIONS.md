@@ -267,3 +267,44 @@ Decision:
 Consequences: fan triangulation assumes convex facets, which mesh exporters write; a non-convex
 facet would be triangulated wrongly (none found so far). Faceted files carry no part names
 beyond the product name; parts are the connected bodies (`Root/1` … `Root/10` here).
+
+## ADR-024 — Drape hull from a height map (M2)
+
+Context: PLAN.md M2 describes the drape hull on a 3D occupancy grid built with winding numbers.
+With `hull.sweep_down: true` (the default: fabric hangs straight down from the widest point),
+the covered solid is exactly the region under the model's height map `H(x, y)`, the highest
+point above each spot of the floor.
+Decision:
+- Sweep, bridging and clearance are computed on that 2D height map. Closing or dilating the
+  solid with a ball equals grey-scale closing or dilation of `H` with a hemisphere (umbra
+  theorem). Bridging is a closing with radius `bridge_gap_mm / 2`; clearance is a dilation
+  with radius `clearance_mm`, which gives rounded top edges of that radius and vertical skirts.
+  It needs no inside/outside, so any triangle soup works. It is exact at the grid samples and
+  2D, so a 510,000-triangle soup takes 34 s and the Blocchi sofa 44 s.
+- The height map samples every triangle exactly at the cell centres. Triangles that cover no
+  cell centre (thin or vertical) mark the cells nearest their vertices and edge samples, so
+  thin tubes and boards are kept.
+- Surface: marching cubes on `min(top - z, wall)`. `wall` is the clearance minus the exact
+  floor-plane distance to the model's triangles (point-to-triangle distance with libigl), so
+  skirts sit at the clearance to floating point rather than half a cell. Where bridging added
+  footprint, the grid distance is used. Exact zeros in the field are nudged, because models in
+  whole mm otherwise give zero-area and non-manifold triangles. Then Taubin smoothing, a plane
+  cut at `hem_height_mm` (hem vertices snapped to it), and isotropic remeshing (pymeshlab,
+  surface deviation at most `hull.remesh_max_deviation_mm`).
+- Clearance guarantee: distances from every vertex, face centre and edge midpoint to the model
+  triangles are measured exactly. Samples closer than the clearance push their vertices
+  straight away from the nearest model point (`hull.clearance_passes` rounds); hem vertices
+  stay at hem height. The report states the minimum, and a warning is given if it is below
+  the clearance.
+- Bridging uses a ball, so a gap narrower than `bridge_gap_mm` still dips slightly:
+  R − √(R² − (g/2)²) for a gap g and R = bridge_gap/2 (1.7 mm for a 20 mm gap at 60 mm;
+  remeshing flattens it to about 1 mm).
+- `hull.sweep_down: false` (fitted shells for cushion-like objects) needs the 3D winding-number
+  field and gives a clear "not available yet" error until a model needs it. Hard edges the
+  cover must follow move to M3, where seams can hold them. Masks are boxes in `cover.json`
+  (`exclude` ignores the furniture inside, `solid` adds the box).
+- The grid is made coarser automatically when the 3D field would exceed `hull.max_grid_cells`,
+  with a warning.
+Consequences: skirts are exact and tops are exact at 5 mm samples; the clearance repair makes
+covers at most slightly looser (at the Blocchi: at most a few mm, where the surface bends
+around furniture edges). Remeshing is the slowest step (about 70 % of the time).
