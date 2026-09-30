@@ -314,6 +314,33 @@ depth, after `drawing.plan_rotation_deg`), `hem_length`, `hem_length:<panel>`, `
 `skirt_lowest:<panel>`, `skirt_highest:<panel>`, `panel_width:<panel>` (median width of the flat
 panel across its length), `seam_length:<seam id>` (on the cover).
 
+## Finished PatternSet (M5) — `finished.json`
+
+Written by `cover export` from `pattern.json`. One entry per piece to cut: the panels with their
+allowances, and the extra pieces (vent hoods and membranes).
+
+```json
+{
+  "format_version": 1, "model_id": "chair", "construction": "double_stitch",
+  "pattern_parameter_hash": "…", "parameter_hash": "…",
+  "pieces": [
+    { "id": "P5", "name": "skirt-right", "quantity": 1,
+      "cut_mm": [[x, y], …], "net_mm": [[x, y], …], "openings_mm": [[[x, y], …]],
+      "edges": [{ "kind": "seam", "seam": "…", "mate": "…", "lap_side": "…",
+                  "allowance_mm": 15, "length_mm": 645.4 }],
+      "size_mm": [676, 479], "area_m2": 0.324, "note": "" }
+  ],
+  "sheet": { "sheet_mm": [w, h], "roll_length_mm": 3050 },
+  "warnings": []
+}
+```
+
+`cut_mm` is the cut line (allowances included, counter-clockwise), `net_mm` the seam-to-seam
+outline (the stitch line) in the same coordinates, `openings_mm` the vent openings. `cut.dxf`:
+CUT layer = `cut_mm` and `openings_mm`; PEN layer = stitch and hem fold lines, weld guides on
+under panels (welded), matching marks, UP arrows, "P5 SKIRT-RIGHT", "TO P2 WALL", the pattern
+revision (model id and parameter hash), vent hood outlines, cord exit marks.
+
 ## Fabric profile (M4 placeholder, M8 measured)
 
 ```json

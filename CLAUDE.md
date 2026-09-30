@@ -194,6 +194,7 @@ cover hull models/<id>/ [--clearance N ...]  drape hull → hull.glb, hull.json,
 cover cut models/<id>/ [--seams FILE]        seams and panels → panels.glb, panels.json
 cover flatten models/<id>/                   flat patterns → pattern.dxf, pattern.svg, pattern.json, sizes.pdf
 cover drawing models/<id>/                   size drawing of cover and panels → sizes.pdf
+cover export models/<id>/                    finished pieces → cut.dxf, cut.svg, cutting-list.pdf, finished.json
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/

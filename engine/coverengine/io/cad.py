@@ -24,7 +24,7 @@ Array = NDArray[np.float64]
 IntArray = NDArray[np.int64]
 
 STEP_SUFFIXES = (".step", ".stp")
-STL_HEADER_BYTES = 80
+STL_HEADER_BYTES = 80  # param-ok: layout or units
 STL_RECORD = np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("attr", "<u2")])
 IGES_SUFFIXES = (".iges", ".igs")
 

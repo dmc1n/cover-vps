@@ -202,7 +202,7 @@ def test_cli_run_and_diff(
 ) -> None:
     src = covers["root"] / "generated" / "chair.stl"
     assert main(["run", str(src), "--out", str(tmp_path / "a")]) == 0
-    files = ("model.glb", "hull.glb", "panels.json", "pattern.dxf", "pattern.json", "sizes.pdf")
+    files = ("model.glb", "hull.glb", "pattern.json", "sizes.pdf", "cut.dxf", "cutting-list.pdf")
     for f in files:
         assert (tmp_path / "a" / f).is_file(), f
     assert (

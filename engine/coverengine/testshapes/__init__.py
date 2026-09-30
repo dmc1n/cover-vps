@@ -27,6 +27,8 @@ HALF = 1 / 2  # half a unit / half a turn (geometry, not a parameter)
 Array = NDArray[np.float64]
 IntArray = NDArray[np.int64]
 
+STL_HEADER = 80  # param-ok: binary STL header size (bytes)
+
 
 @dataclass
 class Shape:
@@ -417,7 +419,7 @@ def write_stl(path: Path, vertices: Array, faces: IntArray, name: str) -> None:
     record = np.zeros(len(faces), dtype=[("n", "<f4", 3), ("v", "<f4", (3, 3)), ("attr", "<u2")])
     record["n"] = normals
     record["v"] = tri
-    header = f"coverengine testshape {name}".encode("ascii").ljust(80, b" ")[:80]
+    header = f"coverengine testshape {name}".encode("ascii").ljust(STL_HEADER, b" ")[:STL_HEADER]
     with path.open("wb") as fh:
         fh.write(header)
         fh.write(struct.pack("<I", len(faces)))

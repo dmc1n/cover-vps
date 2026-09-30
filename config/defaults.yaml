@@ -74,6 +74,8 @@ construction:                    # how panels are joined; a dropdown per model i
 
 stitching:                       # used when construction.method is double_stitch
   allowance_mm: 15               # to confirm; seam allowance for the double-stitched seam
+  sides: both                    # both | lap   to confirm: allowance on both panels of a seam, or
+                                 # only on the panel that laps over
 
 welding:                         # used when construction.method is welded
   overlap_mm: 30                 # to confirm; carried by the upper (lap-side) panel only
@@ -92,6 +94,8 @@ features:                        # per-cover defaults, overridden per model
   vent_above_hem_mm: 50          # bottom edge of the vent above the lower end of the cover
   vents_per_metre: 1             # one vent per full metre of hem length, spread evenly
   vents_min: 1                   # every cover has at least one vent
+  vent_seam_clearance_mm: 100    # to confirm; a vent keeps this far from a vertical seam
+  vent_hood_depth_mm: 80         # to confirm; the hood piece is this much deeper than the vent
   handles: 0
 
 fabric:

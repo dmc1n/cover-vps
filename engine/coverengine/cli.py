@@ -193,6 +193,38 @@ def _cmd_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_export(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from coverengine.export.cut import write_export
+    from coverengine.finish.finish import FINISHED_JSON, finish, finished_set
+    from coverengine.flatten.pattern import PATTERN_JSON
+
+    pattern = args.model / PATTERN_JSON
+    if not pattern.is_file():
+        raise CoverError(f"no {PATTERN_JSON} in {args.model} (run cover flatten first)")
+    cover_json = args.model / "cover.json"
+    params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    doc = _json.loads(pattern.read_text(encoding="utf-8"))
+    pieces, warnings = finish(doc, params)
+    finished = finished_set(doc, pieces, warnings, params)
+    out = args.out or args.model
+    out.mkdir(parents=True, exist_ok=True)
+    finished["sheet"] = write_export(out, pieces, finished, params)
+    (out / FINISHED_JSON).write_text(
+        _json.dumps(finished, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(f"export -> {out / 'cut.dxf'}, cut.svg, cutting-list.pdf, {FINISHED_JSON}")
+    for pc in finished["pieces"]:
+        w, h = pc["size_mm"]
+        print(f"  {pc['id']:<4} {pc['name']:<16} x{pc['quantity']}  {w:6.0f} x {h:6.0f} mm")
+    length = finished["sheet"]["roll_length_mm"]
+    print(f"fabric about {length / 1000:.2f} m of roll")
+    for w in warnings:
+        print(f"warning: {w}", file=sys.stderr)
+    return 0
+
+
 def _cmd_drawing(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -264,6 +296,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         ["hull", str(out)],
         ["cut", str(out)],
         ["flatten", str(out)],
+        ["export", str(out)],
     ]
     extra = [x for s in args.overrides for x in ("--set", s)]
     for step in steps:
@@ -383,6 +416,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_flatten)
+
+    p = sub.add_parser("export", help="finished pieces for the cutting table (cut.dxf, list)")
+    p.add_argument("model", type=Path, help="model directory with patterns (cover flatten)")
+    p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_export)
 
     p = sub.add_parser("drawing", help="size drawing of the cover and its panels (sizes.pdf)")
     p.add_argument("model", type=Path, help="model directory with patterns (cover flatten)")

@@ -492,3 +492,21 @@ has stepped edges on gentle slopes (the 5 mm height grid), which the wall seams 
 zig-zag check reports them), and its top pieces still stretch 2.6–7.5 % (the model's rounded
 cushion ends). Next: smoother cover surface edges (M2 surface), and extra seams on the top.
 
+## ADR-030 — Finished pieces and the machine export (M5)
+
+Status: accepted, 2026-09-30 (built while the owner was offline; the rules marked "to confirm"
+are in docs/QUESTIONS.md).
+
+- Allowances per edge: stitched seams `stitching.allowance_mm` on both panels (or the lap side
+  only, `stitching.sides`), welded seams `welding.overlap_mm` on the lap side only with a weld
+  guide on the under panel, the hem `hem.allowance_mm` with the fold line on PEN. Each edge is
+  grown by a one-sided shapely buffer, run on past its ends by the neighbour's allowance so the
+  corners are square, and united with the panel.
+- Air vents: count and size from the owner's rule; placed evenly along the hem in the order of
+  the skirt panels round the cover, kept 10 cm from vertical seams; the opening on CUT, the
+  hood's edge on PEN; hood and membrane as separate rectangular pieces (sizes to confirm). A vent
+  that does not fit in its skirt is reported, not moved into the panel above.
+- The roll length in the cutting list is a first-fit shelf estimate across the usable width; the
+  machine's nesting is expected to do better.
+- The M4 files (`pattern.*`, seam to seam) stay; the export adds `cut.*` beside them.
+
