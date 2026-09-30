@@ -305,9 +305,8 @@ def smooth_seam(
     sv = np.asarray(surface.vertices, dtype=np.float64)
     sf = np.asarray(surface.faces, dtype=np.int32)
     for _ in range(iterations):
-        target = 0.5 * v[free] + 0.25 * (
-            v[pair[:, 0]] + v[pair[:, 1]]
-        )  # param-ok: half way to the neighbours
+        middle = (v[pair[:, 0]] + v[pair[:, 1]]) / 2
+        target = (v[free] + middle) / 2  # half way to the middle of the neighbours
         _, _, target = igl.point_mesh_squared_distance(target, sv, sf)
         for i, t in zip(free, target, strict=True):
             old = v[i].copy()
