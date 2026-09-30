@@ -50,7 +50,8 @@ one-line edit there.
   standard on every cover, which are optional per model?
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
   or needs stroked lines, arc support). Learned in M0 by cutting a test sheet.
-- Sample models: 3 to 5 representative STEP or STL files in `testdata/models/` (later).
+- Sample models: 3 to 5 representative STEP or STL files in `testdata/models/` (git-ignored,
+  because the repository is public). M1 is verified on synthetic assemblies until they arrive.
 - Cloudflare account and preferred Access login method. (GitHub: `dmc1n/cover-vps`, in use.)
 - Measured fabric values (stretch, weld shrinkage) from swatch tests in M8. Placeholders until
   then, clearly marked.
@@ -94,7 +95,8 @@ config/defaults.yaml      every default parameter, commented; the only place num
 apps/api/                 FastAPI app, SQLite migrations, job runner, Dockerfile
 apps/web/                 React app
 deploy/                   docker-compose.yml, reverse proxy config, cloudflared, backup scripts
-testdata/                 models/ fabrics/ golden/ generated/ machine/, shapes.yaml, generate.py
+testdata/                 models/ (owner samples, git-ignored) fabrics/ golden/ generated/ machine/,
+                          shapes.yaml, generate.py
 docs/                     PLAN.md DECISIONS.md FORMATS.md CALIBRATION.md LICENSES.md reports/ handbook/
 scripts/                  setup-vps.sh, licenses.py (regenerates docs/LICENSES.md) and utilities
 ```
@@ -172,10 +174,12 @@ make demo       full pipeline on the procedural chair, DXF and SVG written to ou
 cover run <model> [--set key=value ...]     import → hull → cut → flatten → export in one go
 cover params <model>                        effective parameters and where each comes from
 cover diff a.json b.json                    panel dimensions that changed by more than 1 mm
-cover info <mesh>                           size, triangles, area; analytic check for test shapes
+cover import <file> --out models/<id>/      STEP/IGES/STL/OBJ/PLY/GLB → model.glb, model.json, parts.json
+cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/
 make testsheets regenerate testdata/machine/*.dxf (a test checks they are current)
+make golden     regenerate testdata/golden/info/ (golden `cover info` output), then review the diff
 make api-dev    uvicorn with reload         make web-dev   Vite dev server
 make deploy     build images and `docker compose up -d` on this server
 make backup     push the data directory to R2 with rclone

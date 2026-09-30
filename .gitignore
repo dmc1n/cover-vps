@@ -14,3 +14,7 @@ deploy/.env
 .env.*
 *.log
 .DS_Store
+# manufacturer sample models are confidential and the repository is public
+testdata/models/*
+!testdata/models/README.md
+/models/

@@ -202,3 +202,42 @@ line 20 mm inside (pen-to-knife offset), a rounded rectangle with bulge corners,
 three ways (CIRCLE entity, bulge polyline, 72 segments). Stroked text uses our own
 single-stroke font (`export/strokefont.py`): outline fonts drawn with a pen give hollow double
 lines. DXF output is byte-deterministic (fixed ezdxf metadata, sorted CLASSES section).
+
+## ADR-022 — Model import (M1)
+
+Decision:
+- STEP and IGES are read through OpenCascade's XCAF readers, keeping part names and nested
+  assemblies. OpenCascade converts lengths to mm; the declared unit is read from the file and
+  recorded. Each distinct part shape is meshed once and every placed copy reuses that mesh. All
+  distinct shapes are meshed in one parallel `BRepMesh_IncrementalMesh` run over a compound
+  (its parallelism is per face, so shapes one by one leave one-face parts on one core); the
+  mesh was identical with 1, 2, 4 and 8 cores. Triangles come back through OpenCascade's binary
+  STL writer, which keeps per-triangle work out of Python (1 million triangles: 13 s).
+- IGES stores loose faces and no assembly tree, so IGES shapes are sewn
+  (`import.sew_tolerance_mm`) before meshing; IGES imports carry no part names.
+- Every loaded triangle set is split into edge-connected bodies. This lets a single STL of a
+  whole chair, or a CAD compound of screws, be filtered per body. Bodies that only touch at a
+  point (a leg under a seat corner) stay separate.
+- Filter: a body is dropped when its largest dimension is below `import.min_part_mm`. That uses
+  the bounding box, not the volume, because surface-only CAD has no volume. Name exclusions are
+  case-insensitive glob patterns matched against the full part path or any segment of it. They
+  are stored in `model.json` and reused on the next import into the same model directory.
+- Units: STEP, IGES and glTF (metres by definition) declare their unit; STL, OBJ and PLY use
+  `--units` or `import.default_units`. A model whose largest dimension is outside
+  `import.min_plausible_size_mm` to `import.max_plausible_size_mm` gets a warning naming every
+  unit that would fit. The unit is never changed automatically (ADR-007).
+- Placement: `import.up_axis` (auto = y for glTF, z otherwise) is rotated to +Z by the smallest
+  quarter turn. `import.front` is given once the model stands upright and is turned to −Y. The
+  lowest point of the kept parts goes to z = 0, and the bounding box is centred on x = y = 0.
+- `model.glb` stores the canonical mm Z-up coordinates as 32-bit floats in its meshes. They
+  hang under one root node whose transform converts to glTF's metres and Y up, so any glTF
+  viewer shows the model upright at true size while the engine reads exact mm values. One node
+  per kept part.
+- Test assemblies: a STEP/IGES chair built with OpenCascade (named solids, instanced legs and
+  screws), plus a 2,000-part variant for the timing test. Their time stamps, assembly-link ids
+  and IGES author are fixed so the files and golden checksums are identical on every machine.
+  IGES test files are written without names, because the IGES writer orders name entities
+  differently on every run.
+Better alternatives, not built yet: skip meshing parts whose B-rep bounding box is already
+below `min_part_mm`; faster vertex welding than `np.unique(axis=0)` (most of the remaining time on
+very large meshes); a per-model up/front choice saved in `cover.json` once the web app exists.

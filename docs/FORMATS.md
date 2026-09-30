@@ -36,18 +36,67 @@ preset | model | trial}, "parameter_hash": ...}`.
 
 ## Model (M1)
 
-`models/<id>/model.glb` (canonical mesh, may be a triangle soup) and `model.json`:
+`cover import <file> --out models/<id>/` writes three files. The model id is the directory
+name. Output is deterministic: the same file and parameters give byte-identical files.
+
+`model.glb`: the kept parts, one glTF node per part named by its part path. The meshes store
+the canonical coordinates (mm, Z up, lowest point z = 0, bounding box centred on x = y = 0,
+front toward −Y) as 32-bit floats. They hang under a root node `cover_model_mm_zup` whose
+transform converts to glTF's metres and Y up, so a generic glTF viewer shows the model upright
+at true size. The engine reads the mm values directly (`coverengine.io.model_io.load_model`).
+Parts may overlap: the canonical mesh is a triangle soup (ADR-022).
+
+`model.json`:
 
 ```json
 {
   "format_version": 1,
-  "id": "lounge-chair-a12",
-  "source": { "file": "A12.step", "sha256": "...", "units_detected": "mm", "units_used": "mm" },
-  "placement": { "up_axis": "z", "front": "-y", "ground_offset_mm": 0.0 },
-  "parts": { "kept": 84, "dropped_small": 212, "min_part_mm": 8, "excluded": ["cushion-*"] },
-  "bbox_mm": [[-400, -350, 0], [400, 350, 910]]
+  "engine_version": "0.1.0",
+  "id": "chair-a12",
+  "source": { "file": "chair_assembly.step", "format": "step", "sha256": "15334f0d…",
+              "units_detected": "mm", "units_used": "mm" },
+  "placement": { "up_axis": "z", "front": "-y", "scale_to_mm": 1.0,
+                 "rotation": [[1,0,0],[0,1,0],[0,0,1]],
+                 "translation_mm": [0.0, -64.023278, 0.0], "ground_offset_mm": 0.0 },
+  "parts": { "total": 19, "kept": 6, "dropped_small": 12, "excluded": 1,
+             "min_part_mm": 8.0, "exclude": ["cushion*"] },
+  "mesh": { "vertices": 48, "triangles": 72 },
+  "bbox_mm": [[-250.0, -314.023285, 0.0], [250.0, 314.023285, 942.962891]],
+  "size_mm": [500.0, 628.04657, 942.962891],
+  "import_parameters": { "import.min_part_mm": 8, "...": "..." },
+  "parameter_sources": { "import.min_part_mm": "default", "...": "..." },
+  "warnings": []
 }
 ```
+
+- `format`: `step`, `iges`, `stl`, `obj`, `ply`, `glb` or `gltf`. `units_detected` is the unit
+  the file declares (STEP, IGES; `m` for glTF by definition) or `null` (STL, OBJ, PLY).
+  `units_used` is what the import applied (`--units`, else the declared unit, else
+  `import.default_units`).
+- `placement`: the file's coordinates, times `scale_to_mm`, rotated by `rotation`, then shifted
+  by `translation_mm`, give the canonical coordinates. `ground_offset_mm` is the z shift.
+- `parts.exclude`: name patterns in effect. The next import into the same directory reuses them
+  (`--forget-exclusions` drops them). The bounding box and size cover the kept parts only.
+- `warnings`: unit plausibility and unit overrides, in words for the operator.
+
+`parts.json`: every body of the source file, kept or not, in canonical coordinates.
+
+```json
+{ "format_version": 1, "parts": [
+  { "path": "chair/frame/seat", "status": "kept", "rule": null, "triangles": 12,
+    "bbox_mm": [[-250.0, -314.023, 420.0], [250.0, 185.977, 460.0]],
+    "size_mm": [500.0, 500.0, 40.0], "volume_mm3": 10000000.0 },
+  { "path": "chair/hardware/screw M4", "status": "dropped_small", "rule": null, "triangles": 140,
+    "bbox_mm": [[-242.0, -306.023, 414.0], [-238.0, -302.023, 420.0]],
+    "size_mm": [4.0, 4.0, 6.0], "volume_mm3": 75.0 }
+] }
+```
+
+- `path`: assembly names joined by `/`. A repeated name gets `#2`, `#3`, … (`chair/frame/leg#2`).
+  A part made of several separate bodies gets `/1`, `/2`, … STL files are named after the file.
+- `status`: `kept`, `dropped_small` (largest dimension below `import.min_part_mm`) or
+  `excluded` (`rule` is the matching pattern).
+- `volume_mm3`: only for closed bodies, else `null`.
 
 ## CoverDefinition (M2–M5)
 
