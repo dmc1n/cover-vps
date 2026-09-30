@@ -268,14 +268,14 @@ def _vent_pieces(count: int, params: EffectiveParams, start: int) -> list[Piece]
             start,
             w + 2 * a,
             h + depth + a,
-            "hood over each air vent opening, holds the plastic insert (to confirm)",
+            "vent hood, holds the plastic insert (to confirm)",
         ),
         rect(
             "vent-membrane",
             start + 1,
             w + 2 * a,
             h + 2 * a,
-            "membrane inside each air vent against dirt (to confirm)",
+            "vent membrane, against dirt (to confirm)",
         ),
     ]
 
