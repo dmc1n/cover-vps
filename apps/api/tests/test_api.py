@@ -127,3 +127,12 @@ def test_family_status_revisions_and_batch(chair: dict[str, Any]) -> None:
     m2 = c.get(f"/api/models/{chair['id']}").json()
     assert m2["revisions"][-1]["number"] == n + 1
     assert c.post("/api/batch", json={"family": "table"}).status_code == 400  # none of them
+
+
+def test_improve_step(chair: dict[str, Any]) -> None:
+    c: TestClient = chair["client"]
+    r = c.post(f"/api/models/{chair['id']}/run", json={"steps": ["improve"]})
+    assert r.status_code == 200, r.text
+    job = chair["app"].state.jobs.wait(r.json()["id"], RUN_TIMEOUT_S)
+    assert job["status"] == "done", job
+    assert "improve" in job["steps"][0]["log"]

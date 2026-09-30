@@ -166,6 +166,21 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
         <button onClick={() => save(true)} title="Forget the hand-placed seams">
           Use automatic seams
         </button>
+        <button
+          title="The program takes its own proposals round by round while the stretch goes down (kept apart from your seams)"
+          onClick={async () => {
+            const r = await fetch(`/api/models/${id}/run`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ steps: ["improve"], trial: {} }),
+            });
+            const out = await r.json();
+            if (r.ok) onJob(out as Job);
+            else setError(out.detail ?? r.statusText);
+          }}
+        >
+          Let the program add seams
+        </button>
         <span className="muted">{MODE_HELP[mode]}</span>
       </div>
       {error && <p className="error">{error}</p>}

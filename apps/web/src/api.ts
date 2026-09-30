@@ -1,6 +1,6 @@
 // Types and calls for the cover API (apps/api/coverapi/main.py).
 
-export type Step = "import" | "hull" | "cut" | "flatten" | "export";
+export type Step = "import" | "hull" | "cut" | "flatten" | "export" | "improve";
 export const STEPS: Step[] = ["import", "hull", "cut", "flatten", "export"];
 export const STEP_LABEL: Record<Step, string> = {
   import: "Import",
@@ -8,6 +8,7 @@ export const STEP_LABEL: Record<Step, string> = {
   cut: "Seams and panels",
   flatten: "Flat patterns",
   export: "Cut pieces",
+  improve: "Seams added by the program",
 };
 
 export type Status = "draft" | "checked" | "production";

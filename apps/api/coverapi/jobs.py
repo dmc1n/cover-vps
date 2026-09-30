@@ -18,6 +18,7 @@ from typing import Any
 from coverapi.store import STEPS, Store
 
 LOG_TAIL = 4000  # characters of each step's output kept in the job file
+EXTRA_STEPS = ["improve"]  # cover improve: take seam proposals while they lower the stretch
 
 
 @dataclass
@@ -38,7 +39,7 @@ class Jobs:
         self._thread.start()
 
     def submit(self, spec: JobSpec) -> dict[str, Any]:
-        unknown = [s for s in spec.steps if s not in STEPS]
+        unknown = [s for s in spec.steps if s not in STEPS and s not in EXTRA_STEPS]
         if unknown:
             raise ValueError(f"unknown step(s): {', '.join(unknown)}")
         job_id = uuid.uuid4().hex[:12]
@@ -102,7 +103,9 @@ class Jobs:
         self._write(doc)
         model_dir = self.store.model_dir(spec.model_id)
         pattern = model_dir / "pattern.json"
-        if "flatten" in spec.steps and pattern.is_file():  # keep the last run for the diff
+        if (
+            "flatten" in spec.steps or "improve" in spec.steps
+        ) and pattern.is_file():  # keep the last run for the diff
             shutil.copyfile(pattern, model_dir / "pattern.prev.json")
         sets = [x for k, v in sorted(spec.trial.items()) for x in ("--set", f"{k}={_yaml(v)}")]
         for step in doc["steps"]:
