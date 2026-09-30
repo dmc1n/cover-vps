@@ -486,6 +486,11 @@ stitching", "for all future covers").
   the same panels got the same id; seam ends running past the seam they meet are no longer cut
   open.
 
+Also tried later (same night): a level wall seam on an edge-preserving line (running median of
+where the upright part ends, 2 mm above it). Chair top 3.8 %, and on the Blocchi a top panel no
+longer in one piece (walls dropped by the fallback). Rejected; the Blocchi's back edge, where the
+steep back face meets the skirt at a very shallow angle over 4 cm, stays an open point.
+
 Results: box, chair and slatted table: stretch 0.1–1.5 %, seam sides within 0.9–3.3 mm, no
 zig-zag. The Blocchi: skirt pieces 0.3 % and straight; three wall pieces; but its cover surface
 has stepped edges on gentle slopes (the 5 mm height grid), which the wall seams follow (the
@@ -549,4 +554,20 @@ Status: accepted, 2026-09-30 (built while the owner was offline).
   models, "Run these"); the report per model is the comparison with its previous revision.
 - The first preset is `table` (balloon under the cover, owner's rule). Other families wait for
   the owner's list (question 16).
+
+## ADR-033 — Fabric compensation (M8, prepared)
+
+Status: accepted, 2026-09-30; off until the fabric is measured.
+
+- With `flatten.fabric_compensation`, every flat piece is scaled by 1 / (1 + the mean of the
+  warp and weft stretch in a fitted cover), from the fabric profile. The mean, not per
+  direction, because the pieces may be turned any way on the roll (CLAUDE.md) and the machine's
+  nesting decides. If the owner later fixes the grain direction per piece, the scale can become
+  per direction.
+- The reported stretch stays that of the shape (without the compensation); `compensation_scale`
+  is recorded in the PatternSet. A warning says so when the profile is still a placeholder.
+- Weld shrinkage is measured and stored but not yet applied: it only matters for welded covers,
+  and how it adds up along a seam needs the first welded sample.
+- `scripts/fabric_profile.py` turns the swatch sheet (`testdata/fabrics/measurements.template.json`)
+  into the profile.
 

@@ -19,9 +19,11 @@ Fabric: 100 % acrylic canvas from the production roll. Record the roll batch.
 4. Weld curvature: weld a curved seam at radii 300, 200, 150 and 100 mm on scrap. Note the
    smallest radius that welds flat without puckering. This becomes `min_weld_radius_mm`.
 5. Thickness with a calliper at three points.
-6. Record everything in `testdata/fabrics/acrylic-300.measurements.json`;
-   `scripts/fabric_profile.py` converts it into the profile in docs/FORMATS.md and sets
-   `status: measured`.
+6. Record everything in a copy of `testdata/fabrics/measurements.template.json` (for example
+   `testdata/fabrics/acrylic-300.measurements.json`), then run
+   `uv run python scripts/fabric_profile.py testdata/fabrics/acrylic-300.measurements.json`.
+   It writes the profile (`status: measured`) and prints the weld radius to put in
+   `config/defaults.yaml`. Then switch on `flatten.fabric_compensation` and run the covers again.
 
 ## Cover measurement protocol (physical gates)
 

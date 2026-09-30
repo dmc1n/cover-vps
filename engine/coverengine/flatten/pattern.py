@@ -129,11 +129,13 @@ def build_patterns(
     label_h = _p(params, "pen.label_height_mm")
     q_limit = _p(params, "flatten.stretch_quantile")
     max_triangles = int(params["flatten.max_triangles"])
+    scale = compensation(params)
 
     patterns: list[PanelPattern] = []
     for k, name in enumerate(names):
         mesh, used = _panel_mesh(vertices, faces[labels == k])
         flat = flatten(mesh, solver, iterations, tolerance, max_triangles)
+        flat.uv = flat.uv * scale  # fabric compensation (1 when off)
         loop = igl.boundary_loop(flat.faces.astype(np.int32))
         # orient the loop counter-clockwise in the pattern
         ring = flat.uv[loop]
@@ -166,7 +168,8 @@ def build_patterns(
                 entry.update({"seam": s["id"], "mate": mate, "lap_side": s["lap_side"]})
             entry["_points"] = idx
             edges.append(entry)
-        s1, s2, area = singular_values(flat.vertices, flat.faces, flat.uv)
+        # the stretch of the shape itself, without the compensation
+        s1, s2, area = singular_values(flat.vertices, flat.faces, flat.uv / scale)
         worst = np.maximum(s1 - 1, 1 - s2)
         order = np.argsort(worst)
         share = np.cumsum(area[order]) / area.sum()
@@ -229,6 +232,28 @@ def wiggle(points: Array) -> float:
                     for c in cl:
                         dev[np.abs(pos - c) <= WIGGLE_WINDOW_MM] = 0.0
     return float(dev.max()) if len(dev) else 0.0
+
+
+def fabric_profile(params: EffectiveParams) -> dict[str, Any]:
+    from coverengine.params.registry import repo_root
+
+    name = str(params["fabric.profile"])
+    path = repo_root() / "testdata" / "fabrics" / f"{name}.json"
+    if not path.is_file():
+        raise CoverError(f"no fabric profile {name!r} (testdata/fabrics/{name}.json)")
+    doc: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return doc
+
+
+def compensation(params: EffectiveParams) -> float:
+    """Scale of the flat pieces for the fabric's stretch in a fitted cover (ADR-033): with
+    `flatten.fabric_compensation`, 1 / (1 + the mean of the warp and weft stretch), since the
+    pieces may be turned any way on the roll. 1 when off."""
+    if not params["flatten.fabric_compensation"]:
+        return 1.0
+    stretch = fabric_profile(params)["stretch_pct"]
+    mean = (float(stretch["warp"]) + float(stretch["weft"])) / 2
+    return 1.0 / (1.0 + mean / PERCENT)
 
 
 def _areas(uv: Array, f: IntArray) -> Array:
@@ -361,6 +386,13 @@ def pattern_set(
             )
     model = json.loads((model_dir / "model.json").read_text(encoding="utf-8"))
     fabric = str(params["fabric.profile"])
+    if params["flatten.fabric_compensation"]:
+        profile = fabric_profile(params)
+        if profile.get("status") != "measured":
+            warnings.append(
+                f"fabric compensation uses the {profile.get('status', 'unmeasured')} profile "
+                f"{fabric}; measure the fabric first (docs/CALIBRATION.md)"
+            )
     doc: dict[str, Any] = {
         "format_version": FORMAT_VERSION,
         "engine_version": __version__,
@@ -371,6 +403,7 @@ def pattern_set(
         "parameter_sources": params.sources(),
         "fabric_profile": fabric,
         "fabric_compensation": bool(params["flatten.fabric_compensation"]),
+        "compensation_scale": round(compensation(params), 6),
         "summary": {
             "panels": len(patterns),
             "max_stretch_pct": max(p.stretch["quantile_pct"] for p in patterns),

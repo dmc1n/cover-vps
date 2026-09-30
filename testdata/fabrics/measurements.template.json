@@ -1,0 +1,24 @@
+{
+  "fabric": "acrylic-300",
+  "name": "100% acrylic canvas, approx. 300 g/m2",
+  "roll_batch": "fill in",
+  "date": "YYYY-MM-DD",
+  "load_kg": 2,
+  "stretch_mm": {
+    "warp": [0, 0, 0],
+    "weft": [0, 0, 0],
+    "bias": [0, 0, 0]
+  },
+  "relaxed_mm": {
+    "warp": [0, 0, 0],
+    "weft": [0, 0, 0],
+    "bias": [0, 0, 0]
+  },
+  "weld": {
+    "along": { "before_mm": 300, "after_mm": [0, 0, 0] },
+    "across": { "before_mm": 300, "after_mm": [0, 0, 0] }
+  },
+  "min_weld_radius_mm": 150,
+  "thickness_mm": [0, 0, 0],
+  "note": "stretch_mm and relaxed_mm: the 200 mm gauge length read on each strip, loaded for 60 s and 10 min after release. weld after_mm: the welded assembly measured against the 300 mm reference. See docs/CALIBRATION.md."
+}
