@@ -1,8 +1,12 @@
-"""Support under the cover for flat tops (tables): a balloon that lifts the fabric into a tent.
+"""Support under the cover for flat tops (tables), so the fabric forms a tent.
 
-The balloon is a dome of radius `hull.support_radius_mm` centred on the largest flat patch of
-the unsupported cover. Its height is `hull.support_height_mm`, or, when that is 0, the lowest
-height at which the whole top sheds water (found by bisection on the drainage check).
+- Balloon: a dome of radius `hull.support_radius_mm` centred on the largest flat patch of the
+  unsupported cover.
+- Frame: a ridge beam along the top's long axis, over its whole length; the cover then forms a
+  gable roof of two flat planes, which lie flat exactly (ADR-035).
+
+The height is `hull.support_height_mm`, or, when that is 0, the lowest height at which the
+whole top sheds water (found by bisection on the drainage check).
 """
 
 from __future__ import annotations
@@ -84,3 +88,53 @@ def balloon(
         else:
             hi = mid
     return lifted(hi), Support("balloon", centre, radius_mm, hi, True)
+
+
+def ridge(obstacle: Array, inside: Mask, xs: Array, ys: Array, base: float, height: float) -> Array:
+    """The obstacle with a ridge beam at `base + height` along the long axis of the top."""
+    h = float(xs[1] - xs[0])
+    ii, jj = np.nonzero(inside)
+    pts = np.column_stack([xs[ii], ys[jj]])
+    centre = pts.mean(axis=0)
+    _, _, axes = np.linalg.svd(pts - centre, full_matrices=False)
+    normal = axes[1]  # across the long axis
+    gx, gy = np.meshgrid(xs, ys, indexing="ij")
+    across = (gx - centre[0]) * normal[0] + (gy - centre[1]) * normal[1]
+    beam = (np.abs(across) <= h) & inside
+    return np.maximum(obstacle, np.where(beam, base + height, -np.inf))
+
+
+def frame(
+    obstacle: Array,
+    inside: Mask,
+    xs: Array,
+    ys: Array,
+    height_mm: float,
+    min_slope_deg: float,
+    patch_mm: float,
+) -> tuple[Array, Support | None]:
+    """The tensioned top over a ridge frame (unchanged if the top already sheds water)."""
+    h = float(xs[1] - xs[0])
+    top = concave_envelope(obstacle, inside, xs, ys)
+    flat = drainage.flat_patches(top, inside, h, min_slope_deg, patch_mm)
+    if not flat.any():
+        return top, None
+    base = float(np.max(np.where(inside, top, -np.inf)))
+    ii, jj = np.nonzero(inside)
+    centre = (float(xs[ii].mean()), float(ys[jj].mean()))
+    half = float(max(np.ptp(xs[ii]), np.ptp(ys[jj])) / 2)
+
+    def lifted(height: float) -> Array:
+        return concave_envelope(ridge(obstacle, inside, xs, ys, base, height), inside, xs, ys)
+
+    if height_mm > 0:
+        return lifted(height_mm), Support("frame", centre, half, height_mm, False)
+    span = float(min(np.ptp(xs[ii]), np.ptp(ys[jj])))
+    lo, hi = 0.0, span / 2
+    for _ in range(BISECTION_STEPS):
+        mid = (lo + hi) / 2
+        if drainage.flat_patches(lifted(mid), inside, h, min_slope_deg, patch_mm).any():
+            lo = mid
+        else:
+            hi = mid
+    return lifted(hi), Support("frame", centre, half, hi, True)

@@ -28,8 +28,11 @@ hull:                            # the cover surface (drape hull)
   min_slope_deg: 5               # to confirm; flatter patches of the top hold water
   flat_patch_mm: 100             # flat spots smaller than this across, or this close to the edge,
                                  # still shed water
-  support: none                  # none | balloon   support under the cover for flat tops
-  support_height_mm: 0           # balloon height above the top; 0 = lowest that sheds water
+  support: none                  # none | balloon | frame   support under the cover for flat tops
+                                 # (tables): frame = a ridge beam along the long axis, the cover
+                                 # forms a gable roof that lies flat; balloon = a dome
+  support_height_mm: 0           # balloon or ridge height above the top; 0 = lowest that sheds
+                                 # water
   support_radius_mm: 150         # to confirm; radius of the balloon's dome
   target_edge_length_mm: 15      # mesh density of the hull
   smoothing_max_iterations: 20   # smoothing passes at smoothing = 1 (Taubin, keeps the volume)
@@ -65,6 +68,7 @@ seams:
                                  # far from itself smoothed over 30 mm, or a warning
   corner_angle_deg: 45           # the skirt gets a vertical seam where its outline turns more
   corner_window_mm: 100          # ... than this within this length
+  min_skirt_panel_mm: 300        # to confirm; corners closer together than this get one seam
   max_skirt_panel_mm: 3000       # to confirm; longer skirt stretches are split into equal parts
   snap_mm: 1                     # points closer than this to a seam are moved onto it
   band_drop_mm: 20               # a top too wide for the roll is first split this far below its

@@ -167,7 +167,12 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
     patch = _p(params, "hull.flat_patch_mm")
     held: support.Support | None = None
     if params["hull.top"] == "tensioned":
-        if params["hull.support"] == "balloon":
+        if params["hull.support"] == "frame":
+            tight, held = support.frame(
+                top, covered, bridged.xs, bridged.ys, _p(params, "hull.support_height_mm"),
+                min_slope, patch,
+            )  # fmt: skip
+        elif params["hull.support"] == "balloon":
             tight, held = support.balloon(
                 top, covered, bridged.xs, bridged.ys, _p(params, "hull.support_radius_mm"),
                 _p(params, "hull.support_height_mm"), min_slope, patch,
@@ -257,7 +262,7 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
         else {
             "kind": held.kind,
             "centre_mm": [round(held.centre_mm[0], 1), round(held.centre_mm[1], 1)],
-            "radius_mm": held.radius_mm,
+            "radius_mm": round(held.radius_mm, 1),
             "height_mm": round(held.height_mm, 1),
             "automatic": held.automatic,
         },

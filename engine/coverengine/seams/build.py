@@ -26,7 +26,16 @@ from coverengine.hull.build import HULL_GLB, MODEL_RGBA, _coloured
 from coverengine.io.model_io import glb_bytes, load_model, read_model_json
 from coverengine.params import EffectiveParams
 from coverengine.seams import auto
-from coverengine.seams.cut import CutMesh, Seam, apply, is_disk, panels, seam_edges, unzip
+from coverengine.seams.cut import (
+    CutMesh,
+    Seam,
+    apply,
+    is_disk,
+    panels,
+    seam_edges,
+    smooth_seam,
+    unzip,
+)
 from coverengine.seams.panels import (
     Panel,
     SeamInfo,
@@ -56,6 +65,9 @@ SLIVER_SEAM_MM = 10.0  # param-ok: geometric tolerance
 # Roll-width splits per panel before giving up (each halves the width).
 MAX_ROLL_SPLITS = 4
 MM_PER_CM = 10.0  # param-ok: unit conversion
+# Smoothing a jittery wall seam in place: passes, and how far a face may turn (cosine).
+SMOOTH_PASSES = 30  # param-ok: iterations
+SMOOTH_KEEP_NORMAL = 0.8  # param-ok: geometric tolerance
 LOW_EDGE_PERCENTILE = 5.0  # param-ok: rule, short dips of the top edge do not set the skirt height
 # Reach of a straight top seam's field beyond its ends (mm), so it cuts right to the panel edge.
 TOP_SEAM_OVERSHOOT_MM = 50.0  # param-ok: geometric reach
@@ -200,7 +212,12 @@ def _cut_cover(
         found = auto.corners(
             line, _p(params, "seams.corner_angle_deg"), _p(params, "seams.corner_window_mm")
         )
-        positions = auto.split_positions(line, found, _p(params, "seams.max_skirt_panel_mm"))
+        positions = auto.split_positions(
+            line,
+            found,
+            _p(params, "seams.max_skirt_panel_mm"),
+            _p(params, "seams.min_skirt_panel_mm"),
+        )
 
     # 3. walls: where the top edge stands clearly higher than the skirt seam (the back of a
     # chair), the upright part between becomes a wall panel, so the top never wraps down over
@@ -218,6 +235,10 @@ def _cut_cover(
         walls, walls_tried = [], True
     if walls:
         cut = apply(cut, auto.wall_seam(line, rim, inset, walls, TOP_REGION), snap)
+        # a wall a millimetre out of plumb makes the true edge jitter: then smooth it in place
+        # (a clean edge, with its real corners, is left as it is)
+        if _seam_wiggle(cut, "wall") > _p(params, "seams.max_wiggle_mm"):
+            cut = smooth_seam(cut, "wall", hull, SMOOTH_PASSES, SMOOTH_KEEP_NORMAL)
     reach = _p(params, "seams.corner_window_mm")
     for i, s in enumerate(positions):
         cut = apply(cut, auto.corner_seam(line, s, i, SKIRT_REGION, reach), snap)
@@ -294,6 +315,34 @@ def _cut_cover(
     result.report["skirt_height_mm"] = [round(h, 1) for h in heights]  # lowest, highest
     result.report["walls_tried"] = walls_tried
     return result
+
+
+def _seam_wiggle(cut: CutMesh, seam_id: str) -> float:
+    """The largest zig-zag (mm) along any part of a seam, as the pattern check measures it."""
+    from coverengine.flatten.pattern import wiggle
+
+    edges = seam_edges(cut).get(seam_id)
+    if edges is None or not len(edges):
+        return 0.0
+    v = np.asarray(cut.mesh.vertices)
+    remaining = {tuple(e) for e in edges.tolist()}
+    worst = 0.0
+    while remaining:
+        start = next(iter(remaining))
+        part, ends = {start}, set(start)
+        remaining.discard(start)
+        grew = True
+        while grew:
+            grew = False
+            for e in [e for e in remaining if e[0] in ends or e[1] in ends]:
+                part.add(e)
+                ends.update(e)
+                remaining.discard(e)
+                grew = True
+        order = _ordered(np.array(sorted(part)))
+        if len(order) > 2:
+            worst = max(worst, wiggle(v[order]))
+    return worst
 
 
 def _copy(cut: CutMesh) -> CutMesh:

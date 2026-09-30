@@ -584,3 +584,22 @@ Status: accepted, 2026-09-30.
   of a line that ran on past the seam it meets; it is no longer cut open. Only a vertical skirt
   seam may close a panel onto itself (a round skirt cut once).
 
+## ADR-035 — Lessons from real models (FreeCAD library, SUNS catalogue)
+
+Status: accepted, 2026-09-30/10-01 (night run, owner offline).
+
+- Splayed legs put the lowest top edge at the floor: the automatic skirt is at least
+  `seams.min_skirt_height_mm` (150, to confirm) high.
+- A frame that encloses an empty area seen from above (a folding chair) left a tube in the
+  cover: holes in the footprint are filled, the top spans them.
+- Corners closer together than `seams.min_skirt_panel_mm` (300, to confirm) get one seam half
+  way between them (no strips of a few cm).
+- A wall a millimetre out of plumb, or a faceted model, makes the true-edge wall seam jitter
+  (4–7 mm): when it zig-zags more than `seams.max_wiggle_mm`, its points are smoothed in place
+  along the seam and put back on the surface (faces may turn by at most acos 0.8); a clean seam
+  keeps its real corners.
+- `hull.support: frame` (a ridge beam along the long axis, gable-roof top) is available; on the
+  test tables it did not beat the balloon (3.2–3.4 % against 0.3–4.2 %), because the ridge ends
+  meet the rounded table edges. Tables keep the balloon; the frame may need a seam along the
+  ridge (question for the owner).
+

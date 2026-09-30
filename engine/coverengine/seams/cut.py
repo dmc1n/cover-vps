@@ -12,6 +12,7 @@ import dataclasses
 from collections.abc import Callable
 from dataclasses import dataclass
 
+import igl
 import numpy as np
 import trimesh
 from numpy.typing import NDArray
@@ -274,3 +275,52 @@ def unzip(mesh: trimesh.Trimesh, cut_edges: IntArray) -> trimesh.Trimesh:
     opened = trimesh.Trimesh(vertices, new_index.reshape(n, 3), process=False)
     opened.metadata["original_vertex"] = corners[first]  # opened vertex -> vertex before
     return opened
+
+
+def smooth_seam(
+    cut: CutMesh, seam_id: str, surface: trimesh.Trimesh, iterations: int, keep_normal: float
+) -> CutMesh:
+    """Smooth a seam that zig-zags on a slightly uneven surface, without changing which faces
+    lie on which side: each of its points (not the ends, and not points shared with other seams)
+    moves half way to the middle of its two neighbours along the seam, and back onto the
+    `surface`; a move is kept only if no face around the point turns more than `keep_normal`
+    (cosine) or collapses."""
+    edges = seam_edges(cut).get(seam_id)
+    if edges is None or not len(edges):
+        return cut
+    nbr: dict[int, list[int]] = {}
+    for a, b in edges.tolist():
+        nbr.setdefault(a, []).append(b)
+        nbr.setdefault(b, []).append(a)
+    others = {v for s in cut.seams if s.id != seam_id for e in s.edges for v in e}
+    free = np.array(sorted(i for i, n in nbr.items() if len(n) == 2 and i not in others))
+    if not len(free):
+        return cut
+    mesh = cut.mesh
+    v = np.asarray(mesh.vertices, dtype=np.float64).copy()
+    f = np.asarray(mesh.faces)
+    n0 = np.asarray(mesh.face_normals)
+    vf = mesh.vertex_faces
+    pair = np.array([nbr[i] for i in free])
+    sv = np.asarray(surface.vertices, dtype=np.float64)
+    sf = np.asarray(surface.faces, dtype=np.int32)
+    for _ in range(iterations):
+        target = 0.5 * v[free] + 0.25 * (
+            v[pair[:, 0]] + v[pair[:, 1]]
+        )  # param-ok: half way to the neighbours
+        _, _, target = igl.point_mesh_squared_distance(target, sv, sf)
+        for i, t in zip(free, target, strict=True):
+            old = v[i].copy()
+            v[i] = t
+            around = vf[i][vf[i] >= 0]
+            tri = v[f[around]]
+            n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+            size = np.linalg.norm(n, axis=1)
+            ok = size > 1e-9
+            if ok.all():
+                cos = ((n / size[:, None]) * n0[around]).sum(axis=1)
+                ok = cos > keep_normal
+            if not ok.all():
+                v[i] = old
+    moved = trimesh.Trimesh(v, f, process=False)
+    return CutMesh(moved, cut.seams, cut.region)

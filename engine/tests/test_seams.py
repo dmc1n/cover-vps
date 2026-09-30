@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+import shapely
 import trimesh
 from coverengine.cli import main
 from coverengine.errors import CoverError
@@ -26,6 +27,7 @@ SEAMS = {
     "seams.corner_angle_deg": 45,
     "seams.corner_window_mm": 100,
     "seams.max_skirt_panel_mm": 3000,
+    "seams.min_skirt_panel_mm": 300,
     "seams.snap_mm": 1,
     "seams.band_drop_mm": 20,
     "seams.skirt_seam": "level",
@@ -189,6 +191,16 @@ def test_a_seam_ending_inside_a_panel_is_not_cut_open(models: Path, tmp_path: Pa
     tops = [p for p in cut.panels if p.region == "top"]
     assert len(tops) == 3 and all(p.disk for p in tops)
     assert not [s for s in cut.seams if s.panels[0] == s.panels[1]]
+
+
+def test_close_corners_get_one_seam() -> None:
+    from coverengine.seams.auto import Outline, split_positions
+
+    square = shapely.Polygon([(0, 0), (1000, 0), (1000, 1000), (0, 1000)])
+    line = Outline(square, np.zeros((0, 2)), 4000.0)
+    # two corners 50 mm apart become one seam half way; the others stay
+    got = split_positions(line, [0.0, 1000.0, 1050.0, 2000.0, 3000.0], 3000.0, 300.0)
+    assert len(got) == 4 and any(abs(g - 1025.0) < 1e-6 for g in got)
 
 
 def test_dome_gets_a_seam_proposal(models: Path) -> None:

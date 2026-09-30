@@ -134,9 +134,20 @@ def _turns(p: Array, angle_deg: float, window_mm: float, length: float) -> list[
     return found
 
 
-def split_positions(line: Outline, corner_s: list[float], max_panel_mm: float) -> list[float]:
-    """Vertical seam positions: corners plus equal splits of long stretches."""
-    cuts = list(corner_s)
+def split_positions(
+    line: Outline, corner_s: list[float], max_panel_mm: float, min_panel_mm: float = 0.0
+) -> list[float]:
+    """Vertical seam positions: corners plus equal splits of long stretches. Corners closer
+    together than `min_panel_mm` get one seam (no strips a few cm wide)."""
+    cuts = sorted(corner_s)
+    while len(cuts) > 1:
+        gaps = [(cuts[(i + 1) % len(cuts)] - cuts[i]) % line.length for i in range(len(cuts))]
+        i = int(np.argmin(gaps))
+        if gaps[i] >= min_panel_mm:
+            break
+        j = (i + 1) % len(cuts)
+        mid = (cuts[i] + gaps[i] / 2) % line.length  # one seam half way between the two
+        cuts = sorted([c for k, c in enumerate(cuts) if k not in (i, j)] + [mid])
     if not cuts:
         back = int(np.argmax(line.points[:, 1]))  # the rear of the cover
         cuts = [float(back * line.length / len(line.points))]
