@@ -3,16 +3,17 @@ name = "cover-pattern-engine"
 version = "0.0.0"
 description = "Workspace root for the cover pattern engine"
 requires-python = ">=3.12,<3.13"
-dependencies = ["coverengine"]
+dependencies = ["coverengine", "coverapi"]
 
 [tool.uv]
 package = false
 
 [tool.uv.workspace]
-members = ["engine"]
+members = ["engine", "apps/api"]
 
 [tool.uv.sources]
 coverengine = { workspace = true }
+coverapi = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -34,10 +35,10 @@ select = ["E", "F", "W", "I", "B", "UP"]
 python_version = "3.12"
 ignore_missing_imports = true
 check_untyped_defs = false
-files = ["engine/coverengine"]
+files = ["engine/coverengine", "apps/api/coverapi"]
 
 [tool.pytest.ini_options]
-testpaths = ["engine/tests"]
+testpaths = ["engine/tests", "apps/api/tests"]
 filterwarnings = [
   # scikit-image's marching cubes on numpy 2.5; harmless, fixed upstream
   "ignore:Setting the shape on a NumPy array has been deprecated:DeprecationWarning",

@@ -200,8 +200,9 @@ cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/
 make testsheets regenerate testdata/machine/*.dxf (a test checks they are current)
 make golden     regenerate testdata/golden/info/ and hull/ (golden outputs), then review the diff
-make api-dev    uvicorn with reload         make web-dev   Vite dev server
-make deploy     build images and `docker compose up -d` on this server
+make api-dev    web app and API on :8080     make web-dev   Vite dev server on :5173
+make web-build  build the pages (apps/web/dist)
+make deploy     build the app image and `docker compose up -d app` (127.0.0.1:8080)
 make backup     push the data directory to R2 with rclone
 ```
 

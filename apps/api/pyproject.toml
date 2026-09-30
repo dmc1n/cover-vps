@@ -1,0 +1,25 @@
+[project]
+name = "coverapi"
+version = "0.1.0"
+description = "Web API and app server for the cover pattern engine"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "coverengine",
+  "fastapi",
+  "uvicorn",
+  "python-multipart",
+  "httpx",
+]
+
+[project.scripts]
+cover-web = "coverapi.main:serve"
+
+[tool.uv.sources]
+coverengine = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["coverapi"]

@@ -22,3 +22,8 @@ jobs:
         run: uv sync --frozen --all-packages --all-extras
       - name: make test
         run: make test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Web app type check and build
+        run: cd apps/web && npm ci --no-audit --no-fund && npm run build

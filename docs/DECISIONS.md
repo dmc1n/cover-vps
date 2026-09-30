@@ -510,3 +510,25 @@ are in docs/QUESTIONS.md).
   machine's nesting is expected to do better.
 - The M4 files (`pattern.*`, seam to seam) stay; the export adds `cut.*` beside them.
 
+## ADR-031 — The first web app (M6)
+
+Status: accepted, 2026-09-30 (built while the owner was offline; plan in docs/plans/M6.md).
+
+- One process serves the API (FastAPI, `apps/api`, package `coverapi`) and the built pages
+  (`apps/web/dist`), on one port. Simpler to run and to put behind a tunnel than separate web
+  and API containers.
+- The data directory holds `models/<id>/` exactly as the command line writes it; the web app
+  reads the same files. No database yet: model state is the folder, jobs are JSON files. SQLite
+  comes with users and revisions.
+- Jobs run the `cover` steps as subprocesses, one job at a time (memory: a big model needs
+  several GB), with per-step status and log. The page polls every 1.5 s; a WebSocket is not
+  needed for this.
+- Pages: React, TypeScript, Vite, Three.js; hash routes, no router library.
+- Settings in the browser use the registry (`GET /api/parameters`): the YAML comments are the
+  help texts, `to confirm` is shown, sources are default / model / changed. Trial runs pass
+  `--set`; saving writes only values that differ from the default into `cover.json`.
+- Access until the Cloudflare account exists: SSH tunnel to 127.0.0.1:8080. The compose file
+  publishes only 127.0.0.1:8080; the Cloudflare tunnel is an optional profile.
+- Headless browser checks run in the official Playwright Docker image (the server lacks the
+  browser's system libraries and we have no root).
+
