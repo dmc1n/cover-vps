@@ -85,3 +85,24 @@ def test_bad_requests(chair: dict[str, Any], tmp_path: Path) -> None:
     r = c.post(f"/api/models/{chair['id']}/run", json={"trial": {"hull.clearance_mm": "wide"}})
     assert r.status_code == 400
     assert c.get("/api/models/nope").status_code == 404
+
+
+def test_plan_view_and_hand_placed_seams(chair: dict[str, Any]) -> None:
+    c: TestClient = chair["client"]
+    p = c.get(f"/api/models/{chair['id']}/plan").json()
+    assert len(p["outline"]) > 10 and p["seams"] and p["panels"]
+    assert c.get(f"/api/models/{chair['id']}/files/plan.png").content[:4] == b"\x89PNG"
+    xmin, ymin, xmax, ymax = p["extent"]
+    # a seam straight across the top, from side to side at the middle
+    y = (ymin + ymax) / 2
+    line = [[xmin - 50, y], [xmax + 50, y]]
+    r = c.put(f"/api/models/{chair['id']}/seams", json={"top_seams": [line]})
+    assert r.status_code == 200, r.text
+    job = chair["app"].state.jobs.wait(r.json()["job"]["id"], RUN_TIMEOUT_S)
+    assert job["status"] == "done", job
+    m = c.get(f"/api/models/{chair['id']}").json()
+    assert sum(1 for q in m["cut"]["panels"] if q["region"] == "top") == 2  # the top is split
+    r = c.put(f"/api/models/{chair['id']}/seams", json={"automatic": True})
+    job = chair["app"].state.jobs.wait(r.json()["job"]["id"], RUN_TIMEOUT_S)
+    m = c.get(f"/api/models/{chair['id']}").json()
+    assert sum(1 for q in m["cut"]["panels"] if q["region"] == "top") == 1

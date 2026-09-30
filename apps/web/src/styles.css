@@ -71,3 +71,14 @@ pre { background: #1d2230; color: #e6e8ef; padding: 10px; border-radius: 6px; ov
   .param { grid-template-columns: 1fr; }
   .summary { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
+
+.seam-editor svg.plan { width: 100%; height: auto; max-height: 75vh; background: #fff; border: 1px solid var(--line); border-radius: 8px; cursor: crosshair; touch-action: none; }
+svg.plan .outline { fill: none; stroke: #e0147a; stroke-width: 3; }
+svg.plan .seam-now { fill: none; stroke: #7a7f8e; stroke-width: 3; stroke-dasharray: 12 8; }
+svg.plan .seam-now.skirt { stroke: #b0b4c0; }
+svg.plan .seam-mine { fill: none; stroke: var(--accent); cursor: pointer; }
+svg.plan .seam-drawing { fill: none; stroke: #e07a14; stroke-dasharray: 10 6; }
+svg.plan .handle { fill: #fff; stroke: var(--accent); stroke-width: 3; cursor: grab; }
+svg.plan .skirt-handle { fill: #e0147a; stroke: #fff; stroke-width: 2; cursor: grab; }
+svg.plan .panel-name { fill: #1d2230; text-anchor: middle; pointer-events: none; opacity: 0.8; }
+button.active-mode { background: #dbe4ff; border-color: var(--accent); }

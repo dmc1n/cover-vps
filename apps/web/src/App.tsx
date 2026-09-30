@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, cm, fileUrl, Job, ModelBrief, ModelDetail, Scalar, Step, STEP_LABEL, STEPS } from "./api";
+import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
 import { Viewer } from "./Viewer";
 
@@ -148,9 +149,10 @@ function Upload() {
   );
 }
 
-type Tab = "3d" | "patterns" | "sizes" | "cut" | "settings" | "files" | "log";
+type Tab = "3d" | "seams" | "patterns" | "sizes" | "cut" | "settings" | "files" | "log";
 const TABS: [Tab, string][] = [
   ["3d", "3D"],
+  ["seams", "Seams"],
   ["patterns", "Patterns"],
   ["sizes", "Size drawing"],
   ["cut", "Cut pieces"],
@@ -256,6 +258,7 @@ function ModelPage({ id }: { id: string }) {
       </nav>
       <section className="tab">
         {tab === "3d" && <Viewer id={id} files={model.files} stamp={stamp} />}
+        {tab === "seams" && <SeamEditor id={id} stamp={stamp} onJob={setJob} />}
         {tab === "patterns" && <Patterns model={model} stamp={stamp} />}
         {tab === "sizes" && <Pdf id={id} name="sizes.pdf" has={has("sizes.pdf")} stamp={stamp} />}
         {tab === "cut" && <CutPieces model={model} stamp={stamp} />}

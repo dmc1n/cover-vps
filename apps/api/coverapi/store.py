@@ -24,7 +24,7 @@ STEP_FILES = {
     "export": ["finished.json", "cut.dxf", "cut.svg", "cutting-list.pdf"],
 }
 STEPS = list(STEP_FILES)
-EXTRA_FILES = ["cover.json", "seams.json", "pattern.prev.json"]
+EXTRA_FILES = ["cover.json", "seams.json", "pattern.prev.json", "plan.png"]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)
 MEDIA = {
     ".glb": "model/gltf-binary",
@@ -32,6 +32,7 @@ MEDIA = {
     ".svg": "image/svg+xml",
     ".pdf": "application/pdf",
     ".dxf": "application/dxf",
+    ".png": "image/png",
 }
 UPLOAD_SUFFIXES = {".step", ".stp", ".iges", ".igs", ".stl", ".obj", ".ply", ".glb", ".gltf"}
 
