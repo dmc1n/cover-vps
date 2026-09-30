@@ -360,7 +360,12 @@ def corner_seam(line: Outline, s: float, index: int, skirt_region: int, reach_mm
     """A vertical seam across the skirt at arc length s: the skirt faces on its plane, up to
     CORNER_REACH times `reach_mm` from the outline point (where the skirt climbs over a low,
     rounded corner it reaches further in than the window)."""
-    p0, t = line.at(s)
+    p0, _ = line.at(s)
+    # the direction of the outline across the corner (before to after), so at a sharp corner
+    # the seam runs diagonally across it instead of along one side
+    before, _ = line.at(s - reach_mm / 2)
+    after, _ = line.at(s + reach_mm / 2)
+    t = (after - before) / (float(np.linalg.norm(after - before)) or 1.0)
 
     def faces(cut: CutMesh) -> Mask:
         c = np.asarray(cut.mesh.triangles_center)

@@ -601,6 +601,11 @@ Status: accepted, 2026-09-30/10-01 (night run, owner offline).
 - Meshing small gaps could leave loose fragments of a few mm2 in the cover surface; they
   became "panels" that could not be flattened. The cover surface is now its largest connected
   part.
+- A vertical corner seam took its direction from the outline just after its point; at a sharp
+  corner (a square table) its plane then ran along the side instead of across the corner, and
+  the skirt stayed a closed ring. The direction now comes from before to after the corner, and
+  the seam reaches the skirt faces on its plane up to three corner windows away (a skirt that
+  climbs over a low, rounded corner).
 - `hull.support: frame` (a ridge beam along the long axis, gable-roof top) is available; on the
   test tables it did not beat the balloon (3.2–3.4 % against 0.3–4.2 %), because the ridge ends
   meet the rounded table edges. Tables keep the balloon; the frame may need a seam along the
