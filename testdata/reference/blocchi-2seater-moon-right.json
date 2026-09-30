@@ -4,7 +4,14 @@
   "source": "owner's fitting cover drawing 'Cover 110' (testdata/models/cover.pdf, not in git), 2026-09-30",
   "measured": "seam to seam, on the finished cover (owner)",
   "fabric": "WeatherMax, charcoal",
-  "features": { "air_pockets": 4, "tie_downs": "elastic", "grommets": null, "bottom": "open" },
+  "features": {
+    "air_pockets": 4,
+    "tie_downs": "elastic",
+    "grommets": null,
+    "bottom": "open",
+    "air_pockets_note": "the drawing shows 4; the current rule (one per metre of hem, owner 2026-09-30) gives 6, and 6 is correct (owner)",
+    "air_pockets_expected": 6
+  },
   "dimensions_mm": {
     "total_height": 880,
     "skirt_height_front": 406,
