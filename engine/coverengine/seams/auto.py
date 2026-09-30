@@ -160,6 +160,9 @@ def split_positions(
     return sorted(s % line.length for s in out)
 
 
+# A corner seam cuts the skirt up to this many corner windows from its point on the outline.
+CORNER_REACH = 3.0  # param-ok: geometric reach
+
 # Rim profile: sampled along the outline this often, from points this far inside the rim (mm).
 RIM_STEP_MM = 10.0  # param-ok: sampling
 RIM_BAND_MM = 50.0  # param-ok: geometric reach
@@ -354,12 +357,16 @@ def wall_seam(
 
 
 def corner_seam(line: Outline, s: float, index: int, skirt_region: int, reach_mm: float) -> Seam:
+    """A vertical seam across the skirt at arc length s: the skirt faces on its plane, up to
+    CORNER_REACH times `reach_mm` from the outline point (where the skirt climbs over a low,
+    rounded corner it reaches further in than the window)."""
     p0, t = line.at(s)
 
     def faces(cut: CutMesh) -> Mask:
         c = np.asarray(cut.mesh.triangles_center)
-        near = np.linalg.norm(c[:, :2] - p0, axis=1) < reach_mm
-        return near & (cut.region == skirt_region)
+        near = np.linalg.norm(c[:, :2] - p0, axis=1) < reach_mm * CORNER_REACH
+        on_plane = np.abs((c[:, :2] - p0) @ t) < reach_mm
+        return near & on_plane & (cut.region == skirt_region)
 
     return Seam(
         id=f"corner-{index + 1}",

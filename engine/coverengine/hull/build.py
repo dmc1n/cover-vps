@@ -341,14 +341,26 @@ def _sharpen(
     return out
 
 
+# Loose fragments below this area, or this share of the cover, are dropped (mm2).
+FRAGMENT_MM2 = 1000.0  # param-ok: geometric tolerance
+FRAGMENT_SHARE = 0.001  # param-ok: geometric tolerance
+
+
 def _one_piece(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
-    """The cover is one piece of surface: loose fragments (a few mm2 left by meshing small
-    gaps) are dropped, the largest connected part is kept."""
+    """Drop loose fragments (a few mm2 left by meshing small gaps; they would become panels
+    that cannot be flattened). Only small parts go: a real piece of cover that touches the rest
+    at a single point is kept."""
     parts = mesh.split(only_watertight=False)
     if len(parts) <= 1:
         return mesh
-    keep = max(parts, key=lambda m: float(m.area))
-    return trimesh.Trimesh(keep.vertices, keep.faces, process=True)
+    total = float(mesh.area)
+    keep = [p for p in parts if float(p.area) >= max(FRAGMENT_MM2, FRAGMENT_SHARE * total)]
+    if len(keep) == len(parts):
+        return mesh
+    offsets = np.cumsum([0] + [len(p.vertices) for p in keep])
+    verts = np.vstack([np.asarray(p.vertices) for p in keep])
+    faces = np.vstack([np.asarray(p.faces) + o for p, o in zip(keep, offsets, strict=False)])
+    return trimesh.Trimesh(verts, faces, process=True)
 
 
 def _mirror_symmetric(hm: HeightMap) -> bool:
