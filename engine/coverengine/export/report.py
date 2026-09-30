@@ -10,6 +10,7 @@ from matplotlib.figure import Figure
 
 A4 = (8.27, 11.69)  # param-ok: paper size (inches)
 ROWS = 44  # param-ok: layout, table rows per page
+TITLE_PT = 15  # param-ok: layout
 COLOUR = {"ready": "#1a7f37", "check": "#b26a00", "failed": "#c62828"}
 MM_PER_M = 1000.0  # param-ok: unit conversion
 
@@ -23,7 +24,7 @@ def write_report(path: Path, rows: list[dict[str, Any]], title: str) -> None:
         for n, chunk in enumerate(pages):
             fig = Figure(figsize=A4)
             if n == 0:
-                fig.text(0.06, 0.965, f"Covers: {title}", fontsize=15, weight="bold")
+                fig.text(0.06, 0.965, f"Covers: {title}", fontsize=TITLE_PT, weight="bold")
                 fig.text(
                     0.06,
                     0.945,

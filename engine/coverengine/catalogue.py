@@ -151,8 +151,8 @@ def compare_files(a: Path, b: Path, threshold_mm: float = 1.0) -> dict[str, Any]
 
 
 # A cover is "ready" when every piece is within the stretch limit, every edge is a smooth line
-# and no seam's two sides differ by more than READY_EASE_MM; otherwise "check" with the reasons.
-READY_EASE_MM = 5.0
+# and no seam's two sides differ by more than the fit tolerance (tolerance.cover_mm); otherwise
+# "check" with the reasons.
 
 
 def grade(model_dir: Path) -> dict[str, Any]:
@@ -167,6 +167,7 @@ def grade(model_dir: Path) -> dict[str, Any]:
     finished = json.loads((model_dir / "finished.json").read_text(encoding="utf-8"))
     limit = float(pattern["parameters"]["fabric"]["max_allowed_stretch_pct"])
     wiggle_limit = float(pattern["parameters"]["seams"]["max_wiggle_mm"])
+    ease_limit = float(pattern["parameters"]["tolerance"]["cover_mm"])
     panels = pattern["panels"]
     stretch = max(p["stretch"]["quantile_pct"] for p in panels)
     ease = max((e.get("ease_mm", 0.0) for p in panels for e in p["edges"]), default=0.0)
@@ -177,7 +178,7 @@ def grade(model_dir: Path) -> dict[str, Any]:
         reasons.append(f"{worst['name']} stretches {stretch:.1f} %")
     if wiggle > wiggle_limit:
         reasons.append(f"an edge zig-zags {wiggle:.1f} mm")
-    if ease > READY_EASE_MM:
+    if ease > ease_limit:
         reasons.append(f"a seam's sides differ by {ease:.0f} mm")
     vents = [w for w in finished.get("warnings", []) if "air vent" in w]
     if vents:
