@@ -153,6 +153,16 @@ def _cmd_hull(args: argparse.Namespace) -> int:
     closest = f"{dist['min']:.1f} mm from the furniture (clearance {dist['clearance']:g} mm)"
     print(f"distance closest {closest}")
     print(f"ridges   {r['ridges']['chains']} sharp ridges (seam candidates for the next step)")
+    runs_off = r["drainage"]["drains"]
+    print(f"water    {'runs off' if runs_off else 'would stay on the top (see warning)'}")
+    if r["support"]:
+        s = r["support"]
+        how = "automatic" if s["automatic"] else "as set"
+        x, y = s["centre_mm"]
+        print(
+            f"support  {s['kind']} {s['height_mm']:.0f} mm high ({how}), "
+            f"radius {s['radius_mm']:g} mm, centred at x {x:.0f}, y {y:.0f}"
+        )
     for w in hull.warnings:
         print(f"warning: {w}", file=sys.stderr)
     return 0

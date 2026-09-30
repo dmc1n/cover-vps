@@ -30,6 +30,12 @@ HULL = {
     "hull.remesh_max_deviation_mm": 0.5,
     "hull.clearance_passes": 10,
     "hull.max_grid_cells": 60_000_000,
+    "hull.top": "tensioned",
+    "hull.min_slope_deg": 5,
+    "hull.flat_patch_mm": 100,
+    "hull.support": "none",
+    "hull.support_height_mm": 0,
+    "hull.support_radius_mm": 150,
     "seams.ridge_angle_deg": 40,
 }
 SHAPES = ["box_with_legs", "slatted_table", "chair", "l_lounge", "sphere", "cone"]
@@ -89,9 +95,11 @@ def test_table_top_is_flat_when_gaps_are_bridged(hulls: dict[str, Any]) -> None:
     assert np.all(over_gaps >= height + 10 - 2.0)
 
 
-def test_table_follows_slats_with_small_bridge(models: Path) -> None:
+def test_draped_table_follows_slats_with_small_bridge(models: Path) -> None:
     slats, gaps, height = slat_and_gap_centres()
-    mesh = build_hull(models / "slatted_table", params(bridge_gap_mm=10, clearance_mm=12)).mesh
+    mesh = build_hull(
+        models / "slatted_table", params(bridge_gap_mm=10, clearance_mm=12, top="draped")
+    ).mesh
     over_slats = top_profile(mesh, 0.0, slats)
     over_gaps = top_profile(mesh, 0.0, gaps)
     assert over_slats == pytest.approx(height + 12, abs=0.5)
@@ -109,14 +117,24 @@ def test_table_skirt_is_vertical_at_clearance(hulls: dict[str, Any]) -> None:
     assert np.abs(v[:, 0]).max() == pytest.approx(t["length"] / 2 + 10, abs=1.5)
 
 
-def test_chair_follows_seat_and_hangs_at_sides_and_rear(hulls: dict[str, Any]) -> None:
+def test_chair_top_spans_the_seat_in_a_straight_line(hulls: dict[str, Any]) -> None:
+    """Rule 12: from the front edge of the seat straight up to the top of the back."""
+    ch = FURNITURE["chair"]
+    mesh = hulls["chair"].mesh
+    v = np.asarray(mesh.vertices)
+    ys = np.linspace(v[:, 1].min() + 60, v[:, 1].min() + ch["seat"][1] * 0.8, 7)
+    z = top_profile(mesh, 0.0, ys)
+    line = np.polyval(np.polyfit(ys, z, 1), ys)
+    assert np.abs(z - line).max() < 3.0  # straight
+    assert np.all(np.diff(z) > 0)  # rising towards the back
+    assert z[len(z) // 2] > ch["seat_height"] + 10 + 100  # well above the seat
+    assert hulls["chair"].report["drainage"]["drains"]
+
+
+def test_chair_hangs_at_sides_and_rear(hulls: dict[str, Any]) -> None:
     ch = FURNITURE["chair"]
     mesh = hulls["chair"].mesh
     v, n, c = np.asarray(mesh.vertices), mesh.face_normals, mesh.triangles_center
-    seat_y = float(v[:, 1].min()) + 10 + ch["seat"][1] / 4  # front half of the seat
-    assert top_profile(mesh, 0.0, np.array([seat_y]))[0] == pytest.approx(
-        ch["seat_height"] + 10, abs=0.5
-    )
     low = (c[:, 2] > 70) & (c[:, 2] < ch["seat_height"] - ch["seat"][2] - 30)
     sides = low & (np.abs(n[:, 0]) > 0.9)
     assert np.abs(c[sides][:, 0]) == pytest.approx(ch["seat"][0] / 2 + 10, abs=1.5)
@@ -126,6 +144,16 @@ def test_chair_follows_seat_and_hangs_at_sides_and_rear(hulls: dict[str, Any]) -
     assert c[rear][:, 1].min() > v[:, 1].min() + ch["seat"][1] + 10
 
 
+def test_draped_chair_follows_the_seat(models: Path) -> None:
+    ch = FURNITURE["chair"]
+    mesh = build_hull(models / "chair", params(top="draped")).mesh
+    v = np.asarray(mesh.vertices)
+    seat_y = float(v[:, 1].min()) + 10 + ch["seat"][1] / 4
+    assert top_profile(mesh, 0.0, np.array([seat_y]))[0] == pytest.approx(
+        ch["seat_height"] + 10, abs=0.5
+    )
+
+
 @pytest.mark.parametrize("name", [*SHAPES, "chair_faceted"])
 def test_clearance_everywhere(models: Path, hulls: dict[str, Any], name: str) -> None:
     hull = hulls[name]
@@ -133,7 +161,7 @@ def test_clearance_everywhere(models: Path, hulls: dict[str, Any], name: str) ->
     d, _ = clearance.distances(hull.mesh, np.asarray(model.vertices), np.asarray(model.faces))
     assert d.min() >= 10 - 1e-6
     assert hull.report["distance_to_model_mm"]["min"] >= 10 - 1e-3
-    assert hull.warnings == []
+    assert not [w for w in hull.warnings if "closest point" in w]
 
 
 @pytest.mark.parametrize("name", SHAPES)
@@ -266,3 +294,54 @@ def test_golden_hull(hulls: dict[str, Any], name: str) -> None:
         golden.write_text(text, encoding="utf-8")
     assert golden.is_file(), f"no golden file {golden}; run make golden"
     assert text == golden.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("name", ["slatted_table", "box_with_legs", "l_lounge"])
+def test_flat_tops_are_reported(hulls: dict[str, Any], name: str) -> None:
+    report = hulls[name].report
+    assert not report["drainage"]["drains"]
+    assert report["drainage"]["flat_area_mm2"] > 0.1e6
+    assert any("water would stay" in w for w in hulls[name].warnings)
+
+
+@pytest.mark.parametrize("name", ["chair", "sphere", "cone", "chair_faceted"])
+def test_sloped_tops_drain(hulls: dict[str, Any], name: str) -> None:
+    assert hulls[name].report["drainage"]["drains"]
+
+
+def test_balloon_makes_a_table_drain(models: Path) -> None:
+    hull = build_hull(models / "slatted_table", params(support="balloon"))
+    s = hull.report["support"]
+    assert hull.report["drainage"]["drains"] and s["automatic"]
+    assert s["centre_mm"] == pytest.approx([0.0, 0.0], abs=5.0)
+    # the lowest height that sheds water: a little lower does not
+    lower = build_hull(
+        models / "slatted_table", params(support="balloon", support_height_mm=0.9 * s["height_mm"])
+    )
+    assert not lower.report["drainage"]["drains"]
+    t = FURNITURE["slatted_table"]
+    assert hull.mesh.bounds[1][2] == pytest.approx(t["height"] + 10 + s["height_mm"], abs=2.0)
+
+
+def test_drainage_finds_a_hollow() -> None:
+    from coverengine.hull import drainage
+
+    xs = ys = np.arange(-200.0, 201.0, 5.0)
+    r = np.hypot(xs[:, None], ys[None, :])
+    bowl = 100 + 0.2 * r - 30 * np.exp(-((r / 60) ** 2))  # a cone with a dent in the middle
+    inside = r < 200
+    result = drainage.check(bowl, inside, xs, ys, 5.0, 100.0)
+    assert not result.drains and result.hollow_area_mm2 > 0
+    assert result.worst_xy_mm == pytest.approx((0.0, 0.0), abs=5.0)
+
+
+def test_concave_envelope_is_straight_between_supports() -> None:
+    from coverengine.hull.tension import concave_envelope
+
+    xs = np.arange(0.0, 501.0, 5.0)
+    ys = np.arange(0.0, 101.0, 5.0)
+    obstacle = np.full((len(xs), len(ys)), 100.0)
+    obstacle[-1, :] = 600.0  # a wall at the far end
+    inside = np.ones_like(obstacle, dtype=bool)
+    z = concave_envelope(obstacle, inside, xs, ys)
+    assert z[:, 10] == pytest.approx(100 + xs, abs=1e-6)

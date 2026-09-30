@@ -23,10 +23,17 @@ from trimesh.grouping import group_rows
 
 from coverengine import __version__
 from coverengine.errors import CoverError
-from coverengine.hull import clearance, masks
+from coverengine.hull import clearance, drainage, masks, support
 from coverengine.hull.heightmap import HeightMap, rasterize
 from coverengine.hull.morphology import close
-from coverengine.hull.surface import BAND_CELLS, BELOW_HEM_CELLS, mesh_solid, solid_field
+from coverengine.hull.surface import (
+    BAND_CELLS,
+    BELOW_HEM_CELLS,
+    FAR_MM,
+    mesh_solid,
+    solid_field,
+)
+from coverengine.hull.tension import concave_envelope
 from coverengine.io.model_io import glb_bytes, load_model, read_model_json
 from coverengine.params import EffectiveParams
 
@@ -134,6 +141,29 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
     hm = rasterize(model_v, model_f, h, margin)
     bridged = HeightMap(close(hm.z, bridge_r, h), hm.x0, hm.y0, h)
     top, wall = solid_field(bridged, c, model_v, model_f)
+    covered = (top > hem) & (wall > 0)
+    min_slope = _p(params, "hull.min_slope_deg")
+    patch = _p(params, "hull.flat_patch_mm")
+    held: support.Support | None = None
+    if params["hull.top"] == "tensioned":
+        if params["hull.support"] == "balloon":
+            tight, held = support.balloon(
+                top, covered, bridged.xs, bridged.ys, _p(params, "hull.support_radius_mm"),
+                _p(params, "hull.support_height_mm"), min_slope, patch,
+            )  # fmt: skip
+        else:
+            tight = concave_envelope(top, covered, bridged.xs, bridged.ys)
+        top = np.where(covered, tight, top)
+    # outside the planform the wall field alone decides where the skirt is
+    top = np.where(wall <= 0, FAR_MM, top)
+    water = drainage.check(top, covered, bridged.xs, bridged.ys, min_slope, patch)
+    if not water.drains:
+        x, y = water.worst_xy_mm or (0.0, 0.0)
+        warnings.append(
+            f"water would stay on the cover near x {x:.0f}, y {y:.0f} mm "
+            f"({water.flat_area_mm2 / 1e6:.2f} m2 flat, {water.hollow_area_mm2 / 1e6:.2f} m2 "
+            "hollow); for a flat top set hull.support = balloon"
+        )
     mesh = mesh_solid(top, wall, hm.x0, hm.y0, h, hem)
     mesh = trimesh.Trimesh(mesh.vertices, mesh.faces, process=True)  # weld duplicate vertices
     iterations = round(_p(params, "hull.smoothing") * _p(params, "hull.smoothing_max_iterations"))
@@ -186,6 +216,17 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
             "chains": chains,
             "length_mm": round(ridge_mm, 1),
             "angle_deg": _p(params, "seams.ridge_angle_deg"),
+        },
+        "top": params["hull.top"],
+        "drainage": water.summary(),
+        "support": None
+        if held is None
+        else {
+            "kind": held.kind,
+            "centre_mm": [round(held.centre_mm[0], 1), round(held.centre_mm[1], 1)],
+            "radius_mm": held.radius_mm,
+            "height_mm": round(held.height_mm, 1),
+            "automatic": held.automatic,
         },
         "masks": len(masks.load_masks(model_dir)),
         "parameters": {k: params[k] for k in keys},

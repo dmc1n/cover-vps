@@ -1,9 +1,9 @@
 model       sphere
 resolution  5 mm
-triangles   12638
+triangles   12654
 area        1.094 m2
-bbox min    -311.7 -311.4 50.0 mm
-bbox max    311.2 312.1 610.0 mm
+bbox min    -310.3 -310.4 50.0 mm
+bbox max    310.4 310.3 610.0 mm
 hem         2.05 m at 50 mm
 distance    min 10.00 mm (clearance 10)
 ridges      8

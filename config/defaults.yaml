@@ -19,6 +19,15 @@ hull:                            # the cover surface (drape hull)
   resolution_mm: 5               # grid resolution; smaller is slower and more exact
   smoothing: 0.5                 # 0 = follow every detail, 1 = maximum smoothing
   sweep_down: true               # fabric hangs from the widest point; false = fitted shell
+  top: tensioned                 # tensioned | draped   tensioned: pulled tight in straight lines
+                                 # between high points, sheds water (rule 12); draped: follows
+                                 # recesses wider than bridge_gap_mm
+  min_slope_deg: 5               # to confirm; flatter patches of the top hold water
+  flat_patch_mm: 100             # flat spots smaller than this across, or this close to the edge,
+                                 # still shed water
+  support: none                  # none | balloon   support under the cover for flat tops
+  support_height_mm: 0           # balloon height above the top; 0 = lowest that sheds water
+  support_radius_mm: 150         # to confirm; radius of the balloon's dome
   target_edge_length_mm: 15      # mesh density of the hull
   smoothing_max_iterations: 20   # smoothing passes at smoothing = 1 (Taubin, keeps the volume)
   remesh_passes: 5               # rounds of even remeshing towards target_edge_length_mm

@@ -1,9 +1,9 @@
 model       slatted_table
 resolution  5 mm
-triangles   54202
-area        4.989 m2
-bbox min    -811.2 -451.2 50.0 mm
-bbox max    811.2 451.2 751.3 mm
+triangles   54050
+area        4.987 m2
+bbox min    -810.9 -450.8 50.0 mm
+bbox max    811.0 451.1 751.1 mm
 hem         5.21 m at 50 mm
 distance    min 10.00 mm (clearance 10)
-ridges      58
+ridges      48
