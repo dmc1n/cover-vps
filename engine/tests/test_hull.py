@@ -345,3 +345,11 @@ def test_concave_envelope_is_straight_between_supports() -> None:
     inside = np.ones_like(obstacle, dtype=bool)
     z = concave_envelope(obstacle, inside, xs, ys)
     assert z[:, 10] == pytest.approx(100 + xs, abs=1e-6)
+
+
+def test_preview_shows_where_water_stays(models: Path, tmp_path: Path) -> None:
+    for name, expected in (("slatted_table", True), ("chair", False)):
+        out = tmp_path / name
+        write_hull(models / name, build_hull(models / name, params()), out)
+        scene = trimesh.load(out / "preview.glb", force="scene")
+        assert ("water" in scene.geometry) is expected, name

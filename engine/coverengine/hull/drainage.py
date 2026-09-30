@@ -32,6 +32,7 @@ class Drainage:
     flat_area_mm2: float
     worst_xy_mm: tuple[float, float] | None  # centre of the largest problem area
     flat: Mask  # cells of the flat patches (for supports)
+    problem: Mask  # cells where water would stay: hollows and flat patches
 
     def summary(self) -> dict[str, object]:
         return {
@@ -100,4 +101,5 @@ def check(
         flat_area_mm2=float(flat.sum()) * h * h,
         worst_xy_mm=worst,
         flat=flat,
+        problem=problem,
     )

@@ -154,7 +154,8 @@ def _cmd_hull(args: argparse.Namespace) -> int:
     print(f"distance closest {closest}")
     print(f"ridges   {r['ridges']['chains']} sharp ridges (seam candidates for the next step)")
     runs_off = r["drainage"]["drains"]
-    print(f"water    {'runs off' if runs_off else 'would stay on the top (see warning)'}")
+    stays = "would stay on the top: red in preview.glb (see warning)"
+    print(f"water    {'runs off' if runs_off else stays}")
     if r["support"]:
         s = r["support"]
         how = "automatic" if s["automatic"] else "as set"

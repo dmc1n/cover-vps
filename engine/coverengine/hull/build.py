@@ -47,6 +47,11 @@ TAUBIN = (0.5, 0.53)  # param-ok: filter coefficients, not a setting
 # Preview colours (RGBA 0-255): furniture grey, cover blue and see-through.
 MODEL_RGBA = (150, 150, 150, 255)  # param-ok: display colour
 HULL_RGBA = (40, 120, 220, 110)  # param-ok: display colour
+# Preview: water spots in red, lifted off the cover so they do not flicker through it.
+WATER_RGBA = (220, 30, 30, 255)  # param-ok: display colour
+WATER_LIFT_MM = 2.0
+# A face counts as part of the top when its normal points up at least this much (cosine).
+WATER_FACING_UP = 0.3
 # Resolution steps when the grid is made coarser to fit max_grid_cells.
 COARSEN_STEP_MM = 0.5  # param-ok: rounding step for the coarsened resolution
 
@@ -56,6 +61,7 @@ class Hull:
     mesh: trimesh.Trimesh
     report: dict[str, Any]
     warnings: list[str] = field(default_factory=list)
+    water_faces: IntArray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
 
 
 def _p(params: EffectiveParams, key: str) -> float:
@@ -234,7 +240,20 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
         "parameter_hash": params.hash(),
         "warnings": warnings,
     }
-    return Hull(mesh, report, warnings)
+    return Hull(mesh, report, warnings, _water_faces(mesh, water, hm.x0, hm.y0, h))
+
+
+def _water_faces(
+    mesh: trimesh.Trimesh, water: drainage.Drainage, x0: float, y0: float, h: float
+) -> IntArray:
+    """Upward-facing hull faces over the cells where water would stay (for the preview)."""
+    if water.drains:
+        return np.zeros(0, dtype=np.int64)
+    c = mesh.triangles_center
+    i = np.clip(np.rint((c[:, 0] - x0) / h).astype(np.int64), 0, water.problem.shape[0] - 1)
+    j = np.clip(np.rint((c[:, 1] - y0) / h).astype(np.int64), 0, water.problem.shape[1] - 1)
+    up = mesh.face_normals[:, 2] > WATER_FACING_UP
+    return np.flatnonzero(up & water.problem[i, j])
 
 
 def _coloured(mesh: trimesh.Trimesh, rgba: tuple[int, int, int, int]) -> trimesh.Trimesh:
@@ -262,5 +281,12 @@ def write_hull(model_dir: Path, hull: Hull, out_dir: Path | None = None) -> Path
         ("furniture", _coloured(model, MODEL_RGBA)),
         ("cover", _coloured(hull.mesh, HULL_RGBA)),
     ]
+    if len(hull.water_faces):
+        spots = trimesh.Trimesh(
+            hull.mesh.vertices, hull.mesh.faces[hull.water_faces], process=False
+        )
+        spots.remove_unreferenced_vertices()
+        spots.vertices = spots.vertices + spots.vertex_normals * WATER_LIFT_MM
+        preview.append(("water", _coloured(spots, WATER_RGBA)))
     (out / PREVIEW_GLB).write_bytes(glb_bytes(preview))
     return out
