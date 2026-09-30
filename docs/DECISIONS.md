@@ -308,3 +308,18 @@ Decision:
 Consequences: skirts are exact and tops are exact at 5 mm samples; the clearance repair makes
 covers at most slightly looser (at the Blocchi: at most a few mm, where the surface bends
 around furniture edges). Remeshing is the slowest step (about 70 % of the time).
+
+## ADR-025 — Water must run off: tensioned cover top (owner requirement, 2026-09-30)
+
+Context: the owner supplied the fitting cover of the Blocchi 2-seater as a PDF
+(`testdata/models/cover.pdf`, not in git). Its top runs as one straight slope from the front
+edge of the base to the top of the back, with a 33 cm band along the back and a vertical skirt
+all round. The owner: "we need to avoid places where the water can stay, the water always
+needs to can get off; for tables we will use a frame or balloon to create a tent."
+Decision: the cover top is a tensioned surface that spans seats and recesses and holds no
+water (CLAUDE.md rule 12). This replaces "wider recesses are followed" from ADR-010: the
+bridge gap no longer decides whether a recess is followed. Flat tops get a raised support
+(frame or balloon) under the cover. The drape hull gets a drainage check (no hollows, no
+areas flatter than a minimum slope). Details follow in the revised M2 plan.
+Consequences: the M2 acceptance "chair hull follows the seat" is replaced by "spans the seat
+and drains". The slatted-table tests change once the tent support exists.

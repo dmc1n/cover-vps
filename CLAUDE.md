@@ -53,6 +53,8 @@ one-line edit there.
 - Sample models: 3 to 5 representative STEP or STL files in `testdata/models/` (git-ignored,
   because the repository is public). One so far: the Blocchi 2-seater, a mesh saved as STEP
   (ADR-023). More detailed CAD samples (curved tubes, bolts) still wanted.
+- Tent support for tables (frame or balloon): its height and shape, and the minimum slope that
+  lets water run off reliably.
 - Cloudflare account and preferred Access login method. (GitHub: `dmc1n/cover-vps`, in use.)
 - Measured fabric values (stretch, weld shrinkage) from swatch tests in M8. Placeholders until
   then, clearly marked.
@@ -131,7 +133,13 @@ scripts/                  setup-vps.sh, licenses.py (regenerates docs/LICENSES.m
 11. Golden tests on analytic shapes (plate, cylinder and cone flatten exactly; sphere octant and
     saddle within stored bounds) and on procedural furniture primitives (chair, slatted table,
     box with legs) protect every algorithm change.
-12. Physical gates in the plan are real. Claude Code prepares the exports and a measurement
+12. Water must always run off (owner, 2026-09-30). The cover surface may hold no water: no
+    hollows, no flat areas on top; from every point of the top there is a downhill path to
+    the edge. Seats and recesses are therefore spanned, not followed (the reference cover of
+    the Blocchi sofa runs straight from the front edge to the top of the back). Flat tops
+    (tables) get a raised support under the cover, a frame or a balloon, so the fabric forms
+    a tent.
+13. Physical gates in the plan are real. Claude Code prepares the exports and a measurement
     sheet, then stops until the owner reports results.
 
 ## Parameters: one file, layered overrides
