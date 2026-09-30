@@ -59,7 +59,12 @@ hem:
 
 features:                        # per-cover defaults, overridden per model
   strap_marks: 0                 # wind strap attachment marks (pen)
-  vents: 0
+  vent_width_mm: 250             # air vent opening, owner 2026-09-30; a plastic insert keeps
+  vent_height_mm: 220            # it open for airflow
+  vent_above_ground_mm: 250      # to confirm: bottom edge or centre of the vent
+  vents_per_metre: 1             # per side: one vent per full metre of that side's length
+                                 # (210 cm -> 2)
+  vents_min_per_side: 1          # every side has at least one vent
   handles: 0
 
 fabric:
