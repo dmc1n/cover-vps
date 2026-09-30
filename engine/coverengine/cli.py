@@ -10,6 +10,7 @@ from pathlib import Path
 
 from coverengine import __version__
 from coverengine.errors import CoverError
+from coverengine.io.placement import SUGGESTED_UNITS
 from coverengine.params import (
     EffectiveParams,
     Registry,
@@ -77,9 +78,48 @@ def _cmd_params(args: argparse.Namespace) -> int:
 
 
 def _cmd_info(args: argparse.Namespace) -> int:
-    from coverengine.io.info import format_info, mesh_info
+    from coverengine.io.info import format_info, format_model_info, is_model, mesh_info
 
-    print(format_info(mesh_info(args.mesh)))
+    if is_model(args.mesh):
+        print(format_model_info(args.mesh))
+    else:
+        print(format_info(mesh_info(args.mesh)))
+    return 0
+
+
+def _cmd_import(args: argparse.Namespace) -> int:
+    from coverengine.io.model_io import import_model
+
+    shortcuts = {
+        "import.min_part_mm": args.min_part_mm,
+        "import.up_axis": args.up,
+        "import.front": args.front,
+    }
+    args.overrides = [f"{k}={v}" for k, v in shortcuts.items() if v is not None] + args.overrides
+    params = resolve_params(args, None)
+    result = import_model(
+        args.file,
+        args.out,
+        params,
+        exclude=args.exclude,
+        units=args.units,
+        forget_exclusions=args.forget_exclusions,
+    )
+    m = result.model
+    parts = m["parts"]
+    size = " x ".join(f"{v:.1f}" for v in m["size_mm"])
+    src = m["source"]
+    print(f"imported {src['file']} -> {result.out_dir}")
+    print(f"units    {src['units_used']} (file declares {src['units_detected'] or 'no unit'})")
+    print(f"size     {size} mm, {m['mesh']['triangles']} triangles")
+    print(
+        f"parts    {parts['kept']} kept, {parts['dropped_small']} dropped as smaller than "
+        f"{parts['min_part_mm']:g} mm, {parts['excluded']} excluded by name"
+    )
+    if parts["exclude"]:
+        print(f"exclude  {', '.join(parts['exclude'])}")
+    for w in result.warnings:
+        print(f"warning: {w}", file=sys.stderr)
     return 0
 
 
@@ -106,7 +146,33 @@ def build_parser() -> argparse.ArgumentParser:
     _add_param_args(p)
     p.set_defaults(handler=_cmd_params)
 
-    p = sub.add_parser("info", help="size, triangle count and area of a mesh file")
+    p = sub.add_parser("import", help="turn a STEP, IGES, STL, OBJ, PLY or GLB file into a model")
+    p.add_argument("file", type=Path)
+    p.add_argument("--out", type=Path, required=True, help="model directory, e.g. models/chair-a12")
+    p.add_argument(
+        "--units",
+        choices=SUGGESTED_UNITS,
+        help="the unit the file is really in (STL, OBJ and PLY store none)",
+    )
+    p.add_argument("--min-part-mm", type=float, help="drop parts smaller than this (screws)")
+    p.add_argument("--up", help="the file's up axis: z | y | x | -z | -y | -x (default auto)")
+    p.add_argument("--front", help="side that is the front once upright: -y | y | -x | x")
+    p.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="PATTERN",
+        help='drop parts by name, e.g. --exclude "cushion*" (repeatable; remembered per model)',
+    )
+    p.add_argument(
+        "--forget-exclusions",
+        action="store_true",
+        help="do not reuse the exclusions of the previous import into --out",
+    )
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_import)
+
+    p = sub.add_parser("info", help="size, triangle count and area of a mesh file or model")
     p.add_argument("mesh", type=Path)
     p.set_defaults(handler=_cmd_info)
 

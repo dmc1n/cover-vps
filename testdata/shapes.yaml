@@ -39,3 +39,28 @@ furniture:
   l_lounge:
     main: [2000, 800, 700]         # along x, front toward -y
     wing: [800, 1400, 700]         # overlapping the right end of the main block, extends to +y
+
+# CAD assemblies (STEP, IGES) written with OpenCascade, for the M1 import tests. The chair is the
+# furniture chair above as named solids in a nested assembly: chair / frame (seat, back, four
+# instances of one leg), chair / cushion, chair / hardware (screws as instances of one screw,
+# washers as separate solids). Screws and washers are below import.min_part_mm (8), so they are
+# dropped. Hardware sits under the seat on a grid.
+assemblies:
+  chair_assembly:
+    files:                               # file -> unit it is written in
+      chair_assembly.step: mm
+      chair_assembly-inch.step: inch
+      chair_assembly.iges: mm
+    cushion: [460, 460, 60]              # on top of the seat
+    screw: {radius: 2, length: 6}        # max dimension 6 mm
+    washer: {radius: 3.5, thickness: 2}  # max dimension 7 mm
+    screws: 8
+    washers: 4
+    hardware_pitch: 10                   # grid spacing under the seat
+  chair_hardware_2000:                   # timing test (M1: < 2 minutes); not written by make shapes
+    like: chair_assembly
+    files:
+      chair_hardware_2000.step: mm
+    screws: 1000
+    washers: 1000
+    on_demand: true

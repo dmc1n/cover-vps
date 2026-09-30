@@ -450,4 +450,7 @@ def write_all(out_dir: Path, config: Mapping[str, Any] | None = None) -> list[Pa
             json.dumps(sidecar(shape), indent=2, sort_keys=True) + "\n"
         )
         written.append(stl)
+    from coverengine.testshapes.assembly import write_assemblies
+
+    written += write_assemblies(out_dir, config)
     return written

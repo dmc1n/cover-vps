@@ -74,9 +74,20 @@ pen:
   tick_spacing_mm: 300           # alignment ticks along shared seams
 
 import:
-  min_part_mm: 8                 # parts smaller than this (screws, washers) are dropped
-  deflection_mm: 0.5             # STEP tessellation accuracy
-  default_units: mm
+  min_part_mm: 8                 # parts whose largest dimension is below this (screws, washers)
+                                 # are dropped
+  deflection_mm: 0.5             # STEP/IGES tessellation: max distance from the true surface
+  angular_deflection_deg: 20     # STEP/IGES tessellation: max angle between neighbouring
+                                 # triangles on curved faces
+  sew_tolerance_mm: 0.1          # IGES: faces whose edges are closer than this are joined into
+                                 # one body (IGES stores loose faces)
+  default_units: mm              # mm | cm | m | inch   for files that store no unit (STL, OBJ, PLY)
+  up_axis: auto                  # auto | z | y | x | -z | -y | -x   the file's up direction;
+                                 # auto = y for glTF/GLB (their standard), z for everything else
+  front: -y                      # -y | y | -x | x   which side is the front once the model stands
+                                 # upright; the model is turned so that side faces -y
+  min_plausible_size_mm: 200     # warn (wrong units?) if the model's largest dimension is smaller
+  max_plausible_size_mm: 6000    # ... or larger than this
 
 tolerance:
   cover_mm: 5.0                  # overall fit target: ±5 mm

@@ -127,3 +127,42 @@ def format_info(info: MeshInfo) -> str:
                 extra = f"  mesh {measured:.3f}  ({(measured - value) / value * 100:+.3f} %)"
             lines.append(f"  {name} {value:.3f}{extra}")
     return "\n".join(lines)
+
+
+def is_model(path: Path) -> bool:
+    """A model directory (or its model.glb) written by `cover import`."""
+    from coverengine.io.model_io import MODEL_JSON
+
+    folder = path if path.is_dir() else path.parent
+    return (folder / MODEL_JSON).is_file() and (path.is_dir() or path.suffix.lower() == ".glb")
+
+
+def format_model_info(path: Path) -> str:
+    """Summary of an imported model; stable text, used for the golden files."""
+    from coverengine.io.model_io import load_model, read_model_json
+
+    folder = path if path.is_dir() else path.parent
+    doc = read_model_json(folder)
+    mesh = load_model(folder)
+    v = np.asarray(mesh.vertices, dtype=np.float64)
+    lo, hi = v.min(axis=0), v.max(axis=0)
+    size = hi - lo
+    src, place, parts = doc["source"], doc["placement"], doc["parts"]
+    lines = [
+        f"model       {doc['id']}",
+        f"source      {src['file']} ({src['format']}), sha256 {src['sha256'][:12]}",
+        f"units       {src['units_used']} (file declares {src['units_detected'] or 'no unit'})",
+        f"placement   up {place['up_axis']}, front {place['front']}, "
+        f"raised by {place['ground_offset_mm']:.3f} mm",
+        f"parts       {parts['kept']} kept, {parts['dropped_small']} dropped as smaller than "
+        f"{parts['min_part_mm']:g} mm, {parts['excluded']} excluded by name",
+        f"exclude     {', '.join(parts['exclude']) or 'none'}",
+        f"vertices    {len(mesh.vertices)}",
+        f"triangles   {len(mesh.faces)}",
+        f"bbox min    {lo[0]:.3f} {lo[1]:.3f} {lo[2]:.3f} mm",
+        f"bbox max    {hi[0]:.3f} {hi[1]:.3f} {hi[2]:.3f} mm",
+        f"size        {size[0]:.3f} x {size[1]:.3f} x {size[2]:.3f} mm",
+        f"area        {float(mesh.area) / 1e6:.6f} m2",
+    ]
+    lines += [f"warning     {w}" for w in doc["warnings"]] or ["warnings    none"]
+    return "\n".join(lines)

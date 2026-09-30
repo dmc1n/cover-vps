@@ -1,4 +1,5 @@
-"""Write the procedural test shapes to testdata/generated/ (STL plus JSON sidecar).
+"""Write the procedural test shapes to testdata/generated/ (STL plus JSON sidecar, and the
+STEP/IGES test assemblies).
 
 Usage: uv run python testdata/generate.py [--out DIR]   (or: make shapes)
 Dimensions come from testdata/shapes.yaml; output is deterministic.
