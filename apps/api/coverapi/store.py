@@ -24,7 +24,15 @@ STEP_FILES = {
     "export": ["finished.json", "cut.dxf", "cut.svg", "cutting-list.pdf"],
 }
 STEPS = list(STEP_FILES)
-EXTRA_FILES = ["cover.json", "seams.json", "pattern.prev.json", "plan.png"]
+EXTRA_FILES = [
+    "cover.json",
+    "seams.json",
+    "pattern.prev.json",
+    "plan.png",
+    "cover.png",
+    "product.jpg",
+    "proposals.json",
+]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)
 MEDIA = {
     ".glb": "model/gltf-binary",
@@ -33,6 +41,7 @@ MEDIA = {
     ".pdf": "application/pdf",
     ".dxf": "application/dxf",
     ".png": "image/png",
+    ".jpg": "image/jpeg",
 }
 UPLOAD_SUFFIXES = {".step", ".stp", ".iges", ".igs", ".stl", ".obj", ".ply", ".glb", ".gltf"}
 
@@ -102,6 +111,7 @@ class Store:
         out["warnings"] = warnings
         g = grade(d)
         out["grade"], out["reasons"] = g["grade"], g.get("reasons", [])
+        out["roll_length_mm"] = g.get("roll_length_mm")
         if brief:
             return out
         hull = _read(d / "hull.json")

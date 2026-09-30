@@ -92,3 +92,14 @@ textarea.notes { width: 100%; box-sizing: border-box; min-height: 44px; border: 
 svg.plan .proposal polyline { fill: none; stroke: #e07a14; stroke-dasharray: 14 8; cursor: pointer; }
 svg.plan .proposal text { fill: #b85f00; cursor: pointer; }
 .badge.grade-ready { background: #d8f0de; color: var(--ok); } .badge.grade-check { background: #fff1d6; color: var(--warn); } .badge.grade-failed { background: #fbdada; color: var(--bad); }
+header a.nav { color: #cfd4e2; text-decoration: none; font-size: 14px; margin-left: 14px; }
+header a.nav:hover { color: #fff; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.product { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; color: inherit; text-decoration: none; }
+.product:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(30, 40, 80, 0.08); }
+.product .pics { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.product .pics img, .product .nopic { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: #f4f5f8; border-radius: 6px; }
+.product .nopic { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; }
+.product .name { font-weight: 600; font-size: 14px; margin: 8px 0 4px; }
+.product .facts { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--muted); align-items: center; }
+.product .facts .ok { color: var(--ok); } .product .facts .bad { color: var(--bad); }

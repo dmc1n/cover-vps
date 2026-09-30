@@ -219,10 +219,13 @@ def _cmd_export(args: argparse.Namespace) -> int:
     out = args.out or args.model
     out.mkdir(parents=True, exist_ok=True)
     finished["sheet"] = write_export(out, pieces, finished, params)
+    from coverengine.export.preview import PREVIEW_PNG, write_preview
+
+    write_preview(args.model, doc, params, out / PREVIEW_PNG)
     (out / FINISHED_JSON).write_text(
         _json.dumps(finished, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(f"export -> {out / 'cut.dxf'}, cut.svg, cutting-list.pdf, {FINISHED_JSON}")
+    print(f"export -> {out / 'cut.dxf'}, cut.svg, cutting-list.pdf, cover.png, {FINISHED_JSON}")
     for pc in finished["pieces"]:
         w, h = pc["size_mm"]
         print(f"  {pc['id']:<4} {pc['name']:<16} x{pc['quantity']}  {w:6.0f} x {h:6.0f} mm")
@@ -382,6 +385,23 @@ def _cmd_report(args: argparse.Namespace) -> int:
         f"{len(rows)} models: {counts['ready']} ready, {counts['check']} to check, "
         f"{counts['failed']} failed -> {args.out / 'catalogue.pdf'}, catalogue.csv"
     )
+    return 0
+
+
+def _cmd_preview(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from coverengine.export.preview import PREVIEW_PNG, write_preview
+    from coverengine.flatten.pattern import PATTERN_JSON
+
+    pattern = args.model / PATTERN_JSON
+    if not pattern.is_file():
+        raise CoverError(f"no {PATTERN_JSON} in {args.model} (run cover flatten first)")
+    cover_json = args.model / "cover.json"
+    params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    doc = _json.loads(pattern.read_text(encoding="utf-8"))
+    out = write_preview(args.model, doc, params, args.out or args.model / PREVIEW_PNG)
+    print(f"preview -> {out}")
     return 0
 
 
@@ -603,6 +623,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--title", help="title of the report")
     p.add_argument("--out", type=Path, default=Path("out/report"), help="output folder")
     p.set_defaults(handler=_cmd_report)
+
+    p = sub.add_parser("preview", help="3D picture of the cover for the catalogue (cover.png)")
+    p.add_argument("model", type=Path, help="model directory with patterns (cover flatten)")
+    p.add_argument("--out", type=Path, help="PNG file (default: cover.png in the model dir)")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_preview)
 
     p = sub.add_parser("drawing", help="size drawing of the cover and its panels (sizes.pdf)")
     p.add_argument("model", type=Path, help="model directory with patterns (cover flatten)")

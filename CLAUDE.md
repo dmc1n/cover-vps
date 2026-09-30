@@ -200,6 +200,8 @@ cover model models/<id>/ [--family F --status S --tags a,b --notes ...]   catalo
 cover batch [--family F | --ids a,b] [--steps hull,cut,flatten,export] [--set ...]  many models, what changed
 cover improve models/<id>/ [--rounds 4]      take seam proposals while they lower the worst stretch
 cover report [--models DIR --tag T --out DIR]  catalogue report: every model ready / check / failed
+cover preview models/<id>/                   3D picture of the cover (cover.png; export makes it too)
+uv run python scripts/warehouse.py list|fetch|photos   products from 3D Warehouse (GLB, photos)
 make e2e        the web app flow in a real browser (Playwright in Docker)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs

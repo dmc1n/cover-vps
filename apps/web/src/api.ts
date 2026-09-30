@@ -40,6 +40,7 @@ export interface ModelBrief {
   warnings: string[];
   grade: "ready" | "check" | "failed";
   reasons: string[];
+  roll_length_mm?: number | null;
 }
 
 export interface JobStep {

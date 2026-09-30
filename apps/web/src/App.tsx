@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, cm, fileUrl, Job, ModelBrief, ModelDetail, Scalar, Step, STEP_LABEL, STEPS } from "./api";
 import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
+import { Gallery } from "./Gallery";
 import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
 import { Viewer } from "./Viewer";
@@ -26,9 +27,15 @@ export function App() {
         <a href="#/" className="brand">
           Cover patterns
         </a>
+        <a href="#/" className="nav">
+          Models
+        </a>
+        <a href="#/catalogue" className="nav">
+          Catalogue
+        </a>
         {m && <span className="crumb">/ {m[1]}</span>}
       </header>
-      <main>{m ? <ModelPage id={m[1]} /> : <ModelList />}</main>
+      <main>{m ? <ModelPage id={m[1]} /> : hash.startsWith("#/catalogue") ? <Gallery /> : <ModelList />}</main>
     </div>
   );
 }
