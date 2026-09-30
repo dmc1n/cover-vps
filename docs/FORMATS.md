@@ -283,6 +283,11 @@ panel, same mm/Z-up convention as `model.glb`.
 
 Seam allowances, hem, vents and final panel data (M5) extend this format.
 
+Every edge also has `wiggle_mm`: how far it strays from itself smoothed over 30 mm (single
+corners and steps left out); above `seams.max_wiggle_mm` a warning says the edge is not a smooth
+line. `panels.json` has `skirt_height_mm` (lowest and highest skirt seam height above the hem;
+equal for the level skirt) and panels with `region` `top`, `skirt` or `wall`.
+
 `sizes.pdf` (`export/drawing.py`, `cover drawing`) is the size drawing built from `panels.npz`,
 `panels.json`, `hull.json` and `pattern.json`: overview views, size tables and one page per flat
 panel, in cm, seam to seam. The PDF has no creation date, so the same input gives the same file.

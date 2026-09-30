@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any
 
 import igl
 import numpy as np
@@ -23,6 +24,7 @@ from coverengine.seams.cut import CutMesh, Seam
 
 Array = NDArray[np.float64]
 Mask = NDArray[np.bool_]
+IntArray = NDArray[np.int64]
 
 # Outline sampling step for corner detection (mm).
 OUTLINE_STEP_MM = 5.0  # param-ok: sampling step
@@ -147,14 +149,197 @@ def split_positions(line: Outline, corner_s: list[float], max_panel_mm: float) -
     return sorted(s % line.length for s in out)
 
 
-def skirt_seam(line: Outline, inset_mm: float) -> Seam:
-    """The seam between skirt and top: the level `inset_mm` inside the outline."""
+# Rim profile: sampled along the outline this often, from points this far inside the rim (mm).
+RIM_STEP_MM = 10.0  # param-ok: sampling
+RIM_BAND_MM = 50.0  # param-ok: geometric reach
+# Wall seam: cut this far past a wall's end, and only on the upright cover within this plan
+# distance of the outline (mm).
+WALL_END_MM = 30.0  # param-ok: geometric reach past a wall's end
+# Past a wall's end the wall field rises this much per mm along the outline (a steep end).
+WALL_END_SLOPE = 1.0  # param-ok: geometric shape of the wall ends
+# A wall all round is left open over this length at its lowest point (mm).
+WALL_GAP_MM = 50.0  # param-ok: geometric
+# The wall field counts everything this far below the top edge line as wall (mm).
+WALL_MASK_MM = 5.0  # param-ok: geometric tolerance
+WALL_ZONE_MM = 10.0  # param-ok: geometric reach
+
+
+def skirt_seam(z_mm: float) -> Seam:
+    """The seam between skirt and top: a level line at height `z_mm` all round. A level line is
+    smooth wherever the surface is not flat, so the skirt panels get straight edges."""
     return Seam(
         id="skirt",
         kind="skirt",
-        field=lambda p: line.inside_distance(p[:, :2]) - inset_mm,
+        field=lambda p: p[:, 2] - z_mm,
         faces=lambda cut: np.ones(len(cut.mesh.faces), dtype=bool),
     )
+
+
+@dataclass
+class RimProfile:
+    """Height of the top edge along the outline: `height[i]` at arc length `at[i]`, a lower
+    envelope smoothed over the smoothing length, so it never lies above the real edge."""
+
+    at: Array
+    height: Array
+    length: float
+
+    def __call__(self, xy: Array, ext: Any) -> Array:
+        t = np.asarray(shapely.line_locate_point(ext, shapely.points(xy)))
+        return np.asarray(np.interp(t, self.at, self.height, period=self.length))
+
+
+def _wrap(a: Array, w: int) -> Array:
+    return np.concatenate([a[-w:], a, a[:w]]) if w else a
+
+
+def rim_profile(mesh: Any, line: Outline, inset_mm: float, smoothing_mm: float) -> RimProfile:
+    """Along the outline (every RIM_STEP_MM), the top of the upright part: the highest point of
+    the cover less than `inset_mm` inside the outline seen from above, where the top starts to
+    round over.
+    A running median over the smoothing length (outliers go, kinks stay), a short average, and
+    lowered where that runs above the edge: a smooth line at or below the edge."""
+    v = np.asarray(mesh.vertices)
+    upright = line.inside_distance(v[:, :2]) < inset_mm  # still at the outline
+    e = np.asarray(mesh.edges_unique)
+    border = np.zeros(len(v), dtype=bool)  # upright points next to the rounding: the edge line
+    cross = upright[e[:, 0]] != upright[e[:, 1]]
+    border[e[cross].ravel()] = True
+    border &= upright
+    ext = line.polygon.exterior
+    n = max(int(line.length / RIM_STEP_MM), 8)  # param-ok: fewest samples
+    step = line.length / n
+    s = np.asarray(shapely.line_locate_point(ext, shapely.points(v[border, :2])))
+    bins = np.minimum((s / step).astype(np.int64), n - 1)
+    z = v[border, 2]
+    low = np.full(n, np.nan)
+    order = np.argsort(bins, kind="stable")
+    groups = np.split(order, np.flatnonzero(np.diff(bins[order])) + 1)
+    for g in groups:
+        if len(g):
+            low[bins[g[0]]] = float(np.median(z[g]))
+    ok = np.isfinite(low)
+    if not ok.any():
+        low[:] = float(v[:, 2].max())
+        ok[:] = True
+    idx = np.arange(n)
+    low = np.interp(idx, idx[ok], low[ok], period=n)
+    w = max(int(smoothing_mm / 2 / step), 1)
+    wa = max(w // 2, 1)
+    kernel = np.ones(2 * wa + 1) / (2 * wa + 1)
+
+    def average(a: Array) -> Array:
+        out: Array = np.convolve(_wrap(a, wa), kernel, mode="valid").astype(np.float64)
+        return out
+
+    def running(a: Array, fn: Any) -> Array:
+        padded = _wrap(a, w)
+        return np.array([fn(padded[i : i + 2 * w + 1]) for i in range(n)], dtype=np.float64)
+
+    # the running median removes single low points (the wall a millimetre out of plumb) but
+    # keeps real kinks of the edge; a short average then smooths the line, and where that runs
+    # above the edge it is lowered by the largest overshoot nearby, itself averaged
+    smooth = average(running(low, np.median))
+    smooth = smooth - average(running(np.maximum(smooth - low, 0.0), np.max))
+    height: Array = np.array(smooth, dtype=np.float64)
+    at: Array = np.asarray((idx + 0.5) * step, dtype=np.float64)  # param-ok: bin centres
+    return RimProfile(at, height, line.length)
+
+
+def rim_seam(line: Outline, rim: RimProfile, below_mm: float) -> Seam:
+    """The seam between skirt and top `below_mm` under the top edge (follow_rim)."""
+    ext = line.polygon.exterior
+    return Seam(
+        id="skirt",
+        kind="skirt",
+        field=lambda p: p[:, 2] - (rim(p[:, :2], ext) - below_mm),
+        faces=lambda cut: np.ones(len(cut.mesh.faces), dtype=bool),
+    )
+
+
+def wall_ranges(
+    rim: RimProfile, level_z: float, wall_min_mm: float, min_length_mm: float
+) -> list[tuple[float, float]]:
+    """Arc-length ranges where the top edge stands more than `wall_min_mm` above the skirt seam
+    over at least `min_length_mm`: there the upright part is a wall panel. An end may pass the
+    outline's length; a wall all round is left open at its lowest point."""
+    n = len(rim.at)
+    step = rim.length / n
+    tall = rim.height - level_z > wall_min_mm
+    if tall.all():
+        low = int(np.argmin(rim.height))
+        gap = max(int(WALL_GAP_MM / step / 2), 1)
+        tall[[(low + k) % n for k in range(-gap, gap + 1)]] = False
+    if not tall.any():
+        return []
+    start = int(np.flatnonzero(~tall)[0])  # walk from a low point, so no range is split
+    out, i = [], 0
+    while i < n:
+        if tall[(start + i) % n]:
+            k = i
+            while k < n and tall[(start + k) % n]:
+                k += 1
+            a = ((start + i) % n) * step
+            if (k - i) * step >= min_length_mm:
+                out.append((a, a + (k - i) * step))
+            i = k
+        else:
+            i += 1
+    return out
+
+
+def _outside(t: Array, ranges: list[tuple[float, float]], length: float) -> Array:
+    """Distance along the outline from t to the nearest range (0 inside one)."""
+    best = np.full(len(t), np.inf)
+    for a, b in ranges:
+        d = (t - a) % length  # position after the range start
+        span = b - a
+        inside = d <= span
+        gap = np.where(inside, 0.0, np.minimum(d - span, length - d))
+        best = np.minimum(best, gap)
+    return best
+
+
+def wall_field(
+    line: Outline, rim: RimProfile, inset_mm: float, ranges: list[tuple[float, float]]
+) -> Any:
+    """Positive on the top, negative on a wall. Along a wall's range, the wall is the upright
+    part (less than `inset_mm` inside the outline, where the top edge rounds over) together with
+    everything clearly below the top edge line, so a wall a millimetre out of plumb gives no
+    zig-zag, and the top never reaches down onto the upright part (that would stop it lying
+    flat). Past a range's end the field rises steeply, so the wall ends in a short upright
+    line."""
+    ext = line.polygon.exterior
+
+    def field(p: Array) -> Array:
+        t = np.asarray(shapely.line_locate_point(ext, shapely.points(p[:, :2])))
+        edge = rim(p[:, :2], ext) - WALL_MASK_MM
+        base = np.minimum(line.inside_distance(p[:, :2]) - inset_mm, p[:, 2] - edge)
+        out: Array = base + _outside(t, ranges, line.length) * WALL_END_SLOPE
+        return out
+
+    return field
+
+
+def wall_seam(
+    line: Outline,
+    rim: RimProfile,
+    inset_mm: float,
+    ranges: list[tuple[float, float]],
+    top_region: int,
+) -> Seam:
+    """The seam between the top and the walls."""
+    ext = line.polygon.exterior
+    padded = [(a - WALL_END_MM, b + WALL_END_MM) for a, b in ranges]
+
+    def faces(cut: CutMesh) -> Mask:
+        c = np.asarray(cut.mesh.triangles_center)
+        t = np.asarray(shapely.line_locate_point(ext, shapely.points(c[:, :2])))
+        near = line.inside_distance(c[:, :2]) < WALL_ZONE_MM
+        within = _outside(t, padded, line.length) == 0
+        return near & (cut.region == top_region) & within
+
+    return Seam(id="wall", kind="wall", field=wall_field(line, rim, inset_mm, ranges), faces=faces)
 
 
 def corner_seam(line: Outline, s: float, index: int, skirt_region: int, reach_mm: float) -> Seam:

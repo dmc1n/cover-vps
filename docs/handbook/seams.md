@@ -29,7 +29,15 @@ scp dev@168.119.50.82:~/cover-pattern-engine/models/blocchi-2seater-moon-right/p
 
 ## Where the seams go by themselves
 
-- **Skirt seam:** all round, where the vertical skirt meets the top. The top laps over the skirt.
+- **Skirt seam:** all round at one height (company rule: easy, straight lines for clean
+  stitching), just below the lowest point where the top starts to round over. The skirt panels
+  are straight strips. The top laps over the skirt. To set the height yourself (for example
+  40.6 cm, as on a cover that fits), put `seams.skirt_height_mm` in the model's `cover.json`.
+- **Walls:** where the furniture's top edge stands clearly higher than the skirt seam (more than
+  2 cm, `seams.wall_min_mm`, over at least 30 cm), the upright part between them becomes a wall
+  panel: the back and sides of a chair, the middle of the Blocchi front. The top then never has
+  to wrap down over its edge (which would stop it lying flat). A wall ends in a short upright
+  line where the edge comes down again; it laps under the top and over the skirt.
 - **Corners:** a vertical seam wherever the skirt turns a sharp corner (tables, boxes, the
   straight end of the Blocchi), placed in the middle of the bend. A skirt stretch longer than
   3 m (`seams.max_skirt_panel_mm`, to confirm) is split into equal parts. A round skirt with no

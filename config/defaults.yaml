@@ -44,8 +44,23 @@ seams:
   min_weld_radius_mm: 150        # to confirm at the machine (weld curvature test, M8)
   seam_tolerance_mm: 1.0         # allowed seam length mismatch before ease is recorded
   lap_rule: upper_over_lower     # water run-off; on vertical seams: front over side
-  skirt_seam_inset_mm: 1         # the skirt seam runs this far inside the outline, just above
-                                 # where the vertical skirt ends
+  skirt_seam_inset_mm: 1         # the top counts as rounding over where it is this far inside
+                                 # the outline seen from above
+  skirt_seam: level              # level | follow_rim. level (owner, 2026-09-30, all covers): the
+                                 # skirt seam at one height all round, so skirt panels are straight
+                                 # strips and seams are easy lines for clean stitching. follow_rim:
+                                 # just below the rounded top edge, smoothed (for comparison)
+  skirt_height_mm: 0             # level skirt height above the hem; 0 = automatic, just below the
+                                 # lowest point of the top edge. Set per model to match a cover
+  skirt_below_rim_mm: -3         # the level skirt seam runs this far below where the top edge
+                                 # starts to round over (negative: that far up the rounding, so the
+                                 # top panel does not reach down onto the upright part)
+  rim_smoothing_mm: 200          # the top edge is followed smoothed over this length
+  wall_min_mm: 20                # where the top edge stands more than this above the level skirt
+  wall_min_length_mm: 300        # ... over at least this length, the upright part between is a
+                                 # wall panel (the back of a chair), so the top does not wrap down
+  max_wiggle_mm: 2               # every edge of a flat panel must be a smooth line: at most this
+                                 # far from itself smoothed over 30 mm, or a warning
   corner_angle_deg: 45           # the skirt gets a vertical seam where its outline turns more
   corner_window_mm: 100          # ... than this within this length
   max_skirt_panel_mm: 3000       # to confirm; longer skirt stretches are split into equal parts

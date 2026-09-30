@@ -456,3 +456,39 @@ Found with it: on the Blocchi, the skirt seam is not at a constant height (25–
 along the front) and zig-zags by 2–4 cm where the rounded top meets the vertical skirt. That
 explains most of the seam differences between panels on the skirt seams.
 
+## ADR-029 — Level skirt, wall panels and a zig-zag check (M4)
+
+Status: accepted, 2026-09-30 (owner: "all parts need to be straight", "easy lines so clean
+stitching", "for all future covers").
+
+- The skirt seam is a level line at one height all round (`seams.skirt_seam: level`), by
+  default just below the lowest point where the top starts to round over (5th percentile of the
+  edge height along the outline, so the rounded corners of a box do not set it), 3 mm up the
+  rounding (`seams.skirt_below_rim_mm: -3`). The skirt panels are straight strips.
+- The top edge height along the outline comes from the vertices where the upright part ends,
+  median per 10 mm, a running median (outliers go, kinks stay), a short average, and lowered
+  where that would lie above the edge.
+- Where the edge stands more than `seams.wall_min_mm` (20) above the level skirt over at least
+  `seams.wall_min_length_mm` (300), the upright part between becomes a wall panel. Its seam with
+  the top follows the true edge (1 mm into the rounding), with everything more than 5 mm below
+  the edge line counted as wall so a slightly leaning wall gives no zig-zag. Past a wall's end the
+  seam field rises steeply, so the wall ends in a short upright line. Vertical bands lie flat
+  exactly, even round corners, so walls need no corner seams.
+- Tried and rejected: a level-only wall seam on the smoothed edge (the top then reaches down onto
+  upright parts at steps of the edge; chair top 7.5 % stretch), an upper-envelope seam (breaks on
+  narrow ridges), smoothing with a lower envelope over 20 cm (drops the seam at kinks of the
+  edge, box-lid corners in the top).
+- Every panel edge gets `wiggle_mm` (distance from itself smoothed over 30 mm; clusters of fewer
+  than four sharp turns, i.e. corners and steps, left out) and a warning above
+  `seams.max_wiggle_mm` (2). Tests require it on the test furniture.
+- Fixed on the way: a seam's length counted only its first part when it came in pieces, or when
+  two seam lines shared edges (the Blocchi diagonal: 1.9 cm instead of 109 cm); two seams between
+  the same panels got the same id; seam ends running past the seam they meet are no longer cut
+  open.
+
+Results: box, chair and slatted table: stretch 0.1–1.5 %, seam sides within 0.9–3.3 mm, no
+zig-zag. The Blocchi: skirt pieces 0.3 % and straight; three wall pieces; but its cover surface
+has stepped edges on gentle slopes (the 5 mm height grid), which the wall seams follow (the
+zig-zag check reports them), and its top pieces still stretch 2.6–7.5 % (the model's rounded
+cushion ends). Next: smoother cover surface edges (M2 surface), and extra seams on the top.
+

@@ -45,6 +45,9 @@ cut them, tape them edge to edge, and put the cover on the furniture.
 - **difference between the two sides of a seam:** both panels along a seam should be the same
   length. A difference above 1 mm is recorded as ease on that seam. When sewing or taping, spread
   it evenly between the matching marks.
+- **smooth lines:** every edge of every panel is checked for zig-zag: an edge that strays more
+  than 2 mm from itself smoothed over 3 cm (`seams.max_wiggle_mm`) is reported as "not a smooth
+  line". Single corners and steps (where a wall ends) are fine.
 - **matching marks:** short pen lines every 30 cm along each seam. The same mark sits on both
   panels; tape mark to mark.
 - **UP arrow:** points up on the furniture.

@@ -49,11 +49,14 @@ PANELS_GLB, PANELS_JSON, SEAMS_AUTO_JSON, SEAMS_JSON = (
     "seams.json",
 )
 PANELS_NPZ = "panels.npz"  # the unzipped cover, panel labels and seam edges, for flattening
-TOP, SKIRT = "top", "skirt"
+TOP, SKIRT, WALL = "top", "skirt", "wall"
+TOP_REGION, SKIRT_REGION, WALL_REGION = 0, 1, 2
 # A seam with the same panel on both sides and shorter than this is a merged sliver's rest (mm).
 SLIVER_SEAM_MM = 10.0  # param-ok: geometric tolerance
 # Roll-width splits per panel before giving up (each halves the width).
 MAX_ROLL_SPLITS = 4
+MM_PER_CM = 10.0  # param-ok: unit conversion
+LOW_EDGE_PERCENTILE = 5.0  # param-ok: rule, short dips of the top edge do not set the skirt height
 # Reach of a straight top seam's field beyond its ends (mm), so it cuts right to the panel edge.
 TOP_SEAM_OVERSHOOT_MM = 50.0  # param-ok: geometric reach
 
@@ -135,14 +138,37 @@ def cut_cover(model_dir: Path, params: EffectiveParams, seams_file: Path | None 
     manual = _read_manual(model_dir, seams_file)
     warnings: list[str] = []
 
-    # 1. skirt seam all round; the two regions it makes are the top and the skirt
-    cut = apply(CutMesh(hull, []), auto.skirt_seam(line, inset), snap)
+    # 1. skirt seam all round at one height (the company rule), just below the lowest point of
+    # the top edge; the two regions it makes are the top and the skirt
+    hem_z = float(hull.vertices[:, 2].min())
+    below = _p(params, "seams.skirt_below_rim_mm")
+    rim = auto.rim_profile(hull, line, inset, _p(params, "seams.rim_smoothing_mm"))
+    # the lowest the top edge goes, leaving out short dips (the rounded corners of a box)
+    lowest_edge = float(np.percentile(rim.height, LOW_EDGE_PERCENTILE))
+    skirt_height = _p(params, "seams.skirt_height_mm")
+    level_skirt = params["seams.skirt_seam"] == "level"
+    if level_skirt:
+        if skirt_height <= 0:  # automatic
+            skirt_height = lowest_edge - below - hem_z
+        if hem_z + skirt_height > lowest_edge:
+            warnings.append(
+                f"the skirt seam ({skirt_height / MM_PER_CM:.1f} cm above the hem) climbs onto "
+                f"the top where the top edge is lower (lowest "
+                f"{(lowest_edge - hem_z) / MM_PER_CM:.1f} cm); the skirt panels there wrap over "
+                "the rounded edge"
+            )
+        skirt = auto.skirt_seam(hem_z + skirt_height)
+        heights = (skirt_height, skirt_height)
+    else:
+        skirt = auto.rim_seam(line, rim, below)
+        heights = (lowest_edge - below - hem_z, float(rim.height.max()) - below - hem_z)
+    cut = apply(CutMesh(hull, []), skirt, snap)
     labels = panels(cut.mesh, seam_edges(cut)["skirt"])
     edges = cut.mesh.edges_sorted
     hem_vertices = np.unique(edges[group_rows(edges, require_count=1)])
     hem_faces = np.flatnonzero(np.isin(cut.mesh.faces, hem_vertices).any(axis=1))
     skirt_label = int(np.bincount(labels[hem_faces]).argmax())
-    cut.region = np.where(labels == skirt_label, 1, 0).astype(np.int64)  # 0 top, 1 skirt
+    cut.region = np.where(labels == skirt_label, SKIRT_REGION, TOP_REGION).astype(np.int64)
 
     # 2. vertical skirt seams: corners and equal splits, or the manual positions
     if manual and manual.get("skirt_seams") is not None:
@@ -153,9 +179,35 @@ def cut_cover(model_dir: Path, params: EffectiveParams, seams_file: Path | None 
             line, _p(params, "seams.corner_angle_deg"), _p(params, "seams.corner_window_mm")
         )
         positions = auto.split_positions(line, found, _p(params, "seams.max_skirt_panel_mm"))
+
+    # 3. walls: where the top edge stands clearly higher than the skirt seam (the back of a
+    # chair), the upright part between becomes a wall panel, so the top never wraps down over
+    # its edge; a wall ends in a short upright line where the edge comes down again
+    walls: list[tuple[float, float]] = []
+    if level_skirt:
+        walls = auto.wall_ranges(
+            rim,
+            hem_z + skirt_height,
+            _p(params, "seams.wall_min_mm"),
+            _p(params, "seams.wall_min_length_mm"),
+        )
+    if walls:
+        cut = apply(cut, auto.wall_seam(line, rim, inset, walls, TOP_REGION), snap)
     reach = _p(params, "seams.corner_window_mm")
     for i, s in enumerate(positions):
-        cut = apply(cut, auto.corner_seam(line, s, i, 1, reach), snap)
+        cut = apply(cut, auto.corner_seam(line, s, i, SKIRT_REGION, reach), snap)
+    if walls:
+        found_edges = [e for e in seam_edges(cut).values() if len(e)]
+        lab = panels(cut.mesh, np.vstack(found_edges))
+        # the top reaches inward from the outline; walls stand at the outline
+        centre = np.asarray(cut.mesh.triangles_center)
+        inward = line.inside_distance(centre[:, :2]) > auto.WALL_ZONE_MM
+        tops = np.unique(lab[inward & (cut.region == TOP_REGION)])
+        cut.region = np.where(
+            cut.region == SKIRT_REGION,
+            SKIRT_REGION,
+            np.where(np.isin(lab, tops), TOP_REGION, WALL_REGION),
+        ).astype(np.int64)
 
     # 3. top seams from seams.json
     top_lines: list[list[list[float]]] = []
@@ -213,7 +265,9 @@ def cut_cover(model_dir: Path, params: EffectiveParams, seams_file: Path | None 
                         top_lines.append(xy_line.tolist())
                     break
 
-    return _assemble(model_dir, cut, params, positions, line, top_lines, levels, warnings)
+    result = _assemble(model_dir, cut, params, positions, line, top_lines, levels, warnings)
+    result.report["skirt_height_mm"] = [round(h, 1) for h in heights]  # lowest, highest
+    return result
 
 
 def _copy(cut: CutMesh) -> CutMesh:
@@ -279,28 +333,32 @@ def _side(angle_deg: float) -> str:
 
 def _names(mesh: trimesh.Trimesh, lab: IntArray, region: IntArray) -> dict[int, str]:
     names: dict[int, str] = {}
-    tops, skirts = [], []
+    tops: list[tuple[float, int]] = []
+    skirts: list[tuple[str, float, int]] = []
+    walls: list[tuple[str, float, int]] = []
     for k in range(int(lab.max()) + 1):
         faces = np.flatnonzero(lab == k)
         c = np.asarray(mesh.triangles_center)[faces]
         w = np.asarray(mesh.area_faces)[faces]
-        if np.bincount(region[faces], minlength=2).argmax() == 0:
+        major = int(np.bincount(region[faces], minlength=3).argmax())
+        if major == TOP_REGION:
             tops.append((float((c[:, 1] * w).sum() / w.sum()), k))
         else:
             n = (np.asarray(mesh.face_normals)[faces][:, :2] * w[:, None]).sum(0)
             angle = math.degrees(math.atan2(n[1], n[0]))
             side = _side(angle)
-            skirts.append((side, angle, k))
+            (walls if major == WALL_REGION else skirts).append((side, angle, k))
     tops.sort()
     for i, (_, k) in enumerate(tops):
         names[k] = "top" if len(tops) == 1 else f"top-{i + 1}"
-    if len(skirts) == 1:  # one skirt all round
-        names[skirts[0][2]] = "skirt"
-        return names
-    for side in ("front", "right", "back", "left"):
-        group = sorted((a, k) for s, a, k in skirts if s == side)
-        for i, (_, k) in enumerate(group):
-            names[k] = f"skirt-{side}" if len(group) == 1 else f"skirt-{side}-{i + 1}"
+    for kind, pieces in (("skirt", skirts), ("wall", walls)):
+        if len(pieces) == 1:  # one piece all round
+            names[pieces[0][2]] = kind
+            continue
+        for side in ("front", "right", "back", "left"):
+            group = sorted((a, k) for s, a, k in pieces if s == side)
+            for i, (_, k) in enumerate(group):
+                names[k] = f"{kind}-{side}" if len(group) == 1 else f"{kind}-{side}-{i + 1}"
     return names
 
 
@@ -318,24 +376,6 @@ def _assemble(
     lab = labels_without_slivers(cut)
     names = _names(mesh, lab, cut.region)
     usable = _p(params, "roll.usable_width_mm")
-    opened = unzip(mesh, all_seam_edges(cut))
-    result: list[Panel] = []
-    for k in range(int(lab.max()) + 1):
-        faces = np.flatnonzero(lab == k)
-        sub = panel_mesh(opened, faces)
-        disk = is_disk(sub)
-        width, length = flat_size(sub) if disk else (float("nan"), float("nan"))
-        region = TOP if np.bincount(cut.region[faces], minlength=2).argmax() == 0 else SKIRT
-        result.append(Panel(k, names[k], faces, sub, float(sub.area), disk, width, length, region))
-        if not disk:
-            raise CoverError(
-                f"panel {names[k]} does not lie flat in one piece (not a disk); add a seam"
-            )
-        if width > usable:
-            warnings.append(
-                f"panel {names[k]} is {width:.0f} mm wide, more than the roll ({usable:g} mm)"
-            )
-
     # seams: group seam edges by the pair of panels on either side
     pairs = np.asarray(mesh.face_adjacency)
     shared = np.sort(np.asarray(mesh.face_adjacency_edges), axis=1)
@@ -351,20 +391,57 @@ def _assemble(
             # a == b: a seam closing a panel onto itself (a skirt ring cut once), or the rest
             # of a merged sliver (dropped below by its length)
             key = (kinds[sid], min(a, b), max(a, b))
-            groups.setdefault(key, []).append((e[0], e[1]))
+            groups.setdefault(key, []).append((min(e), max(e)))
+    # a short seam inside one panel is a leftover slit (the end of a seam that ran on past the
+    # seam it meets); it is not cut open
+    v = np.asarray(mesh.vertices)
+    slits: set[tuple[int, int]] = set()
+    for (_kind, a, b), chain in groups.items():
+        if a == b:
+            e = np.array(sorted(set(chain)))
+            if float(np.linalg.norm(v[e[:, 0]] - v[e[:, 1]], axis=1).sum()) < SLIVER_SEAM_MM:
+                slits.update(map(tuple, e.tolist()))
+    cut_edges = all_seam_edges(cut)
+    if slits:
+        cut_edges = np.array(
+            [e for e in cut_edges.tolist() if (min(e), max(e)) not in slits], dtype=np.int64
+        ).reshape(-1, 2)
+    opened = unzip(mesh, cut_edges)
+    result: list[Panel] = []
+    for k in range(int(lab.max()) + 1):
+        faces = np.flatnonzero(lab == k)
+        sub = panel_mesh(opened, faces)
+        disk = is_disk(sub)
+        width, length = flat_size(sub) if disk else (float("nan"), float("nan"))
+        region = (TOP, SKIRT, WALL)[int(np.bincount(cut.region[faces], minlength=3).argmax())]
+        result.append(Panel(k, names[k], faces, sub, float(sub.area), disk, width, length, region))
+        if not disk:
+            raise CoverError(
+                f"panel {names[k]} does not lie flat in one piece (not a disk); add a seam"
+            )
+        if width > usable:
+            warnings.append(
+                f"panel {names[k]} is {width:.0f} mm wide, more than the roll ({usable:g} mm)"
+            )
+
     infos: list[SeamInfo] = []
     edge_seam: dict[tuple[int, int], int] = {}
     v = np.asarray(mesh.vertices)
     for (kind, a, b), chain in sorted(groups.items()):
+        # two seam lines may run along the same edges (manual lines sharing a stretch)
+        chain = sorted(set(chain))
         order = _ordered(np.array(chain))
         pts = v[order]
-        length = float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum())
+        # all parts of the seam (it may come in pieces, either side of a wall)
+        e = np.array(chain)
+        length = float(np.linalg.norm(v[e[:, 0]] - v[e[:, 1]], axis=1).sum())
         if a == b and length < SLIVER_SEAM_MM:
             continue
         lap = _lap(kind, result[a], result[b])
-        infos.append(
-            SeamInfo(f"{names[a]}/{names[b]}", kind, (a, b), length, lap, min_radius(pts), pts)
-        )
+        seam_id = f"{names[a]}/{names[b]}"
+        if any(i.id == seam_id for i in infos):  # two seams between the same panels
+            seam_id = f"{seam_id} ({kind})"
+        infos.append(SeamInfo(seam_id, kind, (a, b), length, lap, min_radius(pts), pts))
         for e in chain:
             edge_seam[(min(e), max(e))] = len(infos) - 1
         result[a].seams.append(infos[-1].id)
@@ -431,9 +508,10 @@ def _assemble(
 
 
 def _lap(kind: str, a: Panel, b: Panel) -> int:
-    """Which panel laps over the other: the top over the skirt, the higher over the lower on top
-    seams, and on vertical seams the panel facing the front (water run-off, CLAUDE.md rule 6)."""
-    if kind == "skirt":
+    """Which panel laps over the other: the top over skirt and walls, the higher over the lower
+    (a wall over the skirt, on top seams), and on vertical seams the panel facing the front
+    (water run-off, CLAUDE.md rule 6)."""
+    if kind in ("skirt", "wall") and TOP in (a.region, b.region):
         return a.index if a.region == TOP else b.index
     if kind == "corner":
         fa = (np.asarray(a.mesh.face_normals)[:, 1] * a.mesh.area_faces).sum() / a.mesh.area

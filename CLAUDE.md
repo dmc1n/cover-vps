@@ -142,7 +142,10 @@ scripts/                  setup-vps.sh, licenses.py (regenerates docs/LICENSES.m
     the Blocchi sofa runs straight from the front edge to the top of the back). Flat tops
     (tables) get a raised support under the cover, a frame or a balloon, so the fabric forms
     a tent.
-13. Physical gates in the plan are real. Claude Code prepares the exports and a measurement
+13. Every seam is an easy, smooth line for clean stitching (owner, 2026-09-30, all covers): no
+    zig-zag (`seams.max_wiggle_mm`, checked on every panel edge), and the skirt seam at one
+    height all round so skirt panels are straight strips (`seams.skirt_seam: level`).
+14. Physical gates in the plan are real. Claude Code prepares the exports and a measurement
     sheet, then stops until the owner reports results.
 
 ## Parameters: one file, layered overrides

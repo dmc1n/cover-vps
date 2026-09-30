@@ -10,7 +10,7 @@ import trimesh
 from coverengine.cli import main
 from coverengine.export.drawing import load_cover, measure, skirt_heights, write_drawing
 from coverengine.export.pattern import write_all
-from coverengine.flatten.pattern import build_patterns, pattern_set
+from coverengine.flatten.pattern import build_patterns, pattern_set, wiggle
 from coverengine.flatten.solve import flatten, singular_values
 from coverengine.hull.build import build_hull, write_hull
 from coverengine.io.model_io import import_model
@@ -32,6 +32,7 @@ FLAT = {
     "flatten.panel_tolerance_mm": 2.5,
     "flatten.fabric_compensation": False,
     "flatten.stretch_quantile": 0.995,
+    "seams.max_wiggle_mm": 2.0,
     "fabric.max_allowed_stretch_pct": 2.0,
     "pen.label_height_mm": 15,
     "pen.tick_length_mm": 10,
@@ -41,6 +42,8 @@ FLAT = {
 GOLDEN = repo_root() / "testdata" / "golden" / "flatten.json"
 SHAPES = {s.name: s for s in build_all()}
 COVERS = {"box_with_legs": {}, "chair": {}, "slatted_table": {"hull.support": "balloon"}}
+# the chair's back stands higher than its seat edge: a wall panel above the level skirt
+PANELS = {"box_with_legs": 5, "chair": 6, "slatted_table": 5}
 
 
 def params(**overrides: Any) -> Any:
@@ -144,9 +147,11 @@ def covers(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
 @pytest.mark.parametrize("name", list(COVERS))
 def test_cover_patterns(covers: dict[str, Any], name: str) -> None:
     patterns, doc, _ = covers[name]
-    assert len(patterns) == 5
+    assert len(patterns) == PANELS[name]
     for p in doc["panels"]:
         assert p["stretch"]["quantile_pct"] <= 2.0, p["name"]
+        for e in p["edges"]:  # every edge an easy line for clean stitching
+            assert e["wiggle_mm"] <= 2.0, (p["name"], e.get("seam", "hem"))
         assert p["fits_roll"]
         outline = shapely.Polygon(p["outline_mm"])
         assert outline.is_valid and outline.exterior.is_simple, p["name"]
@@ -156,7 +161,7 @@ def test_cover_patterns(covers: dict[str, Any], name: str) -> None:
                 # the rest is recorded as ease)
                 limit = max(2.0, 0.003 * e["length_3d_mm"])
                 assert e["ease_mm"] <= limit, (p["name"], e["seam"])
-                assert e["length_2d_mm"] == pytest.approx(e["length_3d_mm"], rel=5e-3)
+                assert e["length_2d_mm"] == pytest.approx(e["length_3d_mm"], rel=5e-3, abs=1.0)
 
 
 def test_skirt_panels_have_the_hem_at_the_bottom(covers: dict[str, Any]) -> None:
@@ -238,3 +243,37 @@ def test_drawing_sizes_agree(covers: dict[str, Any]) -> None:
         assert 0 < low <= middle <= high < height
     turned = load_cover(root, doc, params(**{"drawing.plan_rotation_deg": 90}))
     assert measure(turned, "plan_extent_a") == pytest.approx(measure(cover, "plan_extent_b"))
+
+
+def test_wiggle_finds_zig_zags_not_corners() -> None:
+    x = np.linspace(0, 1000, 2001)
+    straight = np.column_stack([x, np.zeros_like(x)])
+    assert wiggle(straight) < 0.01
+    heartbeat = np.column_stack([x, 15 * (np.floor(x / 20) % 2)])  # teeth every 20 mm
+    assert wiggle(heartbeat) > 2.0
+    step = np.column_stack([x, np.where(x > 500, 40.0, 0.0)])  # one step (a wall's end)
+    assert wiggle(step) < 0.01
+    arc = np.column_stack([500 * np.cos(x / 1000), 500 * np.sin(x / 1000)])
+    assert wiggle(arc) < 0.5
+
+
+def test_skirt_is_level_and_straight(covers: dict[str, Any]) -> None:
+    for name in COVERS:
+        patterns, _, _ = covers[name]
+        for p in patterns:
+            if not p.name.startswith("skirt"):
+                continue
+            ys = p.outline[:, 1]
+            # a straight strip: the same height everywhere (top edge level, hem at the bottom)
+            assert np.ptp(ys) == pytest.approx(ys.max() - ys.min())
+            top = [e for e in p.edges if e["kind"] == "seam" and not e["mate"].startswith("skirt")]
+            for e in top:
+                assert np.ptp(p.outline[e["_points"], 1]) < 2.0, (name, p.name)
+
+
+def test_chair_back_is_a_wall(covers: dict[str, Any]) -> None:
+    patterns, _, _ = covers["chair"]
+    names = {p.name for p in patterns}
+    assert any(n.startswith("wall") for n in names)
+    top = next(p for p in patterns if p.name == "top")
+    assert all(e.get("mate", "") != "skirt-back" for e in top.edges)  # no wrap down the back

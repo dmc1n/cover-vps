@@ -35,6 +35,14 @@ HEM = -1  # seam index of hem edges
 # Faces below this area (mm2) are dropped before flattening (they cannot be mapped).
 MIN_FACE_MM2 = 1e-6  # param-ok: geometric tolerance
 PERCENT = 100  # param-ok: ratio to percent
+# Wiggle: an edge is compared with itself smoothed over this length (mm), sampled this often.
+WIGGLE_WINDOW_MM = 30.0  # param-ok: measurement definition
+WIGGLE_STEP_MM = 1.0  # param-ok: measurement definition
+# A sharp turn: the direction changes more than WIGGLE_SHARP_DEG over +-WIGGLE_TURN_SPAN_MM.
+WIGGLE_SHARP_DEG = 30.0  # param-ok: measurement definition
+WIGGLE_TURN_SPAN_MM = 5.0  # param-ok: measurement definition
+WIGGLE_CORNER_GAP_MM = 100.0  # param-ok: measurement definition
+WIGGLE_MIN_TURNS = 4  # param-ok: measurement definition
 # The UP arrow sits this many label heights above the label.
 ARROW_ABOVE_LABEL = 2.5  # param-ok: layout
 
@@ -150,6 +158,7 @@ def build_patterns(
                 "kind": "hem" if seam_index == HEM else "seam",
                 "length_3d_mm": round(l3, 2),
                 "length_2d_mm": round(l2, 2),
+                "wiggle_mm": round(wiggle(outline[idx]), 2),
             }
             if seam_index != HEM:
                 s = seams[seam_index]
@@ -177,6 +186,49 @@ def build_patterns(
         pen = _pen_marks(name, outline, edges, v3, tick_spacing, tick_length, label_h)
         patterns.append(PanelPattern(k, name, outline, flat, edges, pen, stretch, width, length))
     return patterns, cut_report
+
+
+def wiggle(points: Array) -> float:
+    """How far an edge zig-zags: the largest distance between the edge and itself smoothed
+    over WIGGLE_WINDOW_MM (a smooth curve stays within a fraction of a mm). A corner or a step
+    (up to three sharp turns close together, where a wall ends, say) is not a zig-zag and is
+    left out; WIGGLE_MIN_TURNS or more sharp turns, each within WIGGLE_CORNER_GAP_MM of the
+    next, are."""
+    seg = np.linalg.norm(np.diff(points, axis=0), axis=1)
+    s = np.concatenate([[0.0], np.cumsum(seg)])
+    if s[-1] <= WIGGLE_WINDOW_MM:
+        return 0.0
+    at = np.arange(0.0, s[-1], WIGGLE_STEP_MM)
+    p = np.column_stack([np.interp(at, s, points[:, k]) for k in range(points.shape[1])])
+    w = int(WIGGLE_WINDOW_MM / WIGGLE_STEP_MM)
+    kernel = np.ones(w + 1) / (w + 1)
+    smooth = np.column_stack(
+        [np.convolve(p[:, k], kernel, mode="valid") for k in range(p.shape[1])]
+    )
+    inner = p[w // 2 : w // 2 + len(smooth)]
+    dev = np.linalg.norm(inner - smooth, axis=1)
+    # sharp turns: direction change over a few mm
+    k = max(int(WIGGLE_TURN_SPAN_MM / WIGGLE_STEP_MM), 1)
+    if len(p) > 2 * k + 1:
+        d1, d2 = p[k:-k] - p[: -2 * k], p[2 * k :] - p[k:-k]
+        cos = (d1 * d2).sum(1) / np.maximum(
+            np.linalg.norm(d1, axis=1) * np.linalg.norm(d2, axis=1), 1e-12
+        )
+        sharp = np.flatnonzero(cos < math.cos(math.radians(WIGGLE_SHARP_DEG))) + k
+        if len(sharp):
+            groups = np.split(sharp, np.flatnonzero(np.diff(sharp) > k) + 1)
+            corners = np.array([g.mean() for g in groups]) * WIGGLE_STEP_MM
+            # corners closer together than the gap form a cluster; a cluster of fewer than
+            # WIGGLE_MIN_TURNS turns is a corner or a step, not a zig-zag
+            clusters = np.split(
+                corners, np.flatnonzero(np.diff(corners) > WIGGLE_CORNER_GAP_MM) + 1
+            )
+            pos = at[w // 2 : w // 2 + len(smooth)]
+            for cl in clusters:
+                if len(cl) < WIGGLE_MIN_TURNS:
+                    for c in cl:
+                        dev[np.abs(pos - c) <= WIGGLE_WINDOW_MM] = 0.0
+    return float(dev.max()) if len(dev) else 0.0
 
 
 def _areas(uv: Array, f: IntArray) -> Array:
@@ -266,11 +318,15 @@ def pattern_set(
     q_limit = _p(params, "flatten.stretch_quantile")
     usable = _p(params, "roll.usable_width_mm")
     # ease: the two sides of every seam compared
-    sides: dict[str, list[float]] = {}
+    # a seam may reach a panel in more than one part (either side of a wall); each panel's
+    # parts are added up before the two panels are compared
+    per_panel: dict[str, dict[str, float]] = {}
     for p in patterns:
         for e in p.edges:
             if e["kind"] == "seam":
-                sides.setdefault(e["seam"], []).append(e["length_2d_mm"])
+                side = per_panel.setdefault(e["seam"], {})
+                side[p.name] = side.get(p.name, 0.0) + e["length_2d_mm"]
+    sides = {seam: list(by_panel.values()) for seam, by_panel in per_panel.items()}
     for p in patterns:
         for e in p.edges:
             if e["kind"] == "seam":
@@ -288,6 +344,15 @@ def pattern_set(
                 f"panel {p.name} is {p.width_mm:.0f} mm wide flat, "
                 f"more than the roll ({usable:g} mm)"
             )
+    max_wiggle = _p(params, "seams.max_wiggle_mm")
+    for p in patterns:
+        for e in p.edges:
+            if e["wiggle_mm"] > max_wiggle:
+                what = f"seam to {e['mate']}" if e["kind"] == "seam" else "hem"
+                warnings.append(
+                    f"panel {p.name}: the {what} is not a smooth line (zig-zags "
+                    f"{e['wiggle_mm']:.1f} mm, limit {max_wiggle:g} mm)"
+                )
     for seam, lengths in sorted(sides.items()):
         if len(lengths) > 1 and max(lengths) - min(lengths) > tolerance:
             diff = max(lengths) - min(lengths)

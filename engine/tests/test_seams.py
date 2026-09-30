@@ -28,6 +28,12 @@ SEAMS = {
     "seams.max_skirt_panel_mm": 3000,
     "seams.snap_mm": 1,
     "seams.band_drop_mm": 20,
+    "seams.skirt_seam": "level",
+    "seams.skirt_height_mm": 0,
+    "seams.skirt_below_rim_mm": -3,
+    "seams.rim_smoothing_mm": 200,
+    "seams.wall_min_mm": 20,
+    "seams.wall_min_length_mm": 300,
     "roll.usable_width_mm": 1480,
     "construction.method": "double_stitch",
 }
@@ -74,8 +80,25 @@ def test_box_gives_top_and_four_skirts(cuts: dict[str, Any]) -> None:
 
 def test_chair_panels(cuts: dict[str, Any]) -> None:
     cut = cuts["chair"]
-    assert names(cut) == ["skirt-back", "skirt-front", "skirt-left", "skirt-right", "top"]
+    # the level skirt all round; above it at the sides and back, where the chair stands
+    # higher than its seat edge, one wall panel
+    assert names(cut) == ["skirt-back", "skirt-front", "skirt-left", "skirt-right", "top", "wall"]
     assert all(p.disk for p in cut.panels)
+    low, high = cut.report["skirt_height_mm"]
+    assert low == high  # one height all round
+
+
+def test_level_skirt_seam_is_level(cuts: dict[str, Any]) -> None:
+    for name in ("box_with_legs", "chair", "slatted_table"):
+        cut = cuts[name]
+        z = [
+            float(np.ptp(np.asarray(s.points)[:, 2]))
+            for s in cut.seams
+            if s.kind == "skirt"
+            and cut.panels[s.panels[0]].region != "wall"
+            and cut.panels[s.panels[1]].region != "wall"
+        ]
+        assert z and max(z) < 1.0, name  # the skirt seam at one height (within 1 mm)
 
 
 def test_table_with_balloon_top_fits_the_roll(cuts: dict[str, Any]) -> None:
