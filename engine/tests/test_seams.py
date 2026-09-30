@@ -175,6 +175,38 @@ def test_manual_seams(models: Path, tmp_path: Path) -> None:
         cut_cover(models / "box_with_legs", params(), tmp_path / "missing.json")
 
 
+def test_a_seam_ending_inside_a_panel_is_not_cut_open(models: Path, tmp_path: Path) -> None:
+    # one line across the box top, and a second that stops half way (it runs into the first
+    # and a little past it): the part past the first line must not leave a slit
+    seams = {
+        "format_version": 1,
+        "top_seams": [[[-500.0, 0.0], [500.0, 0.0]], [[0.0, -500.0], [0.0, 100.0]]],
+    }
+    path = tmp_path / "seams.json"
+    path.write_text(json.dumps(seams))
+    cut = cut_cover(models / "box_with_legs", params(), path)
+    tops = [p for p in cut.panels if p.region == "top"]
+    assert len(tops) == 3 and all(p.disk for p in tops)
+    assert not [s for s in cut.seams if s.panels[0] == s.panels[1]]
+
+
+def test_dome_gets_a_seam_proposal(models: Path) -> None:
+    from coverengine.flatten.pattern import build_patterns, pattern_set
+    from test_flatten import FLAT
+
+    p = params(**FLAT)
+    write_cut(models / "sphere", cut_cover(models / "sphere", p))
+    patterns, report = build_patterns(models / "sphere", p)
+    doc, _ = pattern_set(models / "sphere", p, patterns, report)
+    (proposal,) = [q for q in doc["proposals"] if q["panel"] == "top"]
+    a, b = np.asarray(proposal["points"])
+    mid = (a + b) / 2
+    assert np.linalg.norm(mid) < 50  # through the middle of the dome
+    top = next(q for q in patterns if q.name == "top")
+    span = float(np.ptp(top.flat.vertices[:, 0]))
+    assert np.linalg.norm(b - a) >= 0.9 * span  # across the whole piece
+
+
 def test_outputs_are_deterministic(models: Path, cuts: dict[str, Any], tmp_path: Path) -> None:
     for out in ("a", "b"):
         write_cut(models / "chair", cut_cover(models / "chair", params()), tmp_path / out)

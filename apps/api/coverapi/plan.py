@@ -75,6 +75,7 @@ def plan(model_dir: Path) -> dict[str, Any]:
         "manual": _read(model_dir / "seams.json"),
         "auto": _read(model_dir / "seams.auto.json"),
         "image": PLAN_PNG,
+        "proposals": (_read(model_dir / "pattern.json") or {}).get("proposals", []),
     }
     npz, report = model_dir / "panels.npz", _read(model_dir / "panels.json")
     if npz.is_file() and report:

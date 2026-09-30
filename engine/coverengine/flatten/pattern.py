@@ -43,6 +43,8 @@ WIGGLE_SHARP_DEG = 30.0  # param-ok: measurement definition
 WIGGLE_TURN_SPAN_MM = 5.0  # param-ok: measurement definition
 WIGGLE_CORNER_GAP_MM = 100.0  # param-ok: measurement definition
 WIGGLE_MIN_TURNS = 4  # param-ok: measurement definition
+# A proposed seam runs this far past the panel so it meets the seams round it (mm).
+PROPOSAL_OVERSHOOT_MM = 10.0  # param-ok: geometric reach (the cut runs on 50 mm more)
 # The UP arrow sits this many label heights above the label.
 ARROW_ABOVE_LABEL = 2.5  # param-ok: layout
 
@@ -59,6 +61,7 @@ class PanelPattern:
     width_mm: float
     length_mm: float
     warnings: list[str] = field(default_factory=list)
+    proposal: Array | None = None  # a seam that would relieve the stretch (plan, mm)
 
 
 def _p(params: EffectiveParams, key: str) -> float:
@@ -187,7 +190,10 @@ def build_patterns(
         }
         width, length = narrow_width(outline)
         pen = _pen_marks(name, outline, edges, v3, tick_spacing, tick_length, label_h)
-        patterns.append(PanelPattern(k, name, outline, flat, edges, pen, stretch, width, length))
+        pattern = PanelPattern(k, name, outline, flat, edges, pen, stretch, width, length)
+        if quantile * PERCENT > _p(params, "fabric.max_allowed_stretch_pct"):
+            pattern.proposal = propose_seam(flat, v3, worst, area, quantile)
+        patterns.append(pattern)
     return patterns, cut_report
 
 
@@ -232,6 +238,35 @@ def wiggle(points: Array) -> float:
                     for c in cl:
                         dev[np.abs(pos - c) <= WIGGLE_WINDOW_MM] = 0.0
     return float(dev.max()) if len(dev) else 0.0
+
+
+def propose_seam(
+    flat: Flat, boundary: Array, worst: Array, area: Array, level: float
+) -> Array | None:
+    """A straight seam (in plan, mm) that splits a panel through where it stretches most: across
+    the panel's longer plan extent, through the area-weighted centre of the faces stretching more
+    than `level`, cut to the panel and run a little on so it meets the seams round it."""
+    tri = flat.vertices[flat.faces]
+    xy = tri[:, :, :2].mean(axis=1)
+    hot = worst >= level
+    if not hot.any():
+        return None
+    centre = (xy[hot] * area[hot, None]).sum(axis=0) / area[hot].sum()
+    pts = flat.vertices[:, :2] - flat.vertices[:, :2].mean(axis=0)
+    _, _, axes = np.linalg.svd(pts, full_matrices=False)
+    across = np.array([-axes[0][1], axes[0][0]])  # perpendicular to the long axis
+    footprint = shapely.Polygon(boundary[:, :2]).buffer(0)  # the panel seen from above
+    reach = float(np.ptp(pts, axis=0).max()) * 2
+    line = shapely.LineString([centre - across * reach, centre + across * reach])
+    inside = footprint.intersection(line)
+    parts = list(inside.geoms) if hasattr(inside, "geoms") else [inside]
+    parts = [g for g in parts if isinstance(g, shapely.LineString) and not g.is_empty]
+    if not parts:
+        return None
+    seg = min(parts, key=lambda g: g.distance(shapely.Point(centre)))
+    a, b = np.asarray(seg.coords[0]), np.asarray(seg.coords[-1])
+    d = (b - a) / (np.linalg.norm(b - a) or 1.0)
+    return np.array([a - d * PROPOSAL_OVERSHOOT_MM, b + d * PROPOSAL_OVERSHOOT_MM])
 
 
 def fabric_profile(params: EffectiveParams) -> dict[str, Any]:
@@ -363,6 +398,7 @@ def pattern_set(
                 f"panel {p.name} stretches {p.stretch['quantile_pct']:.1f} % over more than "
                 f"{(1 - q_limit) * PERCENT:.1f} % of its area (limit {limit:g} %); "
                 "an extra seam would help"
+                + (" (proposed in the seam editor)" if p.proposal is not None else "")
             )
         if p.width_mm > usable:
             warnings.append(
@@ -404,6 +440,14 @@ def pattern_set(
         "fabric_profile": fabric,
         "fabric_compensation": bool(params["flatten.fabric_compensation"]),
         "compensation_scale": round(compensation(params), 6),
+        "proposals": [
+            {
+                "panel": p.name,
+                "points": [[round(float(x), 1), round(float(y), 1)] for x, y in p.proposal],
+            }
+            for p in patterns
+            if p.proposal is not None
+        ],
         "summary": {
             "panels": len(patterns),
             "max_stretch_pct": max(p.stretch["quantile_pct"] for p in patterns),

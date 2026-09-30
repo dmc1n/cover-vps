@@ -88,3 +88,14 @@ Tip: open `panels.glb` in the viewer, look from above, and read positions off th
   top over the skirt, and the front panel over a side panel.
 - Seams that curve tightly are listed in `panels.json` (`tight_seams`). For welded covers they are
   also printed as a warning.
+
+## Proposed seams
+
+When a top piece has to stretch more than the fabric allows (2 %), the program proposes a seam:
+a straight line through where it stretches most, across the piece. In the web app's **Seams**
+tab it is drawn dashed orange; click it to take it over, then **Save and recut**. Proposals
+are only suggestions: nothing is cut until you take one. The test dome goes from 41 % to 16 %
+with one proposal, and to 8 % after taking the next two.
+
+A seam line may run on past the seam it meets: the part inside the next piece is not cut.
+

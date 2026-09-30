@@ -168,9 +168,10 @@ def _cut_cover(
     skirt_height = _p(params, "seams.skirt_height_mm")
     level_skirt = params["seams.skirt_seam"] == "level"
     if level_skirt:
-        if skirt_height <= 0:  # automatic
+        chosen = skirt_height > 0
+        if not chosen:  # automatic
             skirt_height = lowest_edge - below - hem_z
-        if hem_z + skirt_height > lowest_edge:
+        if chosen and hem_z + skirt_height > lowest_edge - below:
             warnings.append(
                 f"the skirt seam ({skirt_height / MM_PER_CM:.1f} cm above the hem) climbs onto "
                 f"the top where the top edge is lower (lowest "
@@ -420,10 +421,13 @@ def _assemble(
     # seam it meets); it is not cut open
     v = np.asarray(mesh.vertices)
     slits: set[tuple[int, int]] = set()
-    for (_kind, a, b), chain in groups.items():
+    for (kind, a, b), chain in groups.items():
         if a == b:
             e = np.array(sorted(set(chain)))
-            if float(np.linalg.norm(v[e[:, 0]] - v[e[:, 1]], axis=1).sum()) < SLIVER_SEAM_MM:
+            length = float(np.linalg.norm(v[e[:, 0]] - v[e[:, 1]], axis=1).sum())
+            # only a vertical seam may close a panel onto itself (a round skirt cut once); a
+            # top seam inside one panel is the end of a line that ran on past its seam
+            if length < SLIVER_SEAM_MM or kind != "corner":
                 slits.update(map(tuple, e.tolist()))
     cut_edges = all_seam_edges(cut)
     if slits:
@@ -459,7 +463,7 @@ def _assemble(
         # all parts of the seam (it may come in pieces, either side of a wall)
         e = np.array(chain)
         length = float(np.linalg.norm(v[e[:, 0]] - v[e[:, 1]], axis=1).sum())
-        if a == b and length < SLIVER_SEAM_MM:
+        if a == b and (length < SLIVER_SEAM_MM or kind != "corner"):
             continue
         lap = _lap(kind, result[a], result[b])
         seam_id = f"{names[a]}/{names[b]}"

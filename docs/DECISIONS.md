@@ -571,3 +571,16 @@ Status: accepted, 2026-09-30; off until the fabric is measured.
 - `scripts/fabric_profile.py` turns the swatch sheet (`testdata/fabrics/measurements.template.json`)
   into the profile.
 
+## ADR-034 — Seam proposals, and seam ends inside a panel (M9)
+
+Status: accepted, 2026-09-30.
+
+- A top piece above the stretch limit gets a proposed seam in `pattern.json` (`proposals`): a
+  straight plan line through the area-weighted centre of its worst faces, across its longer
+  plan extent, clipped to the piece's boundary seen from above. It is shown in the seam editor
+  and applied only when the owner takes it (owner: clean, deliberate seams). Not yet
+  automatic: the owner decides where seams go on production covers.
+- A top, wall or roll seam that lies inside one panel (both sides the same panel) is a leftover
+  of a line that ran on past the seam it meets; it is no longer cut open. Only a vertical skirt
+  seam may close a panel onto itself (a round skirt cut once).
+

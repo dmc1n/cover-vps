@@ -89,3 +89,5 @@ input.search { padding: 6px 10px; border: 1px solid var(--line); border-radius: 
 textarea.notes { width: 100%; box-sizing: border-box; min-height: 44px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 14px; }
 .badge.status-draft { background: #eceef3; } .badge.status-checked { background: #dbe4ff; } .badge.status-production { background: #d8f0de; }
 .batch .jobstep { margin-right: 6px; }
+svg.plan .proposal polyline { fill: none; stroke: #e07a14; stroke-dasharray: 14 8; cursor: pointer; }
+svg.plan .proposal text { fill: #b85f00; cursor: pointer; }

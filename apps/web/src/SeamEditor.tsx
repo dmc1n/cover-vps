@@ -15,6 +15,7 @@ interface Plan {
   manual: { skirt_seams?: Pt[]; top_seams?: Pt[][] } | null;
   auto: { skirt_seams?: Pt[]; top_seams?: Pt[][] } | null;
   image: string;
+  proposals: { panel: string; points: Pt[] }[];
 }
 
 type Mode = "move" | "draw" | "skirt" | "delete";
@@ -170,6 +171,7 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
       {error && <p className="error">{error}</p>}
       <p className="muted">
         Grey: the seams of the last run. Blue: your seams ({plan.manual ? "from seams.json" : "starting from the automatic ones"});
+        orange dashed: a seam the program proposes where a piece stretches too much (click it to add it);
         squares: vertical skirt seams{skirtAuto ? " (automatic until you move one)" : ""}. The contour lines (equal height) show where the top folds.
       </p>
       <svg
@@ -228,6 +230,17 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
             ))}
           </g>
         ))}
+        {plan.proposals
+          .filter((pr) => !tops.some((t) => t.length === pr.points.length && t.every((q, i) => q[0] === pr.points[i][0] && q[1] === pr.points[i][1])))
+          .map((pr, i) => (
+            <g key={`p${i}`} className="proposal" onClick={(e) => { e.stopPropagation(); change(() => setTops([...tops, pr.points])); }}>
+              <title>Proposed seam for {pr.panel}: click to add it</title>
+              <polyline strokeWidth={r * 0.6} points={pr.points.map(([x, y]) => `${x},${-y}`).join(" ")} />
+              <text x={(pr.points[0][0] + pr.points[1][0]) / 2} y={-(pr.points[0][1] + pr.points[1][1]) / 2} fontSize={r * 3}>
+                + proposed for {pr.panel}
+              </text>
+            </g>
+          ))}
         {drawing && (
           <polyline className="seam-drawing" strokeWidth={r * 0.6} points={drawing.map(([x, y]) => `${x},${-y}`).join(" ")} />
         )}
