@@ -55,10 +55,19 @@ the picture, using a written size in the same view as the scale, and list its ke
  "notes": "anything the shape does not capture (a band, flaps, zips), or empty"}"""
 
 TOLERANCE_CM = 0.6
+OVERRIDES_FILE = Path(__file__).resolve().parents[1] / "config" / "drawing_overrides.json"
+OVERRIDES: dict[str, Any] = (
+    json.loads(OVERRIDES_FILE.read_text()) if OVERRIDES_FILE.is_file() else {}
+)
+
+OUTLINE_MM = 5.0
 
 COMPARE = """You check whether a program rebuilt a cover workshop's drawing correctly. Image 1 is
 the drawing, image 2 the program's cover (each piece in its own colour, seen from the front
-right and above). You get the sizes the program used (cm) and its pieces (net sizes in mm).
+right and above). You get the sizes the program used (cm) and every flat piece as its outline
+(the corners in cm, laid flat; a sloped piece is longer than its plan view; an end piece with
+five corners is a pentagon, not a rectangle). Pieces wider than the 150 cm roll are split on
+purpose (a seam the drawing may not show); that is not a difference.
 Compare only the shape, the sizes and the seam lines (the lines between pieces): flat strips on
 top, slopes, corners, ends, how the pieces meet. Do not count air pockets, elastic, drawcords,
 grommets or tie downs (the program adds those to the cut pieces; they are not in image 2), nor
@@ -68,11 +77,14 @@ differences in how a picture is drawn. Answer with JSON only:
 
 def compare(row: dict[str, Any], model: Path, sizes: dict[str, Any], picture: Path,
             params: Any) -> dict[str, Any]:  # fmt: skip
+    import shapely
+
     pattern = json.loads((model / "pattern.json").read_text())
-    pieces = [
-        {"name": p["name"], "net_mm": [round(p["flat_width_mm"]), round(p["flat_length_mm"])]}
-        for p in pattern["panels"]
-    ]
+    pieces = []
+    for p in pattern["panels"]:
+        ring = shapely.Polygon(p["outline_mm"]).simplify(OUTLINE_MM)
+        corners = [[round(x / 10, 1), round(y / 10, 1)] for x, y in ring.exterior.coords[:-1]]
+        pieces.append({"name": p["name"], "corners": len(corners), "outline_cm": corners})
     parts = [
         {"type": "text", "text": json.dumps({"sizes_cm": sizes, "pieces": pieces})},
         {"type": "image_url", "image_url": {"url": "data:image/png;base64,"
@@ -112,6 +124,11 @@ def one(row: dict[str, Any], pictures: Path, params: Any, models: Path) -> dict[
     except Exception as exc:  # noqa: BLE001
         return {**out, "status": "AI error", "detail": str(exc)}
     shape, sizes = ans.get("shape"), ans.get("sizes") or {}
+    fixed = OVERRIDES.get(code, {})  # the owner's corrections win over the AI's reading
+    if fixed.get("shape"):
+        shape = fixed["shape"]
+    sizes = {**sizes, **fixed.get("sizes", {})}
+    out["owner_corrected"] = sorted(fixed.get("sizes", {}))
     out.update(shape=shape, sizes=sizes, measured=ans.get("measured") or [],
                notes=ans.get("notes", ""), why_not=ans.get("why_not", ""))  # fmt: skip
     if shape not in ("box", "sloped box", "L shape", "round"):
@@ -122,7 +139,10 @@ def one(row: dict[str, Any], pictures: Path, params: Any, models: Path) -> dict[
         if k.endswith("_cm") and isinstance(v, (int, float)) and v
     }
     out["size_check"] = checked
-    unsure = sorted({k for k, v in checked.items() if v == "not written"} | set(out["measured"]))
+    unsure = sorted(
+        ({k for k, v in checked.items() if v == "not written"} | set(out["measured"]))
+        - set(out["owner_corrected"])
+    )
     try:
         text = " ".join(row["text"].lower().split())
         middle = "drawstring in the middle" in text or "drawcord in the middle" in text
@@ -155,13 +175,42 @@ def one(row: dict[str, Any], pictures: Path, params: Any, models: Path) -> dict[
     return out
 
 
+def recompare(folder: Path) -> None:
+    """Only the comparison again, for the covers already built (covers.json is updated)."""
+    rows = {r["code"]: r for r in json.loads((folder / "drawings.json").read_text())}
+    results = json.loads((folder / "covers.json").read_text())
+    params = Registry.load(None).resolve()
+
+    def again(r: dict[str, Any]) -> dict[str, Any]:
+        if not r.get("model_id"):
+            return r
+        row = rows[r["code"]]
+        picture = folder / "pictures" / (Path(row["file"]).stem + ".png")
+        check = compare(row, Path("models") / r["model_id"], r["sizes"], picture, params)
+        unsure = r.get("detail", "").startswith("sizes not written")
+        status = "built, check sizes" if unsure else "built"
+        detail = [d for d in r.get("detail", "").split(" | ") if d.startswith("sizes not")]
+        if check["matches"] is False:
+            status = "built, AI sees differences"
+            detail += check["differences"]
+        return {**r, "status": status, "detail": " | ".join(detail), "comparison": check}
+
+    with ThreadPoolExecutor(4) as pool:
+        results = list(pool.map(again, results))
+    (folder / "covers.json").write_text(json.dumps(results, indent=1) + "\n")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("folder", type=Path, help="the drawings analysis (drawings.json)")
     ap.add_argument("--only", help="codes, comma separated")
-    ap.add_argument("--pdfs", type=Path, required=True, help="the folder with the PDF drawings")
+    ap.add_argument("--pdfs", type=Path, help="the folder with the PDF drawings")
     ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--compare-only", action="store_true", help="only compare again")
     args = ap.parse_args()
+    if args.compare_only:
+        recompare(args.folder)
+        return 0
     rows = json.loads((args.folder / "drawings.json").read_text())
     for r in rows:
         r["source_pdf"] = str(args.pdfs / r["file"])

@@ -1,0 +1,4 @@
+{
+  "_about": "Sizes the owner confirmed per drawing (ADR-046); they win over the AI's reading. Keys are the codes in the file names.",
+  "C6": {"sizes": {"x_back_strip_cm": 30, "y_back_strip_cm": 30}, "by": "owner, 1 Oct 2026"}
+}

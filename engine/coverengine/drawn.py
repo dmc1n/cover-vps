@@ -127,8 +127,18 @@ def _profile(p: dict[str, Any], depth: float) -> list[tuple[float, float]]:
 
 
 def sloped_box(p: dict[str, Any], roll: float = math.inf) -> list[Piece]:
+    """The ends upright, or leaning in (top_length_cm shorter than length_cm: the front view
+    narrower at the top, as in the owner's D1); a leaning end is one flat face through its
+    bottom edge and the back top corner."""
     x, y = _cm(p, "length_cm"), _cm(p, "depth_cm")
     prof = _profile(p, y)
+    hb = prof[1][1]
+    lean = max(0.0, (x - _cm(p, "top_length_cm", x / MM)) / 2)
+
+    def at(side: int, yy: float, zz: float) -> tuple[float, float, float]:
+        d = lean * zz / hb  # how far the end has come in at this height
+        return (d, yy, zz) if side == 0 else (x - d, yy, zz)
+
     top = prof[1:-1]  # along the top: back edge ... front edge
     names = []
     if _cm(p, "back_strip_cm", 0.0) > 0:
@@ -138,14 +148,14 @@ def sloped_box(p: dict[str, Any], roll: float = math.inf) -> list[Piece]:
         names.append("top-front strip")
     pieces = []
     for name, (a, b) in zip(names, zip(top[:-1], top[1:], strict=True), strict=True):
-        quad = [(0, a[0], a[1]), (x, a[0], a[1]), (x, b[0], b[1]), (0, b[0], b[1])]
+        quad = [at(0, *a), at(1, *a), at(1, *b), at(0, *b)]
         pieces += _bands(name, quad, roll)
-    hb, hf = prof[1][1], prof[-2][1]
+    hf = prof[-2][1]
     pieces += [
-        Piece("back", [[(0, 0, 0), (x, 0, 0), (x, 0, hb), (0, 0, hb)]]),
-        Piece("front", [[(0, y, 0), (0, y, hf), (x, y, hf), (x, y, 0)]]),
-        Piece("left", [[(0, yy, zz) for yy, zz in prof]]),
-        Piece("right", [[(x, yy, zz) for yy, zz in reversed(prof)]]),
+        Piece("back", [[(0, 0, 0), (x, 0, 0), at(1, 0, hb), at(0, 0, hb)]]),
+        Piece("front", [[(0, y, 0), at(0, y, hf), at(1, y, hf), (x, y, 0)]]),
+        Piece("left", [[at(0, yy, zz) for yy, zz in prof]]),
+        Piece("right", [[at(1, yy, zz) for yy, zz in reversed(prof)]]),
     ]
     return pieces
 

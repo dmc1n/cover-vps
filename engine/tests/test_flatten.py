@@ -228,7 +228,9 @@ def test_size_drawing(covers: dict[str, Any], tmp_path: Path) -> None:
     b = write_drawing(root, doc, params(), tmp_path / "b.pdf")
     data = a.read_bytes()
     assert data.startswith(b"%PDF") and data == b.read_bytes()  # same input, same file
-    pages = data.count(b"/Type /Page") - data.count(b"/Type /Pages")
+    import pymupdf
+
+    pages = pymupdf.open(a).page_count
     assert pages == 2 + len(doc["panels"])  # drawing, sizes, one page per panel
 
 
