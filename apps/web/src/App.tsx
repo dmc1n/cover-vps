@@ -551,6 +551,7 @@ const FILE_HELP: Record<string, string> = {
   "model.glb": "the furniture (3D)",
   "hull.glb": "the cover surface (3D)",
   "preview.glb": "furniture and cover, water spots red (3D)",
+  "balloons.glb": "the balloons under a table cover (3D)",
   "panels.glb": "the panels in colour (3D)",
   "cover.json": "this model's own settings",
   "seams.json": "seams placed by hand",

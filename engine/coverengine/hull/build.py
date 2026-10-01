@@ -565,5 +565,47 @@ def write_hull(model_dir: Path, hull: Hull, out_dir: Path | None = None) -> Path
         spots.remove_unreferenced_vertices()
         spots.vertices = spots.vertices + spots.vertex_normals * WATER_LIFT_MM
         preview.append(("water", _coloured(spots, WATER_RGBA)))
+    balloons = balloon_meshes(model_dir, hull.report)
+    preview += [("balloon", _coloured(b, BALLOON_RGBA)) for b in balloons]
     (out / PREVIEW_GLB).write_bytes(glb_bytes(preview))
+    write_balloons(out, balloons)
     return out
+
+
+BALLOONS_GLB = "balloons.glb"
+BALLOON_RGBA = (235, 150, 40, 255)  # param-ok: display colour (orange)
+
+
+def balloon_meshes(model_dir: Path, report: dict[str, Any]) -> list[trimesh.Trimesh]:
+    """The balloons under a table cover, where the program put them, for the 3D view: each lies
+    on the highest part of the furniture under its footprint."""
+    sup = report.get("support") or {}
+    if sup.get("kind") != "balloons" or not sup.get("positions_mm"):
+        return []
+    shape_dir = model_dir.parent / str(sup.get("balloon_model"))
+    if not (shape_dir / "model.glb").is_file():
+        return []
+    b = load_model(shape_dir)
+    bv = np.asarray(b.vertices, np.float64)
+    bv = bv - np.array([(bv[:, 0].min() + bv[:, 0].max()) / 2,
+                        (bv[:, 1].min() + bv[:, 1].max()) / 2, bv[:, 2].min()])  # fmt: skip
+    half = (bv[:, :2].max(axis=0) - bv[:, :2].min(axis=0)) / 2
+    mv = np.asarray(load_model(model_dir).vertices, np.float64)
+    out = []
+    for x, y in sup["positions_mm"]:
+        under = (np.abs(mv[:, 0] - x) <= half[0]) & (np.abs(mv[:, 1] - y) <= half[1])
+        base = float(mv[under, 2].max()) if under.any() else float(mv[:, 2].max())
+        out.append(trimesh.Trimesh(bv + np.array([x, y, base]), b.faces, process=False))
+    return out
+
+
+def write_balloons(out: Path, balloons: list[trimesh.Trimesh]) -> None:
+    path = out / BALLOONS_GLB
+    if not balloons:
+        path.unlink(missing_ok=True)
+        return
+    path.write_bytes(
+        glb_bytes(
+            [(f"balloon-{i + 1}", _coloured(b, BALLOON_RGBA)) for i, b in enumerate(balloons)]
+        )
+    )
