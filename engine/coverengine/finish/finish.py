@@ -135,6 +135,28 @@ def vent_count(hem_mm: float, params: EffectiveParams) -> int:
     return max(int(params["features.vents_min"]), int(hem_mm / MM_PER_M * per_m))
 
 
+def _opening(base: Array, t: Array, up: Array, w: float, h: float) -> Array:
+    """A vent opening w wide and h high, its bottom edge centred on `base`."""
+    return np.array([base - t * w / 2, base + t * w / 2, base + t * w / 2 + up * h,
+                     base - t * w / 2 + up * h])  # fmt: skip
+
+
+def _fits(poly: Any, rect: Array, allowance: float) -> bool:
+    return bool(poly.contains(shapely.Polygon(rect).buffer(allowance, join_style="mitre")))
+
+
+def _height_at(poly: Any, centre: Array, t: Array, up: Array, width: float) -> float:
+    """How high the piece is above its hem at `centre`, the least over `width` along it."""
+    reach = float(np.ptp(np.asarray(poly.exterior.coords), axis=0).max()) * 2
+    out = math.inf
+    for f in (-0.5, 0.0, 0.5):  # param-ok: both ends and the middle of the vent
+        p = centre + t * width * f
+        line = shapely.LineString([p - up * reach * 0.01, p + up * reach])  # param-ok: start
+        cut = poly.intersection(line)  # just below the hem line
+        out = min(out, float(cut.length) if not cut.is_empty else 0.0)
+    return out
+
+
 def side_of(panel: str) -> str:
     """The side of the cover a skirt piece is on: skirt-front-2 -> skirt-front."""
     return re.sub(r"-\d+$", "", panel)
@@ -273,24 +295,30 @@ def place_vents(
                     centre, t = _point_along(r.points, local)
                     up = np.array([-t[1], t[0]])  # into the panel (counter-clockwise outline)
                     base = centre + up * above
-                    room_h = height.get(r.panel, 0.0) - above - allowance
-                    h = min(full_h, math.floor(room_h / MM_PER_CM) * MM_PER_CM)  # whole cm
-                    rect = np.array(
-                        [
-                            base - t * w / 2,
-                            base + t * w / 2,
-                            base + t * w / 2 + up * h,
-                            base - t * w / 2 + up * h,
-                        ]
-                    )
                     poly = shapely.Polygon(np.asarray(by_name[r.panel]["outline_mm"]))
-                    room = shapely.Polygon(rect).buffer(allowance, join_style="mitre")
-                    if not poly.contains(room):
+                    # the height of the piece where the vent goes (a sloping piece is lower at
+                    # one end), over the vent's whole width
+                    local = _height_at(poly, centre, t, up, w)
+                    room_h = local - above - allowance
+                    h = min(full_h, math.floor(room_h / MM_PER_CM) * MM_PER_CM)  # whole cm
+                    if h < _p(params, "features.vent_min_height_mm"):
                         warnings.append(
-                            f"air vent {k} does not fit in {r.panel}: the skirt is lower than "
-                            f"{(above + h + allowance) / MM_PER_CM:.1f} cm (vent "
-                            f"{above / MM_PER_CM:g} cm above the hem, {h / MM_PER_CM:g} cm high, "
-                            "plus the seam allowance)"
+                            f"no air vent {k} on {r.panel}: only {local / MM_PER_CM:.1f} cm high "
+                            "there"
+                        )
+                        break
+                    least_h = _p(params, "features.vent_min_height_mm")
+
+                    # a curved or sloping piece: lower the opening a cm at a time until it fits
+                    rect = _opening(base, t, up, w, h)
+                    while not _fits(poly, rect, allowance) and h - MM_PER_CM >= least_h:
+                        h -= MM_PER_CM
+                        rect = _opening(base, t, up, w, h)
+                    if not _fits(poly, rect, allowance):
+                        warnings.append(
+                            f"air vent {k} does not fit in {r.panel}, even "
+                            f"{least_h / MM_PER_CM:g} cm high: the piece is too low or too "
+                            "curved there"
                         )
                     out.setdefault(r.panel, []).append(rect)
                     break

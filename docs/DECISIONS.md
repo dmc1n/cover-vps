@@ -765,5 +765,6 @@ Status: accepted, 1 Oct 2026 (owner).
   the width. Palermo 240 (114 cm wide): cover 182 cm wide, 3 balloons, 5 + 1 pieces.
 - Air vents (question 29): one per metre of hem, at least one on each side. A side too low for
   the full opening gets a lower one, same 25 cm width, whole cm, at least 10 cm
-  (`features.vent_min_height_mm`); the plastic insert, hood and membrane stay the same size. A
+  (`features.vent_min_height_mm`), measured where the vent goes and lowered a cm at a time on
+  curved or sloping pieces; the plastic insert, hood and membrane stay the same size. A
   side lower than 16.5 cm gets none, with a warning. Kota front (22.4 cm): 25 × 15 cm.
