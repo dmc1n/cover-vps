@@ -742,3 +742,11 @@ DeepSeek").
   checks, and gives its verdict (good / doubt / wrong) and where it disagrees with the program.
   The oblique cover.png misled it (it called the symmetric daybed asymmetric), hence the
   straight views. On the old Basta both found the legs; on the fixed daybed both said good.
+
+## ADR-043 — The owner's drawings as the reference for cover shapes
+
+Status: accepted, 1 Oct 2026. 115 drawings of earlier covers, read by `scripts/drawings.py`
+(texts by the program, pictures by the AI; `out/drawings/covers-and-all/`). They confirm the box
+cover for sloped and plain boxes, and show two shapes the program lacks: L shapes (39 of 115, a
+sloped box along each arm with a 45° seam at the corner) and round tables (a disc and a band).
+Both are the next engine work. Report: `docs/reports/DRAWINGS-2026-10-01.md`.

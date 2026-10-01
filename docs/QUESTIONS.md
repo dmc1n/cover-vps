@@ -114,3 +114,12 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     cover?
 27. *Answered: every table gets at least one balloon.* **Round and square tables:** always one balloon in the middle for small tables (up to which
     size)?
+
+## From the owner's 115 drawings (new, 1 October; docs/reports/DRAWINGS-2026-10-01.md)
+
+28. **Bottom band on box covers:** your drawings have a separate band at the bottom (17 to 20
+    cm). Should the box covers get one too (one more piece, a straight seam all round)?
+29. **Air pockets:** your drawings place about one per 170 cm, high on the cover; the rule you
+    gave on 30 September is one per metre, 5 cm above the bottom edge. Which one is right now?
+30. **Round tables of 240 cm** (R1) are wider than the 150 cm roll: is the top disc made of
+    several pieces, or is that fabric on a wider roll?
