@@ -19,6 +19,7 @@ PatternSet (`finished.json`, FORMATS.md). Rules (ADR-030):
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -134,6 +135,28 @@ def vent_count(hem_mm: float, params: EffectiveParams) -> int:
     return max(int(params["features.vents_min"]), int(hem_mm / MM_PER_M * per_m))
 
 
+def side_of(panel: str) -> str:
+    """The side of the cover a skirt piece is on: skirt-front-2 -> skirt-front."""
+    return re.sub(r"-\d+$", "", panel)
+
+
+def per_side(count: int, lengths: dict[str, float]) -> dict[str, int]:
+    """`count` vents over the sides: at least one each, the rest in proportion to the length
+    (largest remainders first)."""
+    if not lengths:
+        return {}
+    total = sum(lengths.values()) or 1.0
+    ideal = {k: count * v / total for k, v in lengths.items()}
+    n = {k: max(1, int(x)) for k, x in ideal.items()}
+    while sum(n.values()) < count:
+        k = max(ideal, key=lambda q: ideal[q] - n[q])
+        n[k] += 1
+    while sum(n.values()) > count and any(v > 1 for v in n.values()):
+        k = min((q for q in n if n[q] > 1), key=lambda q: ideal[q] - n[q])
+        n[k] -= 1
+    return n
+
+
 @dataclass
 class HemRun:
     panel: str
@@ -208,49 +231,65 @@ def place_vents(
     out: dict[str, list[Array]] = {}
     if total <= 0:
         return out, warnings
-    count = vent_count(hem_total, params)
+    # one per metre of the whole hem, and at least one on every side (owner, 1 Oct 2026)
+    sides: dict[str, list[HemRun]] = {}
+    for r in runs:
+        sides.setdefault(side_of(r.panel), []).append(r)
+    low = sorted({side_of(r.panel) for r in _hem_runs(panels, order)} - set(sides))
+    for side in low:
+        warnings.append(
+            f"no air vent on the {side.removeprefix('skirt-') or 'skirt'}: the skirt there is "
+            f"lower than {need / MM_PER_CM:.1f} cm"
+        )
+    count = max(vent_count(hem_total, params), len(sides))
+    shares = per_side(count, {k: sum(r.length for r in v) for k, v in sides.items()})
     w = _p(params, "features.vent_width_mm")
     h = _p(params, "features.vent_height_mm")
     above = _p(params, "features.vent_above_hem_mm")
     clear = _p(params, "features.vent_seam_clearance_mm")
     allowance = _p(params, "stitching.allowance_mm")
     by_name = {p["name"]: p for p in panels}
-    for k in range(count):
-        s = (k + 0.5) * total / count  # param-ok: layout or units
-        acc = 0.0
-        for r in runs:
-            if s <= acc + r.length or r is runs[-1]:
-                local = s - acc
-                lo, hi = w / 2 + clear, r.length - w / 2 - clear
-                if hi < lo:
-                    warnings.append(
-                        f"no room for air vent {k + 1} on {r.panel} ({r.length:.0f} mm of hem)"
+    k = 0
+    for side, side_runs in sides.items():
+        side_total = sum(r.length for r in side_runs)
+        n = shares[side]
+        for j in range(n):
+            k += 1
+            s_at = (j + 0.5) * side_total / n  # param-ok: the middle of each share
+            acc = 0.0
+            for r in side_runs:
+                if s_at <= acc + r.length or r is side_runs[-1]:
+                    local = s_at - acc
+                    lo, hi = w / 2 + clear, r.length - w / 2 - clear
+                    if hi < lo:
+                        warnings.append(
+                            f"no room for air vent {k} on {r.panel} ({r.length:.0f} mm of hem)"
+                        )
+                        break
+                    local = float(np.clip(local, lo, hi))
+                    centre, t = _point_along(r.points, local)
+                    up = np.array([-t[1], t[0]])  # into the panel (counter-clockwise outline)
+                    base = centre + up * above
+                    rect = np.array(
+                        [
+                            base - t * w / 2,
+                            base + t * w / 2,
+                            base + t * w / 2 + up * h,
+                            base - t * w / 2 + up * h,
+                        ]
                     )
+                    poly = shapely.Polygon(np.asarray(by_name[r.panel]["outline_mm"]))
+                    room = shapely.Polygon(rect).buffer(allowance, join_style="mitre")
+                    if not poly.contains(room):
+                        warnings.append(
+                            f"air vent {k} does not fit in {r.panel}: the skirt is lower than "
+                            f"{(above + h + allowance) / MM_PER_CM:.1f} cm (vent "
+                            f"{above / MM_PER_CM:g} cm above the hem, {h / MM_PER_CM:g} cm high, "
+                            "plus the seam allowance)"
+                        )
+                    out.setdefault(r.panel, []).append(rect)
                     break
-                local = float(np.clip(local, lo, hi))
-                centre, t = _point_along(r.points, local)
-                up = np.array([-t[1], t[0]])  # into the panel (counter-clockwise outline)
-                base = centre + up * above
-                rect = np.array(
-                    [
-                        base - t * w / 2,
-                        base + t * w / 2,
-                        base + t * w / 2 + up * h,
-                        base - t * w / 2 + up * h,
-                    ]
-                )
-                poly = shapely.Polygon(np.asarray(by_name[r.panel]["outline_mm"]))
-                room = shapely.Polygon(rect).buffer(allowance, join_style="mitre")
-                if not poly.contains(room):
-                    warnings.append(
-                        f"air vent {k + 1} does not fit in {r.panel}: the skirt is lower than "
-                        f"{(above + h + allowance) / MM_PER_CM:.1f} cm (vent "
-                        f"{above / MM_PER_CM:g} cm above the hem, {h / MM_PER_CM:g} cm high, "
-                        "plus the seam allowance)"
-                    )
-                out.setdefault(r.panel, []).append(rect)
-                break
-            acc += r.length
+                acc += r.length
     return out, warnings
 
 

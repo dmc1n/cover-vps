@@ -112,7 +112,8 @@ features:                        # per-cover defaults, overridden per model
                                  # keeps dirt out
   vent_above_hem_mm: 50          # bottom edge of the vent above the lower end of the cover
   vents_per_metre: 1             # one vent per full metre of hem length, spread evenly
-  vents_min: 1                   # every cover has at least one vent
+  vents_min: 1                   # every cover has at least one vent, and every side of it too
+                                 # (owner, 1 Oct 2026: one per metre, at least one on each side)
   vent_seam_clearance_mm: 100    # to confirm; a vent keeps this far from a vertical seam
   vent_hood_depth_mm: 80         # to confirm; the hood piece is this much deeper than the vent
   handles: 0
