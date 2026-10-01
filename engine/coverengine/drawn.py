@@ -65,6 +65,23 @@ def scene(pieces: list[Piece]) -> trimesh.Scene:
     return sc
 
 
+def _bands(name: str, quad: Face, roll: float) -> list[Piece]:
+    """A top piece wider than the roll (from its back edge quad[0..1] to its front edge
+    quad[3..2]) split into bands along its length, seams parallel to the back."""
+    q = np.array(quad, dtype=np.float64)
+    width = float(np.linalg.norm((q[0] + q[1]) / 2 - (q[3] + q[2]) / 2))
+    n = max(1, math.ceil(width / roll))
+    if n == 1:
+        return [Piece(name, [quad])]
+    out = []
+    for k in range(n):
+        t0, t1 = k / n, (k + 1) / n
+        a0, b0 = q[0] + (q[3] - q[0]) * t0, q[1] + (q[2] - q[1]) * t0
+        a1, b1 = q[0] + (q[3] - q[0]) * t1, q[1] + (q[2] - q[1]) * t1
+        out.append(Piece(f"{name}-{k + 1}", [[tuple(a0), tuple(b0), tuple(b1), tuple(a1)]]))
+    return out
+
+
 def _cm(params: dict[str, Any], key: str, default: float | None = None) -> float:
     v = params.get(key, default)
     if v is None:
@@ -109,7 +126,7 @@ def _profile(p: dict[str, Any], depth: float) -> list[tuple[float, float]]:
     return pts
 
 
-def sloped_box(p: dict[str, Any]) -> list[Piece]:
+def sloped_box(p: dict[str, Any], roll: float = math.inf) -> list[Piece]:
     x, y = _cm(p, "length_cm"), _cm(p, "depth_cm")
     prof = _profile(p, y)
     top = prof[1:-1]  # along the top: back edge ... front edge
@@ -121,8 +138,8 @@ def sloped_box(p: dict[str, Any]) -> list[Piece]:
         names.append("top-front strip")
     pieces = []
     for name, (a, b) in zip(names, zip(top[:-1], top[1:], strict=True), strict=True):
-        pieces.append(Piece(name, [[(0, a[0], a[1]), (x, a[0], a[1]), (x, b[0], b[1]),
-                                    (0, b[0], b[1])]]))  # fmt: skip
+        quad = [(0, a[0], a[1]), (x, a[0], a[1]), (x, b[0], b[1]), (0, b[0], b[1])]
+        pieces += _bands(name, quad, roll)
     hb, hf = prof[1][1], prof[-2][1]
     pieces += [
         Piece("back", [[(0, 0, 0), (x, 0, 0), (x, 0, hb), (0, 0, hb)]]),
@@ -133,7 +150,7 @@ def sloped_box(p: dict[str, Any]) -> list[Piece]:
     return pieces
 
 
-def l_shape(p: dict[str, Any]) -> list[Piece]:
+def l_shape(p: dict[str, Any], roll: float = math.inf) -> list[Piece]:
     """Arm A along x (outside length X, depth dA), arm B along y (outside length Y, depth dB),
     the outside corner at the origin; back strips sA, sB; back height hb, front height hf."""
     X, Y = _cm(p, "x_length_cm"), _cm(p, "y_length_cm")
@@ -155,9 +172,9 @@ def l_shape(p: dict[str, Any]) -> list[Piece]:
             x_strip = [(0, 0, hb), (X, 0, hb), (X, sA, hb), (sB, sA, hb)]
             y_strip = [(0, 0, hb), (sB, sA, hb), (sB, Y, hb), (0, Y, hb)]
         pieces += [Piece("top-x strip", [x_strip]), Piece("top-y strip", [y_strip])]
+    pieces += _bands("top-x slope", [(sB, sA, hb), (X, sA, hb), (X, dA, hf), (dB, dA, hf)], roll)
+    pieces += _bands("top-y slope", [(sB, Y, hb), (sB, sA, hb), (dB, dA, hf), (dB, Y, hf)], roll)
     pieces += [
-        Piece("top-x slope", [[(sB, sA, hb), (X, sA, hb), (X, dA, hf), (dB, dA, hf)]]),
-        Piece("top-y slope", [[(sB, sA, hb), (dB, dA, hf), (dB, Y, hf), (sB, Y, hb)]]),
         Piece("back-x", [[(0, 0, 0), (X, 0, 0), (X, 0, hb), (0, 0, hb)]]),
         Piece("back-y", [[(0, 0, 0), (0, 0, hb), (0, Y, hb), (0, Y, 0)]]),
         Piece("front-x", [[(dB, dA, 0), (dB, dA, hf), (X, dA, hf), (X, dA, 0)]]),
@@ -213,9 +230,9 @@ def build(shape: str, params: dict[str, Any], roll_mm: float) -> list[Piece]:
     if shape == "box":
         return box(params, roll_mm)
     if shape == "sloped box":
-        return sloped_box(params)
+        return sloped_box(params, roll_mm)
     if shape == "L shape":
-        return l_shape(params)
+        return l_shape(params, roll_mm)
     if shape == "round":
         return round_cover(params, roll_mm)
     raise CoverError(f"no generator for the shape {shape!r} yet")

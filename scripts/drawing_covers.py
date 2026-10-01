@@ -124,7 +124,10 @@ def one(row: dict[str, Any], pictures: Path, params: Any, models: Path) -> dict[
     out["size_check"] = checked
     unsure = sorted({k for k, v in checked.items() if v == "not written"} | set(out["measured"]))
     try:
-        model = make(code, shape, sizes, models, note=out.get("notes", ""))
+        text = " ".join(row["text"].lower().split())
+        middle = "drawstring in the middle" in text or "drawcord in the middle" in text
+        out["middle_cord"] = middle
+        model = make(code, shape, sizes, models, note=out.get("notes", ""), middle_cord=middle)
     except BaseException as exc:  # noqa: BLE001 - one drawing must not stop the rest
         return {**out, "status": "failed", "detail": str(exc) or traceback.format_exc()[-300:]}
     import shutil

@@ -152,3 +152,16 @@ def test_a_short_side_still_gets_its_vent() -> None:
     d["panels"][0]["outline_mm"] = [[0, 0], [260, 0], [260, 400], [0, 400]]
     vents, warnings = place_vents(d["panels"], params())
     assert not vents and any("a vent needs 28 cm" in w for w in warnings)
+
+
+def test_table_covers_get_a_middle_cord_line_and_every_hood_a_logo() -> None:
+    """Owner, 1 Oct 2026: two drawcords on table covers; a logo on every air vent."""
+    d = doc(square("skirt-front", 1200, ["hem", "seam", "seam", "seam"], [False] * 4))
+    d["panels"][0]["outline_mm"] = [[0, 0], [1200, 0], [1200, 870], [0, 870]]
+    pieces, _ = finish(d, params(**{"features.middle_cord": True}))
+    side = next(p for p in pieces if p.name == "skirt-front")
+    assert any("MIDDLE CORD 43.5 CM UP" in t for t, _, _ in side.pen_text)
+    level = [ln for ln in side.pen_lines if len(ln) >= 2 and np.allclose(ln[:, 1], 435)]
+    assert level  # halfway up, level
+    hood = next(p for p in pieces if p.name == "vent-hood")
+    assert any(t == "LOGO" for t, _, _ in hood.pen_text)

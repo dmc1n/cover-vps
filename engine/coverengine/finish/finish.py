@@ -338,8 +338,35 @@ def _vent_pieces(count: int, params: EffectiveParams, start: int) -> list[Piece]
             note=note,
         )
 
+    def with_logo(piece: Piece, width: float, height: float) -> Piece:
+        """Every air vent carries the logo (owner, 1 Oct 2026): its place on the hood, in pen."""
+        lw, lh = (
+            _p(params, "features.vent_logo_width_mm"),
+            _p(params, "features.vent_logo_height_mm"),
+        )
+        cx, cy = width / 2, height - a - depth / 2 - lh / 2  # on the front of the hood
+        box = np.array([[cx - lw / 2, cy], [cx + lw / 2, cy], [cx + lw / 2, cy + lh],
+                        [cx - lw / 2, cy + lh], [cx - lw / 2, cy]])  # fmt: skip
+        piece.pen_lines.append(box)
+        piece.pen_text.append(("LOGO", np.array([cx, cy + lh / 2]), label * 0.8))
+        piece.pen_text[0] = (piece.pen_text[0][0], np.array([width / 2, a + label]), label)
+        piece.note += "; the logo in the frame marked LOGO"
+        return piece
+
     return [
-        rect(
+        with_logo(
+            rect(
+                "vent-hood",
+                start,
+                w + 2 * a,
+                h + depth + a,
+                "vent hood, holds the plastic insert (to confirm)",
+            ),
+            w + 2 * a,
+            h + depth + a,
+        )
+        if params["features.vent_logo"]
+        else rect(
             "vent-hood",
             start,
             w + 2 * a,
@@ -417,12 +444,48 @@ def finish(doc: dict[str, Any], params: EffectiveParams) -> tuple[list[Piece], l
             piece.pen_lines.append(np.asarray(ring.exterior.coords, dtype=np.float64))
         pieces.append(piece)
     _cord_exits(pieces, panels, params)
+    if params["features.middle_cord"]:
+        warnings += _middle_cord(pieces, panels, params)
     total_vents = sum(len(v) for v in vents.values())
     pieces += _vent_pieces(total_vents, params, len(panels) + 1)
     for pc in pieces:
         if not shapely.Polygon(pc.cut).is_valid:
             warnings.append(f"piece {pc.name}: the cut outline crosses itself")
     return pieces, warnings
+
+
+def _middle_cord(
+    pieces: list[Piece], panels: list[dict[str, Any]], params: EffectiveParams
+) -> list[str]:
+    """Table covers (owner, 1 Oct 2026): a second drawcord halfway up the cover, all round. A
+    pen line on every side piece, the same height above the hem everywhere, where the channel
+    is stitched in."""
+    label = _p(params, "pen.label_height_mm")
+    sides = [p for p in panels if p["name"].startswith("skirt")]
+    heights = [float(np.ptp(np.asarray(p["outline_mm"])[:, 1])) for p in sides]
+    if not heights:
+        return ["no side pieces for the middle drawcord"]
+    up = min(heights) / 2  # halfway up the lowest side, level all round
+    by_name = {pc.name: pc for pc in pieces}
+    for p in sides:
+        outline = np.asarray(p["outline_mm"], dtype=np.float64)
+        poly = shapely.Polygon(outline)
+        for e in p["edges"]:
+            if e["kind"] != "hem":
+                continue
+            pts = outline[edge_indices(len(outline), e["range"])]
+            line = inward_line(pts, poly, up)
+            if line is None:
+                continue
+            clipped = poly.intersection(shapely.LineString(line))
+            for g in getattr(clipped, "geoms", [clipped]):
+                if g.length > 0:
+                    by_name[p["name"]].pen_lines.append(np.asarray(g.coords, dtype=np.float64))
+            mid = line[len(line) // 2]
+            by_name[p["name"]].pen_text.append(
+                (f"MIDDLE CORD {up / MM_PER_CM:.1f} CM UP", mid + [0.0, label], label * 0.6)
+            )
+    return []
 
 
 def _cord_exits(pieces: list[Piece], panels: list[dict[str, Any]], params: EffectiveParams) -> None:

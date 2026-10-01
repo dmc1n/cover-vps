@@ -4,3 +4,6 @@ hull:
   support: balloons              # owner, 1 Oct 2026: every table gets the workshop's balloons
                                  # under the cover (ADR-040), at least one; the AI chooses how
                                  # many, a box cover round table and balloons
+features:
+  middle_cord: true              # owner, 1 Oct 2026: table covers have two drawcords, one in
+                                 # the middle of the cover and one at the bottom

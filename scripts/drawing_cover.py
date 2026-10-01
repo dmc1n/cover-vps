@@ -22,7 +22,9 @@ from coverengine.params import Registry
 STEPS = ("hull", "cut", "flatten", "export", "preview")
 
 
-def make(code: str, shape: str, sizes: dict, models: Path, note: str = "") -> Path:
+def make(
+    code: str, shape: str, sizes: dict, models: Path, note: str = "", middle_cord: bool = False
+) -> Path:
     params = Registry.load(None).resolve()
     roll = float(params["roll.usable_width_mm"]) - 2 * float(params["stitching.allowance_mm"])
     pieces = build(shape, sizes, roll)
@@ -33,6 +35,10 @@ def make(code: str, shape: str, sizes: dict, models: Path, note: str = "") -> Pa
     if cover(["import", str(src), "--out", str(model), "--units", "mm", "--up", "z"]):
         raise SystemExit(f"{code}: import failed")
     confirm(model, "cover")
+    if middle_cord:  # the drawing shows a drawstring in the middle of the cover
+        doc = json.loads((model / "cover.json").read_text())
+        doc.setdefault("parameters", {}).setdefault("features", {})["middle_cord"] = True
+        (model / "cover.json").write_text(json.dumps(doc, indent=2) + "\n")
     set_info(
         model,
         {

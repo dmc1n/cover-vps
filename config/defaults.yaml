@@ -111,7 +111,8 @@ welding:                         # used when construction.method is welded
   guide_line: true               # pen line on the under panel where the upper edge lands
 
 hem:
-  type: drawcord_channel         # to confirm: drawcord_channel | elastic_channel | plain
+  type: drawcord_channel         # drawcord_channel | elastic_channel | plain   every cover has a
+                                 # drawcord at the bottom to tighten it (owner, 1 Oct 2026)
   allowance_mm: 50               # to confirm
   cord_exits: 2
 
@@ -120,6 +121,12 @@ features:                        # per-cover defaults, overridden per model
   vent_width_mm: 250             # air vent opening (owner 2026-09-30): a hood of extra fabric
   vent_height_mm: 220            # holds a plastic insert that keeps it open; a membrane inside
                                  # keeps dirt out
+  vent_logo: true                # every air vent carries the logo (owner, 1 Oct 2026): a frame
+                                 # marked LOGO on the hood, in pen
+  vent_logo_width_mm: 120        # to confirm: the logo's size on the hood
+  vent_logo_height_mm: 40        # to confirm
+  middle_cord: false             # a second drawcord halfway up the cover (table covers, owner
+                                 # 1 Oct 2026; on in the table preset): a pen line on the sides
   vent_min_height_mm: 100        # a low side gets a lower opening (same width, same insert,
                                  # hood and membrane), not lower than this (owner, 1 Oct 2026)
   vent_above_hem_mm: 50          # bottom edge of the vent above the lower end of the cover
