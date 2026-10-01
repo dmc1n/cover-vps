@@ -3,6 +3,7 @@ import { api, cm, fileUrl, Job, Kind, ModelBrief, ModelDetail, Scalar, Step, STE
 import { AiAdvice } from "./AiAdvice";
 import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { Gallery } from "./Gallery";
+import { QuickSearch } from "./QuickSearch";
 import { Drawing, Learning } from "./Learning";
 import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
@@ -49,6 +50,7 @@ export function App() {
           Learning
         </a>
         {m && <span className="crumb">/ {m[1]}</span>}
+        <QuickSearch />
       </header>
       <main>{m ? <ModelPage id={m[1]} /> : hash.startsWith("#/catalogue") ? (
           <Gallery />
