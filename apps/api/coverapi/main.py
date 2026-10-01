@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 from coverapi.jobs import Jobs, JobSpec, store_upload
 from coverapi.plan import plan, save_seams
+from coverapi.references import register, unpack
 from coverapi.store import ALLOWED, MEDIA, STEPS, UPLOAD_SUFFIXES, Store, registry_specs
 
 
@@ -177,6 +178,56 @@ def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
         except CoverError as exc:
             raise HTTPException(400, str(exc)) from None
         return jobs.submit(JobSpec(model_id, steps, {}))
+
+    @app.post("/api/references")
+    async def upload_references(file: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008
+        """One zip of the owner's drawings with their 3D models, paired by name."""
+        import time
+
+        if not (file.filename or "").lower().endswith(".zip"):
+            raise HTTPException(400, "upload one .zip with pairs like 1.step + 1.pdf")
+        batch_id = time.strftime("%Y%m%d-%H%M%S")
+        target = store.uploads / f"{batch_id}.zip"
+        with target.open("wb") as out:  # streamed: the zip may be large
+            while chunk := await file.read(1 << 20):
+                out.write(chunk)
+        import zipfile
+
+        try:
+            batch = unpack(store, target, batch_id)
+        except zipfile.BadZipFile:
+            raise HTTPException(400, "this is not a readable zip file") from None
+        if not batch.pairs:
+            raise HTTPException(400, "no pairs found: name the files alike, e.g. 1.step and 1.pdf")
+        made = register(store, batch)
+        for m in made:
+            m["job"] = jobs.submit(JobSpec(m["model_id"], list(STEPS), {}, m["source"]))["id"]
+        doc = {"id": batch_id, "file": file.filename, "pairs": made, "unpaired": batch.unpaired}
+        import json as _json
+
+        (store.batches / f"{batch_id}.json").write_text(_json.dumps(doc, indent=2) + "\n")
+        return doc
+
+    @app.get("/api/references")
+    def references() -> list[dict[str, Any]]:
+        import json as _json
+
+        out = []
+        for path in sorted(store.batches.glob("*.json"), reverse=True):
+            doc = _json.loads(path.read_text())
+            for m in doc["pairs"]:
+                try:
+                    m["status"] = jobs.get(m["job"])["status"]
+                except KeyError:
+                    m["status"] = "unknown"
+            out.append(doc)
+        return out
+
+    @app.get("/api/models/{model_id}/sizes")
+    def sizes(model_id: str) -> list[dict[str, Any]]:
+        from coverapi.store import key_sizes
+
+        return key_sizes(model_or_404(model_id))
 
     @app.get("/api/families")
     def families() -> list[str]:

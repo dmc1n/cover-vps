@@ -9,6 +9,7 @@ dependencies = [
   "uvicorn",
   "python-multipart",
   "httpx",
+  "pymupdf",
 ]
 
 [project.scripts]

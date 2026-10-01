@@ -136,3 +136,41 @@ def test_improve_step(chair: dict[str, Any]) -> None:
     job = chair["app"].state.jobs.wait(r.json()["id"], RUN_TIMEOUT_S)
     assert job["status"] == "done", job
     assert "improve" in job["steps"][0]["log"]
+
+
+def test_reference_zip(chair: dict[str, Any], tmp_path: Path) -> None:
+    import io
+    import zipfile
+
+    from matplotlib.figure import Figure
+
+    fig = Figure(figsize=(4, 3))
+    fig.text(0.1, 0.5, "Skirt height [40.6cm] 16.0in")
+    pdf = io.BytesIO()
+    fig.savefig(pdf, format="pdf")
+    z = tmp_path / "covers.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.write(chair["root"] / "shapes" / "chair.stl", "drawings/1.stl")
+        zf.writestr("drawings/1.pdf", pdf.getvalue())
+        zf.writestr("2.pdf", pdf.getvalue())  # no 3D file: not used
+    c: TestClient = chair["client"]
+    with z.open("rb") as fh:
+        r = c.post("/api/references", files={"file": ("covers.zip", fh)})
+    assert r.status_code == 200, r.text
+    doc = r.json()
+    assert [p["name"] for p in doc["pairs"]] == ["1"] and doc["unpaired"] == ["2.pdf"]
+    model_id = doc["pairs"][0]["model_id"]
+    job = chair["app"].state.jobs.wait(doc["pairs"][0]["job"], RUN_TIMEOUT_S)
+    assert job["status"] == "done", job
+    ref = c.get(f"/api/models/{model_id}/files/reference.json").json()
+    assert 406.0 in ref["sizes_mm"] and ref["vector_paths"] >= 0
+    assert c.get(f"/api/models/{model_id}/files/reference.png").content[:4] == b"\x89PNG"
+    assert any(
+        s["label"].startswith("Total height") for s in c.get(f"/api/models/{model_id}/sizes").json()
+    )
+    listed = c.get("/api/references").json()
+    assert listed[0]["pairs"][0]["status"] == "done"
+    m = c.get(f"/api/models/{model_id}").json()
+    assert "reference" in m["tags"]
+    bad = c.post("/api/references", files={"file": ("x.zip", b"not a zip")})
+    assert bad.status_code == 400

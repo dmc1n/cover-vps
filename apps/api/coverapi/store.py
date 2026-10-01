@@ -33,6 +33,9 @@ EXTRA_FILES = [
     "product.jpg",
     "proposals.json",
     "ai_review.json",
+    "reference.pdf",
+    "reference.png",
+    "reference.json",
 ]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)
 MEDIA = {
@@ -68,8 +71,12 @@ class Store:
     def jobs(self) -> Path:
         return self.root / "jobs"
 
+    @property
+    def batches(self) -> Path:
+        return self.root / "batches"
+
     def ensure(self) -> None:
-        for d in (self.models, self.uploads, self.jobs):
+        for d in (self.models, self.uploads, self.jobs, self.batches):
             d.mkdir(parents=True, exist_ok=True)
 
     def model_dir(self, model_id: str) -> Path:
@@ -207,3 +214,22 @@ def registry_specs() -> list[dict[str, Any]]:
         }
         for s in registry.specs.values()
     ]
+
+
+def key_sizes(model_dir: Path) -> list[dict[str, Any]]:
+    """The calculated cover's main sizes (as on page 2 of sizes.pdf), for the comparison with
+    the owner's drawing."""
+    from coverengine.export.drawing import key_sizes as rows
+    from coverengine.export.drawing import load_cover, measure
+
+    pattern = model_dir / "pattern.json"
+    if not pattern.is_file():
+        return []
+    doc = json.loads(pattern.read_text(encoding="utf-8"))
+    cover = load_cover(model_dir, doc, resolve_model(model_dir))
+    out = []
+    for label, key in rows(cover):
+        value = measure(cover, key)
+        if value is not None:
+            out.append({"label": label, "mm": round(value, 1)})
+    return out

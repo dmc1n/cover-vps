@@ -105,3 +105,7 @@ header a.nav:hover { color: #fff; }
 .product .facts .ok { color: var(--ok); } .product .facts .bad { color: var(--bad); }
 .suggestion { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); }
 .suggestion button { flex: none; min-width: 80px; }
+.side { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 16px; margin-bottom: 16px; }
+.side figure { margin: 0; }
+.side img, .side .nopic { width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.side figcaption { font-size: 13px; color: var(--muted); margin-top: 4px; }

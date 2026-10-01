@@ -3,6 +3,7 @@ import { api, cm, fileUrl, Job, ModelBrief, ModelDetail, Scalar, Step, STEP_LABE
 import { AiAdvice } from "./AiAdvice";
 import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { Gallery } from "./Gallery";
+import { Drawing, Learning } from "./Learning";
 import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
 import { Viewer } from "./Viewer";
@@ -34,9 +35,18 @@ export function App() {
         <a href="#/catalogue" className="nav">
           Catalogue
         </a>
+        <a href="#/learning" className="nav">
+          Learning
+        </a>
         {m && <span className="crumb">/ {m[1]}</span>}
       </header>
-      <main>{m ? <ModelPage id={m[1]} /> : hash.startsWith("#/catalogue") ? <Gallery /> : <ModelList />}</main>
+      <main>{m ? <ModelPage id={m[1]} /> : hash.startsWith("#/catalogue") ? (
+          <Gallery />
+        ) : hash.startsWith("#/learning") ? (
+          <Learning />
+        ) : (
+          <ModelList />
+        )}</main>
     </div>
   );
 }
@@ -231,9 +241,10 @@ function Upload() {
   );
 }
 
-type Tab = "3d" | "seams" | "ai" | "patterns" | "sizes" | "cut" | "settings" | "revisions" | "files" | "log";
+type Tab = "3d" | "drawing" | "seams" | "ai" | "patterns" | "sizes" | "cut" | "settings" | "revisions" | "files" | "log";
 const TABS: [Tab, string][] = [
   ["3d", "3D"],
+  ["drawing", "Your drawing"],
   ["seams", "Seams"],
   ["ai", "AI advice"],
   ["patterns", "Patterns"],
@@ -344,6 +355,7 @@ function ModelPage({ id }: { id: string }) {
       <section className="tab">
         {tab === "3d" && <Viewer id={id} files={model.files} stamp={stamp} />}
         {tab === "seams" && <SeamEditor id={id} stamp={stamp} onJob={setJob} />}
+        {tab === "drawing" && <Drawing id={id} files={model.files} stamp={stamp} />}
         {tab === "ai" && <AiAdvice id={id} files={model.files} stamp={stamp} onJob={setJob} />}
         {tab === "patterns" && <Patterns model={model} stamp={stamp} />}
         {tab === "sizes" && <Pdf id={id} name="sizes.pdf" has={has("sizes.pdf")} stamp={stamp} />}

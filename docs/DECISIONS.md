@@ -630,3 +630,19 @@ Status: accepted, 1 Oct 2026 (owner: "first the AI integration, then the upload 
   from 30 to 4 pieces; the top in one piece then stretches 43 %, so the extra seams must come from
   the owner's drawings (the upload of drawing + model pairs, next).
 
+## ADR-037 — Learning from the owner's covers: drawing + model pairs
+
+Status: accepted, 1 Oct 2026 (owner: "an upload field so I can upload 1 zip, numbered like
+1.step 1.pdf").
+
+- One zip, pairs by name (`1.step` + `1.pdf`; any 3D format the import reads), folders ignored,
+  files without a partner listed. Each pair becomes `models/ref-<batch>-<name>/` (tags
+  `reference`, `batch-<id>`), calculated like any model, with `reference.pdf`, a picture of its
+  first page (`reference.png`) and what was read from it (`reference.json`: every word with its
+  place on the page, every size with its unit converted to mm, and the number of vector paths;
+  0 means a scan, which only an image-reading AI could interpret).
+- PDFs are read with PyMuPDF (AGPL; fine for this internal tool, listed in LICENSES.md).
+- Read correctly from the owner's Blocchi drawing: all eight sizes in cm.
+- Next: read the seam lines from the vector drawings, compare piece counts and sizes with the
+  calculation, and derive a seam layout per family from several pairs, with the AI comparing.
+
