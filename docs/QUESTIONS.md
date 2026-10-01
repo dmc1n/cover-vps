@@ -126,7 +126,7 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
 
 ## Chairs under table covers (new, 1 October)
 
-31. **Chair height for low dining tables** (68 to 70 cm, e.g. Basta low dining): how high do
+31. *Answered 1 Oct: the same as dining chairs, 87 cm; a low dining table gets the same cover as a dining table.* **Chair height for low dining tables** (68 to 70 cm, e.g. Basta low dining): how high do
     the chairs reach? *Meanwhile:* 85 cm.
 32. **Chair height for low bar tables** (95 to 101 cm, e.g. Basta low bar): how high? *Meanwhile:*
     110 cm.

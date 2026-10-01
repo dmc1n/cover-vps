@@ -44,7 +44,7 @@ hull:                            # the cover surface (drape hull)
   chair_room_mm: 330             # chair space beyond the table top on each long side (owner: a
                                  # 100 cm table gets a 166 cm cover)
   chair_height_dining_mm: 870    # cover height over dining tables of 74 to 77 cm (owner: as T1)
-  chair_height_low_dining_mm: 850  # TO CONFIRM: low dining chairs are lower (owner, 1 Oct)
+  chair_height_low_dining_mm: 870  # the same as dining (owner, 1 Oct 2026: same cover)
   chair_height_low_bar_mm: 1100  # TO CONFIRM: low bar chairs are higher (owner, 1 Oct)
   dining_table_min_mm: 740       # a table this high up to dining_table_max_mm is a dining table
   dining_table_max_mm: 770
