@@ -118,3 +118,13 @@ part of the furniture.
 - **water:** runs off, or where it would stay.
 
 Everything is also written to `hull.json` next to the model.
+
+## Box covers
+
+For furniture that is roughly a box (most sofas, chairs, tables, poufs), set
+`hull.top: box` (in the model's settings, or for a family in its preset). The cover is then the
+tightest box with flat faces round the furniture: every face is one piece that lies flat
+exactly, every seam is a straight edge. The program tries 5 to 10 pieces and the AI chooses how
+many (fewer pieces means more room between cover and furniture); `hull.box_pieces` fixes the
+number yourself. A flat top gets a slight slope (or a low gable on a table) so water runs off.
+

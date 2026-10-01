@@ -194,11 +194,21 @@ def place_vents(
     warnings: list[str] = []
     order = skirt_order(panels)
     runs = _hem_runs(panels, order)
+    # only on skirt pieces tall enough for a vent (a low front gives its vents to the sides)
+    need = (
+        _p(params, "features.vent_above_hem_mm")
+        + _p(params, "features.vent_height_mm")
+        + _p(params, "stitching.allowance_mm")
+    )
+    height = {p["name"]: float(np.ptp(np.asarray(p["outline_mm"])[:, 1])) for p in panels}
+    hem_total = sum(r.length for r in runs)  # the vent count: per metre of the whole hem
+    tall = [r for r in runs if height.get(r.panel, 0.0) >= need]
+    runs = tall or runs
     total = sum(r.length for r in runs)
     out: dict[str, list[Array]] = {}
     if total <= 0:
         return out, warnings
-    count = vent_count(total, params)
+    count = vent_count(hem_total, params)
     w = _p(params, "features.vent_width_mm")
     h = _p(params, "features.vent_height_mm")
     above = _p(params, "features.vent_above_hem_mm")

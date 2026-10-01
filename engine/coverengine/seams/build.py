@@ -64,7 +64,11 @@ TOP_REGION, SKIRT_REGION, WALL_REGION = 0, 1, 2
 SLIVER_SEAM_MM = 10.0  # param-ok: geometric tolerance
 # Roll-width splits per panel before giving up (each halves the width).
 MAX_ROLL_SPLITS = 4
-PROPOSALS_JSON = "proposals.json"  # proposed seams accepted by cover improve
+PROPOSALS_JSON = "proposals.json"
+# Box covers: faces with the same normal (to this many decimals) are one panel; faces with
+# |normal z| below BOX_UPRIGHT_NZ are upright (skirt, so the vents go there).
+BOX_NORMAL_DIGITS = 3
+BOX_UPRIGHT_NZ = 0.1  # param-ok: geometric rule  # proposed seams accepted by cover improve
 MM_PER_CM = 10.0  # param-ok: unit conversion
 # Smoothing a jittery wall seam in place: passes, and how far a face may turn (cosine).
 SMOOTH_PASSES = 30  # param-ok: iterations
@@ -165,6 +169,8 @@ def _cut_cover(
         raise CoverError(f"no cover surface at {hull_path} (run cover hull first)")
     hull = load_model(hull_path)
     hull = trimesh.Trimesh(hull.vertices, hull.faces, process=True)
+    if params["hull.top"] == "box":
+        return _box_cut(model_dir, hull, params)
     snap = _p(params, "seams.snap_mm")
     inset = _p(params, "seams.skirt_seam_inset_mm")
     line = auto.outline(hull)
@@ -319,6 +325,41 @@ def _cut_cover(
     result = _assemble(model_dir, cut, params, positions, line, top_lines, levels, warnings)
     result.report["skirt_height_mm"] = [round(h, 1) for h in heights]  # lowest, highest
     result.report["walls_tried"] = walls_tried
+    return result
+
+
+def _box_cut(model_dir: Path, hull: trimesh.Trimesh, params: EffectiveParams) -> Cut:
+    """A box cover: every flat face is one panel and every box edge a seam (ADR-038)."""
+    normals = np.round(np.asarray(hull.face_normals), BOX_NORMAL_DIGITS)
+    _, label = np.unique(normals, axis=0, return_inverse=True)
+    label = label.ravel().astype(np.int64)
+    upright = np.abs(np.asarray(hull.face_normals)[:, 2]) < BOX_UPRIGHT_NZ
+    region = np.where(upright, SKIRT_REGION, TOP_REGION).astype(np.int64)
+    pairs = np.asarray(hull.face_adjacency)
+    shared = np.sort(np.asarray(hull.face_adjacency_edges), axis=1)
+    seams: dict[tuple[int, int], Seam] = {}
+    for (a, b), e in zip(pairs.tolist(), shared.tolist(), strict=True):
+        la, lb = int(label[a]), int(label[b])
+        if la == lb:
+            continue
+        key = (min(la, lb), max(la, lb))
+        if key not in seams:
+            ra, rb = int(region[a]), int(region[b])
+            kind = "corner" if ra == rb == SKIRT_REGION else "skirt" if ra != rb else "top"
+            seams[key] = Seam(
+                f"box-{key[0]}-{key[1]}",
+                kind,
+                field=lambda p: np.zeros(len(p)),
+                faces=lambda c: np.zeros(len(c.mesh.faces), dtype=bool),
+            )
+        seams[key].edges.add((int(e[0]), int(e[1])))
+        seams[key].vertices.update(e)
+    cut = CutMesh(hull, list(seams.values()), region)
+    line = auto.outline(hull)
+    result = _assemble(model_dir, cut, params, [], line, [], [], [])
+    result.report["skirt_height_mm"] = None
+    result.report["walls_tried"] = False
+    result.report["box"] = True
     return result
 
 

@@ -646,3 +646,23 @@ Status: accepted, 1 Oct 2026 (owner: "an upload field so I can upload 1 zip, num
 - Next: read the seam lines from the vector drawings, compare piece counts and sizes with the
   calculation, and derive a seam layout per family from several pairs, with the AI comparing.
 
+## ADR-038 — Box covers: the tightest box with N flat faces, N chosen by the AI
+
+Status: accepted, 1 Oct 2026 (owner: "the box needs to be more boxy, so we don't make so many
+strange panels"; "we need AI input to have not so many panels").
+
+- `hull.top: box`: the cover surface is the tightest convex box with flat faces round the
+  furniture down to the hem, `hull.clearance_mm` clear. It starts as the smallest rectangle seen
+  from above with a top, and gains one face at a time: each time the cut that removes the most
+  empty volume. Every face is one panel (exactly flat: 0 % stretch, matching seams) and every
+  seam a straight box edge.
+- How many faces: `hull.box_pieces`, or (0) the AI chooses from the options (pieces, typical
+  room, room within which 95 % of the cover lies, extra volume), or without AI the fewest pieces
+  within `hull.box_volume_slack_pct` of the tightest box. Kota 2-seater: 6 pieces 41 mm typical
+  room / 10 % extra volume, 7 pieces 24 mm / 7 %; more barely helps; the AI chose 7.
+- Water: a face flatter than `hull.min_slope_deg` is tilted outward; a flat face over the middle
+  (a table top) becomes a low gable of two faces.
+- Vents go on the skirt pieces tall enough for them; their number still follows the whole hem.
+- A box spans bays seen from above (an L sofa, the Blocchi's curve): a warning says so; those
+  keep the tensioned cover.
+

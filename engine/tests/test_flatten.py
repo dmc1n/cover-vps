@@ -358,3 +358,25 @@ def test_ai_review_and_actions(covers: dict[str, Any], tmp_path: Path) -> None:
         ai.apply_action(d, "set_skirt_height", 20.0)
     applied = json.loads((d / "ai_review.json").read_text())["applied"]
     assert [a["action"] for a in applied] == ["skirt_one_piece", "drop_program_seams"]
+
+
+@pytest.mark.parametrize("name", ["box_with_legs", "chair", "slatted_table"])
+def test_box_cover(covers: dict[str, Any], tmp_path: Path, name: str) -> None:
+    """A box cover: few flat pieces, no stretch, seams that match, water runs off."""
+    d = tmp_path / name
+    shutil.copytree(covers["root"] / name, d)
+    (d / "cover.json").write_text(json.dumps({"parameters": {"hull": {"top": "box"}}}))
+    rule = ["--set", "ai.provider=none"]
+    for step in ("hull", "cut", "flatten", "export"):
+        assert main([step, str(d), *rule]) == 0, step
+    hull = json.loads((d / "hull.json").read_text())
+    assert hull["box"]["chosen_by"] == "rule" and 5 <= hull["box"]["chosen"] <= 10
+    doc = json.loads((d / "pattern.json").read_text())
+    assert len(doc["panels"]) <= 11  # at most one more than chosen (a gable for water)
+    for p in doc["panels"]:
+        assert p["stretch"]["quantile_pct"] < 0.1, p["name"]  # flat faces lie flat exactly
+        for e in p["edges"]:
+            if e["kind"] == "seam":
+                assert e["ease_mm"] < 1.0, (p["name"], e["seam"])
+    mesh = trimesh.load(d / "hull.glb", force="mesh")
+    assert mesh.face_normals[:, 1].max() < 0.999  # no flat top: in glTF y is up

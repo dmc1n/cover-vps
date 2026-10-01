@@ -141,6 +141,8 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
         )
     model = load_model(model_dir)
     model_v, model_f = masks.apply(model.vertices, model.faces, masks.load_masks(model_dir))
+    if params["hull.top"] == "box":
+        return _box(model_dir, model_v, model_f, params)
     c = _p(params, "hull.clearance_mm")
     bridge_r = _p(params, "hull.bridge_gap_mm") / 2
     hem = _p(params, "hull.hem_height_mm")
@@ -275,6 +277,62 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
         "warnings": warnings,
     }
     return Hull(mesh, report, warnings, _water_faces(mesh, water, hm.x0, hm.y0, h))
+
+
+def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hull:
+    """A box cover: the tightest box with flat faces (hull/box.py)."""
+    from coverengine.hull.box import box_hull
+    from coverengine.params.registry import read_cover_definition
+
+    hem = _p(params, "hull.hem_height_mm")
+    model = trimesh.Trimesh(v, f, process=False)
+    points = np.asarray(v)[np.asarray(v)[:, 2] > hem]
+    product = (read_cover_definition(model_dir).get("notes") or model_dir.name).split(": ")[-1]
+    mesh, box, warnings = box_hull(points, model, params, product)
+    edges = mesh.edges_sorted
+    hem_edges = edges[group_rows(edges, require_count=1)]
+    hem_len = float(
+        np.linalg.norm(
+            mesh.vertices[hem_edges[:, 0]] - mesh.vertices[hem_edges[:, 1]], axis=1
+        ).sum()
+    )
+    import igl
+
+    d2, _, _ = igl.point_mesh_squared_distance(
+        np.asarray(mesh.vertices, np.float64), np.asarray(v, np.float64), np.asarray(f, np.int32)
+    )
+    report = {
+        "format_version": FORMAT_VERSION,
+        "engine_version": __version__,
+        "model_id": read_model_json(model_dir)["id"],
+        "model_sha256": read_model_json(model_dir)["source"]["sha256"],
+        "top": "box",
+        "box": box,
+        "area_m2": round(float(mesh.area) / 1e6, 6),
+        "bbox_mm": [
+            [round(float(x), 3) for x in mesh.bounds[0]],
+            [round(float(x), 3) for x in mesh.bounds[1]],
+        ],
+        "hem": {"height_mm": hem, "length_mm": round(hem_len, 3)},
+        "distance_to_model_mm": {
+            "clearance": _p(params, "hull.clearance_mm"),
+            "min": round(float(np.sqrt(d2.min())), 3),
+        },
+        "drainage": {
+            "drains": True,
+            "flat_area_mm2": 0.0,
+            "hollow_area_mm2": 0.0,
+            "worst_location_mm": None,
+        },
+        "support": None,
+        "mesh": {"triangles": len(mesh.faces), "vertices": len(mesh.vertices)},
+        "parameters": {k: params[k] for k in params.keys() if k.startswith("hull.")},
+        "parameter_sources": {k: params.source(k) for k in params.keys() if k.startswith("hull.")},
+        "parameter_hash": params.hash(),
+        "ridges": {"angle_deg": _p(params, "seams.ridge_angle_deg"), "chains": 0, "length_mm": 0.0},
+        "warnings": warnings,
+    }
+    return Hull(mesh, report, warnings)
 
 
 def _water_faces(
