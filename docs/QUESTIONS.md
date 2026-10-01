@@ -138,3 +138,26 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     **Short sides:** a 34 cm side has no room for a vent with 10 cm from each seam.
 28. *Answered 1 Oct: the band at the bottom is the strap or rope round the edge that the
     customer tightens.* See the follow-up in the reply: does the hem channel do the same?
+
+## For the morning of 2 October (collected overnight)
+
+36. **Logo on the air vents:** how big is the logo, and where on the hood? *Meanwhile:* a pen
+    frame of 12 × 4 cm marked LOGO in the middle of the hood's front.
+37. **Mirrored drawings** (L1 & L5, L2 & L6, …): one file stands for a cover and its mirror
+    image. Should the program make the mirrored cover as a second model with its own cut file?
+38. **The 3D files of your drawings:** the drawings were made in a CAD program. Do you still have
+    the 3D files (STEP)? Then every cover can be taken over exactly, including the 17 curved and
+    special ones the program cannot rebuild from the views (S24, S44, C26, …).
+39. **Mail server:** for invitations, password links, approval requests and alerts we need an
+    SMTP account (server, port, user name, password, sender address, for example
+    noreply@s2dio.industries). Enter it on the admin page (Mail and address) or send it to me.
+40. **Backup outside the server:** the nightly backup is on the same disk as the data. Where
+    should a second copy go (a Hetzner Storage Box, Cloudflare R2, your own NAS)?
+41. **SSH keys:** everyone, also root, logs in to the server with a password. Make an SSH key
+    for each of you (I explain how) so passwords and root login can be switched off.
+42. **Reboot:** a new kernel waits; the server needs one reboot (about a minute; the app and
+    https start by themselves). When suits you?
+43. **The other users** (Rens, Patrick, Ed, Marcel, Jeffery, Kevin, Willard): e-mail addresses,
+    role (viewer, editor, admin), and who may approve.
+44. **Releases:** from tomorrow every version that goes live gets a number (v1.0, v1.1, …) and
+    going back is one command (docs/handbook/server.md). Agree?
