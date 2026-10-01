@@ -44,7 +44,8 @@ def _round(xy: Array) -> bool:
     if abs(size[0] - size[1]) > ROUND_ASPECT * size.max():
         return False
     area = float(ConvexHull(xy).volume)
-    return bool(area >= ROUND_FILL * np.pi * (size.max() / 2) ** 2)
+    circle = np.pi * (size.max() / 2) ** 2  # a square of the same width is 1.27 times this
+    return bool(ROUND_FILL * circle <= area <= circle / ROUND_FILL)
 
 
 def kind(model_dir: Path, height_mm: float, params: EffectiveParams) -> str:

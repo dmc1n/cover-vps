@@ -333,8 +333,29 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
     report = _plain_report(model_dir, mesh, v, f, params, "box", warnings)
     report["box"] = box
     report["support"] = held
+    # the AI decides once: its choice is kept in the model's cover.json, so the next run gives
+    # the same cover (rule 10; the Kota went from 7 to 6 pieces between two runs)
+    keep = {}
+    if box.get("chosen_by") == "ai":
+        keep["box_pieces"] = int(box["chosen"])
+    if held and held.get("chosen_by") == "ai":
+        keep["balloon_count"] = int(held["balloons"])
+    if keep:
+        _remember(model_dir, keep)
     report["chairs"] = seated
     return Hull(mesh, report, warnings)
+
+
+def _remember(model_dir: Path, hull_values: dict[str, Any]) -> None:
+    """Write hull settings into the model's cover.json (only those not set there yet)."""
+    path = model_dir / "cover.json"
+    doc: dict[str, Any] = (
+        json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"format_version": 1}
+    )
+    hull: dict[str, Any] = doc.setdefault("parameters", {}).setdefault("hull", {})
+    for key, value in hull_values.items():
+        hull.setdefault(key, value)
+    path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
 
 
 def _given(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hull:

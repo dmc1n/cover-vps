@@ -188,6 +188,10 @@ def drain(box: Box, planes: list[Array], min_slope_deg: float) -> list[Array]:
         on = np.abs(solid.points @ n + pl[3]) < 1.0
         mid = solid.points[on, :2].mean(axis=0) if on.any() else centre
         off = (mid - centre) / np.maximum(half, 1.0)
+        # a symmetric cover may only tilt across its mirror lines (lesson: a table top tilted to
+        # one side made the cover of a symmetric table lopsided)
+        for k, _ in box.mirrors:
+            off[k] = 0.0
         if np.abs(off).max() < CENTRAL_SHARE:  # a table top: a gable along the long side
             across = np.array([0.0, 1.0]) if half[0] >= half[1] else np.array([1.0, 0.0])
             for sign in (1.0, -1.0):

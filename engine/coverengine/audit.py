@@ -36,7 +36,8 @@ Array = NDArray[np.float64]
 AUDIT_JSON, AUDIT_PNG = "audit.json", "audit.png"
 SAMPLES = 20000  # param-ok: points spread over the furniture
 OUTSIDE_MM = 3.0  # param-ok: a furniture point further than this outside the cover is outside
-MIRROR_MM = 15.0  # param-ok: a symmetric cover mirrored lies within this of itself (95 %)
+MIRROR_MM = 30.0  # param-ok: a symmetric cover mirrored lies within this of itself (95 %); the
+# furniture itself counts as symmetric within 25 mm (hull/box.py SYMMETRY_MM)
 MIRROR_PCT = 95  # param-ok: share of points
 SCRAP_M2 = 0.02  # param-ok: a piece smaller than this is scrap
 STEP_FILES = ("panels.json", "pattern.json", "finished.json", "cut.dxf")
@@ -184,7 +185,13 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
         )
     seated = hull.get("chairs") or {}
     if seated:
-        across = np.ptp(cover.vertices[:, :2], axis=0).min()
+        # across the long sides, where the chairs are (the axis the chair blocks are thin in)
+        if seated.get("blocks"):
+            lo, hi = np.asarray(seated["blocks"][0])
+            axis = int(np.argmin(np.abs(hi[:2] - lo[:2] - float(seated["room_mm"]))))
+            across = float(np.ptp(cover.vertices[:, axis]))
+        else:  # all round a round table
+            across = float(np.ptp(cover.vertices[:, :2], axis=0).min())
         need = float(seated["cover_width_mm"])
         checks.append(
             _check(
