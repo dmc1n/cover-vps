@@ -45,7 +45,10 @@ VIEW_DPI = 110  # param-ok: picture resolution
 MM_PER_CM = 10.0  # param-ok: unit conversion
 TITLE_PT = 8  # param-ok: display
 PERCENT = 100.0  # param-ok: ratio to percent
-GREY, BLUE, RED = "#8a8f98", "#2f78dc", "#e0302a"  # param-ok: display colours
+GREY, BLUE, RED = "#7d828c", "#1f5fbf", "#e0302a"  # param-ok: display colours
+PALE = "#cfe0f7"  # param-ok: display colour (the cover's area)
+PAD_SHARE = 0.03  # param-ok: display margin
+ON_TOP = 10  # param-ok: drawing order (red dots over everything)
 
 
 def _check(name: str, ok: bool, detail: str) -> dict[str, Any]:
@@ -87,25 +90,37 @@ def mirror_gap(cover: trimesh.Trimesh, axis: int, mid: float) -> float:
 
 
 def views(furniture: trimesh.Trimesh, cover: trimesh.Trimesh, bad: Array, out: Path) -> Path:
-    """Front, side and top views: furniture grey, cover see-through blue, outside points red."""
+    """Three straight views: the cover as a light blue area with a dark blue outline, the
+    furniture solid grey on top of it, furniture outside the cover in red. Grey beyond the blue
+    outline is furniture sticking out."""
+    import shapely
     from matplotlib.collections import PolyCollection
     from matplotlib.figure import Figure
 
     fig = Figure(figsize=VIEW_IN, dpi=VIEW_DPI)
-    for k, (title, a, b) in enumerate(
-        (("front (from the front)", 0, 2), ("side (from the right)", 1, 2), ("top", 0, 1))
-    ):
+    views_ = (
+        ("looking along y (x across)", 0, 2),
+        ("looking along x (y across)", 1, 2),
+        ("from above", 0, 1),
+    )
+    for k, (title, a, b) in enumerate(views_):
         ax = fig.add_subplot(1, 3, k + 1)
-        for mesh, colour, alpha in ((furniture, GREY, 1.0), (cover, BLUE, 0.3)):
-            tri = mesh.vertices[mesh.faces][:, :, [a, b]]
-            ax.add_collection(
-                PolyCollection(list(tri), facecolors=colour, edgecolors="none", alpha=alpha)
-            )
+        ctri = cover.vertices[cover.faces][:, :, [a, b]]
+        ax.add_collection(PolyCollection(list(ctri), facecolors=PALE, edgecolors="none"))
+        ftri = furniture.vertices[furniture.faces][:, :, [a, b]]
+        ax.add_collection(PolyCollection(list(ftri), facecolors=GREY, edgecolors="none"))
+        shapes = [shapely.Polygon(t) for t in ctri]
+        area = shapely.union_all([g for g in shapes if g.is_valid and g.area > 0])
+        for poly in getattr(area, "geoms", [area]):
+            if hasattr(poly, "exterior"):
+                x, y = poly.exterior.xy
+                ax.plot(x, y, color=BLUE, linewidth=1.4)
         if len(bad):
-            ax.scatter(bad[:, a], bad[:, b], s=2, c=RED)
+            ax.scatter(bad[:, a], bad[:, b], s=3, c=RED, zorder=ON_TOP)
         allv = np.vstack([furniture.vertices, cover.vertices])
-        ax.set_xlim(allv[:, a].min(), allv[:, a].max())
-        ax.set_ylim(allv[:, b].min(), allv[:, b].max())
+        pad = float(np.ptp(allv, axis=0).max()) * PAD_SHARE
+        ax.set_xlim(allv[:, a].min() - pad, allv[:, a].max() + pad)
+        ax.set_ylim(allv[:, b].min() - pad, allv[:, b].max() + pad)
         ax.set_aspect("equal")
         ax.set_title(title, fontsize=TITLE_PT)
         ax.axis("off")
@@ -220,14 +235,17 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
 
 
 AI_SYSTEM = """You check outdoor furniture covers for a workshop, as a second opinion next to the
-program's own measurements. Image 1 shows three straight views of the furniture (grey) with the
-calculated cover over it (see-through blue): from the front, from the right side, and from
-above. Red dots are furniture outside the cover. Image 2 is the product photo. A good cover:
-covers all of the furniture down to just above the floor; is roughly the furniture's shape (a box
-over box-like furniture is intended); sheds water (no flat or hollow top; tables have balloons
-under the cover); is symmetric when the furniture is; has few pieces with straight seams. You
-also get the program's measured checks. Judge the pictures yourself, then compare with the
-checks. Answer with JSON only:
+program's own measurements. Image 1 shows three straight views (looking along y, looking along
+x, and from above): the cover is the light blue area with a dark blue outline, the furniture is
+solid grey on top of it. Grey outside the dark blue outline, or red dots, is furniture outside
+the cover. Image 2 is the product photo. Facts about these covers, not faults: the cover ends
+5 cm above the floor (the hem; legs below it are fine); a box cover with flat faces over
+rounded furniture is intended; a top sloping 5 degrees or more sheds water even if it looks
+almost flat; tables have balloons and dining tables chair space beside the long sides, so their
+cover is wider and higher than the table. A good cover covers all of the furniture above the
+hem, sheds water, is symmetric when the furniture is, and has few pieces. You also get the
+program's measured checks (measured on 20 000 points; trust them for what was measured, and
+use the pictures for what they cannot see). Answer with JSON only:
 {"verdict": "good | doubt | wrong", "problems": ["short plain sentences"],
  "disagree_with_program": ["checks where your view differs, with why"]}"""
 
