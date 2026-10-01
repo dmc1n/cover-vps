@@ -9,6 +9,7 @@ interface Batch {
   file: string;
   pairs: { model_id: string; name: string; note: string; status: string }[];
   unpaired: string[];
+  drawings_only?: string[];
 }
 
 export function Learning() {
@@ -81,6 +82,11 @@ export function Learning() {
         batches.map((b) => (
           <section key={b.id} className="card">
             <strong>{b.file}</strong> <span className="muted">· {b.id} · {b.pairs.length} pairs</span>
+            {(b.drawings_only ?? []).length > 0 && (
+              <p className="muted">
+                {b.drawings_only!.length} drawings without a 3D model: kept for the analysis of your covers.
+              </p>
+            )}
             {b.unpaired.length > 0 && (
               <p className="muted">Without a partner (not used): {b.unpaired.join(", ")}</p>
             )}

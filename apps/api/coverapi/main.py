@@ -225,12 +225,23 @@ def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
             batch = unpack(store, target, batch_id)
         except zipfile.BadZipFile:
             raise HTTPException(400, "this is not a readable zip file") from None
-        if not batch.pairs:
-            raise HTTPException(400, "no pairs found: name the files alike, e.g. 1.step and 1.pdf")
+        drawings = [u for u in batch.unpaired if u.lower().endswith(".pdf")]
+        if not batch.pairs and not drawings:
+            raise HTTPException(
+                400, "no drawings found: a zip of PDFs, or pairs like 1.step + 1.pdf"
+            )
         made = register(store, batch)
         for m in made:
             m["job"] = jobs.submit(JobSpec(m["model_id"], list(STEPS), {}, m["source"]))["id"]
-        doc = {"id": batch_id, "file": file.filename, "pairs": made, "unpaired": batch.unpaired}
+        # drawings without a 3D model are kept for the analysis of the owner's covers
+        # (scripts/drawings.py, ADR-043); they are not "unpaired" leftovers
+        doc = {
+            "id": batch_id,
+            "file": file.filename,
+            "pairs": made,
+            "drawings_only": drawings,
+            "unpaired": [u for u in batch.unpaired if u not in drawings],
+        }
         import json as _json
 
         (store.batches / f"{batch_id}.json").write_text(_json.dumps(doc, indent=2) + "\n")
