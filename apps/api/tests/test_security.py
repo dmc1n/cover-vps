@@ -103,3 +103,17 @@ def test_logout_ends_the_session(app: Any) -> None:
     c = login(app, "vera", "a-long-viewer-password")
     assert c.post("/api/auth/logout").status_code == 200
     assert c.get("/api/models").status_code == 401
+
+
+def test_a_user_changes_their_own_password(app: Any) -> None:
+    other = login(app, "vera", "a-long-viewer-password")  # e.g. another computer
+    c = login(app, "vera", "a-long-viewer-password")
+    bad = c.post("/api/auth/password", json={"old": "wrong", "new": "a-brand-new-password"})
+    assert bad.status_code == 400
+    ok = c.post(
+        "/api/auth/password", json={"old": "a-long-viewer-password", "new": "a-brand-new-password"}
+    )
+    assert ok.status_code == 200
+    assert c.get("/api/models").status_code == 200  # this session goes on
+    assert other.get("/api/models").status_code == 401  # the other one ended
+    login(app, "vera", "a-brand-new-password")

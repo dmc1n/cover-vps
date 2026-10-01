@@ -128,7 +128,9 @@ export function UserMenu({ user, onLogout }: { user: User; onLogout: () => void 
           Admin
         </a>
       )}
-      <span title={`${user.username} · ${user.role}${user.can_approve ? " · may approve" : ""}`}>{user.name}</span>
+      <a href="#/account" className="nav" title={`${user.username} · ${user.role}${user.can_approve ? " · may approve" : ""}`}>
+        {user.name}
+      </a>
       <button
         onClick={async () => {
           await auth.logout().catch(() => undefined);
@@ -138,5 +140,57 @@ export function UserMenu({ user, onLogout }: { user: User; onLogout: () => void 
         Log out
       </button>
     </span>
+  );
+}
+
+export function Account({ user }: { user: User }) {
+  const [old, setOld] = useState("");
+  const [nw, setNw] = useState("");
+  const [again, setAgain] = useState("");
+  const [msg, setMsg] = useState("");
+  return (
+    <section className="card">
+      <h2>My account</h2>
+      <p className="muted">
+        {user.name} · {user.username} · {user.role}
+        {user.can_approve ? " · may approve definitive drawings" : ""}
+        {user.email ? ` · ${user.email}` : ""}
+      </p>
+      <form
+        className="fields"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (nw !== again) return setMsg("the two new passwords are not the same");
+          try {
+            await auth.changePassword(old, nw);
+            setOld("");
+            setNw("");
+            setAgain("");
+            setMsg("Password changed.");
+          } catch (err) {
+            setMsg(String(err).replace(/^Error: /, ""));
+          }
+        }}
+      >
+        <label className="field">
+          Current password
+          <input type="password" autoComplete="current-password" value={old} onChange={(e) => setOld(e.target.value)} />
+        </label>
+        <label className="field">
+          New password (at least 12 characters)
+          <input type="password" autoComplete="new-password" value={nw} onChange={(e) => setNw(e.target.value)} />
+        </label>
+        <label className="field">
+          The same again
+          <input type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} />
+        </label>
+        <div className="row">
+          <button className="primary" disabled={!old || nw.length < 12}>
+            Change password
+          </button>
+        </div>
+      </form>
+      {msg && <p className="muted">{msg}</p>}
+    </section>
   );
 }

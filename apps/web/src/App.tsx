@@ -21,7 +21,7 @@ import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { Gallery } from "./Gallery";
 import { QuickSearch } from "./QuickSearch";
 import { Admin } from "./Admin";
-import { Login, SessionContext, useSession, UserMenu, Welcome } from "./Session";
+import { Account, Login, SessionContext, useSession, UserMenu, Welcome } from "./Session";
 import { Drawing, Learning } from "./Learning";
 import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
@@ -96,6 +96,8 @@ export function App() {
           <Learning />
         ) : hash.startsWith("#/admin") && user.role === "admin" ? (
           <Admin />
+        ) : hash.startsWith("#/account") ? (
+          <Account user={user} />
         ) : (
           <ModelList />
         )}</main>

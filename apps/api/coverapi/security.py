@@ -50,6 +50,11 @@ class PasswordRequest(BaseModel):
     password: str
 
 
+class ChangePassword(BaseModel):
+    old: str
+    new: str
+
+
 class NewUserRequest(BaseModel):
     username: str
     name: str = ""
@@ -186,6 +191,18 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
     @app.get("/api/auth/me")
     def me(request: Request) -> dict[str, Any]:
         return {"user": current_user(request).public(), "auth": required}
+
+    @app.post("/api/auth/password")
+    def change_password(req: ChangePassword, request: Request) -> dict[str, Any]:
+        user = current_user(request)
+        if user.id == 0:
+            raise HTTPException(400, "no account to change (logins are off)")
+        try:
+            auth.change_password(user.id, req.old, req.new, request.cookies.get(SESSION_COOKIE))
+        except AuthError as exc:
+            raise HTTPException(exc.status, str(exc)) from None
+        auth.log(user, "password changed")
+        return {"ok": True}
 
     @app.get("/api/auth/invite/{token}")
     def invite_info(token: str) -> dict[str, Any]:

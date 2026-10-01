@@ -274,6 +274,22 @@ class Auth:
             db.execute("UPDATE invites SET used=1 WHERE token_hash=?", (_hash_token(token),))
         return user
 
+    def change_password(self, user_id: int, old: str, new: str, keep: str | None = None) -> None:
+        """A logged-in user's own change; the user's other sessions end (`keep`: this one)."""
+        with self._db() as db:
+            row = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+        if row is None or not check_password(old, row["pw_hash"]):
+            raise AuthError("the current password is not right", 400)
+        problem = password_problem(new, row["username"])
+        if problem:
+            raise AuthError(problem, 400)
+        with self._lock, self._db() as db:
+            db.execute("UPDATE users SET pw_hash=? WHERE id=?", (hash_password(new), user_id))
+            db.execute(
+                "DELETE FROM sessions WHERE user_id=? AND token_hash<>?",
+                (user_id, _hash_token(keep) if keep else ""),
+            )
+
     # ---- login and sessions
     def login(self, username: str, password: str, address: str) -> tuple[User, str]:
         now = time.time()

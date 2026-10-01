@@ -271,6 +271,8 @@ export const auth = {
   logout: () => send("POST", "/api/auth/logout").then((r) => json<{ ok: boolean }>(r)),
   invite: (token: string) =>
     fetch(`/api/auth/invite/${token}`).then((r) => json<{ username: string; name: string }>(r)),
+  changePassword: (old: string, nw: string) =>
+    send("POST", "/api/auth/password", { old, new: nw }).then((r) => json<{ ok: boolean }>(r)),
   setPassword: (token: string, password: string) =>
     send("POST", `/api/auth/invite/${token}`, { password }).then((r) => json<{ user: User }>(r)),
 };
