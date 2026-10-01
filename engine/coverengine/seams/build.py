@@ -169,7 +169,7 @@ def _cut_cover(
         raise CoverError(f"no cover surface at {hull_path} (run cover hull first)")
     hull = load_model(hull_path)
     hull = trimesh.Trimesh(hull.vertices, hull.faces, process=True)
-    if params["hull.top"] == "box":
+    if params["hull.top"] == "box" or (params["hull.top"] == "given" and _flat_faced(hull)):
         return _box_cut(model_dir, hull, params)
     snap = _p(params, "seams.snap_mm")
     inset = _p(params, "seams.skirt_seam_inset_mm")
@@ -326,6 +326,16 @@ def _cut_cover(
     result.report["skirt_height_mm"] = [round(h, 1) for h in heights]  # lowest, highest
     result.report["walls_tried"] = walls_tried
     return result
+
+
+# A given cover surface made of at most this many flat faces is cut like a box (ADR-039).
+FLAT_FACES_MAX = 20  # param-ok: geometric limit
+
+
+def _flat_faced(hull: trimesh.Trimesh) -> bool:
+    """Is the surface a few flat faces (a cover drawn as a box), not a curved surface?"""
+    normals = np.round(np.asarray(hull.face_normals), BOX_NORMAL_DIGITS)
+    return len(np.unique(normals, axis=0)) <= FLAT_FACES_MAX
 
 
 def _box_cut(model_dir: Path, hull: trimesh.Trimesh, params: EffectiveParams) -> Cut:

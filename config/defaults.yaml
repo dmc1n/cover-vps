@@ -22,9 +22,11 @@ hull:                            # the cover surface (drape hull)
   edge: rounded                  # rounded | sharp   where the top meets the skirt: rounded with the
                                  # clearance as radius, or a crease (boxy furniture only: it
                                  # fails on rounded tops)
-  top: tensioned                 # tensioned | draped | box   tensioned: pulled tight in straight lines
-                                 # between high points, sheds water (rule 12); draped: follows
-                                 # recesses wider than bridge_gap_mm
+  top: tensioned                 # tensioned | draped | box | given
+                                 # tensioned: pulled tight in straight lines between high
+                                 # points, sheds water (rule 12); draped: follows recesses
+                                 # wider than bridge_gap_mm; box: flat faces (ADR-038)
+                                 # given: the uploaded file is the cover surface itself (ADR-039)
   min_slope_deg: 5               # to confirm; flatter patches of the top hold water
   flat_patch_mm: 100             # flat spots smaller than this across, or this close to the edge,
                                  # still shed water

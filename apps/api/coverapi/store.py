@@ -36,6 +36,7 @@ EXTRA_FILES = [
     "reference.pdf",
     "reference.png",
     "reference.json",
+    "kind.json",
 ]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)
 MEDIA = {
@@ -117,6 +118,7 @@ class Store:
         for name in ("hull.json", "panels.json", "pattern.json", "finished.json"):
             warnings += (_read(d / name) or {}).get("warnings", [])
         out["warnings"] = warnings
+        out["kind"] = _read(d / "kind.json")
         g = grade(d)
         out["grade"], out["reasons"] = g["grade"], g.get("reasons", [])
         out["roll_length_mm"] = g.get("roll_length_mm")

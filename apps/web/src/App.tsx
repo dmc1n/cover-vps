@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, cm, fileUrl, Job, ModelBrief, ModelDetail, Scalar, Step, STEP_LABEL, STEPS } from "./api";
+import { api, cm, fileUrl, Job, Kind, ModelBrief, ModelDetail, Scalar, Step, STEP_LABEL, STEPS } from "./api";
 import { AiAdvice } from "./AiAdvice";
 import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { Gallery } from "./Gallery";
@@ -205,8 +205,9 @@ function Upload() {
     <section className="card upload">
       <h2>New model</h2>
       <p className="muted">
-        STEP, IGES, STL, OBJ, PLY or GLB. Everything runs by itself: import, cover, seams, patterns and the
-        cut pieces.
+        STEP, IGES, STL, OBJ, PLY or GLB: the complete product, or only the cover surface. After the import
+        the program shows which one it thinks it is; you confirm, and the rest runs by itself: cover, seams,
+        patterns and the cut pieces.
       </p>
       <div className="row">
         <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
@@ -255,6 +256,43 @@ const TABS: [Tab, string][] = [
   ["files", "Downloads"],
   ["log", "Warnings and log"],
 ];
+
+const KIND_LABEL = {
+  product: "the complete product (furniture)",
+  cover: "only the cover surface",
+} as const;
+
+/** After an upload: what the program thinks the file is; the owner confirms (ADR-039). */
+function KindCheck({ kind, onConfirm }: { kind: Kind; onConfirm: (k: "product" | "cover") => void }) {
+  const guess = kind.guess ?? "product";
+  const other = guess === "product" ? "cover" : "product";
+  return (
+    <section className="card kind-check">
+      <h3>Check: what is this file?</h3>
+      <p>
+        The program thinks this is <strong>{KIND_LABEL[guess]}</strong>
+        {kind.sure ? "." : ", but it is not sure."} Look at the 3D view below and confirm.
+      </p>
+      {kind.reasons && (
+        <ul className="muted">
+          {kind.reasons.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+      )}
+      <p className="muted">
+        Complete product: the program makes the cover round it. Cover surface only: the surface is the
+        cover, and only its pieces are drawn.
+      </p>
+      <div className="row">
+        <button className="primary" onClick={() => onConfirm(guess)}>
+          Yes, {KIND_LABEL[guess]}
+        </button>
+        <button onClick={() => onConfirm(other)}>No, it is {KIND_LABEL[other]}</button>
+      </div>
+    </section>
+  );
+}
 
 function ModelPage({ id }: { id: string }) {
   const [model, setModel] = useState<ModelDetail | null>(null);
@@ -321,6 +359,20 @@ function ModelPage({ id }: { id: string }) {
           </button>
         </div>
       </section>
+      {model.kind && !model.kind.confirmed && has("model.json") && !running && (
+        <KindCheck
+          kind={model.kind}
+          onConfirm={async (k) => {
+            try {
+              const r = await api.setKind(id, k);
+              if (r.job) setJob(r.job);
+              load();
+            } catch (e) {
+              setError(String(e));
+            }
+          }}
+        />
+      )}
       <ModelInfo key={`${model.id}-${model.family}-${model.status}`} model={model} onSaved={load} />
       {job && <JobBar job={job} />}
       {error && <p className="error">{error}</p>}

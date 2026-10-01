@@ -22,6 +22,10 @@ async def main() -> int:
         await page.goto(URL)
         await page.set_input_files("input[type=file]", CHAIR)
         await page.get_by_role("button", name="Upload and run").click()
+        await expect(page.get_by_text("Check: what is this file?")).to_be_visible(timeout=RUN_MS)
+        await page.get_by_role("button", name="Yes, the complete product (furniture)").click()
+        await expect(page.get_by_text("Check: what is this file?")).to_be_hidden()
+        await expect(page.locator(".job .jobstep")).to_have_count(4, timeout=RUN_MS)  # the rest
         await expect(page.get_by_text("Last run finished.")).to_be_visible(timeout=RUN_MS)
         for tab in ("3D", "Seams", "Patterns", "Size drawing", "Cut pieces", "Downloads"):
             await page.get_by_role("button", name=tab, exact=True).click()

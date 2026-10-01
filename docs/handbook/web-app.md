@@ -61,3 +61,11 @@ make deploy      # the app in Docker on 127.0.0.1:8080 (data in ../data)
 On this server the app runs in the tmux session `cover`, window `web`, with the data in
 `~/cover-data` (its `models` is the repository's `models/` folder, so the command line and the
 web app share models).
+
+## Complete product or cover surface only
+
+Upload either the furniture or, when that is all there is, the cover surface itself (the outside
+of the cover, open at the bottom). After the import the model page asks **Check: what is this
+file?** with the program's guess and its reasons. Look at the 3D view and press **Yes** or
+**No**; only then the cover is calculated. For a cover surface the program does not make a cover
+round anything: the surface is the cover, and only its pieces are drawn (`hull.top: given`).

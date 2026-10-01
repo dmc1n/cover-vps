@@ -114,6 +114,10 @@ def _cmd_import(args: argparse.Namespace) -> int:
         units=args.units,
         forget_exclusions=args.forget_exclusions,
     )
+    from coverengine.io.kind import write_guess
+    from coverengine.io.model_io import load_model
+
+    kind = write_guess(result.out_dir, load_model(result.out_dir), args.file.name)
     m = result.model
     parts = m["parts"]
     size = " x ".join(f"{v:.1f}" for v in m["size_mm"])
@@ -127,6 +131,9 @@ def _cmd_import(args: argparse.Namespace) -> int:
     )
     if parts["exclude"]:
         print(f"exclude  {', '.join(parts['exclude'])}")
+    what = "the cover surface itself" if kind["guess"] == "cover" else "the furniture"
+    sure = "" if kind["sure"] else " (not sure)"
+    print(f"kind     looks like {what}{sure}: {'; '.join(kind['reasons'])}")
     for w in result.warnings:
         print(f"warning: {w}", file=sys.stderr)
     return 0

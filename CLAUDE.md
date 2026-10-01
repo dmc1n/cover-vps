@@ -189,7 +189,8 @@ make demo       full pipeline on the procedural chair, DXF and SVG written to ou
 cover run <model> [--set key=value ...]     import → hull → cut → flatten → export in one go
 cover params <model>                        effective parameters and where each comes from
 cover diff a.json b.json                    panel dimensions that changed by more than 1 mm
-cover import <file> --out models/<id>/      STEP/IGES/STL/OBJ/PLY/GLB → model.glb, model.json, parts.json
+cover import <file> --out models/<id>/      STEP/IGES/STL/OBJ/PLY/GLB → model.glb, model.json, parts.json,
+                                             kind.json (furniture or cover surface, ADR-039)
 cover hull models/<id>/ [--clearance N ...]  drape hull → hull.glb, hull.json, preview.glb
 cover cut models/<id>/ [--seams FILE]        seams and panels → panels.glb, panels.json
 cover flatten models/<id>/                   flat patterns → pattern.dxf, pattern.svg, pattern.json, sizes.pdf

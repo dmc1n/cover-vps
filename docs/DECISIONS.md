@@ -666,3 +666,22 @@ strange panels"; "we need AI input to have not so many panels").
 - A box spans bays seen from above (an L sofa, the Blocchi's curve): a warning says so; those
   keep the tensioned cover.
 
+
+## ADR-039 — Uploads: the complete product or only the cover surface, confirmed by the owner
+
+Status: accepted, 1 Oct 2026 (owner: for some products there is only a drawing of the cover
+surface; "show after the upload what you think it is, complete product or cover surface only, so
+we can give the final confirmation").
+
+- One upload field. After the import the program guesses what the file is (`coverengine/io/
+  kind.py`, `kind.json`) from three measures: closed sides (horizontal lines of sight low down
+  all hit it), no floor (no flat area at the bottom), one skin (area about that of its envelope).
+  All three: a cover surface; otherwise the furniture. On 25 SUNS products and their 25 cover
+  surfaces: 50 of 50 right.
+- The web app shows the guess with its reasons and waits: the owner confirms or corrects it, and
+  only then does the rest run. Through the API, `kind` on the upload skips the question.
+- A cover surface is used as the cover (`hull.top: given`): cleaned, faced outward, split into
+  small triangles; seams, flattening, allowances and export as usual.
+- Not yet: 2D contour drawings (DXF or PDF with the flat pieces). They need no flattening, only
+  allowances and marks, and which edges join must be known. Built when the owner's samples show
+  their form. Seam lines drawn in a cover surface (separate faces per piece) are not used yet.

@@ -49,6 +49,11 @@ class BatchRequest(BaseModel):
     trial: dict[str, Any] = {}
 
 
+class KindRequest(BaseModel):
+    kind: str  # product | cover
+    run: bool = True
+
+
 class AiApplyRequest(BaseModel):
     action: str
     value: float | None = None
@@ -91,14 +96,24 @@ def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
         units: str | None = Form(None),  # noqa: B008
         up: str | None = Form(None),  # noqa: B008
         run_all: bool = Form(True),  # noqa: B008
+        kind: str | None = Form(None),  # noqa: B008 - product | cover; none: ask after import
     ) -> dict[str, Any]:
+        """Without `kind` only the import runs: the web app shows what the program thinks the
+        file is (the furniture or the cover surface only) and the owner confirms (ADR-039)."""
+        from coverengine.io.kind import confirm
+
         name = file.filename or "model"
         if Path(name).suffix.lower() not in UPLOAD_SUFFIXES:
             raise HTTPException(400, f"{name}: not a 3D file this program reads")
         model_id = store.new_id(name)
         path = store_upload(store, model_id, name, await file.read())
         store.model_dir(model_id).mkdir(parents=True)
-        steps = STEPS if run_all else ["import"]
+        if kind:
+            try:
+                confirm(store.model_dir(model_id), kind)
+            except CoverError as exc:
+                raise HTTPException(400, str(exc)) from None
+        steps = STEPS if run_all and kind else ["import"]
         job = jobs.submit(JobSpec(model_id, list(steps), {}, str(path), units or None, up or None))
         return {"model_id": model_id, "job": job}
 
@@ -167,6 +182,19 @@ def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
             save_seams(d, {"skirt_seams": req.skirt_seams, "top_seams": req.top_seams})
         job = jobs.submit(JobSpec(model_id, ["cut", "flatten", "export"], {})) if req.run else None
         return {"saved": not req.automatic, "job": job}
+
+    @app.post("/api/models/{model_id}/kind")
+    def set_kind(model_id: str, req: KindRequest) -> dict[str, Any]:
+        """The owner confirms what the file is; then the cover is calculated."""
+        from coverengine.io.kind import confirm
+
+        d = model_or_404(model_id)
+        try:
+            doc = confirm(d, req.kind)
+        except CoverError as exc:
+            raise HTTPException(400, str(exc)) from None
+        job = jobs.submit(JobSpec(model_id, STEPS[1:], {})) if req.run else None
+        return {"kind": doc, "job": job}
 
     @app.post("/api/models/{model_id}/ai-apply")
     def ai_apply(model_id: str, req: AiApplyRequest) -> dict[str, Any]:

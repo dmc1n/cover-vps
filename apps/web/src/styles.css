@@ -109,3 +109,10 @@ header a.nav:hover { color: #fff; }
 .side figure { margin: 0; }
 .side img, .side .nopic { width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
 .side figcaption { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+.kind-check {
+  border-left: 4px solid var(--accent);
+}
+.kind-check ul {
+  margin: 0.25rem 0 0.5rem 1.2rem;
+}

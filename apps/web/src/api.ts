@@ -42,6 +42,17 @@ export interface ModelBrief {
   grade: "ready" | "check" | "failed";
   reasons: string[];
   roll_length_mm?: number | null;
+  kind?: Kind | null;
+}
+
+/** What an uploaded file is: the furniture, or only the cover surface (kind.json). */
+export interface Kind {
+  guess: "product" | "cover" | null;
+  sure: boolean;
+  measures?: { sides_closed: number; floor_share: number; skin_ratio: number };
+  reasons?: string[];
+  confirmed: boolean;
+  kind: "product" | "cover" | null;
 }
 
 export interface JobStep {
@@ -168,6 +179,12 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model_ids, steps }),
     }).then((r) => json<{ jobs: Job[] }>(r)),
+  setKind: (id: string, kind: "product" | "cover") =>
+    fetch(`/api/models/${id}/kind`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind }),
+    }).then((r) => json<{ kind: Kind; job: Job | null }>(r)),
   upload: (file: File, units: string, up: string) => {
     const form = new FormData();
     form.append("file", file);

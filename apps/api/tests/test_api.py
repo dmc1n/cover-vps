@@ -17,7 +17,9 @@ def chair(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     app = create_app(root / "data")
     client = TestClient(app)
     with (root / "shapes" / "chair.stl").open("rb") as fh:
-        r = client.post("/api/models", files={"file": ("Test Chair.stl", fh)})
+        r = client.post(
+            "/api/models", files={"file": ("Test Chair.stl", fh)}, data={"kind": "product"}
+        )
     assert r.status_code == 200, r.text
     body = r.json()
     job = app.state.jobs.wait(body["job"]["id"], RUN_TIMEOUT_S)
@@ -31,10 +33,23 @@ def test_upload_runs_every_step(chair: dict[str, Any]) -> None:
     assert chair["id"] == "test-chair"
 
 
+def test_upload_asks_what_the_file_is(chair: dict[str, Any]) -> None:
+    c: TestClient = chair["client"]
+    with (chair["root"] / "shapes" / "chair.stl").open("rb") as fh:
+        r = c.post("/api/models", files={"file": ("Second Chair.stl", fh)})
+    job = chair["app"].state.jobs.wait(r.json()["job"]["id"], RUN_TIMEOUT_S)
+    assert [s["name"] for s in job["steps"]] == ["import"]
+    m = c.get("/api/models/second-chair").json()
+    assert m["kind"]["guess"] == "product" and not m["kind"]["confirmed"]
+    r = c.post("/api/models/second-chair/kind", json={"kind": "product", "run": False})
+    assert r.status_code == 200 and r.json()["kind"]["confirmed"]
+    assert c.post("/api/models/second-chair/kind", json={"kind": "sofa"}).status_code == 400
+
+
 def test_model_summary_and_files(chair: dict[str, Any]) -> None:
     c: TestClient = chair["client"]
     listing = c.get("/api/models").json()
-    assert [m["id"] for m in listing] == ["test-chair"]
+    assert "test-chair" in [m["id"] for m in listing]
     m = c.get(f"/api/models/{chair['id']}").json()
     assert m["steps_done"] == ["import", "hull", "cut", "flatten", "export"]
     assert m["pattern"]["summary"]["panels"] == len(m["cut"]["panels"])
@@ -114,8 +129,9 @@ def test_family_status_revisions_and_batch(chair: dict[str, Any]) -> None:
     r = c.put(f"/api/models/{chair['id']}/info", json={"status": "checked", "tags": ["test"]})
     assert r.status_code == 200 and r.json()["status"] == "checked"
     assert c.put(f"/api/models/{chair['id']}/info", json={"status": "nope"}).status_code == 400
-    listing = c.get("/api/models").json()
-    assert listing[0]["status"] == "checked" and listing[0]["tags"] == ["test"]
+    listing = {m["id"]: m for m in c.get("/api/models").json()}
+    assert listing[chair["id"]]["status"] == "checked"
+    assert listing[chair["id"]]["tags"] == ["test"]
     m = c.get(f"/api/models/{chair['id']}").json()
     assert m["revisions"], "every export keeps a revision"
     n = m["revisions"][-1]["number"]

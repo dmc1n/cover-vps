@@ -35,6 +35,7 @@ from coverengine.hull.surface import (
     solid_field,
 )
 from coverengine.hull.tension import concave_envelope
+from coverengine.io.kind import FLAT_NZ, FLOOR_BAND
 from coverengine.io.model_io import glb_bytes, load_model, read_model_json
 from coverengine.params import EffectiveParams
 
@@ -143,6 +144,8 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
     model_v, model_f = masks.apply(model.vertices, model.faces, masks.load_masks(model_dir))
     if params["hull.top"] == "box":
         return _box(model_dir, model_v, model_f, params)
+    if params["hull.top"] == "given":
+        return _given(model_dir, model_v, model_f, params)
     c = _p(params, "hull.clearance_mm")
     bridge_r = _p(params, "hull.bridge_gap_mm") / 2
     hem = _p(params, "hull.hem_height_mm")
@@ -289,6 +292,52 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
     points = np.asarray(v)[np.asarray(v)[:, 2] > hem]
     product = (read_cover_definition(model_dir).get("notes") or model_dir.name).split(": ")[-1]
     mesh, box, warnings = box_hull(points, model, params, product)
+    report = _plain_report(model_dir, mesh, v, f, params, "box", warnings)
+    report["box"] = box
+    return Hull(mesh, report, warnings)
+
+
+def _given(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hull:
+    """The uploaded file is the cover surface itself (ADR-039): used as it is, only cleaned,
+    faced outward and split into small triangles for the seams and the flattening."""
+    from coverengine.hull.box import EDGE_MM
+
+    mesh = trimesh.Trimesh(v, f, process=True)
+    mesh.update_faces(mesh.nondegenerate_faces())
+    # a cover drawn as a solid: its bottom is not fabric, the cover is open there
+    height = float(np.ptp(mesh.vertices[:, 2])) or 1.0
+    floor = (np.abs(mesh.face_normals[:, 2]) > FLAT_NZ) & (
+        mesh.triangles_center[:, 2] < mesh.vertices[:, 2].min() + FLOOR_BAND * height
+    )
+    if floor.any():
+        mesh.update_faces(~floor)
+        mesh.remove_unreferenced_vertices()
+    mesh = _one_piece(mesh)
+    trimesh.repair.fix_normals(mesh, multibody=False)
+    # outward: on average the faces point away from the middle (and the top faces up)
+    centre = mesh.vertices.mean(axis=0)
+    away = np.einsum("ij,ij->i", mesh.face_normals, mesh.triangles_center - centre)
+    if float((away * mesh.area_faces).sum()) < 0:
+        mesh.invert()
+    nv, nf = trimesh.remesh.subdivide_to_size(mesh.vertices, mesh.faces, max_edge=EDGE_MM)
+    mesh = trimesh.Trimesh(nv, nf, process=True)
+    warnings: list[str] = []
+    if len(_boundary_vertices(mesh)) == 0:
+        warnings.append("the cover surface is closed: a cover must be open at the bottom")
+    return Hull(mesh, _plain_report(model_dir, mesh, v, f, params, "given", warnings), warnings)
+
+
+def _plain_report(
+    model_dir: Path,
+    mesh: trimesh.Trimesh,
+    v: Array,
+    f: IntArray,
+    params: EffectiveParams,
+    top: str,
+    warnings: list[str],
+) -> dict[str, Any]:
+    """hull.json for a cover surface not grown from a height map (box, given)."""
+    hem = _p(params, "hull.hem_height_mm")
     edges = mesh.edges_sorted
     hem_edges = edges[group_rows(edges, require_count=1)]
     hem_len = float(
@@ -301,13 +350,12 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
     d2, _, _ = igl.point_mesh_squared_distance(
         np.asarray(mesh.vertices, np.float64), np.asarray(v, np.float64), np.asarray(f, np.int32)
     )
-    report = {
+    return {
         "format_version": FORMAT_VERSION,
         "engine_version": __version__,
         "model_id": read_model_json(model_dir)["id"],
         "model_sha256": read_model_json(model_dir)["source"]["sha256"],
-        "top": "box",
-        "box": box,
+        "top": top,
         "area_m2": round(float(mesh.area) / 1e6, 6),
         "bbox_mm": [
             [round(float(x), 3) for x in mesh.bounds[0]],
@@ -332,7 +380,6 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
         "ridges": {"angle_deg": _p(params, "seams.ridge_angle_deg"), "chains": 0, "length_mm": 0.0},
         "warnings": warnings,
     }
-    return Hull(mesh, report, warnings)
 
 
 def _water_faces(
