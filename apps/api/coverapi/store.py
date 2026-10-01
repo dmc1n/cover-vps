@@ -60,6 +60,22 @@ def slug(name: str) -> str:
     return s or "model"
 
 
+# Brief summaries by model id, with the file stamp they were made from.
+_BRIEF: dict[str, tuple[tuple[Any, ...], dict[str, Any]]] = {}
+
+
+def _stamp(d: Path) -> tuple[Any, ...]:
+    """Changes whenever a file of the model is written, added or removed."""
+    out = []
+    for f in sorted(ALLOWED):
+        try:
+            st = (d / f).stat()
+            out.append((f, st.st_mtime_ns, st.st_size))
+        except FileNotFoundError:
+            continue
+    return tuple(out)
+
+
 @dataclass
 class Store:
     root: Path
@@ -97,10 +113,19 @@ class Store:
         return model_id
 
     def list_models(self) -> list[dict[str, Any]]:
+        """Every model's brief summary. A summary is kept until one of the model's files
+        changes (the list has hundreds of models; reading them all took seconds)."""
         if not self.models.is_dir():
             return []
-        ids = sorted(p.name for p in self.models.iterdir() if p.is_dir())
-        return [self.summary(i, brief=True) for i in ids]
+        out = []
+        for d in sorted(p for p in self.models.iterdir() if p.is_dir()):
+            key = _stamp(d)
+            hit = _BRIEF.get(d.name)
+            if hit is None or hit[0] != key:
+                hit = (key, self.summary(d.name, brief=True))
+                _BRIEF[d.name] = hit
+            out.append(hit[1])
+        return out
 
     def summary(self, model_id: str, brief: bool = False) -> dict[str, Any]:
         d = self.model_dir(model_id)
