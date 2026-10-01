@@ -791,4 +791,5 @@ translate this correctly to a production ready model").
   length taken as width, allowance corners taken as size), checked one by one.
 - Owner, 1 Oct 2026: the strip is 30 cm; a cover from the owner's drawing is replicated
   exactly, flat strip included (the audit notes a flat top on a `given` cover, it does not fail
-  it). Air vents: one per full metre (2.10 m: 2, 2.90 m: 2, 3.10 m: 3, 1.40 m: 1).
+  it). Air vents: one per full metre of each side separately, at least one per side (2.10 m:
+  2, 2.90 m: 2, 3.10 m: 3, 1.40 m: 1); C6: 10 vents.

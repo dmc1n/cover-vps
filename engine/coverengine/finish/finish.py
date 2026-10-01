@@ -162,21 +162,10 @@ def side_of(panel: str) -> str:
     return re.sub(r"-\d+$", "", panel)
 
 
-def per_side(count: int, lengths: dict[str, float]) -> dict[str, int]:
-    """`count` vents over the sides: at least one each, the rest in proportion to the length
-    (largest remainders first)."""
-    if not lengths:
-        return {}
-    total = sum(lengths.values()) or 1.0
-    ideal = {k: count * v / total for k, v in lengths.items()}
-    n = {k: max(1, int(x)) for k, x in ideal.items()}
-    while sum(n.values()) < count:
-        k = max(ideal, key=lambda q: ideal[q] - n[q])
-        n[k] += 1
-    while sum(n.values()) > count and any(v > 1 for v in n.values()):
-        k = min((q for q in n if n[q] > 1), key=lambda q: ideal[q] - n[q])
-        n[k] -= 1
-    return n
+def per_side(lengths: dict[str, float], params: EffectiveParams) -> dict[str, int]:
+    """Vents per side of the cover: one per full metre of that side, at least one (owner, 1 Oct
+    2026: each side separately; 2.10 m: 2, 2.90 m: 2, 3.10 m: 3, 1.40 m: 1)."""
+    return {k: vent_count(v, params) for k, v in lengths.items()}
 
 
 @dataclass
@@ -246,7 +235,6 @@ def place_vents(
         + _p(params, "stitching.allowance_mm")
     )
     height = {p["name"]: float(np.ptp(np.asarray(p["outline_mm"])[:, 1])) for p in panels}
-    hem_total = sum(r.length for r in runs)  # the vent count: per metre of the whole hem
     # a low side gets a lower opening, same width, at least vent_min_height_mm (owner, 1 Oct
     # 2026); the plastic insert, the hood and the membrane stay the same size
     least = need - _p(params, "features.vent_height_mm") + _p(params, "features.vent_min_height_mm")
@@ -254,7 +242,7 @@ def place_vents(
     runs = tall  # a side lower than that gets no vent (warned below)
     total = sum(r.length for r in runs)
     out: dict[str, list[Array]] = {}
-    # one per metre of the whole hem, and at least one on every side (owner, 1 Oct 2026)
+    # one per full metre of each side, at least one per side (owner, 1 Oct 2026)
     sides: dict[str, list[HemRun]] = {}
     for r in runs:
         sides.setdefault(side_of(r.panel), []).append(r)
@@ -266,8 +254,7 @@ def place_vents(
         )
     if total <= 0:
         return out, warnings
-    count = max(vent_count(hem_total, params), len(sides))
-    shares = per_side(count, {k: sum(r.length for r in v) for k, v in sides.items()})
+    shares = per_side({k: sum(r.length for r in v) for k, v in sides.items()}, params)
     w = _p(params, "features.vent_width_mm")
     full_h = h = _p(params, "features.vent_height_mm")
     above = _p(params, "features.vent_above_hem_mm")

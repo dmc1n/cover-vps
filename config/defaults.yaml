@@ -123,7 +123,8 @@ features:                        # per-cover defaults, overridden per model
   vent_min_height_mm: 100        # a low side gets a lower opening (same width, same insert,
                                  # hood and membrane), not lower than this (owner, 1 Oct 2026)
   vent_above_hem_mm: 50          # bottom edge of the vent above the lower end of the cover
-  vents_per_metre: 1             # one vent per full metre of hem length, spread evenly
+  vents_per_metre: 1             # one vent per full metre of each side, spread evenly (owner,
+                                 # 1 Oct 2026: each side separately; 2.90 m: 2, 3.10 m: 3)
   vents_min: 1                   # every cover has at least one vent, and every side of it too
                                  # (owner, 1 Oct 2026: one per metre, at least one on each side)
   vent_seam_clearance_mm: 100    # to confirm; a vent keeps this far from a vertical seam; a short

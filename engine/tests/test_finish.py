@@ -133,18 +133,13 @@ def test_export_files_are_deterministic(tmp_path: Path) -> None:
         assert (tmp_path / "a" / f).read_bytes() == (tmp_path / "b" / f).read_bytes(), f
 
 
-def test_vents_one_per_metre_and_at_least_one_on_each_side() -> None:
-    """Owner, 1 Oct 2026: one per metre, at least one on every side."""
+def test_vents_one_per_full_metre_of_each_side() -> None:
+    """Owner, 1 Oct 2026: each side separately, one per full metre, at least one."""
     from coverengine.finish.finish import per_side, side_of
 
     assert side_of("skirt-front-2") == "skirt-front" and side_of("skirt-left") == "skirt-left"
-    # a 2.5 x 0.9 m cover: 6.8 m of hem, 6 vents; the short ends still get one each
-    n = per_side(
-        6, {"skirt-front": 2500, "skirt-back": 2500, "skirt-left": 900, "skirt-right": 900}
-    )
-    assert n == {"skirt-front": 2, "skirt-back": 2, "skirt-left": 1, "skirt-right": 1}
-    # a small cover: fewer metres than sides, still one per side
-    assert per_side(4, {"a": 500, "b": 500, "c": 400, "d": 400}) == {"a": 1, "b": 1, "c": 1, "d": 1}
+    sides = {"a": 2100, "b": 2900, "c": 3100, "d": 1400, "e": 340}
+    assert per_side(sides, params()) == {"a": 2, "b": 2, "c": 3, "d": 1, "e": 1}
 
 
 def test_a_short_side_still_gets_its_vent() -> None:
