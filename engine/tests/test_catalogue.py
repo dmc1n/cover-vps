@@ -21,7 +21,8 @@ def test_family_preset_is_layer_two(tmp_path: Path) -> None:
     assert "table" in list_families()
     d = model_dir(tmp_path, {"family": "table"})
     p = resolve_model(d)
-    assert p["hull.support"] == "balloon" and p.source("hull.support") == "preset"
+    assert p["hull.support"] == "balloons" and p.source("hull.support") == "preset"
+    assert p["features.middle_cord"] is True  # table covers: the second drawcord
     d2 = tmp_path / "m2"
     d2.mkdir()
     (d2 / "cover.json").write_text(
