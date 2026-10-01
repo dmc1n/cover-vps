@@ -722,3 +722,23 @@ other stays straight; analyse it with the DeepSeek API, we must learn from our m
   Vento daybed: 9 pieces, every slope with its mirror image. Kota 2-seater: unchanged, 7.
 - Box faces are now flat regions (neighbours turning less than 1°, slivers merged), not equal
   rounded normals: 11 of 15 SUNS products that stopped at the cut now pass.
+
+## ADR-042 — The audit: fixed checks on every cover, and the AI's second opinion with pictures
+
+Status: accepted, 1 Oct 2026 (owner, on the Basta 340: "the table legs come outside the cover,
+and I miss the balloons; check all models, cover surface and panels, with a double check by
+DeepSeek").
+
+- Cause of the Basta: its legs are long single triangles from the floor up; the box cover took
+  only the corner points above the hem, so the slanting legs between 5 and 60 cm were not seen
+  and the cover was 4 cm short at each end. The furniture is now cut at hem height first. The
+  balloons were missing because the table had not been recalculated yet.
+- `cover audit [--ai]` measures each model: steps complete and newer than the cover surface;
+  furniture above the hem inside the cover (20 000 points, 3 mm); a table has balloons; a
+  symmetric piece of furniture has a symmetric cover; water runs off; the grade and no scrap
+  pieces. `audit.json` per model, `audit.csv` for all.
+- With `--ai` DeepSeek V4.1 Flash (it reads pictures) gets three straight views (furniture grey,
+  cover see-through blue, furniture outside the cover red), the product photo and the measured
+  checks, and gives its verdict (good / doubt / wrong) and where it disagrees with the program.
+  The oblique cover.png misled it (it called the symmetric daybed asymmetric), hence the
+  straight views. On the old Basta both found the legs; on the fixed daybed both said good.

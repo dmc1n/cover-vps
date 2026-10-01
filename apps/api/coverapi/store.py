@@ -37,6 +37,8 @@ EXTRA_FILES = [
     "reference.png",
     "reference.json",
     "kind.json",
+    "audit.json",
+    "audit.png",
 ]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)
 MEDIA = {

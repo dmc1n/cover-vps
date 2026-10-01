@@ -134,6 +134,13 @@ Suggest at most four actions, most important first; none if the cover is already
 
 
 def ask(params: EffectiveParams, system: str, user: str) -> dict[str, Any]:
+    return ask_parts(params, system, user)
+
+
+def ask_parts(
+    params: EffectiveParams, system: str, user: str | list[dict[str, Any]]
+) -> dict[str, Any]:
+    """`user`: text, or a list of parts (text and pictures, OpenAI style)."""
     provider = str(params["ai.provider"])
     if provider == "none":
         raise CoverError("AI advice is off (ai.provider = none)")

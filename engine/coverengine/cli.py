@@ -402,6 +402,55 @@ def _cmd_ai(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_audit(args: argparse.Namespace) -> int:
+    """Check calculated covers (and ask the AI for a second opinion): audit.json per model."""
+    import csv
+
+    from coverengine.audit import audit
+    from coverengine.catalogue import info
+
+    dirs = (
+        [d for d in args.model]
+        if args.model
+        else sorted(d for d in args.models.iterdir() if (d / "model.json").is_file())
+    )
+    if args.tag:
+        dirs = [d for d in dirs if args.tag in info(d)["tags"]]
+    args.out.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for d in dirs:
+        params = resolve_params(args, d / "cover.json")
+        try:
+            doc = audit(d, params, args.ai)
+        except Exception as exc:  # noqa: BLE001 - one broken model must not stop the audit
+            print(f"{d.name}: audit failed: {exc}")
+            rows.append({"model": d.name, "ok": False, "failed": "; ".join(["audit", str(exc)])})
+            continue
+        failed = [c["check"] for c in doc["checks"] if not c["ok"]]
+        ai = doc.get("ai", {})
+        rows.append(
+            {
+                "model": d.name,
+                "ok": doc["ok"],
+                "failed": "; ".join(failed),
+                "details": " | ".join(c["detail"] for c in doc["checks"] if not c["ok"]),
+                "ai_verdict": ai.get("verdict", ai.get("error", "")),
+                "ai_problems": " | ".join(ai.get("problems", [])),
+                "ai_disagrees": " | ".join(ai.get("disagree", [])),
+            }
+        )
+        verdict = f"  AI: {rows[-1]['ai_verdict']}" if args.ai else ""
+        print(f"{d.name:<50} {'ok' if doc['ok'] else 'NOT OK: ' + ', '.join(failed)}{verdict}")
+    keys = ["model", "ok", "failed", "details", "ai_verdict", "ai_problems", "ai_disagrees"]
+    with (args.out / "audit.csv").open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=keys)
+        w.writeheader()
+        w.writerows(rows)
+    good = sum(1 for r in rows if r["ok"])
+    print(f"{len(rows)} models: {good} pass every check -> {args.out / 'audit.csv'}")
+    return 0
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
     """A catalogue report: every model graded ready / check / failed (CSV and PDF)."""
     import csv
@@ -668,6 +717,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--learn", metavar="COMPLAINT", help="why was this cover wrong? (a lesson)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_ai)
+
+    p = sub.add_parser("audit", help="check calculated covers, optionally with an AI opinion")
+    p.add_argument("model", type=Path, nargs="*", help="model directories (default: all)")
+    p.add_argument("--models", type=Path, default=Path("models"), help="models folder")
+    p.add_argument("--tag", help="only models with this tag")
+    p.add_argument("--ai", action="store_true", help="ask the AI for a second opinion")
+    p.add_argument("--out", type=Path, default=Path("out/audit"), help="where audit.csv goes")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_audit)
 
     p = sub.add_parser("report", help="catalogue report: every model ready / check / failed")
     p.add_argument("--models", type=Path, default=Path("models"), help="models folder")

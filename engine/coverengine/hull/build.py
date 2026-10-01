@@ -301,7 +301,13 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
 
     hem = _p(params, "hull.hem_height_mm")
     model = trimesh.Trimesh(v, f, process=False)
-    points = np.asarray(v)[np.asarray(v)[:, 2] > hem]
+    # everything above the hem, with the furniture cut off at hem height: a slanting leg is one
+    # long triangle from the floor up, with no corner points between (Basta 340: the cover was
+    # 4 cm short at each end)
+    above = trimesh.intersections.slice_mesh_plane(
+        model, plane_normal=[0.0, 0.0, 1.0], plane_origin=[0.0, 0.0, hem], cap=False
+    )
+    points = np.asarray(above.vertices, np.float64)
     product = (read_cover_definition(model_dir).get("notes") or model_dir.name).split(": ")[-1]
     held = None
     if params["hull.support"] == "balloons":
