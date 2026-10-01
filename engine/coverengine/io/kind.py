@@ -79,7 +79,8 @@ def measure(mesh: trimesh.Trimesh) -> dict[str, float]:
         for k in range(SIGHT_DIRECTIONS):
             a = 2 * math.pi * k / SIGHT_DIRECTIONS
             d = np.array([math.cos(a), math.sin(a)])
-            sight = shapely.LineString([centre[:2] - d * radius, centre[:2]])
+            # the whole line across (an L shape has its middle in the open corner)
+            sight = shapely.LineString([centre[:2] - d * radius, centre[:2] + d * radius])
             hit += bool(len(segments)) and sight.intersects(lines)
     sides = hit / (len(SIGHT_HEIGHTS) * SIGHT_DIRECTIONS)
     return {

@@ -362,7 +362,23 @@ def _given(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> H
     warnings: list[str] = []
     if len(_boundary_vertices(mesh)) == 0:
         warnings.append("the cover surface is closed: a cover must be open at the bottom")
-    return Hull(mesh, _plain_report(model_dir, mesh, v, f, params, "given", warnings), warnings)
+    # water: faces on top flatter than the minimum slope (rule 12)
+    flat = mesh.face_normals[:, 2] > math.cos(math.radians(_p(params, "hull.min_slope_deg")))
+    flat_mm2 = float(mesh.area_faces[flat].sum())
+    report = _plain_report(model_dir, mesh, v, f, params, "given", warnings)
+    if flat_mm2 > _p(params, "hull.flat_patch_mm") ** 2:
+        where = mesh.triangles_center[flat][int(np.argmax(mesh.area_faces[flat]))]
+        report["drainage"] = {
+            "drains": False,
+            "flat_area_mm2": round(flat_mm2, 1),
+            "hollow_area_mm2": 0.0,
+            "worst_location_mm": [round(float(where[0]), 1), round(float(where[1]), 1)],
+        }
+        warnings.append(
+            f"{flat_mm2 / 1e6:.2f} m2 of the top is flatter than "
+            f"{_p(params, 'hull.min_slope_deg'):g} degrees: water would stay there"
+        )
+    return Hull(mesh, report, warnings)
 
 
 def _plain_report(

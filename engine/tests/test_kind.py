@@ -94,3 +94,29 @@ def test_a_symmetric_product_gets_its_slopes_in_mirror_pairs() -> None:
     for planes in box.grow(9):
         xs = sorted(round(float(p[0]), 3) for p in planes)
         assert xs == sorted(-x for x in xs)  # every face has its mirror image
+
+
+def test_an_l_shaped_cover_from_a_drawing_becomes_the_drawn_pieces(tmp_path: Path) -> None:
+    """The owner's C6 (ADR-045): recognised as a cover surface, the strip and the slope split
+    at 45 degrees at the corner, one piece per wall, every piece flat."""
+    import sys
+
+    from coverengine.cli import main
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+    from c6_surface import mesh
+
+    src = tmp_path / "c6.stl"
+    mesh().export(src)
+    model = tmp_path / "c6"
+    assert main(["import", str(src), "--out", str(model), "--units", "mm"]) == 0
+    assert read(model)["guess"] == COVER  # type: ignore[index]
+    confirm(model, COVER)
+    assert main(["hull", str(model)]) == 0
+    assert main(["cut", str(model)]) == 0
+    panels = json.loads((model / "panels.json").read_text())["panels"]
+    assert len(panels) == 10
+    tops = sorted(round(p["area_m2"], 2) for p in panels if p["region"] == "top")
+    # strips 30 cm wide with 45 degree ends (0.825, 1.095 m2); slopes 80 cm across, 93.3 cm
+    # along the slope (1.76 and 2.48 m2 seen from above)
+    assert tops == [0.82, 1.09, 2.05, 2.89]

@@ -771,3 +771,21 @@ Status: accepted, 1 Oct 2026 (owner).
   side lower than 16.5 cm gets none, with a warning. Kota front (22.4 cm): 25 × 15 cm. A short
   side still gets one (owner): centred, closer to the seams than 10 cm, at least the seam
   allowance away; a side under 28 cm of hem has no room (warning).
+
+## ADR-045 — A cover drawing translated to production: the owner's C6
+
+Status: accepted, 1 Oct 2026 (owner: "make a model based on the cover of C6, to see if you can
+translate this correctly to a production ready model").
+
+- `scripts/c6_surface.py` builds the cover surface from the drawing's sizes (L shape 290 × 380
+  cm, arms 110 cm, back 85 cm, front 37 cm, a flat strip 30 cm along the back measured on the
+  top view, 45° seams at the corner); it runs through `hull.top: given` as model `drawing-c6`.
+- Three program changes came out of it, for every uploaded cover surface: the upload guess
+  looks along whole lines (an L has its middle in the open corner); a flat piece that turns a
+  corner is split from its inside corner along the line halving it (the 45° seam); the water
+  check is real (the top faces flatter than the minimum slope), no longer assumed.
+- Result: 10 pieces as drawn (2 strips, 2 slopes, 2 back walls, 2 inside walls, 2 ends), 0 %
+  stretch, seams equal, every piece within the roll; 13 air vents by the owner's rule against 7
+  air pockets in the drawing; the flat strip holds water (1.92 m²). DeepSeek, given the drawing
+  and the result, found the vent difference; its other four remarks were misreadings (slope
+  length taken as width, allowance corners taken as size), checked one by one.

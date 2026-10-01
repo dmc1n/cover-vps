@@ -70,6 +70,9 @@ PROPOSALS_JSON = "proposals.json"
 BOX_NORMAL_DIGITS = 3
 BOX_COPLANAR_DEG = 1.0  # param-ok: neighbours turning less are one flat face
 BOX_SCRAP_SHARE = 0.002  # param-ok: flat bits smaller than this share of the cover are merged
+# A flat piece is L-shaped when its convex outline is this share larger than the piece itself.
+CORNER_SHARE = 0.02  # param-ok: geometric tolerance
+SIMPLIFY_MM = 1.0  # param-ok: outline tolerance for finding its corners
 BOX_UPRIGHT_NZ = 0.1  # param-ok: geometric rule  # proposed seams accepted by cover improve
 MM_PER_CM = 10.0  # param-ok: unit conversion
 # Smoothing a jittery wall seam in place: passes, and how far a face may turn (cosine).
@@ -372,7 +375,50 @@ def _flat_regions(hull: trimesh.Trimesh) -> NDArray[np.int64]:
         shared = np.bincount(other, weights=edge_len[touch])
         label[label == r] = int(np.argmax(shared))
     _, label = np.unique(label, return_inverse=True)
-    return label.ravel().astype(np.int64)
+    return _split_at_inside_corners(hull, label.ravel().astype(np.int64))
+
+
+def _split_at_inside_corners(hull: trimesh.Trimesh, label: NDArray[np.int64]) -> NDArray[np.int64]:
+    """A flat piece that turns a corner (an L-shaped strip) is split from its inside corner
+    along the line halving that corner: the 45 degree seam of an L-shaped cover (ADR-045)."""
+    out = label.copy()
+    nxt = int(label.max()) + 1
+    for r in range(int(label.max()) + 1):
+        m = np.flatnonzero(out == r)
+        if not len(m):
+            continue
+        n = hull.face_normals[m].mean(axis=0)
+        n /= np.linalg.norm(n)
+        u = np.cross(n, [0.0, 0.0, 1.0] if abs(n[2]) < 0.9 else [1.0, 0.0, 0.0])  # param-ok
+        u /= np.linalg.norm(u)
+        w = np.cross(n, u)
+        tri = hull.vertices[hull.faces[m]]
+        flat = np.stack([tri @ u, tri @ w], axis=-1)
+        piece = shapely.union_all([shapely.Polygon(t) for t in flat]).buffer(0)
+        if not isinstance(piece, shapely.Polygon) or piece.convex_hull.area <= piece.area * (
+            1 + CORNER_SHARE
+        ):
+            continue
+        ring = np.asarray(piece.simplify(SIMPLIFY_MM).exterior.coords)[:-1]
+        if shapely.LinearRing(ring).is_ccw is False:
+            ring = ring[::-1]
+        centres = tri.mean(axis=1) @ np.column_stack([u, w])
+        for i in range(len(ring)):
+            a, v, b = ring[i - 1], ring[i], ring[(i + 1) % len(ring)]
+            e1, e2 = (a - v) / np.linalg.norm(a - v), (b - v) / np.linalg.norm(b - v)
+            if e1[0] * e2[1] - e1[1] * e2[0] <= 0:  # not an inside (reflex) corner
+                continue
+            d = -(e1 + e2)
+            d /= np.linalg.norm(d)
+            side = (d[0] * (centres[:, 1] - v[1]) - d[1] * (centres[:, 0] - v[0])) > 0
+            here = out[m] == r
+            if side[here].all() or not side[here].any():
+                continue
+            out[m[here & side]] = nxt
+            nxt += 1
+            break
+    _, out = np.unique(out, return_inverse=True)
+    return out.ravel().astype(np.int64)
 
 
 def _box_cut(model_dir: Path, hull: trimesh.Trimesh, params: EffectiveParams) -> Cut:
