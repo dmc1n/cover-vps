@@ -4,7 +4,7 @@ One list, kept current. Each question says what the program does meanwhile (the 
 work does not wait. Answers go into `config/defaults.yaml` (one line each) or a model's
 `cover.json`, and are recorded in `docs/DECISIONS.md`.
 
-Last updated: 2026-10-01 (night run, owner offline). New: questions 18–23 (the SUNS catalogue).
+Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons under table covers).
 
 ## Most important
 
@@ -94,10 +94,23 @@ Last updated: 2026-10-01 (night run, owner offline). New: questions 18–23 (the
 21. **Sets** (99 entries: lounge sets, dining sets): a cover per product in the set (the
     products are also in the catalogue on their own), or covers for whole sets too?
     *Meanwhile:* single products only.
-22. **Tables: balloon or frame?** A ridge frame (a gable-roof cover) is now possible
+22. *Answered 1 Oct: balloons, under every table cover; the owner uploads the 3D model of the
+    balloons and the AI proposes how many per table (questions 24–27).* **Tables: balloon or frame?** A ridge frame (a gable-roof cover) is now possible
     (`hull.support: frame`). On the test tables the balloon was as good or better. Which do you
     use? *Meanwhile:* balloon.
 23. **Vents on low skirts** (question 4 again, with numbers): on almost all SUNS seating the
     skirt is 15–24 cm and the vents (28.5 cm with allowance) do not fit. Raise the skirt to at
     least 30 cm when there are vents, put vents on the back only, or make them smaller?
 
+
+## Balloons under table covers (new, 1 October)
+
+24. **Balloon sizes:** one size or several? Diameter and height when inflated (the 3D model will
+    show the shape; is it at the pressure you use)?
+25. **Placement:** is there a largest distance between balloons, or from a balloon to the table
+    edge, before the fabric sags and holds water? Do they lie loose on the table top or are they
+    fixed (straps, a pocket sewn into the cover)?
+26. **Slope:** is 5° enough for the fabric between balloons, or what slope do you see on a good
+    cover?
+27. **Round and square tables:** always one balloon in the middle for small tables (up to which
+    size)?
