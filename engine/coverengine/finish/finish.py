@@ -350,7 +350,7 @@ def _vent_pieces(count: int, params: EffectiveParams, start: int) -> list[Piece]
         piece.pen_lines.append(box)
         piece.pen_text.append(("LOGO", np.array([cx, cy + lh / 2]), label * 0.8))
         piece.pen_text[0] = (piece.pen_text[0][0], np.array([width / 2, a + label]), label)
-        piece.note += "; the logo in the frame marked LOGO"
+        piece.note = "vent hood with the logo; holds the plastic insert"
         return piece
 
     return [

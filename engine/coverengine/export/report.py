@@ -54,3 +54,6 @@ def write_report(path: Path, rows: list[dict[str, Any]], title: str) -> None:
                     fig.text(x, y, c, fontsize=6, color=colour)
             fig.text(0.94, 0.02, f"page {n + 1} of {len(pages)}", fontsize=6, ha="right")
             pdf.savefig(fig)
+    from coverengine.export.brand import brand
+
+    brand(path)

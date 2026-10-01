@@ -24,6 +24,7 @@ Note column.
 | ezdxf | 1.4.4 | MIT License | DXF read and write |  |
 | ruamel.yaml | 0.19.1 | MIT | parameter file (config/defaults.yaml) |  |
 | matplotlib | 3.11.2 | Python Software Foundation License | DXF preview renders, plots |  |
+| pymupdf | 1.28.2 | see package | reading the owner's PDF drawings (learning) | AGPL-3.0: fine for internal use (ADR-037); review before distributing |
 | fastapi | 0.141.1 | MIT | API (M6) |  |
 | uvicorn | 0.54.0 | BSD-3-Clause | API server (M6) |  |
 | pytest | 9.1.1 | MIT | tests (dev) |  |
@@ -32,7 +33,6 @@ Note column.
 | pre-commit | 4.6.2 | MIT | commit hooks (dev) |  |
 | python-multipart | 0.0.32 | Apache-2.0 | file uploads in the API (M6) |  |
 | httpx | 0.28.1 | BSD-3-Clause | API test client (M6) |  |
-| pymupdf | 1.28.2 | see package | reading the owner's PDF drawings (learning) | AGPL-3.0: fine for internal use (ADR-037); review before distributing |
 <!-- END GENERATED -->
 
 ## Not Python

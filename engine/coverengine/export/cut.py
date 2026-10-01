@@ -198,6 +198,9 @@ def write_cutting_list(
         text(LEFT_MM, y + 10 + 5 * i, f"warning: {w}"[:120], FONT - 1)  # param-ok: layout
     with PdfPages(path, metadata={"CreationDate": None, "Creator": "cover-pattern-engine"}) as pdf:
         pdf.savefig(fig)
+    from coverengine.export.brand import brand
+
+    brand(path)
     return length
 
 

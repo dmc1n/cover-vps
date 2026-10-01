@@ -1001,4 +1001,6 @@ def write_drawing(model_dir: Path, doc: dict[str, Any], params: EffectiveParams,
     ) as pdf:
         for fig in figures:
             pdf.savefig(fig, dpi=DPI)
-    return out
+    from coverengine.export.brand import brand
+
+    return brand(out)

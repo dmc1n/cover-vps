@@ -17,6 +17,7 @@ dependencies = [
   "ezdxf",
   "ruamel.yaml",
   "matplotlib",
+  "pymupdf",
 ]
 
 [project.optional-dependencies]
