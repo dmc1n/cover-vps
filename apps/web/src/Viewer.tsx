@@ -16,6 +16,7 @@ interface Layer {
 const LAYERS: Layer[] = [
   { file: "model.glb", label: "Furniture", opacity: 1 },
   { file: "balloons.glb", label: "Balloons", opacity: 1 },
+  { file: "chairs.glb", label: "Chair space", opacity: 0.35 },
   { file: "preview.glb", label: "Cover surface", opacity: 0.55 },
   { file: "panels.glb", label: "Panels", opacity: 1 },
 ];
@@ -28,7 +29,13 @@ export function Viewer({ id, files, stamp }: { id: string; files: string[]; stam
     const panels = files.includes("panels.glb");
     if (files.includes("balloons.glb")) {
       // a table: furniture and balloons, with the cover see-through over them
-      return { "model.glb": true, "balloons.glb": true, "preview.glb": true, "panels.glb": false };
+      return {
+        "model.glb": true,
+        "balloons.glb": true,
+        "chairs.glb": true,
+        "preview.glb": true,
+        "panels.glb": false,
+      };
     }
     return { "model.glb": !panels, "preview.glb": false, "panels.glb": panels };
   });

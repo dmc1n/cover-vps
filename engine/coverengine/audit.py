@@ -167,6 +167,20 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
                 else "a table without balloons under its cover",
             )
         )
+    seated = hull.get("chairs") or {}
+    if seated:
+        across = np.ptp(cover.vertices[:, :2], axis=0).min()
+        need = float(seated["cover_width_mm"])
+        checks.append(
+            _check(
+                "chair space",
+                across >= need,
+                f"{seated['kind'].replace('_', ' ')} table: the cover is "
+                f"{across / MM_PER_CM:.0f} cm wide across, at least {need / MM_PER_CM:.0f} cm "
+                f"(table + 2 x {seated['room_mm'] / MM_PER_CM:g} cm for the chairs), "
+                f"{seated['height_mm'] / MM_PER_CM:g} cm high at the chairs",
+            )
+        )
     axes = Box._symmetry(np.asarray(furniture.vertices, np.float64))
     for axis, mid in axes:
         gap = mirror_gap(cover, axis, mid)

@@ -104,11 +104,16 @@ def test_vents_spread_and_clear_of_seams() -> None:
         assert np.ptp(r[:, 0]) == pytest.approx(250.0) and np.ptp(r[:, 1]) == pytest.approx(220.0)
 
 
-def test_vent_on_a_low_skirt_is_reported() -> None:
+def test_a_low_skirt_gets_a_lower_vent_or_none() -> None:
+    """Owner, 1 Oct 2026: same width, lower opening down to 10 cm; lower sides get none."""
     d = doc(square("skirt-front", 250, ["hem", "seam", "seam", "seam"], [False] * 4))
     d["panels"][0]["outline_mm"] = [[0, 0], [1200, 0], [1200, 250], [0, 250]]
-    _, warnings = place_vents(d["panels"], params())
-    assert any("lower than" in w for w in warnings)
+    vents, warnings = place_vents(d["panels"], params())
+    (rect,) = vents["skirt-front"]
+    assert np.allclose(np.ptp(rect, axis=0), [250, 180])  # 25 - 5 - 1.5 cm, whole cm
+    d["panels"][0]["outline_mm"] = [[0, 0], [1200, 0], [1200, 150], [0, 150]]
+    vents, warnings = place_vents(d["panels"], params())
+    assert not vents and any("lower than 16.5 cm" in w for w in warnings)
 
 
 def test_roll_length_rows_across_the_roll() -> None:

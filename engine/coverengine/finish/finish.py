@@ -225,12 +225,13 @@ def place_vents(
     )
     height = {p["name"]: float(np.ptp(np.asarray(p["outline_mm"])[:, 1])) for p in panels}
     hem_total = sum(r.length for r in runs)  # the vent count: per metre of the whole hem
-    tall = [r for r in runs if height.get(r.panel, 0.0) >= need]
-    runs = tall or runs
+    # a low side gets a lower opening, same width, at least vent_min_height_mm (owner, 1 Oct
+    # 2026); the plastic insert, the hood and the membrane stay the same size
+    least = need - _p(params, "features.vent_height_mm") + _p(params, "features.vent_min_height_mm")
+    tall = [r for r in runs if height.get(r.panel, 0.0) >= least]
+    runs = tall  # a side lower than that gets no vent (warned below)
     total = sum(r.length for r in runs)
     out: dict[str, list[Array]] = {}
-    if total <= 0:
-        return out, warnings
     # one per metre of the whole hem, and at least one on every side (owner, 1 Oct 2026)
     sides: dict[str, list[HemRun]] = {}
     for r in runs:
@@ -239,12 +240,14 @@ def place_vents(
     for side in low:
         warnings.append(
             f"no air vent on the {side.removeprefix('skirt-') or 'skirt'}: the skirt there is "
-            f"lower than {need / MM_PER_CM:.1f} cm"
+            f"lower than {least / MM_PER_CM:.1f} cm"
         )
+    if total <= 0:
+        return out, warnings
     count = max(vent_count(hem_total, params), len(sides))
     shares = per_side(count, {k: sum(r.length for r in v) for k, v in sides.items()})
     w = _p(params, "features.vent_width_mm")
-    h = _p(params, "features.vent_height_mm")
+    full_h = h = _p(params, "features.vent_height_mm")
     above = _p(params, "features.vent_above_hem_mm")
     clear = _p(params, "features.vent_seam_clearance_mm")
     allowance = _p(params, "stitching.allowance_mm")
@@ -270,6 +273,8 @@ def place_vents(
                     centre, t = _point_along(r.points, local)
                     up = np.array([-t[1], t[0]])  # into the panel (counter-clockwise outline)
                     base = centre + up * above
+                    room_h = height.get(r.panel, 0.0) - above - allowance
+                    h = min(full_h, math.floor(room_h / MM_PER_CM) * MM_PER_CM)  # whole cm
                     rect = np.array(
                         [
                             base - t * w / 2,

@@ -750,3 +750,20 @@ Status: accepted, 1 Oct 2026. 115 drawings of earlier covers, read by `scripts/d
 cover for sloped and plain boxes, and show two shapes the program lacks: L shapes (39 of 115, a
 sloped box along each arm with a 45° seam at the corner) and round tables (a disc and a band).
 Both are the next engine work. Report: `docs/reports/DRAWINGS-2026-10-01.md`.
+
+## ADR-044 — Table covers include the chairs; lower air vents on low sides
+
+Status: accepted, 1 Oct 2026 (owner).
+
+- Chairs: every cover for a dining table, low dining table or low bar table also covers the
+  chairs pushed in along the two long sides (not the short ends): `hull.chair_room_mm` 330 beyond
+  the table top on each side (a 100 cm table: 166 cm). Height fixed per kind: dining tables (74
+  to 77 cm) 87 cm as the owner's cover T1; low dining and low bar chairs have other heights (850
+  and 1100 mm, to confirm). Bar tables, lounge and side tables, fire pits, picnic tables: none.
+  `hull.chairs: auto` decides by the name and the height. The box cover is made round table,
+  chair space and balloons; the 3D view shows the chair space (`chairs.glb`), the audit checks
+  the width. Palermo 240 (114 cm wide): cover 182 cm wide, 3 balloons, 5 + 1 pieces.
+- Air vents (question 29): one per metre of hem, at least one on each side. A side too low for
+  the full opening gets a lower one, same 25 cm width, whole cm, at least 10 cm
+  (`features.vent_min_height_mm`); the plastic insert, hood and membrane stay the same size. A
+  side lower than 16.5 cm gets none, with a warning. Kota front (22.4 cm): 25 × 15 cm.

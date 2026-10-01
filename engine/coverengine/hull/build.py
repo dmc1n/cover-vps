@@ -310,6 +310,11 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
     points = np.asarray(above.vertices, np.float64)
     product = (read_cover_definition(model_dir).get("notes") or model_dir.name).split(": ")[-1]
     held = None
+    from coverengine.hull.chairs import chair_space
+
+    blocks, seated = chair_space(np.asarray(v), model_dir, params)
+    if blocks:
+        points = np.vstack([points, *blocks])
     if params["hull.support"] == "balloons":
         from coverengine.hull.balloons import box_points
 
@@ -321,9 +326,12 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
             "tight fit, a simple roof of 2 or 4 roof pieces is usual)"
         )
     mesh, box, warnings = box_hull(points, model, params, product)
+    if blocks or held:  # chairs and balloons widen the box on purpose: not a bay to follow
+        warnings = [w for w in warnings if "far from a box" not in w]
     report = _plain_report(model_dir, mesh, v, f, params, "box", warnings)
     report["box"] = box
     report["support"] = held
+    report["chairs"] = seated
     return Hull(mesh, report, warnings)
 
 
@@ -569,7 +577,28 @@ def write_hull(model_dir: Path, hull: Hull, out_dir: Path | None = None) -> Path
     preview += [("balloon", _coloured(b, BALLOON_RGBA)) for b in balloons]
     (out / PREVIEW_GLB).write_bytes(glb_bytes(preview))
     write_balloons(out, balloons)
+    write_chairs(out, hull.report)
     return out
+
+
+CHAIRS_GLB = "chairs.glb"
+CHAIR_RGBA = (120, 170, 90, 255)  # param-ok: display colour (green; see-through in the viewer)
+
+
+def write_chairs(out: Path, report: dict[str, Any]) -> None:
+    """The chair space beside the long sides of a table, as blocks for the 3D view."""
+    path = out / CHAIRS_GLB
+    seated = report.get("chairs") or {}
+    if not seated.get("blocks"):
+        path.unlink(missing_ok=True)
+        return
+    parts = []
+    for i, (lo, hi) in enumerate(seated["blocks"]):
+        lo, hi = np.asarray(lo), np.asarray(hi)
+        block = trimesh.creation.box(extents=hi - lo)
+        block.apply_translation((lo + hi) / 2)
+        parts.append((f"chairs-{i + 1}", _coloured(block, CHAIR_RGBA)))
+    path.write_bytes(glb_bytes(parts))
 
 
 BALLOONS_GLB = "balloons.glb"

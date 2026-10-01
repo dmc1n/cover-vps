@@ -38,6 +38,16 @@ hull:                            # the cover surface (drape hull)
                                  # for flat tops (tables): balloons = the workshop's balloons
                                  # (balloon_model) in a grid; frame = a ridge beam along the long
                                  # axis, a gable roof that lies flat; balloon = a dome
+  chairs: auto                   # auto | none | dining | low_dining | low_bar   the chairs pushed
+                                 # in along the two long sides of a table, covered too (owner,
+                                 # 1 Oct 2026); auto: by the name and the table height
+  chair_room_mm: 330             # chair space beyond the table top on each long side (owner: a
+                                 # 100 cm table gets a 166 cm cover)
+  chair_height_dining_mm: 870    # cover height over dining tables of 74 to 77 cm (owner: as T1)
+  chair_height_low_dining_mm: 850  # TO CONFIRM: low dining chairs are lower (owner, 1 Oct)
+  chair_height_low_bar_mm: 1100  # TO CONFIRM: low bar chairs are higher (owner, 1 Oct)
+  dining_table_min_mm: 740       # a table this high up to dining_table_max_mm is a dining table
+  dining_table_max_mm: 770
   balloon_model: table-baloon    # the balloon's model folder (owner, 1 Oct 2026: one size)
   balloon_count: 0               # balloons under a table; 0 = chosen by the AI (or, without AI,
                                  # the fewest with which all water runs off)
@@ -110,6 +120,8 @@ features:                        # per-cover defaults, overridden per model
   vent_width_mm: 250             # air vent opening (owner 2026-09-30): a hood of extra fabric
   vent_height_mm: 220            # holds a plastic insert that keeps it open; a membrane inside
                                  # keeps dirt out
+  vent_min_height_mm: 100        # a low side gets a lower opening (same width, same insert,
+                                 # hood and membrane), not lower than this (owner, 1 Oct 2026)
   vent_above_hem_mm: 50          # bottom edge of the vent above the lower end of the cover
   vents_per_metre: 1             # one vent per full metre of hem length, spread evenly
   vents_min: 1                   # every cover has at least one vent, and every side of it too

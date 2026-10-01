@@ -123,3 +123,12 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     gave on 30 September is one per metre, 5 cm above the bottom edge. Which one is right now?
 30. *Answered 1 Oct: the top may be several pieces; no roll wider than 150 cm.* **Round tables of 240 cm** (R1) are wider than the 150 cm roll: is the top disc made of
     several pieces, or is that fabric on a wider roll?
+
+## Chairs under table covers (new, 1 October)
+
+31. **Chair height for low dining tables** (68 to 70 cm, e.g. Basta low dining): how high do
+    the chairs reach? *Meanwhile:* 85 cm.
+32. **Chair height for low bar tables** (95 to 101 cm, e.g. Basta low bar): how high? *Meanwhile:*
+    110 cm.
+33. **Dining tables outside 74 to 77 cm** (Monte Vari 81 cm in the 3D file, Savona and Sorolo
+    71 to 73 cm): also 87 cm high? *Meanwhile:* yes, every table named dining table.
