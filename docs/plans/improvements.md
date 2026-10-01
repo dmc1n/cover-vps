@@ -32,6 +32,10 @@ what was checked, what was fixed, and what is next, most important first.
 
 ## 3. What the SUNS run shows (see the catalogue report)
 
+Final run, 1 Oct 00:35, all 304 downloadable products with the final code: 297 complete, 5
+stopped; 5 ready, 292 to check. Numbers per kind and the reasons: `docs/reports/NIGHT-2026-10-01.md`.
+
+
 - **Tables:** mostly good: stretch under 2 % on most rectangular tables; the seams between top
   and skirt differ by 1–3 cm (the balloon tent). Round tables of 150–170 cm are wider than the
   roll in one piece.
