@@ -759,7 +759,8 @@ Status: accepted, 1 Oct 2026 (owner).
   chairs pushed in along the two long sides (not the short ends): `hull.chair_room_mm` 330 beyond
   the table top on each side (a 100 cm table: 166 cm). Height fixed per kind: dining tables (74
   to 77 cm) 87 cm as the owner's cover T1; low dining tables the same (owner: the same cover);
-  low bar chairs are higher (1100 mm, to confirm). Bar tables, lounge and side tables, fire pits, picnic tables: none.
+  low bar tables 123 cm (owner: as the round covers R5, R6, R10). Round tables have chairs
+  all round, the same 33 cm beyond the edge (owner; R1 is 240 cm for a 170 cm table). Bar tables, lounge and side tables, fire pits, picnic tables: none.
   `hull.chairs: auto` decides by the name and the height. The box cover is made round table,
   chair space and balloons; the 3D view shows the chair space (`chairs.glb`), the audit checks
   the width. Palermo 240 (114 cm wide): cover 182 cm wide, 3 balloons, 5 + 1 pieces.
@@ -767,4 +768,6 @@ Status: accepted, 1 Oct 2026 (owner).
   the full opening gets a lower one, same 25 cm width, whole cm, at least 10 cm
   (`features.vent_min_height_mm`), measured where the vent goes and lowered a cm at a time on
   curved or sloping pieces; the plastic insert, hood and membrane stay the same size. A
-  side lower than 16.5 cm gets none, with a warning. Kota front (22.4 cm): 25 × 15 cm.
+  side lower than 16.5 cm gets none, with a warning. Kota front (22.4 cm): 25 × 15 cm. A short
+  side still gets one (owner): centred, closer to the seams than 10 cm, at least the seam
+  allowance away; a side under 28 cm of hem has no room (warning).

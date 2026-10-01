@@ -4,7 +4,8 @@ Owner, 1 October 2026: a table cover also covers the chairs pushed in along the 
 of the table (not the short ends), `hull.chair_room_mm` beyond the table top on each side; a
 100 cm wide table gets a cover of 166 cm. The cover is as high as the chairs: one fixed height
 per kind of table (dining tables 74 to 77 cm: 87 cm, as the owner's cover T1; low dining and low
-bar tables have other chairs). Bar tables, lounge and side tables, fire pits: no chairs.
+bar tables have other chairs). Bar tables, lounge and side tables, fire pits: no chairs. A
+round table has its chairs all round, the same 33 cm beyond its edge.
 
 The program adds a block of chair space beside each long side of the table top, from the floor
 to the chair height, and makes the cover round table, chairs and balloons together.
@@ -27,6 +28,23 @@ TOP_MM = 30.0  # param-ok: geometric tolerance
 MM_PER_CM = 10.0  # param-ok: unit conversion
 # Names of tables without chairs (lounge, side and coffee tables, fire pits, picnic tables).
 NO_CHAIRS = ("lounge", "side", "fire-pit", "picnic", "coffee")
+
+
+# A table top is round when it is as wide as long (within ROUND_ASPECT) and fills its circle
+# (area within ROUND_FILL of the circle's); the chair ring has RING_POINTS corners.
+ROUND_ASPECT = 0.05  # param-ok: geometric tolerance
+ROUND_FILL = 0.9  # param-ok: geometric tolerance
+RING_POINTS = 48  # param-ok: sampling
+
+
+def _round(xy: Array) -> bool:
+    from scipy.spatial import ConvexHull
+
+    size = np.ptp(xy, axis=0)
+    if abs(size[0] - size[1]) > ROUND_ASPECT * size.max():
+        return False
+    area = float(ConvexHull(xy).volume)
+    return bool(area >= ROUND_FILL * np.pi * (size.max() / 2) ** 2)
 
 
 def kind(model_dir: Path, height_mm: float, params: EffectiveParams) -> str:
@@ -62,6 +80,27 @@ def chair_space(
     hem = float(params["hull.hem_height_mm"])  # type: ignore[arg-type]
     top = v[v[:, 2] > height - TOP_MM]
     lo, hi = top[:, :2].min(axis=0), top[:, :2].max(axis=0)
+    if _round(top[:, :2]):  # chairs all round a round table (owner, 1 Oct 2026)
+        centre = (lo + hi) / 2
+        r_table = float(np.max(np.linalg.norm(top[:, :2] - centre, axis=1)))
+        r_out = r_table + room
+        a = np.linspace(0, 2 * np.pi, RING_POINTS, endpoint=False)
+        ring = np.column_stack([centre[0] + r_out * np.cos(a), centre[1] + r_out * np.sin(a)])
+        pts = np.vstack([np.column_stack([ring, np.full(len(ring), z)]) for z in (hem, top_z)])
+        return [pts], {
+            "kind": k,
+            "room_mm": room,
+            "height_mm": top_z,
+            "sides": "all round",
+            "table_mm": [round(2 * r_table)] * 2,
+            "cover_width_mm": round(2 * r_out),
+            "ring": {
+                "centre_mm": [round(float(x), 1) for x in centre],
+                "table_radius_mm": round(r_table, 1),
+                "radius_mm": round(r_out, 1),
+                "z_mm": [hem, top_z],
+            },
+        }
     long_axis = int(np.argmax(hi - lo))
     across = 1 - long_axis
     blocks = []

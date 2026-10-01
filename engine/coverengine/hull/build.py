@@ -589,10 +589,19 @@ def write_chairs(out: Path, report: dict[str, Any]) -> None:
     """The chair space beside the long sides of a table, as blocks for the 3D view."""
     path = out / CHAIRS_GLB
     seated = report.get("chairs") or {}
-    if not seated.get("blocks"):
+    if not seated.get("blocks") and not seated.get("ring"):
         path.unlink(missing_ok=True)
         return
     parts = []
+    if seated.get("ring"):
+        ring = seated["ring"]
+        z0, z1 = ring["z_mm"]
+        band = trimesh.creation.annulus(
+            r_min=ring["table_radius_mm"], r_max=ring["radius_mm"], height=z1 - z0
+        )
+        band.apply_translation((*ring["centre_mm"], (z0 + z1) / 2))
+        path.write_bytes(glb_bytes([("chairs", _coloured(band, CHAIR_RGBA))]))
+        return
     for i, (lo, hi) in enumerate(seated["blocks"]):
         lo, hi = np.asarray(lo), np.asarray(hi)
         block = trimesh.creation.box(extents=hi - lo)

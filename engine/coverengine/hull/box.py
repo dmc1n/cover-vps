@@ -35,6 +35,8 @@ PERCENT = 100.0  # param-ok: ratio to percent
 # distance (mm).
 SYMMETRY_DIRECTIONS = 2000  # param-ok: sampling
 SYMMETRY_MM = 25.0  # param-ok: geometric tolerance
+# The box starts square to the furniture unless a turned rectangle is this share smaller.
+STRAIGHT_SHARE = 0.01  # param-ok: geometric tolerance
 # Candidate face directions closer than this are one candidate (degrees).
 CANDIDATE_SPACING_DEG = 3.0
 # Room between box and furniture is sampled at this many points per box triangle.
@@ -120,9 +122,15 @@ class Box:
         return np.append(n, -(float((self.points @ n).max()) + self.clearance))
 
     def start(self) -> list[Array]:
-        rect = np.asarray(
-            shapely.MultiPoint(self.points[:, :2]).minimum_rotated_rectangle.exterior.coords
-        )[:4]
+        cloud = shapely.MultiPoint(self.points[:, :2])
+        turned = cloud.minimum_rotated_rectangle
+        lo, hi = self.points[:, :2].min(axis=0), self.points[:, :2].max(axis=0)
+        # a turned rectangle only when it is clearly smaller: for a round table any turn is as
+        # small, and the box must stay square to the furniture
+        if turned.area < (1 - STRAIGHT_SHARE) * float(np.prod(hi - lo)):
+            rect = np.asarray(turned.exterior.coords)[:4]
+        else:
+            rect = np.array([[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]])
         out = [np.array([0.0, 0.0, -1.0, self.hem]), self.plane(np.array([0.0, 0.0, 1.0]))]
         centre = rect.mean(axis=0)
         for i in range(4):

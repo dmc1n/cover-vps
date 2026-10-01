@@ -285,10 +285,14 @@ def place_vents(
             for r in side_runs:
                 if s_at <= acc + r.length or r is side_runs[-1]:
                     local = s_at - acc
-                    lo, hi = w / 2 + clear, r.length - w / 2 - clear
-                    if hi < lo:
+                    # a short side still gets its vent (owner, 1 Oct 2026): centred, as far
+                    # from the seams as it can be, at least the seam allowance
+                    gap = clear if r.length >= w + 2 * clear else (r.length - w) / 2
+                    lo, hi = w / 2 + gap, r.length - w / 2 - gap
+                    if gap < allowance:
                         warnings.append(
-                            f"no room for air vent {k} on {r.panel} ({r.length:.0f} mm of hem)"
+                            f"no room for air vent {k} on {r.panel}: {r.length / MM_PER_CM:.0f} cm "
+                            f"of hem, a vent needs {(w + 2 * allowance) / MM_PER_CM:g} cm"
                         )
                         break
                     local = float(np.clip(local, lo, hi))

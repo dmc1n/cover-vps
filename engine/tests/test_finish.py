@@ -145,3 +145,15 @@ def test_vents_one_per_metre_and_at_least_one_on_each_side() -> None:
     assert n == {"skirt-front": 2, "skirt-back": 2, "skirt-left": 1, "skirt-right": 1}
     # a small cover: fewer metres than sides, still one per side
     assert per_side(4, {"a": 500, "b": 500, "c": 400, "d": 400}) == {"a": 1, "b": 1, "c": 1, "d": 1}
+
+
+def test_a_short_side_still_gets_its_vent() -> None:
+    """Owner, 1 Oct 2026: a short side (a 34 cm chair side) needs a vent too."""
+    d = doc(square("skirt-left", 340, ["hem", "seam", "seam", "seam"], [False] * 4))
+    d["panels"][0]["outline_mm"] = [[0, 0], [340, 0], [340, 400], [0, 400]]
+    vents, warnings = place_vents(d["panels"], params())
+    (rect,) = vents["skirt-left"]
+    assert np.isclose(rect[:, 0].min(), 45) and np.isclose(rect[:, 0].max(), 295)  # centred
+    d["panels"][0]["outline_mm"] = [[0, 0], [260, 0], [260, 400], [0, 400]]
+    vents, warnings = place_vents(d["panels"], params())
+    assert not vents and any("a vent needs 28 cm" in w for w in warnings)
