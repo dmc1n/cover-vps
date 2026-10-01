@@ -1,9 +1,27 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, cm, fileUrl, Job, Kind, ModelBrief, ModelDetail, Scalar, Step, STEP_LABEL, STEPS } from "./api";
+import {
+  api,
+  Approval,
+  approvals,
+  auth,
+  cm,
+  fileUrl,
+  Job,
+  Kind,
+  ModelBrief,
+  ModelDetail,
+  Scalar,
+  Step,
+  STEP_LABEL,
+  STEPS,
+  User,
+} from "./api";
 import { AiAdvice } from "./AiAdvice";
 import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { Gallery } from "./Gallery";
 import { QuickSearch } from "./QuickSearch";
+import { Admin } from "./Admin";
+import { Login, SessionContext, useSession, UserMenu, Welcome } from "./Session";
 import { Drawing, Learning } from "./Learning";
 import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
@@ -24,7 +42,26 @@ function useHash(): string {
 export function App() {
   const hash = useHash();
   const m = hash.match(/^#\/model\/([a-z0-9-]+)/);
+  const welcome = hash.match(/^#\/welcome\/([A-Za-z0-9_-]+)/);
+  const [user, setUser] = useState<User | null | undefined>(undefined); // undefined: checking
+  const [loginRequired, setLoginRequired] = useState(true);
+  useEffect(() => {
+    auth
+      .me()
+      .then((r) => {
+        setUser(r.user);
+        setLoginRequired(r.auth);
+      })
+      .catch(() => setUser(null));
+    const out = () => setUser(null);
+    window.addEventListener("login-needed", out);
+    return () => window.removeEventListener("login-needed", out);
+  }, []);
+  if (welcome) return <Welcome token={welcome[1]} onDone={setUser} />;
+  if (user === undefined) return <div className="login-page muted">Loading…</div>;
+  if (user === null) return <Login onDone={setUser} />;
   return (
+    <SessionContext.Provider value={{ user, loginRequired }}>
     <div className="app">
       <header>
         <a href="#/" className="brand" title="Cover Studio">
@@ -51,15 +88,19 @@ export function App() {
         </a>
         {m && <span className="crumb">/ {m[1]}</span>}
         <QuickSearch />
+        {loginRequired && <UserMenu user={user} onLogout={() => setUser(null)} />}
       </header>
       <main>{m ? <ModelPage id={m[1]} /> : hash.startsWith("#/catalogue") ? (
           <Gallery />
         ) : hash.startsWith("#/learning") ? (
           <Learning />
+        ) : hash.startsWith("#/admin") && user.role === "admin" ? (
+          <Admin />
         ) : (
           <ModelList />
         )}</main>
     </div>
+    </SessionContext.Provider>
   );
 }
 
@@ -269,6 +310,81 @@ const TABS: [Tab, string][] = [
   ["log", "Warnings and log"],
 ];
 
+/** The approval of the definitive drawing (ADR-047): who approved which revision, or why not. */
+function ApprovalCard({ model, onChange }: { model: ModelDetail; onChange: () => void }) {
+  const { user } = useSession();
+  const [note, setNote] = useState("");
+  const [msg, setMsg] = useState("");
+  if (!model.files.includes("cut.dxf")) return null;
+  const a: Approval | null | undefined = model.approval;
+  const act = async (f: () => Promise<unknown>, done: string) => {
+    setMsg("");
+    try {
+      await f();
+      setMsg(done);
+      onChange();
+    } catch (e) {
+      setMsg(String(e).replace(/^Error: /, ""));
+    }
+  };
+  const date = a ? new Date(a.time * 1000).toLocaleString() : "";
+  return (
+    <section className={`card approval ${a ? (a.valid ? "ok" : "stale") : "none"}`}>
+      <div className="approval-state">
+        {!a && <strong>Definitive drawing: not approved yet</strong>}
+        {a && a.valid && (
+          <strong>
+            Approved by {a.name} on {date}
+            {a.revision !== null && `, revision ${a.revision}`}
+          </strong>
+        )}
+        {a && !a.valid && (
+          <strong>
+            Changed after the approval by {a.name} ({date}): approve again before cutting
+          </strong>
+        )}
+        {a?.note && <span className="muted"> · {a.note}</span>}
+      </div>
+      <div className="row">
+        {a?.valid && (
+          <>
+            <a href={`/api/models/${model.id}/approved/sizes.pdf`} target="_blank" rel="noreferrer">
+              Approved size drawing
+            </a>
+            <a href={`/api/models/${model.id}/approved/cutting-list.pdf`} target="_blank" rel="noreferrer">
+              Approved cutting list
+            </a>
+          </>
+        )}
+        {user?.can_approve && (!a || !a.valid) && (
+          <>
+            <input placeholder="note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+            <button className="primary" onClick={() => act(() => approvals.approve(model.id, note), "Approved.")}>
+              Approve the definitive drawing
+            </button>
+          </>
+        )}
+        {user?.can_approve && a && (
+          <button onClick={() => act(() => approvals.withdraw(model.id), "Approval withdrawn.")}>Withdraw</button>
+        )}
+        {!user?.can_approve && user?.role !== "viewer" && (!a || !a.valid) && (
+          <button
+            onClick={() =>
+              act(async () => {
+                const r = await approvals.ask(model.id);
+                setMsg(r.mailed.length ? `Asked ${r.mailed.join(", ")} by mail.` : "No approver could be mailed.");
+              }, "")
+            }
+          >
+            Ask for approval
+          </button>
+        )}
+      </div>
+      {msg && <p className="muted">{msg}</p>}
+    </section>
+  );
+}
+
 const KIND_LABEL = {
   product: "the complete product (furniture)",
   cover: "only the cover surface",
@@ -385,6 +501,7 @@ function ModelPage({ id }: { id: string }) {
           }}
         />
       )}
+      <ApprovalCard model={model} onChange={load} />
       <ModelInfo key={`${model.id}-${model.family}-${model.status}`} model={model} onSaved={load} />
       {job && <JobBar job={job} />}
       {error && <p className="error">{error}</p>}

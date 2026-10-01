@@ -43,6 +43,7 @@ export interface ModelBrief {
   reasons: string[];
   roll_length_mm?: number | null;
   kind?: Kind | null;
+  approval?: Approval | null;
 }
 
 /** What an uploaded file is: the furniture, or only the cover surface (kind.json). */
@@ -133,6 +134,9 @@ export interface ModelParams {
 }
 
 async function json<T>(r: Response): Promise<T> {
+  if (r.status === 401 && !r.url.includes("/api/auth/")) {
+    window.dispatchEvent(new Event("login-needed")); // the session ended: show the login
+  }
   if (!r.ok) {
     let msg = `${r.status} ${r.statusText}`;
     try {
@@ -219,4 +223,94 @@ export const ACTION_LABEL: Record<string, string> = {
   no_walls: "No separate wall pieces",
   smoother_surface: "Calmer cover surface (15 mm, bridge 15 cm, smooth)",
   set_skirt_height: "Skirt at this height",
+};
+
+// ---- logins, the admin page and approvals (ADR-047)
+
+export interface User {
+  id: number;
+  username: string;
+  name: string;
+  email: string | null;
+  role: "admin" | "editor" | "viewer";
+  can_approve: boolean;
+  active: boolean;
+  last_login: number | null;
+  has_password: boolean;
+}
+
+export interface Approval {
+  approved_by: string;
+  name: string;
+  time: number;
+  revision: number | null;
+  note: string;
+  valid: boolean;
+}
+
+export interface MailSettings {
+  host?: string;
+  port?: number;
+  security?: string;
+  username?: string;
+  sender?: string;
+  password_set?: boolean;
+}
+
+const send = (method: string, url: string, body?: unknown) =>
+  fetch(url, {
+    method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+export const auth = {
+  me: () => fetch("/api/auth/me").then((r) => json<{ user: User; auth: boolean }>(r)),
+  login: (username: string, password: string) =>
+    send("POST", "/api/auth/login", { username, password }).then((r) => json<{ user: User }>(r)),
+  logout: () => send("POST", "/api/auth/logout").then((r) => json<{ ok: boolean }>(r)),
+  invite: (token: string) =>
+    fetch(`/api/auth/invite/${token}`).then((r) => json<{ username: string; name: string }>(r)),
+  setPassword: (token: string, password: string) =>
+    send("POST", `/api/auth/invite/${token}`, { password }).then((r) => json<{ user: User }>(r)),
+};
+
+export interface Invite {
+  link: string;
+  mailed: boolean;
+  mail_problem: string | null;
+}
+
+export const admin = {
+  users: () => fetch("/api/admin/users").then((r) => json<{ users: User[]; roles: string[] }>(r)),
+  addUser: (u: Partial<User> & { username: string }) =>
+    send("POST", "/api/admin/users", u).then((r) => json<{ user: User } & Invite>(r)),
+  changeUser: (id: number, changes: Partial<User>) =>
+    send("PUT", `/api/admin/users/${id}`, changes).then((r) => json<{ user: User }>(r)),
+  invite: (id: number) => send("POST", `/api/admin/users/${id}/invite`).then((r) => json<Invite>(r)),
+  sessions: () =>
+    fetch("/api/admin/sessions").then((r) =>
+      json<{ sessions: { username: string; created: number; expires: number; address: string }[] }>(r),
+    ),
+  audit: () =>
+    fetch("/api/admin/audit").then((r) =>
+      json<{ audit: { time: number; username: string | null; action: string; detail: string | null }[] }>(r),
+    ),
+  mail: () => fetch("/api/admin/mail").then((r) => json<{ mail: MailSettings; public_url: string }>(r)),
+  saveMail: (m: MailSettings & { password?: string }) =>
+    send("PUT", "/api/admin/mail", m).then((r) => json<{ mail: MailSettings }>(r)),
+  testMail: (to: string) => send("POST", "/api/admin/mail/test", { to }).then((r) => json<{ ok: boolean }>(r)),
+  publicUrl: (url: string) =>
+    send("PUT", "/api/admin/public-url", { url }).then((r) => json<{ public_url: string }>(r)),
+  system: () => fetch("/api/admin/system").then((r) => json<Record<string, unknown>>(r)),
+};
+
+export const approvals = {
+  approve: (id: string, note: string) =>
+    send("POST", `/api/models/${id}/approve`, { note }).then((r) => json<{ approval: Approval }>(r)),
+  withdraw: (id: string) => send("DELETE", `/api/models/${id}/approve`).then((r) => json<unknown>(r)),
+  ask: (id: string) =>
+    send("POST", `/api/models/${id}/approval-request`).then((r) =>
+      json<{ mailed: string[]; not_mailed: string[] }>(r),
+    ),
 };

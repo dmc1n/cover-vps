@@ -167,3 +167,31 @@ svg.plan .proposal text { fill: var(--warn); cursor: pointer; }
 .kind-check ul {
   margin: 0.25rem 0 0.5rem 1.2rem;
 }
+
+/* ---- login, admin and approval (ADR-047) ---- */
+.login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; box-sizing: border-box;
+  background: radial-gradient(circle at 20% 10%, var(--olive) 0%, var(--olive-deep) 60%); }
+.login-card { width: min(380px, 100%); background: var(--bg); border-radius: 16px; padding: 28px 28px 22px; display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35); border-top: 4px solid var(--sand); }
+.login-card h1 { margin: 4px 0 0; font-size: 28px; font-style: italic; }
+.login-card label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.login-card input { padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.login-card input:focus { outline: 2px solid var(--sand-soft); border-color: var(--sand); }
+.login-card button { margin-top: 4px; padding: 10px; }
+.login-brand { display: flex; align-items: center; gap: 10px; }
+.login-brand img { height: 40px; }
+.login-brand .times { color: var(--muted); }
+.small { font-size: 12px; }
+.approval { display: flex; flex-direction: column; gap: 6px; border-left: 4px solid var(--line); }
+.approval.ok { border-left-color: var(--ok); background: var(--ok-soft); }
+.approval.stale { border-left-color: var(--warn); background: var(--warn-soft); }
+.approval.none { border-left-color: var(--sand); }
+.approval input { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; min-width: 220px; }
+.invite input.link, input.link { flex: 1; min-width: 260px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; font-family: ui-monospace, monospace; font-size: 12px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; margin: 8px 0 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.field input, .field select, table.list td input:not([type="checkbox"]), table.list td select, .card .row input:not([type="checkbox"]), .card .row select {
+  padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+table.list tr.static:hover { background: none; cursor: default; }
+td.nowrap, .nowrap { white-space: nowrap; }
+td.detail { max-width: 520px; overflow-wrap: anywhere; font-size: 12px; }

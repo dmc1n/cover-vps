@@ -8,9 +8,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+import coverengine.seams.auto as auto
 import numpy as np
 from coverengine.io.model_io import load_model
-from coverengine.seams import auto
 from coverengine.seams.panels import _ordered
 
 PLAN_PNG = "plan.png"
