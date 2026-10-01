@@ -44,6 +44,7 @@ IntArray = NDArray[np.int64]
 
 FORMAT_VERSION = 1
 HULL_GLB, HULL_JSON, PREVIEW_GLB = "hull.glb", "hull.json", "preview.glb"
+HULL_PARTS = "hull_parts.npy"  # per face of hull.glb: the drawn piece (given covers drawn in parts)
 # Taubin smoothing filter coefficients (lambda, mu): the classic volume-preserving pair.
 TAUBIN = (0.5, 0.53)  # param-ok: filter coefficients, not a setting
 # Preview colours (RGBA 0-255): furniture grey, cover blue and see-through.
@@ -70,6 +71,7 @@ class Hull:
     report: dict[str, Any]
     warnings: list[str] = field(default_factory=list)
     water_faces: IntArray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    parts: IntArray | None = None  # per face: the drawn piece it belongs to (given covers)
 
 
 def _p(params: EffectiveParams, key: str) -> float:
@@ -339,9 +341,15 @@ def _given(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> H
     """The uploaded file is the cover surface itself (ADR-039): used as it is, only cleaned,
     faced outward and split into small triangles for the seams and the flattening."""
     from coverengine.hull.box import EDGE_MM
+    from coverengine.io.model_io import load_model_parts
 
+    _, part = load_model_parts(model_dir)
+    if len(part) != len(f):  # masks removed faces: the drawn pieces cannot be followed
+        part = np.zeros(len(f), dtype=np.int64)
     mesh = trimesh.Trimesh(v, f, process=True)
-    mesh.update_faces(mesh.nondegenerate_faces())
+    keep = mesh.nondegenerate_faces()
+    mesh.update_faces(keep)
+    part = part[keep]
     # a cover drawn as a solid: its bottom is not fabric, the cover is open there
     height = float(np.ptp(mesh.vertices[:, 2])) or 1.0
     floor = (np.abs(mesh.face_normals[:, 2]) > FLAT_NZ) & (
@@ -349,16 +357,22 @@ def _given(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> H
     )
     if floor.any():
         mesh.update_faces(~floor)
+        part = part[~floor]
         mesh.remove_unreferenced_vertices()
-    mesh = _one_piece(mesh)
+    if len(np.unique(part)) == 1:
+        mesh = _one_piece(mesh)
+        part = np.zeros(len(mesh.faces), dtype=np.int64)
     trimesh.repair.fix_normals(mesh, multibody=False)
     # outward: on average the faces point away from the middle (and the top faces up)
     centre = mesh.vertices.mean(axis=0)
     away = np.einsum("ij,ij->i", mesh.face_normals, mesh.triangles_center - centre)
     if float((away * mesh.area_faces).sum()) < 0:
         mesh.invert()
-    nv, nf = trimesh.remesh.subdivide_to_size(mesh.vertices, mesh.faces, max_edge=EDGE_MM)
+    nv, nf, idx = trimesh.remesh.subdivide_to_size(
+        mesh.vertices, mesh.faces, max_edge=EDGE_MM, return_index=True
+    )
     mesh = trimesh.Trimesh(nv, nf, process=True)
+    part = part[idx]
     warnings: list[str] = []
     if len(_boundary_vertices(mesh)) == 0:
         warnings.append("the cover surface is closed: a cover must be open at the bottom")
@@ -378,7 +392,9 @@ def _given(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> H
             f"{flat_mm2 / 1e6:.2f} m2 of the top is flatter than "
             f"{_p(params, 'hull.min_slope_deg'):g} degrees: water would stay there"
         )
-    return Hull(mesh, report, warnings)
+    pieces = len(np.unique(part))
+    report["drawn_pieces"] = pieces if pieces > 1 else None
+    return Hull(mesh, report, warnings, parts=part if pieces > 1 else None)
 
 
 def _plain_report(
@@ -574,6 +590,10 @@ def write_hull(model_dir: Path, hull: Hull, out_dir: Path | None = None) -> Path
     out = out_dir or model_dir
     out.mkdir(parents=True, exist_ok=True)
     (out / HULL_GLB).write_bytes(glb_bytes([("hull", hull.mesh)]))
+    if hull.parts is not None:
+        np.save(out / HULL_PARTS, hull.parts)
+    else:
+        (out / HULL_PARTS).unlink(missing_ok=True)
     (out / HULL_JSON).write_text(
         json.dumps(hull.report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

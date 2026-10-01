@@ -330,6 +330,20 @@ def load_model(model_dir: Path) -> trimesh.Trimesh:
     return trimesh.Trimesh(np.vstack(verts), np.vstack(faces), process=False)
 
 
+def load_model_parts(model_dir: Path) -> tuple[trimesh.Trimesh, NDArray[np.int64]]:
+    """The canonical mesh and, per face, the number of the part it came from (a cover surface
+    drawn as separate pieces: each part is one piece, ADR-045)."""
+    glb = model_dir / MODEL_GLB if model_dir.is_dir() else model_dir
+    mesh = load_model(model_dir)
+    scene = trimesh.load(glb, force="scene", process=False)
+    assert isinstance(scene, trimesh.Scene)
+    counts = [
+        len(scene.geometry[scene.graph[node][1]].faces)
+        for node in sorted(scene.graph.nodes_geometry, key=_node_order(scene))
+    ]
+    return mesh, np.repeat(np.arange(len(counts), dtype=np.int64), counts)
+
+
 def _node_order(scene: trimesh.Scene):  # type: ignore[no-untyped-def]
     """Nodes in the order the parts were written (the glTF node list order)."""
     order = {name: i for i, name in enumerate(scene.geometry)}

@@ -174,8 +174,13 @@ def _cut_cover(
         raise CoverError(f"no cover surface at {hull_path} (run cover hull first)")
     hull = load_model(hull_path)
     hull = trimesh.Trimesh(hull.vertices, hull.faces, process=True)
-    if params["hull.top"] == "box" or (params["hull.top"] == "given" and _flat_faced(hull)):
-        return _box_cut(model_dir, hull, params)
+    drawn = _drawn_parts(model_dir, hull) if params["hull.top"] == "given" else None
+    if (
+        drawn is not None
+        or params["hull.top"] == "box"
+        or (params["hull.top"] == "given" and _flat_faced(hull))
+    ):
+        return _box_cut(model_dir, hull, params, drawn)
     snap = _p(params, "seams.snap_mm")
     inset = _p(params, "seams.skirt_seam_inset_mm")
     line = auto.outline(hull)
@@ -421,9 +426,29 @@ def _split_at_inside_corners(hull: trimesh.Trimesh, label: NDArray[np.int64]) ->
     return out.ravel().astype(np.int64)
 
 
-def _box_cut(model_dir: Path, hull: trimesh.Trimesh, params: EffectiveParams) -> Cut:
-    """A box cover: every flat face is one panel and every box edge a seam (ADR-038)."""
-    label = _flat_regions(hull)
+def _drawn_parts(model_dir: Path, hull: trimesh.Trimesh) -> NDArray[np.int64] | None:
+    """The pieces of a cover surface drawn in parts (one part per piece), if it was."""
+    from coverengine.hull.build import HULL_PARTS
+
+    path = model_dir / HULL_PARTS
+    if not path.is_file():
+        return None
+    part = np.load(path)
+    if len(part) != len(hull.faces):
+        return None
+    _, label = np.unique(part, return_inverse=True)
+    return label.ravel().astype(np.int64)
+
+
+def _box_cut(
+    model_dir: Path,
+    hull: trimesh.Trimesh,
+    params: EffectiveParams,
+    drawn: NDArray[np.int64] | None = None,
+) -> Cut:
+    """A box cover: every flat face is one panel and every box edge a seam (ADR-038); a cover
+    drawn in parts: every part is one panel (ADR-045)."""
+    label = drawn if drawn is not None else _flat_regions(hull)
     # a region's direction is its area-weighted normal (thin slivers have noisy normals)
     weighted = np.zeros((label.max() + 1, 3))
     np.add.at(weighted, label, hull.face_normals * hull.area_faces[:, None])
