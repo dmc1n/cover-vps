@@ -1,0 +1,30 @@
+# Cover Studio web app (ADR-048): one process on 127.0.0.1:8080, behind Caddy (deploy/Caddyfile).
+# Install: sudo cp deploy/cover-web.service /etc/systemd/system/ && sudo systemctl enable --now cover-web
+[Unit]
+Description=Cover Studio (S2DIO x SUNS) web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=dev
+Group=dev
+WorkingDirectory=/home/dev/cover-pattern-engine
+Environment=COVER_DATA_DIR=/home/dev/cover-data
+Environment=COVER_LOGIN=on
+Environment=COVER_HOST=127.0.0.1
+Environment=COVER_PORT=8080
+ExecStart=/home/dev/cover-pattern-engine/.venv/bin/cover-web
+Restart=always
+RestartSec=5
+# hardening: no privileges, own /tmp, the system read only
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

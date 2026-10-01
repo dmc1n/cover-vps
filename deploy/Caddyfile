@@ -1,0 +1,31 @@
+# Cover Studio on the internet (ADR-048): https with an automatic Let's Encrypt certificate,
+# everything passed to the app on 127.0.0.1:8080, which needs a login for every request.
+# Install: sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+{
+	email rick@s2dio.industries
+}
+
+covers.suns.nu {
+	encode zstd gzip
+	request_body {
+		max_size 2GB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:8080 {
+		transport http {
+			read_timeout 30m
+			write_timeout 30m
+		}
+	}
+	log {
+		output file /var/log/caddy/covers.log {
+			roll_size 20MiB
+			roll_keep 10
+		}
+	}
+}

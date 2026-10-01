@@ -213,6 +213,8 @@ make golden     regenerate testdata/golden/info/ and hull/ (golden outputs), the
 make api-dev    web app and API on :8080     make web-dev   Vite dev server on :5173
 make web-build  build the pages (apps/web/dist)
 make deploy     build the app image and `docker compose up -d app` (127.0.0.1:8080)
+cover-users list | add <name> --role admin --approve | invite <name>   users (ADR-047)
+sudo systemctl restart cover-web            the app as a service; Caddy serves https://covers.suns.nu
 make backup     push the data directory to R2 with rclone
 ```
 

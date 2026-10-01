@@ -793,3 +793,42 @@ translate this correctly to a production ready model").
   exactly, flat strip included (the audit notes a flat top on a `given` cover, it does not fail
   it). Air vents: one per full metre of each side separately, at least one per side (2.10 m:
   2, 2.90 m: 2, 3.10 m: 3, 1.40 m: 1); C6: 10 vents.
+
+## ADR-047 — Users, rights and the approval of the definitive drawing
+
+Status: accepted, 1 Oct 2026 (owner: reachable from the internet, a well secured user
+structure, approval of the definitive drawing only by chosen users; users Rick and Wout first,
+both admin).
+
+- Users in `<data>/app.db` (SQLite, mode 600): role admin / editor / viewer, and per user
+  `can_approve`. Passwords as scrypt hashes; at least 12 characters, not the user name. One-time
+  links (3 days) for the first password and resets, by mail or copied by an admin.
+- Sessions: a random token in an HttpOnly, SameSite=Strict cookie, Secure over https, 14 days;
+  kept as a hash. Five wrong passwords lock the user for 15 minutes; ten from one address lock
+  the address. The same work is done for unknown users (no timing hint).
+- Every /api request needs a login (except health, login and the one-time links); a change
+  needs editor, the admin API admin, approving `can_approve`; changes must come from the app's
+  own pages (Origin = Host). Security headers (CSP, no framing, nosniff, HSTS over https). The
+  API's own documentation pages are off. Every change goes to the audit log.
+- Approval: of one revision, with a sha256 fingerprint of the production files; stamped copies
+  of the size drawing and the cutting list; status production only with a valid approval; any
+  change to the files makes it "changed after approval". Editors can ask the approvers by mail.
+- Admin page: users, rights, links, the SMTP server (password never shown again), the public
+  address, who is logged in, the audit log, system state. `cover-users` for the first admin.
+
+## ADR-048 — The server: https on covers.suns.nu, the app as a service, hardening
+
+Status: accepted, 1 Oct 2026.
+
+- Caddy (deploy/Caddyfile) serves covers.suns.nu with an automatic Let's Encrypt certificate and
+  passes everything to the app on 127.0.0.1:8080; the firewall (ufw) allows SSH, 80 and 443
+  only. Opened only after the logins were in place and tested.
+- The app runs as the systemd service cover-web (deploy/cover-web.service): restarts by
+  itself, starts at boot, no extra privileges, the system read only.
+- Updates: unattended security upgrades on; installed by hand on 1 Oct. A reboot is waiting
+  (new kernel and libc), to be done when it suits the owner.
+- SSH: everyone still logs in with a password (also root), so passwords stay on until keys are
+  set; meanwhile fail2ban bans after 4 wrong tries (an hour, growing to a week for repeat
+  offenders), 4 tries per connection, no X11 or agent forwarding.
+- Backups: every night at 02:30 a tar of the data folder (models, users, settings) in
+  ~/backups on the same disk; an off-site copy is still to be chosen (question).
