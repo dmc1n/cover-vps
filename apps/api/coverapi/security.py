@@ -326,7 +326,31 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
             "ai": bool(os.environ.get("DEEPSEEK_API_KEY")) or _env_has("DEEPSEEK_API_KEY"),
             "mail": mailer.configured(auth),
             "login_required": required,
+            "alert_email": auth.setting("alert_email", "rick@s2dio.industries"),
+            "alerts": _tail(store.root / "alerts.log", 15),
+            "open_problems": _problems(store.root / "watchdog.json"),
         }
+
+    @app.put("/api/admin/alert-email")
+    def alert_email(req: TestMailRequest, request: Request) -> dict[str, Any]:
+        admin = require(request, "admin")
+        if "@" not in req.to:
+            raise HTTPException(400, "that is not an e-mail address")
+        auth.set_setting("alert_email", req.to.strip())
+        auth.log(admin, "alert address changed", req.to)
+        return {"alert_email": req.to.strip()}
+
+
+def _tail(path: Any, n: int) -> list[str]:
+    return path.read_text(errors="ignore").splitlines()[-n:] if path.is_file() else []
+
+
+def _problems(path: Any) -> list[str]:
+    import json
+
+    if not path.is_file():
+        return []
+    return [v.get("text", k) for k, v in json.loads(path.read_text() or "{}").items()]
 
 
 def _env_has(name: str) -> bool:

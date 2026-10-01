@@ -342,22 +342,66 @@ function Audit() {
 
 function System() {
   const [s, setS] = useState<Record<string, unknown> | null>(null);
+  const [to, setTo] = useState("");
+  const [msg, setMsg] = useState("");
   useEffect(() => {
-    admin.system().then(setS);
+    admin.system().then((r) => {
+      setS(r);
+      setTo(String(r.alert_email ?? ""));
+    });
   }, []);
   if (!s) return <p className="muted">Loading…</p>;
   const yes = (v: unknown) => (v ? "yes" : "no");
+  const problems = (s.open_problems as string[]) ?? [];
+  const alerts = (s.alerts as string[]) ?? [];
   return (
-    <table className="list facts">
-      <tbody>
-        <tr className="static"><td>Engine version</td><td>{String(s.engine)}</td></tr>
-        <tr className="static"><td>Models</td><td>{String(s.models)}</td></tr>
-        <tr className="static"><td>Disk free</td><td>{String(s.disk_free_gb)} of {String(s.disk_total_gb)} GB</td></tr>
-        <tr className="static"><td>Last backup</td><td>{String(s.last_backup ?? "—")}</td></tr>
-        <tr className="static"><td>Login required</td><td>{yes(s.login_required)}</td></tr>
-        <tr className="static"><td>Mail server set</td><td>{yes(s.mail)}</td></tr>
-        <tr className="static"><td>AI key present</td><td>{yes(s.ai)}</td></tr>
-      </tbody>
-    </table>
+    <>
+      {problems.length > 0 && (
+        <section className="card approval stale">
+          <strong>Open problems</strong>
+          <ul>
+            {problems.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <table className="list facts">
+        <tbody>
+          <tr className="static"><td>Engine version</td><td>{String(s.engine)}</td></tr>
+          <tr className="static"><td>Models</td><td>{String(s.models)}</td></tr>
+          <tr className="static"><td>Disk free</td><td>{String(s.disk_free_gb)} of {String(s.disk_total_gb)} GB</td></tr>
+          <tr className="static"><td>Last backup</td><td>{String(s.last_backup ?? "—")}</td></tr>
+          <tr className="static"><td>Login required</td><td>{yes(s.login_required)}</td></tr>
+          <tr className="static"><td>Mail server set</td><td>{yes(s.mail)}</td></tr>
+          <tr className="static"><td>AI key present</td><td>{yes(s.ai)}</td></tr>
+        </tbody>
+      </table>
+      <form
+        className="card"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          try {
+            setTo((await admin.alertEmail(to)).alert_email);
+            setMsg("Saved.");
+          } catch (err) {
+            setMsg(String(err));
+          }
+        }}
+      >
+        <h3>Alerts</h3>
+        <p className="muted">
+          The server checks itself every 10 minutes (app, https, services, disk, certificate, backup, updates) and mails
+          this address when something is wrong, and again when it is solved.
+        </p>
+        <div className="row">
+          <input value={to} onChange={(e) => setTo(e.target.value)} className="link" />
+          <button className="primary">Save</button>
+        </div>
+        {msg && <p className="muted">{msg}</p>}
+        <h3>Last alerts</h3>
+        {alerts.length === 0 ? <p className="muted">None.</p> : <pre>{alerts.join("\n")}</pre>}
+      </form>
+    </>
   );
 }

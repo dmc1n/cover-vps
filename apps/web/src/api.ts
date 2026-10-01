@@ -303,6 +303,8 @@ export const admin = {
   publicUrl: (url: string) =>
     send("PUT", "/api/admin/public-url", { url }).then((r) => json<{ public_url: string }>(r)),
   system: () => fetch("/api/admin/system").then((r) => json<Record<string, unknown>>(r)),
+  alertEmail: (to: string) =>
+    send("PUT", "/api/admin/alert-email", { to }).then((r) => json<{ alert_email: string }>(r)),
 };
 
 export const approvals = {
