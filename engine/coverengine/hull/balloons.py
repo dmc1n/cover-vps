@@ -188,9 +188,10 @@ def choose(
     )
     if params["ai.provider"] != "none":
         try:
-            from coverengine.ai import ask
+            from coverengine.ai import ask, lessons_text
 
-            answer = ask(params, AI_SYSTEM, json.dumps({"table": product, "options": rows}))
+            system = AI_SYSTEM + lessons_text("tensioned")
+            answer = ask(params, system, json.dumps({"table": product, "options": rows}))
             n = int(answer["balloons"])
             if any(r["balloons"] == n for r in rows):
                 return n, "ai", str(answer.get("reason", ""))
