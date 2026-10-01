@@ -1,5 +1,6 @@
 # Family preset: tables (parameter layer 2, CLAUDE.md "Parameters"). A model joins the family
 # with "family": "table" in its cover.json (or in the web app); its own settings still win.
 hull:
-  support: balloon               # owner, 2026-09-30: tables get a frame or balloon underneath so
-                                 # the cover forms a tent and water runs off
+  support: balloons              # owner, 1 Oct 2026: every table gets the workshop's balloons
+                                 # under the cover (ADR-040), at least one; the AI chooses how
+                                 # many, a box cover round table and balloons
