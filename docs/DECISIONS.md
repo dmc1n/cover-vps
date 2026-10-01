@@ -704,3 +704,21 @@ least one).
 - Tried: SUNS tables 60 × 60 (1 balloon, 6 pieces), 210 × 90 (2, 7), 340 × 100 (4, 6): 0 %
   stretch, seams equal. The tensioned tent over the same balloons follows the slopes down to the
   table edge, but gives 8 to 11 pieces with 2 to 5 % stretch and seams up to 10 cm apart.
+
+## ADR-041 — Learning from rejected covers; symmetric furniture gets a symmetric cover
+
+Status: accepted, 1 Oct 2026 (owner, on the Vento daybed: "one side slopes down neatly, the
+other stays straight; analyse it with the DeepSeek API, we must learn from our mistakes").
+
+- `cover ai <model> --learn "<complaint>"` sends the complaint and the cover's facts (each flat
+  face with its direction, area and centre) to the AI, which states the cause, a general rule
+  and a check. The lesson is kept in `config/ai_lessons.json` (in the repository) and its rule
+  goes into every later AI question (layout review, box pieces, balloons).
+- The first lesson (Vento daybed): the box grew one face at a time, so with 8 pieces one front
+  corner was sloped and the other not. Rule: a left-right symmetric product gets a symmetric
+  cover. Now the box checks whether the furniture's outside is mirror-symmetric (in 2000
+  directions it reaches as far as mirrored, within 25 mm; loose cushions do not count) and adds
+  faces in mirror pairs; a face almost square to the mirror plane is made exactly square.
+  Vento daybed: 9 pieces, every slope with its mirror image. Kota 2-seater: unchanged, 7.
+- Box faces are now flat regions (neighbours turning less than 1°, slivers merged), not equal
+  rounded normals: 11 of 15 SUNS products that stopped at the cut now pass.

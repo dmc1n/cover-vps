@@ -314,11 +314,11 @@ def box_points(
         )
     elif params["ai.provider"] != "none":
         try:
-            from coverengine.ai import ask
+            from coverengine.ai import ask, lessons_text
 
             answer = ask(
                 params,
-                AI_BOX_SYSTEM,
+                AI_BOX_SYSTEM + lessons_text("box"),
                 json.dumps({"table": product, "length_mm": round(length), "options": facts}),
             )
             if any(r["balloons"] == int(answer["balloons"]) for r in rows):

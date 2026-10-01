@@ -75,3 +75,22 @@ def test_a_cover_drawn_as_a_box_becomes_one_piece_per_face(tmp_path: Path) -> No
         "skirt-right",
         "top",
     ]
+
+
+def test_a_symmetric_product_gets_its_slopes_in_mirror_pairs() -> None:
+    """Lesson from the Vento daybed (ADR-041): one front corner sloped, the other did not."""
+    from coverengine.hull.box import Box
+
+    rng = np.random.default_rng(1)
+    pts = rng.uniform((-1000, -900, 50), (1000, 900, 400), (4000, 3))
+    back = rng.uniform((-1000, 500, 400), (1000, 900, 850), (2000, 3))  # a high back
+    half = np.vstack([pts, back])
+    half = half[half[:, 0] >= 0]
+    box = Box(np.vstack([half, half * (-1, 1, 1)]), 50.0, 10.0)  # left = right mirrored
+    assert [k for k, _ in box.mirrors] == [0]  # left-right, not front-back
+    slope = np.array([0.6, -0.5, 0.62])
+    pair = box.mirror(slope / np.linalg.norm(slope))
+    assert len(pair) == 2 and np.isclose(pair[0][0], -pair[1][0])
+    for planes in box.grow(9):
+        xs = sorted(round(float(p[0]), 3) for p in planes)
+        assert xs == sorted(-x for x in xs)  # every face has its mirror image

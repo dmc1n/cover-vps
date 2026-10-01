@@ -68,6 +68,8 @@ PROPOSALS_JSON = "proposals.json"
 # Box covers: faces with the same normal (to this many decimals) are one panel; faces with
 # |normal z| below BOX_UPRIGHT_NZ are upright (skirt, so the vents go there).
 BOX_NORMAL_DIGITS = 3
+BOX_COPLANAR_DEG = 1.0  # param-ok: neighbours turning less are one flat face
+BOX_SCRAP_SHARE = 0.002  # param-ok: flat bits smaller than this share of the cover are merged
 BOX_UPRIGHT_NZ = 0.1  # param-ok: geometric rule  # proposed seams accepted by cover improve
 MM_PER_CM = 10.0  # param-ok: unit conversion
 # Smoothing a jittery wall seam in place: passes, and how far a face may turn (cosine).
@@ -338,12 +340,48 @@ def _flat_faced(hull: trimesh.Trimesh) -> bool:
     return len(np.unique(normals, axis=0)) <= FLAT_FACES_MAX
 
 
+def _flat_regions(hull: trimesh.Trimesh) -> NDArray[np.int64]:
+    """Faces joined into flat regions: neighbours turning less than BOX_COPLANAR_DEG are one
+    region; regions smaller than BOX_SCRAP_SHARE of the cover (slivers left by meshing) go to
+    the neighbour they share the longest edge with."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    n = len(hull.faces)
+    pairs = np.asarray(hull.face_adjacency)
+    same = np.asarray(hull.face_adjacency_angles) < math.radians(BOX_COPLANAR_DEG)
+    a, b = pairs[same, 0], pairs[same, 1]
+    graph = coo_matrix((np.ones(len(a)), (a, b)), shape=(n, n))
+    _, label = connected_components(graph, directed=False)
+    label = np.asarray(label, np.int64)
+    edge_len = np.linalg.norm(
+        np.diff(hull.vertices[hull.face_adjacency_edges], axis=1)[:, 0], axis=1
+    )
+    scrap = BOX_SCRAP_SHARE * float(hull.area)
+    for _ in range(n):
+        area = np.bincount(label, weights=hull.area_faces)
+        small = [r for r in np.flatnonzero(area) if area[r] < scrap]
+        if not small:
+            break
+        r = min(small, key=lambda q: area[q])
+        la, lb = label[pairs[:, 0]], label[pairs[:, 1]]
+        touch = ((la == r) & (lb != r)) | ((lb == r) & (la != r))
+        if not touch.any():
+            break
+        other = np.where(la[touch] == r, lb[touch], la[touch])
+        shared = np.bincount(other, weights=edge_len[touch])
+        label[label == r] = int(np.argmax(shared))
+    _, label = np.unique(label, return_inverse=True)
+    return label.ravel().astype(np.int64)
+
+
 def _box_cut(model_dir: Path, hull: trimesh.Trimesh, params: EffectiveParams) -> Cut:
     """A box cover: every flat face is one panel and every box edge a seam (ADR-038)."""
-    normals = np.round(np.asarray(hull.face_normals), BOX_NORMAL_DIGITS)
-    _, label = np.unique(normals, axis=0, return_inverse=True)
-    label = label.ravel().astype(np.int64)
-    upright = np.abs(np.asarray(hull.face_normals)[:, 2]) < BOX_UPRIGHT_NZ
+    label = _flat_regions(hull)
+    # a region's direction is its area-weighted normal (thin slivers have noisy normals)
+    weighted = np.zeros((label.max() + 1, 3))
+    np.add.at(weighted, label, hull.face_normals * hull.area_faces[:, None])
+    upright = np.abs(weighted[label, 2] / np.linalg.norm(weighted[label], axis=1)) < BOX_UPRIGHT_NZ
     region = np.where(upright, SKIRT_REGION, TOP_REGION).astype(np.int64)
     pairs = np.asarray(hull.face_adjacency)
     shared = np.sort(np.asarray(hull.face_adjacency_edges), axis=1)

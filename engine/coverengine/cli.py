@@ -372,6 +372,15 @@ def _cmd_ai(args: argparse.Namespace) -> int:
 
     cover_json = args.model / "cover.json"
     params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    if args.learn:
+        from coverengine.ai import LESSONS_JSON, learn
+
+        lesson = learn(args.model, params, args.learn)
+        print(f"cause  {lesson['cause']}")
+        print(f"rule   {lesson['rule']}")
+        print(f"check  {lesson['check']}")
+        print(f"kept in {LESSONS_JSON} (given to the AI from now on, for {lesson['applies_to']})")
+        return 0
     if args.apply:
         steps = apply_action(args.model, args.apply, args.value)
         print(f"applied {args.apply}; run again: {', '.join(steps)}")
@@ -656,6 +665,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--apply", help="carry out one action (see ai_review.json)")
     p.add_argument("--value", type=float, help="value for the action (skirt height in mm)")
     p.add_argument("--run", action="store_true", help="with --apply: calculate again")
+    p.add_argument("--learn", metavar="COMPLAINT", help="why was this cover wrong? (a lesson)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_ai)
 

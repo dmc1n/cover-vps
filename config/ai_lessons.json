@@ -1,0 +1,12 @@
+[
+  {
+    "time": 1790846497,
+    "model_id": "suns-daybed-vento",
+    "complaint": "This cover is not right: one side slopes down neatly, the other side stays straight. The daybed is the same on the left and the right.",
+    "cause": "The cover was built with an uneven set of panels: on the right side there is an angled panel (normal 0.82, -0.57, 0.06), while the left side uses a straight vertical panel (normal -1, 0, 0) and a separate top slope (normal -0.2, -0.37, 0.91). The furniture is left-right symmetric, but the cover's panels are not mirror images, so one side slopes and the other stays straight.",
+    "rule": "For furniture that is left-right symmetric, the cover must be left-right symmetric: every panel on one side must have an identical mirrored panel on the other side.",
+    "check": "Mirror each panel's centre and normal across the furniture's left-right centre plane and verify that a matching panel with the same area exists within a small tolerance.",
+    "applies_to": "all",
+    "ai_model": "deepseek-flash"
+  }
+]

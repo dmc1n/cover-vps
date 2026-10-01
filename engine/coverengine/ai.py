@@ -169,7 +169,8 @@ def review(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
             raise CoverError(f"no {name} in {model_dir} (calculate the cover first)")
     facts = describe(model_dir)
     actions = "\n".join(f"- {k}: {v}" for k, v in ACTIONS.items())
-    answer = ask(params, SYSTEM.replace("__ACTIONS__", actions), json.dumps(facts))
+    system = SYSTEM.replace("__ACTIONS__", actions) + lessons_text("all")
+    answer = ask(params, system, json.dumps(facts))
     suggestions = [
         s
         for s in answer.get("suggestions", [])
@@ -239,3 +240,92 @@ def apply_action(model_dir: Path, action: str, value: float | None = None) -> li
 NO_CORNERS_DEG = 179  # param-ok: a corner would have to turn more than this: none do
 NO_WALLS_MM = 100000  # param-ok: a wall would have to be this tall: none are
 SKIRT_RANGE = (150.0, 600.0)  # param-ok: sensible skirt heights (mm)
+
+
+# Lessons from covers the owner rejected: the AI's analysis of what went wrong and the general
+# rule, kept in the repository and given to the AI with every later question (ADR-041).
+LESSONS_JSON = "config/ai_lessons.json"
+
+LEARN_SYSTEM = """You help a workshop that sews outdoor furniture covers learn from its mistakes.
+The program calculated a cover and the owner rejected it. You get the owner's complaint and the
+facts: the furniture, how the cover was made, and each fabric piece with its direction (the
+outward normal: x to the right, y to the back, z up), area and centre. Find the cause in the
+facts, then state a general rule the program and the AI must follow from now on, and a check
+that would have caught it. Plain words, no jargon. Answer with JSON only:
+{"cause": "two or three sentences", "rule": "one sentence, general, for all covers",
+ "check": "one sentence: what to measure to catch this", "applies_to": "box | tensioned | all"}"""
+
+
+def lessons() -> list[dict[str, Any]]:
+    path = repo_root() / LESSONS_JSON
+    if not path.is_file():
+        return []
+    doc: list[dict[str, Any]] = json.loads(path.read_text(encoding="utf-8"))
+    return doc
+
+
+def lessons_text(applies_to: str) -> str:
+    """The rules learned so far, for an AI prompt."""
+    rules = [r["rule"] for r in lessons() if r.get("applies_to") in (applies_to, "all")]
+    if not rules:
+        return ""
+    return "\nRules learned from earlier mistakes (follow them):\n" + "\n".join(
+        f"- {r}" for r in rules
+    )
+
+
+def faces(model_dir: Path) -> list[dict[str, Any]]:
+    """The cover's flat faces as the AI sees them (box covers)."""
+    import numpy as np
+
+    from coverengine.io.model_io import load_model
+    from coverengine.seams.build import _flat_regions
+
+    hull = load_model(model_dir / "hull.glb")
+    label = _flat_regions(hull)
+    out = []
+    for r in range(int(label.max()) + 1):
+        m = label == r
+        area = hull.area_faces[m]
+        n = (hull.face_normals[m] * area[:, None]).sum(axis=0)
+        c = (hull.triangles_center[m] * area[:, None]).sum(axis=0) / area.sum()
+        out.append(
+            {
+                "normal": [round(float(x), 2) for x in n / np.linalg.norm(n)],
+                "area_m2": round(float(area.sum()) / 1e6, 3),
+                "centre_cm": [round(float(x) / MM_PER_CM) for x in c],
+            }
+        )
+    return out
+
+
+def learn(model_dir: Path, params: EffectiveParams, complaint: str) -> dict[str, Any]:
+    """Ask the AI why the owner rejected this cover; the lesson is added to LESSONS_JSON."""
+    cover = read_cover_definition(model_dir)
+    hull = json.loads((model_dir / "hull.json").read_text(encoding="utf-8"))
+    model = json.loads((model_dir / "model.json").read_text(encoding="utf-8"))
+    facts = {
+        "product": (cover.get("notes") or model_dir.name).split(": ", 1)[-1],
+        "furniture_bbox_cm": [[round(v / MM_PER_CM) for v in c] for c in model["bbox_mm"]],
+        "cover": hull.get("top"),
+        "box": hull.get("box"),
+        "faces": faces(model_dir),
+    }
+    answer = ask(
+        params,
+        LEARN_SYSTEM,
+        json.dumps({"complaint": complaint, "facts": facts}),
+    )
+    lesson = {
+        "time": round(time.time()),
+        "model_id": model_dir.name,
+        "complaint": complaint,
+        "cause": str(answer.get("cause", "")),
+        "rule": str(answer.get("rule", "")),
+        "check": str(answer.get("check", "")),
+        "applies_to": str(answer.get("applies_to", "all")),
+        "ai_model": str(params["ai.model"]),
+    }
+    path = repo_root() / LESSONS_JSON
+    path.write_text(json.dumps([*lessons(), lesson], indent=2) + "\n", encoding="utf-8")
+    return lesson
