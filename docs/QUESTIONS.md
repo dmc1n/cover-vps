@@ -128,7 +128,9 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
 
 31. *Answered 1 Oct: the same as dining chairs, 87 cm; a low dining table gets the same cover as a dining table.* **Chair height for low dining tables** (68 to 70 cm, e.g. Basta low dining): how high do
     the chairs reach? *Meanwhile:* 85 cm.
-32. **Chair height for low bar tables** (95 to 101 cm, e.g. Basta low bar): how high? *Meanwhile:*
+32. *Not from the drawings: 110 cm was a guess. The drawings R5, R6, R10 are round covers 123 cm high, probably bar sets; proposed 123 cm, waiting for the owner.* **Chair height for low bar tables** (95 to 101 cm, e.g. Basta low bar): how high? *Meanwhile:*
     110 cm.
-33. **Dining tables outside 74 to 77 cm** (Monte Vari 81 cm in the 3D file, Savona and Sorolo
+33. *Answered 1 Oct: yes, 87 cm for every dining table.* **Dining tables outside 74 to 77 cm** (Monte Vari 81 cm in the 3D file, Savona and Sorolo
     71 to 73 cm): also 87 cm high? *Meanwhile:* yes, every table named dining table.
+34. **Round dining tables:** chairs stand all round a round table. Chair space of 33 cm all
+    round (a 174 cm table gets a 240 cm cover, like your R1)?
