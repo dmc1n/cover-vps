@@ -30,6 +30,9 @@ Note column.
 | ruff | 0.16.9 | MIT | lint and format (dev) |  |
 | mypy | 2.3.1 | MIT | type checks (dev) |  |
 | pre-commit | 4.6.2 | MIT | commit hooks (dev) |  |
+| python-multipart | 0.0.32 | Apache-2.0 | file uploads in the API (M6) |  |
+| httpx | 0.28.1 | BSD-3-Clause | API test client (M6) |  |
+| pymupdf | 1.28.2 | see package | reading the owner's PDF drawings (learning) | AGPL-3.0: fine for internal use (ADR-037); review before distributing |
 <!-- END GENERATED -->
 
 ## Not Python

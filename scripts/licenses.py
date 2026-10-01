@@ -33,6 +33,9 @@ USED_FOR = {
     "matplotlib": "DXF preview renders, plots",
     "fastapi": "API (M6)",
     "uvicorn": "API server (M6)",
+    "python-multipart": "file uploads in the API (M6)",
+    "httpx": "API test client (M6)",
+    "pymupdf": "reading the owner's PDF drawings (learning)",
     "pytest": "tests (dev)",
     "ruff": "lint and format (dev)",
     "mypy": "type checks (dev)",
@@ -45,6 +48,7 @@ NOTES = {
         "bindings Apache-2.0; bundles OpenCascade (LGPL-2.1 with exception) and VTK (BSD)"
     ),
     "pymeshlab": "GPL-3.0: fine for internal use (ADR-013); review before distributing",
+    "pymupdf": "AGPL-3.0: fine for internal use (ADR-037); review before distributing",
 }
 
 _SPDX_SHORT = re.compile(r"^[A-Za-z0-9.\-+ ()]{1,40}$")
@@ -59,6 +63,8 @@ def direct_dependencies() -> list[str]:
         specs += extra
     for group in root.get("dependency-groups", {}).values():
         specs += group
+    api = tomllib.loads((ROOT / "apps" / "api" / "pyproject.toml").read_text())["project"]
+    specs += [s for s in api["dependencies"] if not s.startswith("coverengine")]
     for spec in specs:
         name = re.split(r"[<>=!~\[; ]", spec, maxsplit=1)[0]
         if name not in names:
