@@ -168,13 +168,13 @@ def test_reference_zip(chair: dict[str, Any], tmp_path: Path) -> None:
     with zipfile.ZipFile(z, "w") as zf:
         zf.write(chair["root"] / "shapes" / "chair.stl", "drawings/1.stl")
         zf.writestr("drawings/1.pdf", pdf.getvalue())
-        zf.writestr("2.pdf", pdf.getvalue())  # no 3D file: not used
+        zf.writestr("2.pdf", pdf.getvalue())  # no 3D file: kept as a drawing
     c: TestClient = chair["client"]
     with z.open("rb") as fh:
         r = c.post("/api/references", files={"file": ("covers.zip", fh)})
     assert r.status_code == 200, r.text
     doc = r.json()
-    assert [p["name"] for p in doc["pairs"]] == ["1"] and doc["unpaired"] == ["2.pdf"]
+    assert [p["name"] for p in doc["pairs"]] == ["1"] and doc["drawings_only"] == ["2.pdf"]
     model_id = doc["pairs"][0]["model_id"]
     job = chair["app"].state.jobs.wait(doc["pairs"][0]["job"], RUN_TIMEOUT_S)
     assert job["status"] == "done", job
