@@ -411,6 +411,13 @@ def finish(doc: dict[str, Any], params: EffectiveParams) -> tuple[list[Piece], l
             piece.edges.append(info)
             if d > 0:  # the stitch line, or the hem fold line
                 piece.pen_lines.append(pts)
+            if e["kind"] == "hem" and d > 0 and params["hem.type"] == "drawcord_channel":
+                # the bottom drawcord (owner, 1 Oct 2026: every cover): say what the fold is
+                mid = pts[len(pts) // 2]
+                piece.pen_text.append(
+                    (f"HEM {d / MM_PER_CM:g} CM: BOTTOM CORD CHANNEL", mid + [0.0, label],
+                     label * 0.6)
+                )  # fmt: skip
             if welded and e["kind"] == "seam" and d == 0 and params["welding.guide_line"]:
                 guide = inward_line(pts, poly, overlap)
                 if guide is not None:
