@@ -174,7 +174,8 @@ tolerance:
 
 ai:                              # AI advice on cover layouts (the key: DEEPSEEK_API_KEY in deploy/.env)
   provider: deepseek             # deepseek | none
-  model: deepseek-flash          # deepseek-flash (fast) | deepseek-v4-pro (stronger, slower)
+  model: deepseek-flash          # deepseek-flash = V4.1 Flash (fast, since 10 Sep 2026) |
+                                 # deepseek-v4-pro = V4 Pro (stronger, slower; no 4.1 Pro yet)
   base_url: https://api.deepseek.com
   timeout_s: 120                 # how long to wait for an answer
 
