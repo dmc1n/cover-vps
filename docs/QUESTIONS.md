@@ -105,12 +105,12 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
 
 ## Balloons under table covers (new, 1 October)
 
-24. **Balloon sizes:** one size or several? Diameter and height when inflated (the 3D model will
+24. *Answered: one size, as the model.* **Balloon sizes:** one size or several? Diameter and height when inflated (the 3D model will
     show the shape; is it at the pressure you use)?
-25. **Placement:** is there a largest distance between balloons, or from a balloon to the table
+25. *Answered: a 340 cm table usually gets 3 to 4.* **Placement:** is there a largest distance between balloons, or from a balloon to the table
     edge, before the fabric sags and holds water? Do they lie loose on the table top or are they
     fixed (straps, a pocket sewn into the cover)?
-26. **Slope:** is 5° enough for the fabric between balloons, or what slope do you see on a good
+26. *Answered: between balloons the fabric runs straight; the slope is round the balloons.* **Slope:** is 5° enough for the fabric between balloons, or what slope do you see on a good
     cover?
-27. **Round and square tables:** always one balloon in the middle for small tables (up to which
+27. *Answered: every table gets at least one balloon.* **Round and square tables:** always one balloon in the middle for small tables (up to which
     size)?

@@ -171,12 +171,22 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
     min_slope = _p(params, "hull.min_slope_deg")
     patch = _p(params, "hull.flat_patch_mm")
     held: support.Support | None = None
+    balloon_report: dict[str, Any] | None = None
     if params["hull.top"] == "tensioned":
         if params["hull.support"] == "frame":
             tight, held = support.frame(
                 top, covered, bridged.xs, bridged.ys, _p(params, "hull.support_height_mm"),
                 min_slope, patch,
             )  # fmt: skip
+        elif params["hull.support"] == "balloons":
+            from coverengine.hull.balloons import support as balloons
+            from coverengine.params.registry import read_cover_definition
+
+            notes = read_cover_definition(model_dir).get("notes") or model_dir.name
+            tight, balloon_report, more = balloons(
+                top, covered, bridged.xs, bridged.ys, model_dir, params, notes.split(": ")[-1]
+            )
+            warnings += more
         elif params["hull.support"] == "balloon":
             tight, held = support.balloon(
                 top, covered, bridged.xs, bridged.ys, _p(params, "hull.support_radius_mm"),
@@ -263,7 +273,9 @@ def build_hull(model_dir: Path, params: EffectiveParams) -> Hull:
         },
         "top": params["hull.top"],
         "drainage": water.summary(),
-        "support": None
+        "support": balloon_report
+        if balloon_report is not None
+        else None
         if held is None
         else {
             "kind": held.kind,
@@ -291,9 +303,21 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
     model = trimesh.Trimesh(v, f, process=False)
     points = np.asarray(v)[np.asarray(v)[:, 2] > hem]
     product = (read_cover_definition(model_dir).get("notes") or model_dir.name).split(": ")[-1]
+    held = None
+    if params["hull.support"] == "balloons":
+        from coverengine.hull.balloons import box_points
+
+        extra, held = box_points(np.asarray(v), model_dir, params, product)
+        points = np.vstack([points, extra])
+        product += (
+            f" (a table with {held['balloons']} balloon(s) under the cover: the roof runs from "
+            "the balloons down to the edges of the table; here few pieces matter more than a "
+            "tight fit, a simple roof of 2 or 4 roof pieces is usual)"
+        )
     mesh, box, warnings = box_hull(points, model, params, product)
     report = _plain_report(model_dir, mesh, v, f, params, "box", warnings)
     report["box"] = box
+    report["support"] = held
     return Hull(mesh, report, warnings)
 
 

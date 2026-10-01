@@ -685,3 +685,22 @@ we can give the final confirmation").
 - Not yet: 2D contour drawings (DXF or PDF with the flat pieces). They need no flattening, only
   allowances and marks, and which edges join must be known. Built when the owner's samples show
   their form. Seam lines drawn in a cover surface (separate faces per piece) are not used yet.
+
+## ADR-040 — Balloons under table covers
+
+Status: accepted, 1 Oct 2026 (owner: balloons under every table cover so the fabric slopes; one
+balloon size, the uploaded model `table-baloon`, 52 × 51 × 20.6 cm; a 340 cm table gets 3 to 4;
+between balloons the fabric runs straight and the slope is all round them; every table gets at
+least one).
+
+- `hull.support: balloons` puts the balloon model on the table top in the evenest grid for 1, 2,
+  ... balloons (`hull.balloon_max`), never overlapping. How many: `hull.balloon_count`, or (0)
+  the AI chooses with the owner's practice in its instructions, or without AI about one per
+  `hull.balloon_spacing_mm` of table length, at least one.
+- With the tensioned cover the program measures each option (flat spots, hollows); the balloon's
+  flat top counts as pressed round by the fabric. With a box cover (`hull.top: box`) the box is
+  made round table and balloons: upright sides and a roof of flat faces, every piece exactly
+  flat. Told that it is a balloon table, the AI chooses the fewest roof pieces.
+- Tried: SUNS tables 60 × 60 (1 balloon, 6 pieces), 210 × 90 (2, 7), 340 × 100 (4, 6): 0 %
+  stretch, seams equal. The tensioned tent over the same balloons follows the slopes down to the
+  table edge, but gives 8 to 11 pieces with 2 to 5 % stretch and seams up to 10 cm apart.

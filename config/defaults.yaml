@@ -34,9 +34,16 @@ hull:                            # the cover surface (drape hull)
                                  # AI, the fewest within box_volume_slack_pct of the tightest box)
   box_max_pieces: 10             # box cover: options tried, up to this many pieces
   box_volume_slack_pct: 5        # box cover without AI: extra volume allowed over the tightest box
-  support: none                  # none | balloon | frame   support under the cover for flat tops
-                                 # (tables): frame = a ridge beam along the long axis, the cover
-                                 # forms a gable roof that lies flat; balloon = a dome
+  support: none                  # none | balloons | balloon | frame   support under the cover
+                                 # for flat tops (tables): balloons = the workshop's balloons
+                                 # (balloon_model) in a grid; frame = a ridge beam along the long
+                                 # axis, a gable roof that lies flat; balloon = a dome
+  balloon_model: table-baloon    # the balloon's model folder (owner, 1 Oct 2026: one size)
+  balloon_count: 0               # balloons under a table; 0 = chosen by the AI (or, without AI,
+                                 # the fewest with which all water runs off)
+  balloon_max: 8                 # balloons: options tried, up to this many
+  balloon_spacing_mm: 1100       # without AI about one balloon per this table length (owner,
+                                 # 1 Oct 2026: a 340 cm table gets 3 to 4); always at least 1
   support_height_mm: 0           # balloon or ridge height above the top; 0 = lowest that sheds
                                  # water
   support_radius_mm: 150         # to confirm; radius of the balloon's dome
