@@ -26,8 +26,18 @@ export function App() {
   return (
     <div className="app">
       <header>
-        <a href="#/" className="brand">
-          Cover patterns
+        <a href="#/" className="brand" title="Cover Studio">
+          <span className="logos">
+            <img src="/brand/s2dio-mark.svg" alt="S2DIO" />
+            <span className="wordmark">
+              s2dio
+              <br />
+              industries
+            </span>
+            <span className="times">×</span>
+            <img src="/brand/suns.svg" alt="SUNS" />
+          </span>
+          <span className="title">Cover Studio</span>
         </a>
         <a href="#/" className="nav">
           Models

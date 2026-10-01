@@ -1,5 +1,6 @@
-"""A 3D picture of the finished cover (`cover.png`) for the catalogue: the panels in their own
-colours, shaded, seams in dark lines, seen from the front right and above."""
+"""A 3D picture of the finished cover (`cover.png`) for the catalogue: the panels in the
+house-style colours (palette.py), shaded, seams in dark lines, seen from the front right and
+above."""
 
 from __future__ import annotations
 
@@ -11,17 +12,14 @@ from matplotlib.collections import LineCollection, PolyCollection
 from matplotlib.figure import Figure
 
 from coverengine.export.drawing import _edge_visibility, _projected, _views, load_cover
+from coverengine.palette import PIECES
 from coverengine.params import EffectiveParams
 
 PREVIEW_PNG = "cover.png"
 SIZE_IN = (4.0, 3.0)  # param-ok: picture size (inches)
 DPI = 150  # param-ok: picture resolution
-# Soft panel colours (one per panel, repeating), like panels.glb.
-PALETTE = [
-    (0.55, 0.66, 0.85), (0.86, 0.62, 0.52), (0.60, 0.80, 0.62), (0.85, 0.78, 0.51),
-    (0.72, 0.60, 0.84), (0.52, 0.80, 0.82), (0.86, 0.60, 0.72), (0.70, 0.74, 0.52),
-]  # fmt: skip
-SHADE_MIN = 0.45  # param-ok: display
+PALETTE = PIECES  # the house-style piece colours
+SHADE_MIN = 0.72  # param-ok: display (light shading: the house colours stay recognisable)
 
 
 def write_preview(model_dir: Path, doc: dict[str, Any], params: EffectiveParams, out: Path) -> Path:

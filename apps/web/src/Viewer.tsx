@@ -44,17 +44,17 @@ export function Viewer({ id, files, stamp }: { id: string; files: string[]; stam
     const el = host.current;
     if (!el) return;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#f4f5f8");
+    scene.background = new THREE.Color("#f9f6e8"); // SUNS cream
     const camera = new THREE.PerspectiveCamera(40, el.clientWidth / el.clientHeight, 0.01, 100);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(el.clientWidth, el.clientHeight);
     el.appendChild(renderer.domElement);
-    scene.add(new THREE.HemisphereLight("#ffffff", "#8890a0", 1.6));
+    scene.add(new THREE.HemisphereLight("#fffdf6", "#85886f", 1.6)); // warm light, sage ground
     const sun = new THREE.DirectionalLight("#ffffff", 1.4);
     sun.position.set(2, 4, 3);
     scene.add(sun);
-    const grid = new THREE.GridHelper(4, 40, "#c8ccd6", "#e0e3ea");
+    const grid = new THREE.GridHelper(4, 40, "#d6cdb6", "#ebe4d2");
     scene.add(grid);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;

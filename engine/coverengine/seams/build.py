@@ -7,7 +7,6 @@ models/<id>/seams.auto.json   the seams used, in the editable format of seams.js
 
 from __future__ import annotations
 
-import colorsys
 import json
 import math
 from dataclasses import dataclass, field
@@ -24,6 +23,7 @@ from coverengine import __version__
 from coverengine.errors import CoverError
 from coverengine.hull.build import HULL_GLB, MODEL_RGBA, _coloured
 from coverengine.io.model_io import glb_bytes, load_model, read_model_json
+from coverengine.palette import piece as piece_colour
 from coverengine.params import EffectiveParams
 from coverengine.seams import auto
 from coverengine.seams.cut import (
@@ -787,12 +787,13 @@ def write_cut(model_dir: Path, result: Cut, out_dir: Path | None = None) -> Path
     (out / SEAMS_AUTO_JSON).write_text(
         json.dumps(seams_used, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    meshes = [("furniture", _coloured(load_model(model_dir), MODEL_RGBA))]
-    n = max(len(result.panels), 1)
+    hull_json = model_dir / "hull.json"
+    given = hull_json.is_file() and json.loads(hull_json.read_text()).get("top") == "given"
+    # a cover surface upload: the "furniture" is the cover itself; drawn twice it flickers
+    meshes = [] if given else [("furniture", _coloured(load_model(model_dir), MODEL_RGBA))]
     for p in result.panels:
-        r, g, b = colorsys.hsv_to_rgb((p.index * 0.618034) % 1.0, 0.55, 0.95)
-        rgba = (int(r * 255), int(g * 255), int(b * 255), 255)
+        r, g, b = piece_colour(p.index)  # the house-style piece colours (palette.py)
+        rgba = (int(r * 255), int(g * 255), int(b * 255), 255)  # param-ok: 8-bit colour
         meshes.append((p.name, _coloured(p.mesh, rgba)))
-    del n
     (out / PANELS_GLB).write_bytes(glb_bytes(meshes))
     return out
