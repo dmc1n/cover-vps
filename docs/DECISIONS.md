@@ -611,3 +611,22 @@ Status: accepted, 2026-09-30/10-01 (night run, owner offline).
   meet the rounded table edges. Tables keep the balloon; the frame may need a seam along the
   ridge (question for the owner).
 
+## ADR-036 — AI advice on cover layouts (DeepSeek)
+
+Status: accepted, 1 Oct 2026 (owner: "first the AI integration, then the upload field").
+
+- The program describes a calculated cover as JSON text (product, size, every piece with flat
+  size, area and stretch, the seams between pieces, why it needs checking) and asks a language
+  model (`ai.provider: deepseek`, `ai.model: deepseek-flash`, the owner's choice) how to make it
+  simpler. The model may only choose actions from a fixed list the program can carry out
+  (`coverengine/ai.py` ACTIONS); unknown actions are dropped. It changes nothing itself: the owner
+  applies a suggestion (web app: AI advice tab; CLI `cover ai --apply`), which writes settings to
+  the model's cover.json or removes the program's added seams, and the cover is calculated again.
+- The key lives only in `deploy/.env` (git-ignored, mode 600) or the environment. The AI test
+  calls DeepSeek for real when the key is there and is skipped where it is not (GitHub).
+- DeepSeek takes text only, no images: drawings are read by the program itself (vector PDFs).
+- First result, SUNS Kota 2-seater: the AI named the owner's own complaints (30 pieces, scraps,
+  skirt in four, wall pieces) and proposed target 6. Its first three actions brought the cover
+  from 30 to 4 pieces; the top in one piece then stretches 43 %, so the extra seams must come from
+  the owner's drawings (the upload of drawing + model pairs, next).
+

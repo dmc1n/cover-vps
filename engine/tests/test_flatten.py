@@ -10,6 +10,7 @@ import shapely
 import trimesh
 from coverengine.catalogue import revisions
 from coverengine.cli import main
+from coverengine.errors import CoverError
 from coverengine.export.drawing import load_cover, measure, skirt_heights, write_drawing
 from coverengine.export.pattern import write_all
 from coverengine.flatten.pattern import build_patterns, pattern_set, wiggle
@@ -321,3 +322,39 @@ def test_report_grades_models(covers: dict[str, Any], tmp_path: Path, capsys: An
     assert "2 models" in capsys.readouterr().out
     assert (tmp_path / "rep" / "catalogue.pdf").read_bytes().startswith(b"%PDF")
     assert "box" in (tmp_path / "rep" / "catalogue.csv").read_text()
+
+
+def _has_ai_key() -> bool:
+    import coverengine.ai as ai
+
+    try:
+        ai._key("deepseek")
+        return True
+    except CoverError:
+        return False
+
+
+@pytest.mark.skipif(not _has_ai_key(), reason="no DEEPSEEK_API_KEY (deploy/.env on the server)")
+def test_ai_review_and_actions(covers: dict[str, Any], tmp_path: Path) -> None:
+    """A real AI review of the test box's cover, then the actions it may suggest."""
+    import coverengine.ai as ai
+    from coverengine.params import resolve_model
+
+    d = tmp_path / "box"
+    shutil.copytree(covers["root"] / "box_with_legs", d)
+    assert main(["flatten", str(d)]) == 0
+    assert main(["export", str(d)]) == 0
+    doc = ai.review(d, resolve_model(d))
+    assert doc["pieces_now"] == 5
+    assert doc["summary"] and isinstance(doc["target_pieces"], int)
+    assert all(s["action"] in ai.ACTIONS for s in doc["suggestions"])  # only known actions
+    assert json.loads((d / "ai_review.json").read_text())["summary"] == doc["summary"]
+    assert ai.apply_action(d, "skirt_one_piece") == ["cut", "flatten", "export"]
+    assert resolve_model(d)["seams.corner_angle_deg"] == ai.NO_CORNERS_DEG
+    (d / "proposals.json").write_text('{"top_seams": []}')
+    ai.apply_action(d, "drop_program_seams")
+    assert not (d / "proposals.json").exists()
+    with pytest.raises(CoverError):
+        ai.apply_action(d, "set_skirt_height", 20.0)
+    applied = json.loads((d / "ai_review.json").read_text())["applied"]
+    assert [a["action"] for a in applied] == ["skirt_one_piece", "drop_program_seams"]

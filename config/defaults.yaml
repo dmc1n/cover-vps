@@ -158,3 +158,10 @@ import:
 
 tolerance:
   cover_mm: 5.0                  # overall fit target: ±5 mm
+
+ai:                              # AI advice on cover layouts (the key: DEEPSEEK_API_KEY in deploy/.env)
+  provider: deepseek             # deepseek | none
+  model: deepseek-flash          # deepseek-flash (fast) | deepseek-v4-pro (stronger, slower)
+  base_url: https://api.deepseek.com
+  timeout_s: 120                 # how long to wait for an answer
+

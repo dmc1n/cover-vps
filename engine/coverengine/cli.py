@@ -359,6 +359,33 @@ def _cmd_improve(args: argparse.Namespace) -> int:
     return run("export") if args.export else 0
 
 
+def _cmd_ai(args: argparse.Namespace) -> int:
+    """AI advice on a cover's layout; with --apply, carry out one suggested action."""
+    from coverengine.ai import ACTIONS, apply_action, review
+
+    cover_json = args.model / "cover.json"
+    params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    if args.apply:
+        steps = apply_action(args.model, args.apply, args.value)
+        print(f"applied {args.apply}; run again: {', '.join(steps)}")
+        if args.run:
+            for st in steps:
+                code = main([st, str(args.model)])
+                if code:
+                    return code
+        return 0
+    doc = review(args.model, params)
+    print(f"AI ({doc['model']}): {doc['summary']}")
+    print(f"pieces now {doc['pieces_now']}, the AI's target {doc['target_pieces']}")
+    for p in doc["problems"]:
+        print(f"  problem: {p}")
+    for i, sug in enumerate(doc["suggestions"], 1):
+        val = f" ({sug['value']})" if sug.get("value") is not None else ""
+        print(f"  {i}. {sug['action']}{val}: {sug.get('reason', '')}")
+        print(f"     = {ACTIONS[sug['action']]}")
+    return 0
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
     """A catalogue report: every model graded ready / check / failed (CSV and PDF)."""
     import csv
@@ -616,6 +643,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-export", dest="export", action="store_false")
     p.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
     p.set_defaults(handler=_cmd_improve)
+
+    p = sub.add_parser("ai", help="AI advice on a cover's layout (ai_review.json)")
+    p.add_argument("model", type=Path, help="model directory with a calculated cover")
+    p.add_argument("--apply", help="carry out one action (see ai_review.json)")
+    p.add_argument("--value", type=float, help="value for the action (skirt height in mm)")
+    p.add_argument("--run", action="store_true", help="with --apply: calculate again")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_ai)
 
     p = sub.add_parser("report", help="catalogue report: every model ready / check / failed")
     p.add_argument("--models", type=Path, default=Path("models"), help="models folder")

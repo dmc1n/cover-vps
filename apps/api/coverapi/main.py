@@ -48,6 +48,11 @@ class BatchRequest(BaseModel):
     trial: dict[str, Any] = {}
 
 
+class AiApplyRequest(BaseModel):
+    action: str
+    value: float | None = None
+
+
 class SeamsRequest(BaseModel):
     automatic: bool = False  # true: forget the hand-placed seams
     skirt_seams: list[list[float]] | None = None  # plan points, one per vertical skirt seam
@@ -161,6 +166,17 @@ def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
             save_seams(d, {"skirt_seams": req.skirt_seams, "top_seams": req.top_seams})
         job = jobs.submit(JobSpec(model_id, ["cut", "flatten", "export"], {})) if req.run else None
         return {"saved": not req.automatic, "job": job}
+
+    @app.post("/api/models/{model_id}/ai-apply")
+    def ai_apply(model_id: str, req: AiApplyRequest) -> dict[str, Any]:
+        from coverengine.ai import apply_action
+
+        d = model_or_404(model_id)
+        try:
+            steps = apply_action(d, req.action, req.value)
+        except CoverError as exc:
+            raise HTTPException(400, str(exc)) from None
+        return jobs.submit(JobSpec(model_id, steps, {}))
 
     @app.get("/api/families")
     def families() -> list[str]:

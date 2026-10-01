@@ -103,3 +103,5 @@ header a.nav:hover { color: #fff; }
 .product .name { font-weight: 600; font-size: 14px; margin: 8px 0 4px; }
 .product .facts { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--muted); align-items: center; }
 .product .facts .ok { color: var(--ok); } .product .facts .bad { color: var(--bad); }
+.suggestion { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); }
+.suggestion button { flex: none; min-width: 80px; }

@@ -1,6 +1,6 @@
 // Types and calls for the cover API (apps/api/coverapi/main.py).
 
-export type Step = "import" | "hull" | "cut" | "flatten" | "export" | "improve";
+export type Step = "import" | "hull" | "cut" | "flatten" | "export" | "improve" | "ai";
 export const STEPS: Step[] = ["import", "hull", "cut", "flatten", "export"];
 export const STEP_LABEL: Record<Step, string> = {
   import: "Import",
@@ -9,6 +9,7 @@ export const STEP_LABEL: Record<Step, string> = {
   flatten: "Flat patterns",
   export: "Cut pieces",
   improve: "Seams added by the program",
+  ai: "AI advice",
 };
 
 export type Status = "draft" | "checked" | "production";
@@ -183,3 +184,22 @@ export const fileUrl = (id: string, name: string) => `/api/models/${id}/files/${
 export const cm = (mm: number) => `${(mm / 10).toFixed(1)} cm`;
 
 export const revisionUrl = (id: string, n: number, name: string) => `/api/models/${id}/revisions/${n}/${name}`;
+
+export interface AiReview {
+  time: number;
+  model: string;
+  summary: string;
+  target_pieces: number | null;
+  pieces_now: number;
+  problems: string[];
+  suggestions: { action: string; value: number | null; reason: string }[];
+  applied: { action: string; value: number | null }[];
+}
+
+export const ACTION_LABEL: Record<string, string> = {
+  drop_program_seams: "Remove the seams the program added",
+  skirt_one_piece: "Skirt in one piece",
+  no_walls: "No separate wall pieces",
+  smoother_surface: "Calmer cover surface (15 mm, bridge 15 cm, smooth)",
+  set_skirt_height: "Skirt at this height",
+};

@@ -18,7 +18,7 @@ from typing import Any
 from coverapi.store import STEPS, Store
 
 LOG_TAIL = 4000  # characters of each step's output kept in the job file
-EXTRA_STEPS = ["improve"]  # cover improve: take seam proposals while they lower the stretch
+EXTRA_STEPS = ["improve", "ai"]  # cover improve: the program adds seams; cover ai: AI advice
 
 
 @dataclass

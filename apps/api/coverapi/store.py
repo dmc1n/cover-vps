@@ -32,6 +32,7 @@ EXTRA_FILES = [
     "cover.png",
     "product.jpg",
     "proposals.json",
+    "ai_review.json",
 ]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)
 MEDIA = {

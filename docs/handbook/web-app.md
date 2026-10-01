@@ -33,6 +33,10 @@ and leave that window open. Then go to **http://localhost:8080** in the browser.
   - **Let the program add seams** (Seams tab): the program takes its own proposals round by
     round while the worst stretch goes down, and keeps them in `proposals.json`, apart from
     your seams. Delete that file (or use "Use automatic seams") to go back.
+  - **AI advice:** "Ask the AI" sends the cover as text to the AI (DeepSeek), which says how
+    many pieces it should have, what is wrong, and suggests steps (skirt in one piece, no wall
+    pieces, remove the program's seams, a calmer surface, a skirt height). "Apply" carries out
+    one and calculates the cover again; nothing changes without your click.
   - **Patterns:** the flat pieces and the stretch picture, with a table per piece.
   - **Size drawing:** `sizes.pdf`, with your reference cover's sizes where there is one.
   - **Cut pieces:** what the machine cuts, the cutting list, and the DXF download.
