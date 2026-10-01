@@ -209,7 +209,14 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
             )
         )
     drains = bool((hull.get("drainage") or {}).get("drains", False))
-    checks.append(_check("water", drains, "runs off" if drains else "water would stay on top"))
+    if hull.get("top") == "given" and not drains:
+        # the owner's own cover, replicated exactly (owner, 1 Oct 2026): noted, not a fault
+        flat = (hull.get("drainage") or {}).get("flat_area_mm2", 0.0) / 1e6
+        checks.append(
+            _check("water", True, f"{flat:.2f} m2 flat on top, as in the drawing (replicated)")
+        )
+    else:
+        checks.append(_check("water", drains, "runs off" if drains else "water would stay on top"))
     g = grade(model_dir)
     pieces: list[dict[str, Any]] = []
     if (model_dir / "panels.json").is_file():
