@@ -2,7 +2,8 @@
 
     COVER_DATA_DIR=data uv run cover-web          # http://127.0.0.1:8080
 
-One process, one port. It is meant to sit behind the Cloudflare tunnel (M6) or an SSH tunnel.
+One process, one port, on 127.0.0.1 only: the reverse proxy (deploy/Caddyfile) serves it to
+the internet over https. Users must log in (COVER_LOGIN=off turns that off for a local trial).
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from coverengine import __version__
 from coverengine.catalogue import KEPT, compare_files, info, revision_file, set_info
 from coverengine.errors import CoverError
 from coverengine.params.registry import ParamError, list_families, repo_root
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -24,6 +25,10 @@ from coverapi.jobs import Jobs, JobSpec, store_upload
 from coverapi.plan import plan, save_seams
 from coverapi.references import register, unpack
 from coverapi.store import ALLOWED, MEDIA, STEPS, UPLOAD_SUFFIXES, Store, registry_specs
+
+
+class ApproveRequest(BaseModel):
+    note: str = ""
 
 
 class RunRequest(BaseModel):
@@ -66,12 +71,22 @@ class SeamsRequest(BaseModel):
     run: bool = True  # cut and flatten again straight away
 
 
-def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
+def create_app(
+    data_dir: Path, web_dir: Path | None = None, login_required: bool = False
+) -> FastAPI:
+    """`login_required`: users must log in (the served app, `cover-web`); off in the tests."""
+    from coverapi.auth import Auth
+    from coverapi.security import install, require
+
     store = Store(data_dir)
     store.ensure()
     jobs = Jobs(store)
-    app = FastAPI(title="Cover pattern engine", version=__version__)
+    app = FastAPI(
+        title="Cover Studio", version=__version__, docs_url=None, redoc_url=None, openapi_url=None
+    )
     app.state.store, app.state.jobs = store, jobs
+    auth = Auth(store.root / "app.db")
+    install(app, auth, login_required)
 
     def model_or_404(model_id: str) -> Path:
         try:
@@ -119,9 +134,12 @@ def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
 
     @app.get("/api/models/{model_id}")
     def model(model_id: str) -> dict[str, Any]:
-        model_or_404(model_id)
+        from coverapi.approval import state
+
+        d = model_or_404(model_id)
         out = store.summary(model_id)
         out["job"] = jobs.latest(model_id)
+        out["approval"] = state(d)
         return out
 
     @app.get("/api/models/{model_id}/files/{name}")
@@ -274,8 +292,13 @@ def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
 
     @app.put("/api/models/{model_id}/info")
     def model_info(model_id: str, req: InfoRequest) -> dict[str, Any]:
+        from coverapi.approval import state
+
         d = model_or_404(model_id)
         changes = {k: v for k, v in req.model_dump().items() if k in req.model_fields_set}
+        approved = state(d)
+        if changes.get("status") == "production" and not (approved and approved["valid"]):
+            raise HTTPException(400, "production needs an approval of the current drawing")
         try:
             return set_info(d, changes)
         except CoverError as exc:
@@ -317,6 +340,70 @@ def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
         except (ParamError, ValueError) as exc:
             raise HTTPException(400, str(exc)) from None
 
+    @app.get("/api/models/{model_id}/approval")
+    def approval_state(model_id: str) -> dict[str, Any]:
+        from coverapi.approval import state
+
+        return {"approval": state(model_or_404(model_id))}
+
+    @app.post("/api/models/{model_id}/approve")
+    def approve_model(model_id: str, req: ApproveRequest, request: Request) -> dict[str, Any]:
+        from coverapi.approval import approve
+
+        user = require(request, "approve")
+        d = model_or_404(model_id)
+        try:
+            doc = approve(d, user.username, user.name, req.note)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from None
+        auth.log(user, "approved", {"model": model_id, "revision": doc["revision"]})
+        return {"approval": doc}
+
+    @app.delete("/api/models/{model_id}/approve")
+    def withdraw_approval(model_id: str, request: Request) -> dict[str, Any]:
+        from coverapi.approval import withdraw
+
+        user = require(request, "approve")
+        withdraw(model_or_404(model_id))
+        auth.log(user, "approval withdrawn", {"model": model_id})
+        return {"approval": None}
+
+    @app.post("/api/models/{model_id}/approval-request")
+    def ask_approval(model_id: str, request: Request) -> dict[str, Any]:
+        from coverapi import mailer
+        from coverapi.security import DEFAULT_PUBLIC_URL, PUBLIC_URL_KEY
+
+        user = require(request, "edit")
+        model_or_404(model_id)
+        base = str(auth.setting(PUBLIC_URL_KEY, DEFAULT_PUBLIC_URL)).rstrip("/")
+        sent, skipped = [], []
+        for u in auth.users():
+            if not (u.can_approve and u.active and u.email):
+                continue
+            if not mailer.configured(auth):
+                skipped.append(u.username)
+                continue
+            try:
+                mailer.send(
+                    auth, u.email, f"Please approve the cover {model_id}",
+                    f"Hello {u.name},\n\n{user.name} asks you to approve the definitive "
+                    f"drawing of {model_id}:\n\n{base}/#/model/{model_id}\n",
+                )  # fmt: skip
+                sent.append(u.username)
+            except Exception:  # noqa: BLE001
+                skipped.append(u.username)
+        auth.log(user, "approval asked", {"model": model_id, "mailed": sent})
+        return {"mailed": sent, "not_mailed": skipped}
+
+    @app.get("/api/models/{model_id}/approved/{name}")
+    def approved_file(model_id: str, name: str) -> FileResponse:
+        from coverapi.approval import APPROVED_DIR, STAMPED
+
+        d = model_or_404(model_id)
+        if name not in STAMPED or not (d / APPROVED_DIR / name).is_file():
+            raise HTTPException(404, f"no approved {name!r}")
+        return FileResponse(d / APPROVED_DIR / name, media_type="application/pdf")
+
     @app.get("/api/jobs/{job_id}")
     def job(job_id: str) -> dict[str, Any]:
         try:
@@ -332,7 +419,8 @@ def create_app(data_dir: Path, web_dir: Path | None = None) -> FastAPI:
 def default_app() -> FastAPI:
     data = Path(os.environ.get("COVER_DATA_DIR", repo_root() / "data"))
     web = Path(os.environ.get("COVER_WEB_DIR", repo_root() / "apps" / "web" / "dist"))
-    return create_app(data, web)
+    login = os.environ.get("COVER_LOGIN", "on") != "off"
+    return create_app(data, web, login_required=login)
 
 
 def serve() -> None:

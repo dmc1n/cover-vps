@@ -190,3 +190,23 @@ def test_reference_zip(chair: dict[str, Any], tmp_path: Path) -> None:
     assert "reference" in m["tags"]
     bad = c.post("/api/references", files={"file": ("x.zip", b"not a zip")})
     assert bad.status_code == 400
+
+
+def test_approval_of_the_definitive_drawing(chair: dict[str, Any]) -> None:
+    c: TestClient = chair["client"]
+    mid = chair["id"]
+    r = c.put(f"/api/models/{mid}/info", json={"status": "production"})
+    assert r.status_code == 400  # production needs an approval first
+    r = c.post(f"/api/models/{mid}/approve", json={"note": "checked on the table"})
+    assert r.status_code == 200, r.text
+    assert r.json()["approval"]["valid"]
+    assert c.get(f"/api/models/{mid}").json()["approval"]["valid"]
+    pdf = c.get(f"/api/models/{mid}/approved/sizes.pdf")
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+    # calculated again with other settings: the approval no longer matches the files
+    r = c.post(
+        f"/api/models/{mid}/run", json={"steps": ["export"], "trial": {"hem.allowance_mm": 60}}
+    )
+    chair["app"].state.jobs.wait(r.json()["id"], RUN_TIMEOUT_S)
+    assert c.get(f"/api/models/{mid}").json()["approval"]["valid"] is False
+    assert c.delete(f"/api/models/{mid}/approve").status_code == 200
