@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { fileUrl, Rain } from "./api";
+import { Drape, fileUrl, Rain } from "./api";
 
 // The 3D view: the furniture, the cover surface (water spots in red) and the panels, each a
 // layer that can be switched on and off. The GLB files are in metres, Y up.
@@ -23,9 +23,11 @@ const LAYERS: Layer[] = [
 
 // Rain drops: the paths are in mm, Z up (the engine's coordinates); the scene is glTF (metres,
 // Y up): x, z, -y.
-const toScene = (p: number[]) => new THREE.Vector3(p[0] / 1000, p[2] / 1000, -p[1] / 1000);
+const toScene = (p: number[]) =>
+  new THREE.Vector3(p[0] / 1000, p[2] / 1000, -p[1] / 1000);
 const DROP_SPEED = 0.6; // path points per frame
 const DROPS_SHOWN = 160;
+const DRAPE_SPEED = 0.35; // frames of the fall per screen frame
 
 export function Viewer({
   id,
@@ -33,34 +35,56 @@ export function Viewer({
   stamp,
   onRain,
   rainBusy,
+  onDrape,
+  drapeBusy,
 }: {
   id: string;
   files: string[];
   stamp: number;
   onRain?: () => void;
   rainBusy?: boolean;
+  onDrape?: () => void;
+  drapeBusy?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
-  const rainAnim = useRef<{ points: THREE.Points; paths: THREE.Vector3[][]; t: number[] } | null>(null);
+  const rainAnim = useRef<{
+    points: THREE.Points;
+    paths: THREE.Vector3[][];
+    t: number[];
+  } | null>(null);
   const [rain, setRain] = useState<Rain | null>(null);
   const [raining, setRaining] = useState(false);
+  const [draping, setDraping] = useState(false);
+  const [drape, setDrape] = useState<Drape | null>(null);
+  const drapeAnim = useRef<{
+    mesh: THREE.Mesh;
+    frames: Float32Array[];
+    t: number;
+    final: THREE.Object3D | null;
+  } | null>(null);
   const groups = useRef<Record<string, THREE.Object3D>>({});
   const available = LAYERS.filter((l) => files.includes(l.file));
-  const [shown, setShown] = useState<Record<string, boolean>>((): Record<string, boolean> => {
-    const panels = files.includes("panels.glb");
-    if (files.includes("balloons.glb")) {
-      // a table: furniture and balloons, with the cover see-through over them
+  const [shown, setShown] = useState<Record<string, boolean>>(
+    (): Record<string, boolean> => {
+      const panels = files.includes("panels.glb");
+      if (files.includes("balloons.glb")) {
+        // a table: furniture and balloons, with the cover see-through over them
+        return {
+          "model.glb": true,
+          "balloons.glb": true,
+          "chairs.glb": true,
+          "preview.glb": true,
+          "panels.glb": false,
+        };
+      }
       return {
-        "model.glb": true,
-        "balloons.glb": true,
-        "chairs.glb": true,
-        "preview.glb": true,
-        "panels.glb": false,
+        "model.glb": !panels,
+        "preview.glb": false,
+        "panels.glb": panels,
       };
-    }
-    return { "model.glb": !panels, "preview.glb": false, "panels.glb": panels };
-  });
+    },
+  );
 
   useEffect(() => {
     const el = host.current;
@@ -68,7 +92,12 @@ export function Viewer({
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     scene.background = new THREE.Color("#f9f6e8"); // SUNS cream
-    const camera = new THREE.PerspectiveCamera(40, el.clientWidth / el.clientHeight, 0.01, 100);
+    const camera = new THREE.PerspectiveCamera(
+      40,
+      el.clientWidth / el.clientHeight,
+      0.01,
+      100,
+    );
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(el.clientWidth, el.clientHeight);
@@ -92,7 +121,9 @@ export function Viewer({
         root.traverse((o) => {
           const mesh = o as THREE.Mesh;
           if (!mesh.isMesh) return;
-          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          const mats = Array.isArray(mesh.material)
+            ? mesh.material
+            : [mesh.material];
           for (const m of mats) {
             const std = m as THREE.MeshStandardMaterial;
             std.side = THREE.DoubleSide;
@@ -111,7 +142,9 @@ export function Viewer({
           const size = box.getSize(new THREE.Vector3()).length();
           const centre = box.getCenter(new THREE.Vector3());
           controls.target.copy(centre);
-          camera.position.copy(centre).add(new THREE.Vector3(0.6, 0.5, 1.0).multiplyScalar(size));
+          camera.position
+            .copy(centre)
+            .add(new THREE.Vector3(0.6, 0.5, 1.0).multiplyScalar(size));
           grid.position.y = box.min.y;
           framed = true;
         }
@@ -127,7 +160,9 @@ export function Viewer({
       controls.update();
       const anim = rainAnim.current;
       if (anim) {
-        const pos = anim.points.geometry.getAttribute("position") as THREE.BufferAttribute;
+        const pos = anim.points.geometry.getAttribute(
+          "position",
+        ) as THREE.BufferAttribute;
         anim.paths.forEach((path, k) => {
           anim.t[k] += DROP_SPEED;
           if (anim.t[k] >= path.length - 1) anim.t[k] = -Math.random() * 40; // fall again
@@ -140,6 +175,25 @@ export function Viewer({
           pos.setXYZ(k, p.x, p.y, p.z);
         });
         pos.needsUpdate = true;
+      }
+      const fall = drapeAnim.current;
+      if (fall && fall.t < fall.frames.length - 1) {
+        fall.t = Math.min(fall.t + DRAPE_SPEED, fall.frames.length - 1);
+        const i = Math.floor(fall.t);
+        const a = fall.frames[i];
+        const b = fall.frames[Math.min(i + 1, fall.frames.length - 1)];
+        const w = fall.t - i;
+        const pos = fall.mesh.geometry.getAttribute(
+          "position",
+        ) as THREE.BufferAttribute;
+        const arr = pos.array as Float32Array;
+        for (let k = 0; k < arr.length; k++) arr[k] = a[k] * (1 - w) + b[k] * w;
+        pos.needsUpdate = true;
+        fall.mesh.geometry.computeVertexNormals();
+        if (fall.t >= fall.frames.length - 1 && fall.final) {
+          fall.mesh.visible = false; // the cover as it lies, coloured by its folds
+          fall.final.visible = true;
+        }
       }
       renderer.render(scene, camera);
     });
@@ -167,15 +221,29 @@ export function Viewer({
         .map((d) => d.path.map(toScene))
         .filter((p) => p.length > 1);
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(paths.length * 3), 3));
+      geo.setAttribute(
+        "position",
+        new THREE.BufferAttribute(new Float32Array(paths.length * 3), 3),
+      );
       const points = new THREE.Points(
         geo,
-        new THREE.PointsMaterial({ color: "#2f7fe0", size: 0.025, transparent: true, opacity: 0.9 }),
+        new THREE.PointsMaterial({
+          color: "#2f7fe0",
+          size: 0.025,
+          transparent: true,
+          opacity: 0.9,
+        }),
       );
       group.add(points);
-      rainAnim.current = { points, paths, t: paths.map(() => -Math.random() * 60) };
+      rainAnim.current = {
+        points,
+        paths,
+        t: paths.map(() => -Math.random() * 60),
+      };
       if (files.includes("rain.glb")) {
-        new GLTFLoader().load(`${fileUrl(id, "rain.glb")}?v=${stamp}`, (gltf) => group.add(gltf.scene));
+        new GLTFLoader().load(`${fileUrl(id, "rain.glb")}?v=${stamp}`, (gltf) =>
+          group.add(gltf.scene),
+        );
       }
     } else {
       rainAnim.current = null;
@@ -195,13 +263,100 @@ export function Viewer({
       .catch(() => setRain(null));
   }, [raining, id, stamp, files]);
 
+  // drape: the sewn cover falling over the furniture (drape.json, drape.bin, drape.glb)
+  useEffect(() => {
+    if (!draping || !files.includes("drape.json")) return;
+    let alive = true;
+    const added: THREE.Object3D[] = [];
+    Promise.all([
+      fetch(`${fileUrl(id, "drape.json")}?v=${stamp}`).then(
+        (r) => r.json() as Promise<Drape>,
+      ),
+      fetch(`${fileUrl(id, "drape.bin")}?v=${stamp}`).then((r) =>
+        r.arrayBuffer(),
+      ),
+    ])
+      .then(([doc, buf]) => {
+        const scene = sceneRef.current;
+        if (!alive || !scene) return;
+        setDrape(doc);
+        const n = doc.points_per_frame;
+        const q = new Uint16Array(buf);
+        const count = Math.floor(q.length / (n * 3));
+        const [lo, hi] = doc.frame_box_mm;
+        const frames: Float32Array[] = [];
+        for (let f = 0; f < count; f++) {
+          const out = new Float32Array(n * 3);
+          for (let k = 0; k < n; k++) {
+            const o = (f * n + k) * 3;
+            const x = lo[0] + (q[o] / 65535) * (hi[0] - lo[0]);
+            const y = lo[1] + (q[o + 1] / 65535) * (hi[1] - lo[1]);
+            const z = lo[2] + (q[o + 2] / 65535) * (hi[2] - lo[2]);
+            out[k * 3] = x / 1000; // mm Z up -> m Y up: x, z, -y
+            out[k * 3 + 1] = z / 1000;
+            out[k * 3 + 2] = -y / 1000;
+          }
+          frames.push(out);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute(
+          "position",
+          new THREE.BufferAttribute(frames[0].slice(), 3),
+        );
+        geo.setIndex(doc.faces.flat());
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(
+          geo,
+          new THREE.MeshStandardMaterial({
+            color: "#85886f",
+            side: THREE.DoubleSide,
+            roughness: 0.9,
+          }),
+        );
+        scene.add(mesh);
+        added.push(mesh);
+        drapeAnim.current = { mesh, frames, t: 0, final: null };
+        new GLTFLoader().load(
+          `${fileUrl(id, "drape.glb")}?v=${stamp}`,
+          (gltf) => {
+            if (!alive || !sceneRef.current) return;
+            gltf.scene.traverse((o) => {
+              const m = o as THREE.Mesh;
+              if (m.isMesh)
+                (m.material as THREE.MeshStandardMaterial).side =
+                  THREE.DoubleSide;
+            });
+            gltf.scene.visible = false;
+            sceneRef.current.add(gltf.scene);
+            added.push(gltf.scene);
+            if (drapeAnim.current) drapeAnim.current.final = gltf.scene;
+          },
+        );
+      })
+      .catch(() => setDrape(null));
+    // the designed surface and the panels make way for the real cover
+    for (const f of ["preview.glb", "panels.glb"])
+      if (groups.current[f]) groups.current[f].visible = false;
+    return () => {
+      alive = false;
+      drapeAnim.current = null;
+      for (const o of added) sceneRef.current?.remove(o);
+      for (const [file, obj] of Object.entries(groups.current))
+        obj.visible = !!shownRef.current[file];
+    };
+  }, [draping, id, stamp, files]);
+
   const shownRef = useRef(shown);
   shownRef.current = shown;
   useEffect(() => {
-    for (const [file, obj] of Object.entries(groups.current)) obj.visible = !!shown[file];
+    for (const [file, obj] of Object.entries(groups.current))
+      obj.visible = !!shown[file];
   }, [shown]);
 
-  if (!available.length) return <p className="muted">Nothing to show yet: the model is being imported.</p>;
+  if (!available.length)
+    return (
+      <p className="muted">Nothing to show yet: the model is being imported.</p>
+    );
   return (
     <div className="viewer">
       <div className="layers">
@@ -210,15 +365,22 @@ export function Viewer({
             <input
               type="checkbox"
               checked={!!shown[l.file]}
-              onChange={(e) => setShown({ ...shown, [l.file]: e.target.checked })}
+              onChange={(e) =>
+                setShown({ ...shown, [l.file]: e.target.checked })
+              }
             />
             {l.label}
           </label>
         ))}
-        <span className="muted">Drag to turn, scroll to zoom, right-drag to move.</span>
+        <span className="muted">
+          Drag to turn, scroll to zoom, right-drag to move.
+        </span>
         <span className="rain-buttons">
           {files.includes("rain.json") && (
-            <button className={raining ? "primary" : ""} onClick={() => setRaining(!raining)}>
+            <button
+              className={raining ? "primary" : ""}
+              onClick={() => setRaining(!raining)}
+            >
               {raining ? "Stop the rain" : "Rain"}
             </button>
           )}
@@ -230,14 +392,82 @@ export function Viewer({
                 onRain();
               }}
             >
-              {rainBusy ? "Simulating…" : files.includes("rain.json") ? "Simulate again" : "Rain simulation"}
+              {rainBusy
+                ? "Simulating…"
+                : files.includes("rain.json")
+                  ? "Simulate again"
+                  : "Rain simulation"}
+            </button>
+          )}
+        </span>
+        <span className="rain-buttons">
+          {files.includes("drape.json") && (
+            <button
+              className={draping ? "primary" : ""}
+              onClick={() => setDraping(!draping)}
+            >
+              {draping ? "Back to the design" : "Drape"}
+            </button>
+          )}
+          {onDrape && (
+            <button
+              disabled={drapeBusy}
+              title="The cut pieces sewn and dropped over the furniture: folds where there is too much fabric"
+              onClick={() => {
+                setDraping(false);
+                onDrape();
+              }}
+            >
+              {drapeBusy
+                ? "Draping… (minutes)"
+                : files.includes("drape.json")
+                  ? "Drape again"
+                  : "Drape simulation"}
             </button>
           )}
         </span>
       </div>
       <div className="canvas" ref={host} />
       {raining && rain && <RainReport rain={rain} />}
+      {draping && drape && <DrapeReport drape={drape} />}
     </div>
+  );
+}
+
+function DrapeReport({ drape }: { drape: Drape }) {
+  const folds = drape.fold_share_pct > 10;
+  return (
+    <section className={`card rain ${folds ? "risk" : "dry"}`}>
+      <div className="rain-head">
+        <strong>The sewn cover, dropped over the furniture</strong>
+        <span className="muted">
+          {drape.points.toLocaleString()} points, {drape.seconds_simulated} s of
+          falling, worked out in {Math.round(drape.run_s)} s
+        </span>
+      </div>
+      <ul>
+        <li>
+          <span className="swatch fold" /> Folds (red): {drape.fold_area_m2} m²
+          ({drape.fold_share_pct} % of the cover), sharpest {drape.max_fold_deg}
+          °. Folds show where a piece has more fabric than the shape needs.
+        </li>
+        <li>
+          Tightest: {drape.max_stretch_pct} % stretch; {drape.tight_share_pct} %
+          of the cover near the fabric's limit.
+        </li>
+        <li>
+          Sags up to {(drape.max_sag_mm / 10).toFixed(1)} cm below the designed
+          surface (where nothing holds it).
+        </li>
+        <li>
+          Lies on the furniture over {drape.touching_share_pct} % of its points.
+        </li>
+      </ul>
+      <p className="muted">
+        The fabric values are best guesses until the fabric is measured: the
+        places of the folds are right, their size is an estimate.
+      </p>
+    </section>
   );
 }
 
@@ -248,11 +478,19 @@ function RainReport({ rain }: { rain: Rain }) {
     <section className={`card rain ${verdict}`}>
       <div className="rain-head">
         <strong>
-          {verdict === "dry" ? "Dry: the rain runs off" : verdict === "wet" ? "Water stays on this cover" : "Risk of standing water"}
+          {verdict === "dry"
+            ? "Dry: the rain runs off"
+            : verdict === "wet"
+              ? "Water stays on this cover"
+              : "Risk of standing water"}
         </strong>
         <span className="muted">
-          {rain.ponds.length} pond{rain.ponds.length === 1 ? "" : "s"} ({rain.pond_volume_l} l) · flat {rain.flat_area_m2} m² ·
-          off at {Object.entries(rain.exits).filter(([, n]) => n).map(([k, n]) => `${k} ${n}`).join(", ")}
+          {rain.ponds.length} pond{rain.ponds.length === 1 ? "" : "s"} (
+          {rain.pond_volume_l} l) · flat {rain.flat_area_m2} m² · off at{" "}
+          {Object.entries(rain.exits)
+            .filter(([, n]) => n)
+            .map(([k, n]) => `${k} ${n}`)
+            .join(", ")}
         </span>
       </div>
       {ai?.summary && <p>{ai.summary}</p>}
@@ -260,16 +498,20 @@ function RainReport({ rain }: { rain: Rain }) {
         <ul>
           {rain.ponds.slice(0, 6).map((p, i) => (
             <li key={i}>
-              Pond {i + 1}: {p.area_m2} m², up to {p.max_depth_mm} mm deep, {p.volume_l} l; with the fabric sagging{" "}
-              {p.volume_with_sag_l} l{p.keeps_growing ? " — keeps growing under its weight" : ""}
+              Pond {i + 1}: {p.area_m2} m², up to {p.max_depth_mm} mm deep,{" "}
+              {p.volume_l} l; with the fabric sagging {p.volume_with_sag_l} l
+              {p.keeps_growing ? " — keeps growing under its weight" : ""}
             </li>
           ))}
         </ul>
       )}
       {rain.seams_along.length > 0 && (
         <p className="muted">
-          Water runs along {rain.seams_along.map((s) => `${s.seam} (${Math.round(s.run_mm / 10)} cm)`).join(", ")}: seams
-          soak there.
+          Water runs along{" "}
+          {rain.seams_along
+            .map((s) => `${s.seam} (${Math.round(s.run_mm / 10)} cm)`)
+            .join(", ")}
+          : seams soak there.
         </p>
       )}
       {ai?.risks && ai.risks.length > 0 && (
@@ -293,8 +535,9 @@ function RainReport({ rain }: { rain: Rain }) {
         </>
       )}
       <p className="muted small">
-        Streams and ponds computed from the cover's shape; the sag estimate uses a fabric tension still to be measured.
-        The verdict and advice are DeepSeek's.
+        Streams and ponds computed from the cover's shape; the sag estimate uses
+        a fabric tension still to be measured. The verdict and advice are
+        DeepSeek's.
       </p>
     </section>
   );

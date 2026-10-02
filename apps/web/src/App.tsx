@@ -707,6 +707,10 @@ function ModelPage({ id }: { id: string }) {
               user?.role === "viewer" ? undefined : () => run(["rain"], {})
             }
             rainBusy={!!running && job?.steps.some((s) => s.name === "rain")}
+            onDrape={
+              user?.role === "viewer" ? undefined : () => run(["drape"], {})
+            }
+            drapeBusy={!!running && job?.steps.some((s) => s.name === "drape")}
           />
         )}
         {tab === "seams" && <SeamEditor id={id} stamp={stamp} onJob={setJob} />}

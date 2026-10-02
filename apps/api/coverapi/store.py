@@ -43,6 +43,9 @@ EXTRA_FILES = [
     "rain.json",
     "rain.glb",
     "rain.png",
+    "drape.json",
+    "drape.glb",
+    "drape.bin",
     "audit.png",
 ]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)
@@ -54,6 +57,7 @@ MEDIA = {
     ".dxf": "application/dxf",
     ".png": "image/png",
     ".jpg": "image/jpeg",
+    ".bin": "application/octet-stream",
 }
 UPLOAD_SUFFIXES = {".step", ".stp", ".iges", ".igs", ".stl", ".obj", ".ply", ".glb", ".gltf"}
 

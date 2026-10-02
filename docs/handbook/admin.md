@@ -74,3 +74,19 @@ COVER_DATA_DIR=~/cover-data uv run cover-users add <name> --name "Full Name" --e
     --role editor [--approve]
 COVER_DATA_DIR=~/cover-data uv run cover-users invite <name>      # a new password link
 ```
+
+## The drape simulation (3D view)
+
+**Drape simulation** sews the cut pieces virtually and drops them over the furniture (and the
+balloons of a table). It takes a few minutes, in the background. **Drape** then plays the fall
+and shows the cover as it lies.
+
+- **Red** shows folds: there the piece has more fabric than the shape needs.
+- The card below gives:
+  - the fold area;
+  - the tightest spot;
+  - how far the top sags below the designed surface;
+  - how much of the cover lies on the furniture.
+
+**Back to the design** shows the designed surface again. The fabric values are estimates until
+the fabric has been measured.

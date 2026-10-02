@@ -964,3 +964,44 @@ minimum width is to be learned (10 cm for now).
 
   Then it is swept over all models (the scan of 2 October: 21 SUNS models with a piece under
   8 cm, 168 with a top that would fit the roll in one piece).
+
+## ADR-056 — The drape simulation
+
+The owner, 2 October 2026: "a simulation button where the cover really falls over the product
+... lifelike, where you also see folds where there is too much fabric" (plan:
+docs/plans/drape-simulation.md).
+
+- **The cloth:**
+  - The pieces of `panels.npz` (the cut), each with its flat shape from the flattening as rest
+    shape, sewn over their seams (the two sides of a seam are one point).
+  - It starts where it lies in the designed cover, a fabric's thickness outward. The support is
+    then gone.
+- **The solver:** projective dynamics (Bouaziz et al. 2014), in numpy and scipy, deterministic,
+  no new dependency.
+  - Each step is `drape.iterations` rounds.
+  - Local step: every triangle's stretch projected into `1 ± drape.max_stretch_pct`.
+  - Global step: one sparse solve, factorised again only when contacts change.
+  - Bending: the quadratic energy of the flat rest shape (cotangent Laplacian), within each
+    piece. A seam is a free hinge.
+- **Contact:**
+  - A point that would go through the furniture or the balloons, or come closer than the
+    fabric's thickness, is held on the surface, on the side it came from. That is a constraint
+    in the global solve (`drape.contact_stiffness`), not a push afterwards.
+  - The closest points are exact (libigl), not from a grid. Pushing afterwards, and a 12 mm
+    grid, both tore the cloth at thin parts.
+- **Tuning on a tablecloth over a box** (the standard cloth test, `engine/tests/test_drape.py`):
+  - With a high stretch weight the solver itself damps the fall: the cloth hung like cardboard.
+  - At `drape.stretch_stiffness` 3000 with 20 rounds, the sides hang straight down the box
+    (30 cm overhang, 50 cm box), the corners fold, and the stretch stays under 3 %.
+  - The fabric values (weight, stretch, bending) are placeholders until the fabric is
+    measured. The places of the folds are geometry; their size is an estimate.
+- **Outputs:**
+  - `drape.glb`: the cover as it lies, the folds in the house red;
+  - `drape.bin`: the fall in 16-bit frames;
+  - `drape.json`: the folds, tension, sag and contact.
+- **Interface:** the command `cover drape`, and the 3D view's **Drape simulation** / **Drape**
+  buttons, which play the fall and then show the cover as it lies, with the report.
+- **Run time** without a graphics card: minutes for a sofa (the Kota: 13,500 points). It runs as
+  a background job and the result is kept.
+- **Next:** self-contact; the hem cord's pull; the AI's verdict; the audit check; the night run
+  over the catalogue; fitting the fabric values to photos of the first sewn cover.

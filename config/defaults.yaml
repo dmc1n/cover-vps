@@ -158,6 +158,23 @@ rain:                            # cover rain: where rain goes on a cover (ADR-0
                                  # for the sag of a pond between supports
   seam_run_mm: 250               # water running along a seam further than this soaks in
 
+drape:                           # the drape simulation: the sewn cover falling over the furniture (ADR-056)
+  fabric_g_m2: 300               # to confirm: the fabric's weight (acrylic canvas, WeatherMax ~ 300)
+  max_stretch_pct: 1.6           # to confirm: how far the woven fabric gives before it is tight
+  stretch_stiffness: 3000.0      # the solver's weight on stretch, N/m: above the max_stretch_pct
+                                 # limit the fabric is held hard; higher than this the solver itself
+                                 # damps the fall (tested on a tablecloth over a box, ADR-056)
+  bending_stiffness: 100.0       # to confirm: bending rigidity, N mm (1e-4 N m; high: big soft folds)
+  thickness_mm: 3.5              # contact distance: the fabric's thickness and a little air
+  contact_stiffness: 2000000.0   # how hard the furniture holds a point it touches (N/m, high: hard)
+  friction: 0.65                 # share of the speed lost where it lies on something
+  damping: 0.012                 # share of the speed lost every step (air, the fabric itself)
+  steps_per_second: 60           # time steps per simulated second
+  seconds: 5.0                   # at most this long; it stops sooner when the cover lies still
+  iterations: 20                 # rounds per step (more: stiffer and truer, slower)
+  rest_mm_s: 5                   # it lies still when 99 % of the cloth moves slower than this
+  frames: 60                     # frames of the fall kept for the 3D view
+  fold_deg: 28                   # a point bends at least this much between two triangles: a fold
 roll:
   width_mm: 1500
   usable_width_mm: 1480          # no panel wider than this in its narrowest orientation

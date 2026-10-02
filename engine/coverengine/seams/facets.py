@@ -168,17 +168,25 @@ def join(
             groups[g].append(m)
             owner[m] = g
 
-    # 1 slivers, narrowest first, into the neighbour on the same side with the longest edge
+    def fits(members: list[int], *parts: list[int]) -> bool:
+        """Fits the roll, and is no longer than the longest piece (or than it already was)."""
+        w, length_now = size(members)
+        longest = max([max_length] + [size(p)[1] for p in parts])
+        return w <= roll_width and length_now <= longest + 1.0  # param-ok: 1 mm rounding
+
+    # 1 slivers, narrowest first: into the neighbour on the same side with the longest shared
+    # edge; if none fits, into the neighbour with the longest shared edge on either side (a
+    # narrow strip under a sloping top goes into the top, with a fold)
     for r in sorted(regions, key=lambda q: size([q])[0]):
         g = owner[r]
         width = size(groups[g])[0]
         if width >= min_width:
             continue
-        for _, h in neighbours(g):
-            if facets[h].top != facets[r].top:
-                continue
-            w, L = size(groups[h] + groups[g])
-            if w <= roll_width and L <= max_length:
+        near = neighbours(g)
+        order = [h for _, h in near if facets[h].top == facets[r].top]
+        order += [h for _, h in near if facets[h].top != facets[r].top]
+        for h in order:
+            if fits(groups[h] + groups[g], groups[h], groups[g]):
                 merge(h, g)
                 notes.append(
                     f"a {width / MM_PER_CM:.1f} cm narrow face joined to its neighbour (fold)"
@@ -198,8 +206,7 @@ def join(
                 for _, h in neighbours(g):
                     if not facets[h].top:
                         continue
-                    w, L = size(groups[g] + groups[h])
-                    if w <= roll_width and L <= max_length:
+                    if fits(groups[g] + groups[h], groups[g], groups[h]):
                         merge(g, h)
                         notes.append("two top faces joined into one piece (fold)")
                         changed = True

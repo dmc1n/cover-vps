@@ -1,7 +1,15 @@
 // Types and calls for the cover API (apps/api/coverapi/main.py).
 
 export type Step =
-  "import" | "hull" | "cut" | "flatten" | "export" | "improve" | "ai" | "rain";
+  | "import"
+  | "hull"
+  | "cut"
+  | "flatten"
+  | "export"
+  | "improve"
+  | "ai"
+  | "rain"
+  | "drape";
 export const STEPS: Step[] = ["import", "hull", "cut", "flatten", "export"];
 export const STEP_LABEL: Record<Step, string> = {
   import: "Import",
@@ -12,7 +20,26 @@ export const STEP_LABEL: Record<Step, string> = {
   improve: "Seams added by the program",
   ai: "AI advice",
   rain: "Rain simulation",
+  drape: "Drape simulation",
 };
+
+/** The drape simulation (drape.json, ADR-056): the sewn cover falling over the furniture. */
+export interface Drape {
+  fold_area_m2: number;
+  fold_share_pct: number;
+  max_fold_deg: number;
+  max_stretch_pct: number;
+  tight_share_pct: number;
+  max_sag_mm: number;
+  touching_share_pct: number;
+  seconds_simulated: number;
+  run_s: number;
+  points: number;
+  frames: number;
+  faces: number[][];
+  frame_box_mm: [number[], number[]];
+  points_per_frame: number;
+}
 
 /** The rain simulation (rain.json, ADR-049). */
 export interface Rain {

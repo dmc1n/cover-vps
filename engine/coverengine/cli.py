@@ -458,6 +458,17 @@ def _cmd_rain(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_drape(args: argparse.Namespace) -> int:
+    """The sewn cover falling over the furniture: folds, tension, sag (drape.glb, drape.json)."""
+    from coverengine import drape
+
+    cover_json = args.model / "cover.json"
+    params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    r = drape.simulate(args.model, params, log=print if args.verbose else lambda *_: None)
+    print(drape.summary(r))
+    return 0
+
+
 def _cmd_audit(args: argparse.Namespace) -> int:
     """Check calculated covers (and ask the AI for a second opinion): audit.json per model."""
     import csv
@@ -781,6 +792,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--force", action="store_true", help="also models that have a category")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_categorise)
+
+    p = sub.add_parser("drape", help="the sewn cover falling over the furniture (folds, tension)")
+    p.add_argument("model", type=Path, help="model directory (after cover flatten)")
+    p.add_argument("--verbose", action="store_true", help="show the progress")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_drape)
 
     p = sub.add_parser("rain", help="where rain goes on the cover (rain.json, rain.glb)")
     p.add_argument("model", type=Path, help="model directory with a cover surface")
