@@ -642,14 +642,10 @@ CHAIRS_GLB = "chairs.glb"
 CHAIR_RGBA = (120, 170, 90, 255)  # param-ok: display colour (green; see-through in the viewer)
 
 
-def write_chairs(out: Path, report: dict[str, Any]) -> None:
-    """The chair space beside the long sides of a table, as blocks for the 3D view."""
-    path = out / CHAIRS_GLB
+def chair_meshes(report: dict[str, Any]) -> list[trimesh.Trimesh]:
+    """The chair space beside a table (blocks, or a ring round a round table), in mm, Z up: the
+    chairs stand under the cover, so the drape lies on them too."""
     seated = report.get("chairs") or {}
-    if not seated.get("blocks") and not seated.get("ring"):
-        path.unlink(missing_ok=True)
-        return
-    parts = []
     if seated.get("ring"):
         ring = seated["ring"]
         z0, z1 = ring["z_mm"]
@@ -657,14 +653,29 @@ def write_chairs(out: Path, report: dict[str, Any]) -> None:
             r_min=ring["table_radius_mm"], r_max=ring["radius_mm"], height=z1 - z0
         )
         band.apply_translation((*ring["centre_mm"], (z0 + z1) / 2))
-        path.write_bytes(glb_bytes([("chairs", _coloured(band, CHAIR_RGBA))]))
-        return
-    for i, (lo, hi) in enumerate(seated["blocks"]):
+        return [band]
+    out = []
+    for lo, hi in seated.get("blocks") or []:
         lo, hi = np.asarray(lo), np.asarray(hi)
         block = trimesh.creation.box(extents=hi - lo)
         block.apply_translation((lo + hi) / 2)
-        parts.append((f"chairs-{i + 1}", _coloured(block, CHAIR_RGBA)))
-    path.write_bytes(glb_bytes(parts))
+        out.append(block)
+    return out
+
+
+def write_chairs(out: Path, report: dict[str, Any]) -> None:
+    """The chair space beside the long sides of a table, as blocks for the 3D view."""
+    path = out / CHAIRS_GLB
+    meshes = chair_meshes(report)
+    if not meshes:
+        path.unlink(missing_ok=True)
+        return
+    name = "chairs" if len(meshes) == 1 else None
+    path.write_bytes(
+        glb_bytes(
+            [(name or f"chairs-{i + 1}", _coloured(m, CHAIR_RGBA)) for i, m in enumerate(meshes)]
+        )
+    )
 
 
 BALLOONS_GLB = "balloons.glb"

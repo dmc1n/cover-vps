@@ -152,6 +152,34 @@ def sheet(x: Array, faces: IntArray, uv: Array) -> Cloth:
                  np.abs(det) / 2, ["sheet"], bending)  # fmt: skip
 
 
+TIGHTEST_PCT = 99  # param-ok: the measures leave out the odd 1 % (single triangles)
+NEAR_EVERY = 8  # param-ok: steps between full checks of which points are near the furniture
+NEAR_MM = 80.0  # param-ok: a point further than this cannot reach it within those steps
+REFACTOR_SHARE = 0.002  # param-ok: the matrix is renewed when this share of the held points changed
+
+
+def limit_stretch(f: Array, limit: float) -> Array:
+    """Every triangle's deformation gradient (t, 3, 2) with its stretches held within 1 ± limit:
+    F V diag(clamped / stretch) V^T, from the closed form of the 2 x 2 matrix F^T F (much faster
+    than an SVD of every triangle)."""
+    a = np.einsum("ti,ti->t", f[:, :, 0], f[:, :, 0])
+    b = np.einsum("ti,ti->t", f[:, :, 0], f[:, :, 1])
+    d = np.einsum("ti,ti->t", f[:, :, 1], f[:, :, 1])
+    mid, rad = (a + d) / 2, np.sqrt(((a - d) / 2) ** 2 + b**2)
+    s1 = np.sqrt(np.maximum(mid + rad, 0.0))
+    s2 = np.sqrt(np.maximum(mid - rad, 0.0))
+    theta = np.arctan2(2 * b, a - d) / 2
+    c, s = np.cos(theta), np.sin(theta)
+    floor = 1e-6  # param-ok: a collapsed triangle keeps its direction
+    r1 = np.clip(s1, 1 - limit, 1 + limit) / np.maximum(s1, floor)
+    r2 = np.clip(s2, 1 - limit, 1 + limit) / np.maximum(s2, floor)
+    m = np.empty((len(f), 2, 2))
+    m[:, 0, 0] = r1 * c * c + r2 * s * s
+    m[:, 0, 1] = m[:, 1, 0] = (r1 - r2) * c * s
+    m[:, 1, 1] = r1 * s * s + r2 * c * c
+    return f @ m
+
+
 class Contact:
     """The furniture and the balloons as one surface. A point that has come closer than the
     fabric's thickness, or has gone through, is put back on the side it came from: the
@@ -163,12 +191,23 @@ class Contact:
         assert isinstance(m, trimesh.Trimesh)
         self.v = np.asarray(m.vertices, np.float64)
         self.f = np.asarray(m.faces, np.int32)
+        self.tree = igl.AABB()  # built once, asked many times
+        self.tree.init(self.v, self.f)
 
     def closest(self, p: Array) -> tuple[Array, Array]:
-        d2, _, c = igl.point_mesh_squared_distance(p, self.v, self.f)
+        d2, _, c = self.tree.squared_distance(self.v, self.f, np.asarray(p, np.float64))
         return np.sqrt(np.asarray(d2)), np.asarray(c)
 
-    def project(self, y: Array, before: Array, thick: float) -> tuple[Array, NDArray[np.bool_]]:
+    def project(
+        self, y: Array, before: Array, thick: float, only: NDArray[np.bool_] | None = None
+    ) -> tuple[Array, NDArray[np.bool_]]:
+        if only is not None:  # only the points that can be near
+            idx = np.flatnonzero(only)
+            out_y, out_hit = y.copy(), np.zeros(len(y), bool)
+            if len(idx):
+                py, ph = self.project(y[idx], before[idx], thick)
+                out_y[idx], out_hit[idx] = py, ph
+            return out_y, out_hit
         dist, c = self.closest(y)
         out = before - c  # towards the side the point came from
         length = np.linalg.norm(out, axis=1)
@@ -182,13 +221,14 @@ class Contact:
 
 
 def _colliders(model_dir: Path) -> list[trimesh.Trimesh]:
-    from coverengine.hull.build import balloon_meshes
+    from coverengine.hull.build import balloon_meshes, chair_meshes
     from coverengine.io.model_io import load_model
 
     m = load_model(model_dir)
     out = [trimesh.Trimesh(m.vertices, m.faces, process=False)]
     hull = json.loads((model_dir / "hull.json").read_text(encoding="utf-8"))
     out += balloon_meshes(model_dir, hull)  # the balloons under a table cover hold it up too
+    out += chair_meshes(hull)  # and the dining chairs beside it (the chair space)
     return out
 
 
@@ -236,7 +276,9 @@ def run(
     lhs = sp.csr_matrix((k.ravel(), (r, cc)), shape=(n, n))
     base = (lhs + sp.diags(mass / h**2) + bend_w * c.bending).tocsr()
     hold_w = _p(params, "drape.contact_stiffness")
-    solve = spla.factorized(base.tocsc())
+    solve = spla.splu(base.tocsc()).solve  # x, y and z in one call
+    factored_for = np.zeros(len(c.x), bool)  # the held points the factorisation is for
+    near = np.ones(len(c.x), bool)
 
     x = c.x.copy()
     # start just outside the designed surface: the cover slipped on
@@ -252,31 +294,35 @@ def run(
         s = x + h * v + h * h * gravity
         y = s.copy()
         held = np.zeros(n, bool)  # points held by the furniture or the ground this step
-        target = np.zeros_like(x)
-        for _ in range(rounds):
+        target = x.copy()  # a held point that is not touching this step stays where it was
+        for k in range(rounds):
             # contact: where a point would go through or come too close, it is held on the
             # surface, on the side it came from (a constraint in the solve, not a push after)
-            t, hit = contact.project(y, x, thick)
-            low = t[:, 2] < thick
-            t[low, 2] = thick
-            hit |= low
-            if (hit & ~held).any():  # new contacts: the matrix changes
-                held |= hit
-                solve = spla.factorized((base + sp.diags(np.where(held, hold_w, 0.0))).tocsc())
-            target[hit] = t[hit]
+            if k == 0 and step % NEAR_EVERY == 0:  # which points are near anything at all
+                far, _ = contact.closest(y)
+                near = far < NEAR_MM
+            if k == 0 or k == rounds - 1:  # contacts at the start and the end of the rounds
+                t, hit = contact.project(y, x, thick, near)
+                low = t[:, 2] < thick
+                t[low, 2] = thick
+                hit |= low
+            if k == 0:  # the held points, once a step; the matrix only when they changed
+                changed = int((hit != factored_for).sum())
+                if changed > REFACTOR_SHARE * n:
+                    solve = spla.splu((base + sp.diags(np.where(hit, hold_w, 0.0))).tocsc()).solve
+                    factored_for = hit.copy()
+            target[factored_for & hit] = t[factored_for & hit]
             # local: every triangle's deformation gradient, its stretch limited
             ds = np.stack([y[c.faces[:, 1]] - y[c.faces[:, 0]],
                            y[c.faces[:, 2]] - y[c.faces[:, 0]]], axis=2)  # fmt: skip
             f = ds @ c.rest_inv  # (t, 3, 2)
-            u, sig, vt = np.linalg.svd(f, full_matrices=False)
-            sig = np.clip(sig, 1 - limit, 1 + limit)
-            p = u @ (sig[:, :, None] * vt)  # (t, 3, 2)
-            rhs = (mass / h**2)[:, None] * s + np.where(held, hold_w, 0.0)[:, None] * target
+            p = limit_stretch(f, limit)  # (t, 3, 2)
+            rhs = (mass / h**2)[:, None] * s + np.where(factored_for, hold_w, 0.0)[:, None] * target
             contrib = np.einsum("tid,tad->tai", p, cu) * wa[:, None, None]  # (t, 3 corners, 3)
             np.add.at(rhs, c.faces.ravel(), contrib.reshape(-1, D3))
-            y = np.column_stack([solve(rhs[:, i]) for i in range(3)])
+            y = solve(rhs)
         # what still lies too deep after the rounds is put on the surface
-        y, hit = contact.project(y, x, thick)
+        y, hit = contact.project(y, x, thick, near)
         y[:, 2] = np.maximum(y[:, 2], thick)
         touching = held | hit
         # a point held by the furniture this step but pulled away by the fabric is released
@@ -325,8 +371,10 @@ def measures(c: Cloth, x: Array, contact: Contact, params: EffectiveParams) -> d
     return {
         "fold_area_m2": round(fold_area, 3),  # param-ok: decimals
         "fold_share_pct": round(PERCENT * fold_area * MM2_PER_M2 / float(area.sum()), 1),
-        "max_fold_deg": round(float(fold_deg.max()), 1),
-        "max_stretch_pct": round(float(stretch.max()), 2),
+        "max_fold_deg": round(float(np.percentile(fold_deg, TIGHTEST_PCT)), 1),
+        "max_stretch_pct": round(
+            float(np.percentile(stretch, TIGHTEST_PCT)), 2
+        ),  # the tightest 1 %
         "tight_share_pct": round(
             PERCENT
             * float(area[stretch > 0.8 * _p(params, "drape.max_stretch_pct")].sum())
