@@ -1005,3 +1005,28 @@ docs/plans/drape-simulation.md).
   a background job and the result is kept.
 - **Next:** self-contact; the hem cord's pull; the AI's verdict; the audit check; the night run
   over the catalogue; fitting the fabric values to photos of the first sewn cover.
+
+### ADR-056, addendum (2 October 2026, evening)
+
+- **The fabric.** It is **Sunbrella Coverlast** (the owner):
+  - 100 % polyester with an acrylic coating on the top side;
+  - 250 g/m² ±5 %, roll 152 cm (Dickson);
+  - tensile 195/104 daN per 5 cm (MBS Fabrics).
+
+  It is `testdata/fabrics/coverlast.json`, and `fabric.profile` now points to it. The drape
+  uses its weight and a lower bending stiffness (it folds easily). Its stretch is still a
+  placeholder; no elongation is published (QUESTIONS 51).
+- **DeepSeek's verdict.** Every drape writes `drape.png` (the cover as it lies, from the front
+  and the back, next to the design) and asks DeepSeek for a verdict (good / doubt / wrong, the
+  problems, advice). It is shown in the 3D view's drape card.
+- **The audit check *drape*.** It fails above `drape.max_fold_share_pct` (35 %, to confirm) in
+  folds, or where the top sags deeper than `drape.max_sag_cm` (24, to confirm).
+- **The first results.**
+  - The Kota: 26 % folds, 18 cm sag.
+  - The Basta 340, with its balloons and the chair space under the cover: 19 %, 18 cm.
+  - The Lucia 2-seater right: 35 %, 42 cm. The design spans the seat, but the real fabric sinks
+    into it and water would stand there. DeepSeek: "wrong".
+  - That is the use of the simulation: the designed surface promised run-off that the sewn
+    pieces do not give. The remedy is a question of design: something under the cover on the
+    seat, or a tighter cut.
+

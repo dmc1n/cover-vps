@@ -180,4 +180,14 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
 48. **Minimum piece width:** no piece narrower than 10 cm (now there are pieces of 3 to 8 cm on
     21 SUNS models). Is 10 cm right?
     **Answered 2 Oct 2026:** to be learned from our analyses; 10 cm for now (marked to confirm).
+49. **Roll width:** Sunbrella Coverlast is 152 cm wide (Dickson). The program uses 148 cm
+    usable (`roll.usable_width_mm`, from the 150 cm you named earlier). Is 148 still right, or
+    150 of the 152?
+50. **The hem cord in the drape:** is the bottom drawcord pulled tight when the cover is on (the
+    bottom edge pulled in under the furniture), or does the cover hang loose? The drape
+    simulation leaves it loose for now.
+51. **Coverlast's stretch:** Dickson publishes no elongation. The rest of the fabric data is
+    known: 250 g/m², 152 cm wide, tensile 195/104 daN per 5 cm. Can Vyva or Dickson give the
+    elongation at a working load (for example at 10 % of the break load), lengthways and
+    across? Otherwise the 1 kg strip test on Monday.
 
