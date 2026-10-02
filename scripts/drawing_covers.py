@@ -21,6 +21,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coverengine.ai import ask_parts  # noqa: E402
 from coverengine.params import Registry  # noqa: E402
@@ -41,7 +43,11 @@ in brackets, e.g. "33.46 (85 cm)"). Choose the shape and fill in its sizes in cm
   y_back_strip_cm (flat strip along the back of each arm; 0 only if clearly none), back_height_cm,
   front_height_cm, strip_corner: "mitre" if the strips meet in a diagonal line at the corner,
   "x" if the strip of the x arm runs through to the outside corner, "y" if the other one does.
-  The x arm is the one drawn along the top of the top view.
+  The x arm is the one drawn along the top of the top view. If the arms' ends slope down
+  (the top comes down over the last part of each arm to a lower end wall, a cross line near
+  each end in the top view): end_length_cm (how long that part is), end_back_height_cm and
+  end_front_height_cm (the end wall's heights at the back and the front); otherwise leave out.
+  The strip width is often written in the 3D view (a small size across the top band).
 - "round": a cylinder. diameter_cm, height_cm, band_pieces (how many pieces the side band is,
   counted from the vertical seams drawn on the side; at least 2).
 - "other": anything else (curved, U shape, a slope at one end only, steps, cut-outs): then
@@ -61,13 +67,59 @@ OVERRIDES: dict[str, Any] = (
 )
 
 OUTLINE_MM = 5.0
+TOP_PX = 900  # the top view's longest side
+
+
+def top_view(model: Path) -> Path:
+    """The cover seen from straight above, as the drawings' TOP VIEW: every top piece shaded by
+    its slope, the seams between pieces as black lines, the overall sizes in the title."""
+    import trimesh
+    from coverengine.io.model_io import load_model
+    from matplotlib.collections import PolyCollection
+    from matplotlib.figure import Figure
+
+    hull = load_model(model / "hull.glb")
+    m = trimesh.Trimesh(hull.vertices, hull.faces, process=False)
+    lab = np.load(model / "hull_parts.npy")
+    up = m.face_normals[:, 2] > 0.05  # seen from above
+    v = m.vertices
+    w, d = np.ptp(v[:, 0]), np.ptp(v[:, 1])
+    fig = Figure(figsize=(TOP_PX / 100 * w / max(w, d) + 1, TOP_PX / 100 * d / max(w, d) + 1))
+    ax = fig.add_axes((0.04, 0.04, 0.92, 0.88))
+    shade = np.clip(0.92 - 1.6 * (1 - m.face_normals[up, 2]), 0.35, 0.92)
+    rgb = np.c_[shade, shade, np.minimum(shade + 0.06, 1)]
+    ax.add_collection(PolyCollection(m.triangles[up][:, :, :2], facecolors=rgb, edgecolors=rgb,
+                                     linewidths=0.3))  # fmt: skip
+    adj, edges = m.face_adjacency, m.face_adjacency_edges
+    seam = (lab[adj[:, 0]] != lab[adj[:, 1]]) & up[adj[:, 0]] & up[adj[:, 1]]
+    open_e = trimesh.grouping.group_rows(m.edges_sorted[np.repeat(up, 3)], require_count=1)
+    lines = [v[e][:, :2] for e in edges[seam]]
+    lines += [v[e][:, :2] for e in m.edges_sorted[np.repeat(up, 3)][open_e]]
+    from matplotlib.collections import LineCollection
+
+    ax.add_collection(LineCollection(lines, colors="black", linewidths=1.0))
+    ax.set_xlim(v[:, 0].min() - 20, v[:, 0].max() + 20)
+    ax.set_ylim(v[:, 1].min() - 20, v[:, 1].max() + 20)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title(f"TOP VIEW (front at the bottom): {w / 10:.1f} x {d / 10:.1f} cm")
+    out = model / "top.png"
+    fig.savefig(out, dpi=100)
+    return out
+
 
 COMPARE = """You check whether a program rebuilt a cover workshop's drawing correctly. Image 1 is
-the drawing, image 2 the program's cover (each piece in its own colour, seen from the front
-right and above). You get the sizes the program used (cm) and every flat piece as its outline
-(the corners in cm, laid flat; a sloped piece is longer than its plan view; an end piece with
-five corners is a pentagon, not a rectangle). Pieces wider than the 150 cm roll are split on
-purpose (a seam the drawing may not show); that is not a difference.
+the drawing, image 2 the program's cover seen from straight above (like the drawing's TOP VIEW:
+the front at the bottom, black lines are the seams between pieces, darker grey is steeper),
+image 3 the same cover in 3D (each piece in its own colour, seen from the front right and
+above; the program's view may come from another side than the drawing's, so compare shapes,
+not which side is in front). The plan view is the most reliable for the seam lines. You get
+the sizes the program used (cm) and every flat piece as its outline (the corners in cm, laid
+flat; a sloped piece is longer than its plan view; an end piece with five corners is a
+pentagon, not a rectangle). Pieces wider than the 150 cm roll are split on
+purpose (a seam the drawing may not show), and so is a band longer than the 300 cm the
+workshop cuts in one piece; that is not a difference. Two pieces with the same outline are fine
+where the drawing has mirror images: a flat piece turned over is its mirror image.
 Compare only the shape, the sizes and the seam lines (the lines between pieces): flat strips on
 top, slopes, corners, ends, how the pieces meet. Do not count air pockets, elastic, drawcords,
 grommets or tie downs (the program adds those to the cut pieces; they are not in image 2), nor
@@ -89,6 +141,8 @@ def compare(row: dict[str, Any], model: Path, sizes: dict[str, Any], picture: Pa
         {"type": "text", "text": json.dumps({"sizes_cm": sizes, "pieces": pieces})},
         {"type": "image_url", "image_url": {"url": "data:image/png;base64,"
                                             + base64.b64encode(picture.read_bytes()).decode()}},
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,"
+         + base64.b64encode(top_view(model).read_bytes()).decode()}},
         {"type": "image_url", "image_url": {"url": "data:image/png;base64,"
          + base64.b64encode((model / "cover.png").read_bytes()).decode()}},
     ]  # fmt: skip
@@ -131,8 +185,10 @@ def one(row: dict[str, Any], pictures: Path, params: Any, models: Path) -> dict[
     out["owner_corrected"] = sorted(fixed.get("sizes", {}))
     out.update(shape=shape, sizes=sizes, measured=ans.get("measured") or [],
                notes=ans.get("notes", ""), why_not=ans.get("why_not", ""))  # fmt: skip
+    if fixed.get("why_not"):
+        out["why_not"] = fixed["why_not"]
     if shape not in ("box", "sloped box", "L shape", "round"):
-        return {**out, "status": "not built", "detail": ans.get("why_not", "")}
+        return {**out, "status": "not built", "detail": out["why_not"]}
     checked = {
         k: written(float(v), row["sizes_cm"])
         for k, v in sizes.items()
@@ -197,7 +253,7 @@ def recompare(folder: Path) -> None:
 
     with ThreadPoolExecutor(4) as pool:
         results = list(pool.map(again, results))
-    (folder / "covers.json").write_text(json.dumps(results, indent=1) + "\n")
+    write_results(folder, results)
 
 
 def main() -> int:
@@ -222,10 +278,19 @@ def main() -> int:
         results = list(
             pool.map(lambda r: one(r, args.folder / "pictures", params, Path("models")), rows)
         )
-    (args.folder / "covers.json").write_text(json.dumps(results, indent=1) + "\n")
+    if args.only and (args.folder / "covers.json").is_file():  # merge into the earlier run
+        done = {r["code"]: r for r in results}
+        earlier = json.loads((args.folder / "covers.json").read_text())
+        results = [done.pop(r["code"], r) for r in earlier] + list(done.values())
+    write_results(args.folder, results)
+    return 0
+
+
+def write_results(folder: Path, results: list[dict[str, Any]]) -> None:
+    (folder / "covers.json").write_text(json.dumps(results, indent=1) + "\n")
     keys = ["code", "status", "shape", "pieces", "max_stretch_pct", "detail", "notes", "model_id",
             "sizes", "file"]  # fmt: skip
-    with (args.folder / "covers.csv").open("w", newline="") as fh:
+    with (folder / "covers.csv").open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=keys, extrasaction="ignore")
         w.writeheader()
         for r in results:
@@ -233,7 +298,6 @@ def main() -> int:
     from collections import Counter
 
     print(Counter(r["status"] for r in results))
-    return 0
 
 
 if __name__ == "__main__":

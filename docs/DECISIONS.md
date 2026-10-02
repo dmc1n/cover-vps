@@ -890,3 +890,26 @@ good").
 - Open: the drawn outline measures 642 cm, the drawing states a bottom circumference of 668 cm
   (the walls are upright here; the drawing's side view shows the back leaning). Reading vector
   drawings is the way for the other curved drawings too (S43, S46, C26, ...).
+
+## ADR-053 — Releases with version numbers, and going back in seconds
+
+The owner, 2 October 2026: "we must be able to go back to an earlier version if we make a
+mistake"; "start with version numbers in git so that we can go back".
+
+- A release is a tag `vMAJOR.MINOR.PATCH` on a tested `main` (`scripts/release.sh v1.0.0
+  "what is new"`: `make test`, tag, push, then the release is built in its own folder
+  `~/releases/v1.0.0`: a git worktree of the tag with its own Python environment and web pages).
+- The app runs from `~/releases/current`, a link to the live release (`deploy/cover-web.service`).
+  Switching is changing the link and restarting the app; if the app does not answer within
+  60 s the switch is undone at once. `~/releases/history.log` records every switch, the admin
+  page shows the live release and the last switches.
+- Back: `scripts/rollback.sh` (the release before), `scripts/rollback.sh v1.0.0` (a chosen
+  one), `scripts/rollback.sh --list`. The data (models, users, uploads, the drawings' results)
+  is outside the releases (`models`, `out` and `deploy/.env` are links into the working copy
+  and `~/cover-data`), so going back changes the program, never the data. Going back past a
+  change of the data's format is not supported; such a change gets a new MAJOR number.
+- Numbers: MAJOR for a change that existing models or files do not survive, MINOR for new
+  features, PATCH for fixes. Development goes on in `~/cover-pattern-engine` (main); the
+  nightly scripts and `cover` on the command line use that working copy.
+- Why not `git checkout <tag>` in the working copy: that stops development while the old
+  version runs, and a half-finished change would go live with any restart.

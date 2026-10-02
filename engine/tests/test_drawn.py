@@ -45,3 +45,48 @@ def test_an_l_shape_whose_sizes_do_not_fit_is_refused() -> None:
              "y_arm_depth_cm": 50, "back_height_cm": 80, "front_height_cm": 40}  # fmt: skip
     with pytest.raises(CoverError):
         build("L shape", sizes, ROLL)
+
+
+def _open_above_hem(pieces) -> int:  # type: ignore[no-untyped-def]
+    m = trimesh.Trimesh(_mesh(pieces).vertices, _mesh(pieces).faces, process=True)
+    once = trimesh.grouping.group_rows(m.edges_sorted, require_count=1)
+    return int((m.vertices[m.edges_sorted[once].ravel(), 2] > 1).sum())
+
+
+def test_an_l_shape_with_sloping_arm_ends_is_closed_and_comes_down_at_the_ends() -> None:
+    sizes = {
+        "x_length_cm": 344,
+        "y_length_cm": 268,
+        "x_arm_depth_cm": 85,
+        "y_arm_depth_cm": 85,
+        "x_back_strip_cm": 25,
+        "y_back_strip_cm": 25,
+        "back_height_cm": 90,
+        "front_height_cm": 43,
+        "end_length_cm": 40,
+        "end_back_height_cm": 26.4,
+        "end_front_height_cm": 17,
+    }  # the owner's C2
+    pieces = build("L shape", sizes, ROLL)
+    names = [p.name for p in pieces]
+    ends = {"top-x end strip", "top-x end slope", "top-y end strip", "top-y end slope"}
+    assert ends <= set(names)
+    assert _open_above_hem(pieces) == 0  # the pieces meet point to point
+    end = next(p for p in pieces if p.name == "end-x")
+    assert max(z for f in end.faces for _, _, z in f) == pytest.approx(264)
+
+
+def test_an_l_whose_second_arm_is_only_a_corner_end_is_built() -> None:
+    sizes = {
+        "x_length_cm": 380,
+        "y_length_cm": 110,
+        "x_arm_depth_cm": 110,
+        "y_arm_depth_cm": 110,
+        "x_back_strip_cm": 35,
+        "y_back_strip_cm": 35,
+        "back_height_cm": 82,
+        "front_height_cm": 37,
+    }  # the owner's S18
+    pieces = build("L shape", sizes, ROLL)
+    assert "front-y" not in [p.name for p in pieces]  # no front on a corner end
+    assert _open_above_hem(pieces) == 0

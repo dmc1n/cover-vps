@@ -413,8 +413,14 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
         store = app.state.store
         disk = shutil.disk_usage(store.root)
         backup = store.root / "last_backup.txt"
+        from coverengine.params.registry import repo_root
+
+        root = repo_root()
+        history = root.parent / "history.log"  # ~/releases/history.log (ADR-053)
         return {
             "engine": __version__,
+            "release": root.name if root.name.startswith("v") else "development",
+            "releases": history.read_text().splitlines()[-5:] if history.is_file() else [],
             "models": sum(1 for d in store.models.iterdir() if d.is_dir()),
             "disk_free_gb": round(disk.free / 1e9, 1),
             "disk_total_gb": round(disk.total / 1e9, 1),

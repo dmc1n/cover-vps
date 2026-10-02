@@ -17,6 +17,7 @@ the back, y towards the front.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -38,9 +39,50 @@ class Piece:
 
 
 def _poly(face: Face) -> tuple[np.ndarray, np.ndarray]:
+    """A flat face as triangles. With points along its edges (where a neighbour has more
+    corners) it is triangulated in its plane, so no triangle comes out as a line."""
     v = np.array(face, dtype=np.float64)
-    tris = [(0, k, k + 1) for k in range(1, len(face) - 1)]
+    if len(face) <= 4:  # param-ok: a quad's fan has no line triangles
+        tris = [(0, k, k + 1) for k in range(1, len(face) - 1)]
+        return v, np.array(tris, dtype=np.int64)
+    import shapely
+
+    c = v.mean(axis=0)
+    _, _, vt = np.linalg.svd(v - c)
+    uv = (v - c) @ vt[:2].T
+    where = {(round(a, 6), round(b, 6)): i for i, (a, b) in enumerate(uv)}
+    tris = []
+    for t in shapely.constrained_delaunay_triangles(shapely.Polygon(uv)).geoms:
+        corners = list(t.exterior.coords)[:3]
+        i, j, k = (where[(round(a, 6), round(b, 6))] for a, b in corners)
+        tris.append((i, j, k))
     return v, np.array(tris, dtype=np.int64)
+
+
+def conform(pieces: list[Piece], tol: float = 0.01) -> list[Piece]:  # param-ok: mm
+    """Every corner that lies on another face's edge becomes a corner of that face too, so the
+    pieces meet point to point (no gaps where a curved piece has more points along a seam)."""
+    pts = np.unique(np.round(np.vstack([np.array(f) for p in pieces for f in p.faces]), 6),
+                    axis=0)  # fmt: skip
+    out = []
+    for p in pieces:
+        faces = []
+        for f in p.faces:
+            new: Face = []
+            for a, b in zip(f, f[1:] + f[:1], strict=True):
+                new.append(a)
+                pa, pb = np.array(a), np.array(b)
+                d = pb - pa
+                L2 = float(d @ d)
+                t = (pts - pa) @ d / L2
+                near = np.linalg.norm(pa + np.outer(t, d) - pts, axis=1) < tol
+                on = near & (t > 1e-6) & (t < 1 - 1e-6)  # param-ok: strictly inside the edge
+                for k in np.argsort(t[on]):
+                    q = pts[on][k]
+                    new.append((float(q[0]), float(q[1]), float(q[2])))
+            faces.append([(round(x, 6), round(y, 6), round(z, 6)) for x, y, z in new])
+        out.append(Piece(p.name, faces))
+    return out
 
 
 def scene(pieces: list[Piece]) -> trimesh.Scene:
@@ -160,43 +202,100 @@ def sloped_box(p: dict[str, Any], roll: float = math.inf) -> list[Piece]:
     return pieces
 
 
+def _twisted(name: str, quad: Face, n: int = 12) -> Piece:  # param-ok: grid of the patch
+    """A four-sided piece whose corners do not lie in one plane (the slope of a sloping arm end):
+    the straight lines between its opposite edges, as the fabric lies (a ruled patch)."""
+    q = np.array(quad, dtype=np.float64)
+    faces: list[Face] = []
+    for i in range(n):
+        for j in range(n):
+            pts = []
+            for a, b in ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1)):
+                u, w = a / n, b / n
+                p = (1 - u) * ((1 - w) * q[0] + w * q[3]) + u * ((1 - w) * q[1] + w * q[2])
+                pts.append((float(p[0]), float(p[1]), float(p[2])))
+            faces += [[pts[0], pts[1], pts[2]], [pts[0], pts[2], pts[3]]]
+    return Piece(name, faces)
+
+
 def l_shape(p: dict[str, Any], roll: float = math.inf) -> list[Piece]:
     """Arm A along x (outside length X, depth dA), arm B along y (outside length Y, depth dB),
-    the outside corner at the origin; back strips sA, sB; back height hb, front height hf."""
+    the outside corner at the origin; back strips sA, sB; back height hb, front height hf.
+
+    Sloping arm ends (end_length_cm, as the owner's C2): over the last e of each arm the top
+    comes down to end_back_height_cm at the back and end_front_height_cm at the front; the strip
+    and the slope each get an end piece, the end wall is lower."""
     X, Y = _cm(p, "x_length_cm"), _cm(p, "y_length_cm")
     dA, dB = _cm(p, "x_arm_depth_cm"), _cm(p, "y_arm_depth_cm")
     sA, sB = _cm(p, "x_back_strip_cm", 0.0), _cm(p, "y_back_strip_cm", 0.0)
     hb, hf = _cm(p, "back_height_cm"), _cm(p, "front_height_cm")
-    if not (sA < dA < Y and sB < dB < X):
-        raise CoverError("the L shape's sizes do not fit together")
+    e = _cm(p, "end_length_cm", 0.0)
+    ebh, efh = _cm(p, "end_back_height_cm", hb / MM), _cm(p, "end_front_height_cm", hf / MM)
+    if not (sA < dA <= Y and sB < dB <= X):  # an arm as long as the other is deep: a corner
+        raise CoverError("the L shape's sizes do not fit together")  # end only (the owner's S18)
+    if e and not (e < X - dB and e < Y - dA):
+        raise CoverError("the sloping arm ends are longer than the arms")
+    Xe, Ye = X - e, Y - e  # where the arm ends start to slope
     pieces = []
     corner = str(p.get("strip_corner") or "mitre")  # mitre | x (x strip runs on) | y
     if sA > 0 or sB > 0:
         if corner == "x":  # the x strip runs to the outside corner, the y strip butts on to it
-            x_strip = [(0, 0, hb), (X, 0, hb), (X, sA, hb), (sB, sA, hb), (0, sA, hb)]
-            y_strip = [(0, sA, hb), (sB, sA, hb), (sB, Y, hb), (0, Y, hb)]
+            x_strip = [(0, 0, hb), (Xe, 0, hb), (Xe, sA, hb), (sB, sA, hb), (0, sA, hb)]
+            y_strip = [(0, sA, hb), (sB, sA, hb), (sB, Ye, hb), (0, Ye, hb)]
         elif corner == "y":
-            x_strip = [(sB, 0, hb), (X, 0, hb), (X, sA, hb), (sB, sA, hb)]
-            y_strip = [(0, 0, hb), (sB, 0, hb), (sB, sA, hb), (sB, Y, hb), (0, Y, hb)]
+            x_strip = [(sB, 0, hb), (Xe, 0, hb), (Xe, sA, hb), (sB, sA, hb)]
+            y_strip = [(0, 0, hb), (sB, 0, hb), (sB, sA, hb), (sB, Ye, hb), (0, Ye, hb)]
         else:  # from the inside corner of the strips to the outside corner
-            x_strip = [(0, 0, hb), (X, 0, hb), (X, sA, hb), (sB, sA, hb)]
-            y_strip = [(0, 0, hb), (sB, sA, hb), (sB, Y, hb), (0, Y, hb)]
+            x_strip = [(0, 0, hb), (Xe, 0, hb), (Xe, sA, hb), (sB, sA, hb)]
+            y_strip = [(0, 0, hb), (sB, sA, hb), (sB, Ye, hb), (0, Ye, hb)]
         pieces += [Piece("top-x strip", [x_strip]), Piece("top-y strip", [y_strip])]
-    pieces += _bands("top-x slope", [(sB, sA, hb), (X, sA, hb), (X, dA, hf), (dB, dA, hf)], roll)
-    pieces += _bands("top-y slope", [(sB, Y, hb), (sB, sA, hb), (dB, dA, hf), (dB, Y, hf)], roll)
+    pieces += _bands("top-x slope", [(sB, sA, hb), (Xe, sA, hb), (Xe, dA, hf), (dB, dA, hf)], roll)
+    pieces += _bands("top-y slope", [(sB, Ye, hb), (sB, sA, hb), (dB, dA, hf), (dB, Ye, hf)], roll)
+    if e:
+        if sA > 0:
+            pieces.append(Piece("top-x end strip", [[(Xe, 0, hb), (X, 0, ebh), (X, sA, ebh),
+                                                     (Xe, sA, hb)]]))  # fmt: skip
+        if sB > 0:
+            pieces.append(Piece("top-y end strip", [[(0, Ye, hb), (sB, Ye, hb), (sB, Y, ebh),
+                                                     (0, Y, ebh)]]))  # fmt: skip
+        pieces += [
+            _twisted("top-x end slope", [(Xe, sA, hb), (X, sA, ebh), (X, dA, efh), (Xe, dA, hf)]),
+            _twisted("top-y end slope", [(sB, Ye, hb), (dB, Ye, hf), (dB, Y, efh), (sB, Y, ebh)]),
+        ]
+    bx = [(0, 0, 0), (X, 0, 0), (X, 0, ebh), (Xe, 0, hb), (0, 0, hb)]
+    by = [(0, 0, 0), (0, 0, hb), (0, Ye, hb), (0, Y, ebh), (0, Y, 0)]
+    fx = [(dB, dA, 0), (dB, dA, hf), (Xe, dA, hf), (X, dA, efh), (X, dA, 0)]
+    fy = [(dB, dA, 0), (dB, Y, 0), (dB, Y, efh), (dB, Ye, hf), (dB, dA, hf)]
     pieces += [
-        Piece("back-x", [[(0, 0, 0), (X, 0, 0), (X, 0, hb), (0, 0, hb)]]),
-        Piece("back-y", [[(0, 0, 0), (0, 0, hb), (0, Y, hb), (0, Y, 0)]]),
-        Piece("front-x", [[(dB, dA, 0), (dB, dA, hf), (X, dA, hf), (X, dA, 0)]]),
-        Piece("front-y", [[(dB, dA, 0), (dB, Y, 0), (dB, Y, hf), (dB, dA, hf)]]),
+        Piece("back-x", [_dedupe(bx)]),
+        Piece("back-y", [_dedupe(by)]),
+        Piece("front-x", [_dedupe(fx)]),
+        Piece("front-y", [_dedupe(fy)]),
     ]
-    end_x = [(X, 0, 0), (X, dA, 0), (X, dA, hf), (X, sA, hb), (X, 0, hb)]
-    end_y = [(0, Y, 0), (0, Y, hb), (sB, Y, hb), (dB, Y, hf), (dB, Y, 0)]
+    end_x = [(X, 0, 0), (X, dA, 0), (X, dA, efh), (X, sA, ebh), (X, 0, ebh)]
+    end_y = [(0, Y, 0), (0, Y, ebh), (sB, Y, ebh), (dB, Y, efh), (dB, Y, 0)]
     pieces += [Piece("end-x", [_dedupe(end_x)]), Piece("end-y", [_dedupe(end_y)])]
-    return pieces
+    return _solid(pieces)
 
 
-def _dedupe(face: Face) -> Face:
+def _solid(pieces: list[Piece]) -> list[Piece]:
+    """Without the faces that came out as lines (a short arm's front, an arm end's strip)."""
+    out = []
+    for p in pieces:
+        faces = []
+        for f in p.faces:
+            f = _dedupe(f)
+            if len(f) > 2:
+                v, t = _poly(f)
+                a = np.cross(v[t[:, 1]] - v[t[:, 0]], v[t[:, 2]] - v[t[:, 0]])
+                if float(np.linalg.norm(a, axis=1).sum()) > 2.0:  # param-ok: twice 1 mm2
+                    faces.append(f)
+        if faces:
+            out.append(Piece(p.name, faces))
+    return out
+
+
+def _dedupe(face: Sequence[tuple[float, float, float]]) -> Face:
     out: Face = []
     for q in face:
         if not out or np.linalg.norm(np.subtract(q, out[-1])) > 1e-6:
@@ -242,7 +341,7 @@ def build(shape: str, params: dict[str, Any], roll_mm: float) -> list[Piece]:
     if shape == "sloped box":
         return sloped_box(params, roll_mm)
     if shape == "L shape":
-        return l_shape(params, roll_mm)
+        return conform(l_shape(params, roll_mm))
     if shape == "round":
         return round_cover(params, roll_mm)
     raise CoverError(f"no generator for the shape {shape!r} yet")

@@ -98,9 +98,12 @@ def create_app(
             raise HTTPException(404, f"no model {model_id!r}")
         return d
 
+    release = repo_root().name if repo_root().name.startswith("v") else "development"
+
     @app.get("/api/health")
     def health() -> dict[str, str]:
-        return {"status": "ok", "engine": __version__}
+        # the release is the folder the app runs from (~/releases/v1.2.3, ADR-053)
+        return {"status": "ok", "engine": __version__, "release": release}
 
     @app.get("/api/models")
     def models() -> list[dict[str, Any]]:

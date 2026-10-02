@@ -281,6 +281,13 @@ def second_opinion(model_dir: Path, params: EffectiveParams, facts: dict[str, An
 
 
 def audit(model_dir: Path, params: EffectiveParams, use_ai: bool) -> dict[str, Any]:
+    if "set" in (info(model_dir).get("tags") or []):  # a whole set in one file: no cover
+        doc: dict[str, Any] = {"model_id": model_dir.name, "time": round(time.time()), "ok": True,
+               "set": True,
+               "checks": [_check("set", True, "a complete set in one file: covers per piece, "
+                                 "not over the whole set")]}  # fmt: skip
+        (model_dir / AUDIT_JSON).write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+        return doc
     doc = measure(model_dir, params)
     doc["model_id"] = model_dir.name
     doc["time"] = round(time.time())

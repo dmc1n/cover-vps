@@ -1,4 +1,105 @@
 {
-  "_about": "Sizes the owner confirmed per drawing (ADR-046); they win over the AI's reading. Keys are the codes in the file names.",
-  "C6": {"sizes": {"x_back_strip_cm": 30, "y_back_strip_cm": 30}, "by": "owner, 1 Oct 2026"}
+ "_about": "Sizes the owner confirmed per drawing (ADR-046), or read again by hand from the drawing where the AI misread it; they win over the AI's reading. Keys are the codes in the file names.",
+ "C6": {
+  "sizes": {
+   "x_back_strip_cm": 30,
+   "y_back_strip_cm": 30
+  },
+  "by": "owner, 1 Oct 2026"
+ },
+ "S28": {
+  "sizes": {
+   "back_strip_cm": 30,
+   "front_strip_cm": 0
+  },
+  "by": "read again: the 30 cm flat strip is along the 85 cm high back (2 Oct 2026)"
+ },
+ "S40": {
+  "sizes": {
+   "back_strip_cm": 35,
+   "front_strip_cm": 0
+  },
+  "by": "read again: the 35 cm flat strip is along the 86 cm high back (2 Oct 2026)"
+ },
+ "C2": {
+  "sizes": {
+   "x_back_strip_cm": 25,
+   "y_back_strip_cm": 25,
+   "end_length_cm": 40,
+   "end_back_height_cm": 26.4,
+   "end_front_height_cm": 17
+  },
+  "by": "read again: 25 cm strips (3D view), arm ends slope down over 40 cm to 26.4 / 17 cm (2 Oct 2026)"
+ },
+ "L4": {
+  "shape": "other",
+  "why_not": "a sofa with a chaise arm that slopes down from 61 to 43.2 cm (not the L shape: the arm has no back); to build from the vector drawing",
+  "by": "checked by hand, 2 Oct 2026"
+ },
+ "cover 42 & 49 - L4 & L8 mirror": {
+  "shape": "other",
+  "why_not": "a sofa with a chaise arm that slopes down from 61 to 43.2 cm (not the L shape: the arm has no back); to build from the vector drawing",
+  "by": "checked by hand, 2 Oct 2026"
+ },
+ "cover 39 & 46 - L1 & L5 mirror": {
+  "shape": "other",
+  "why_not": "an L whose chaise arm comes down along its length (the outer wall not at one height); to build from the vector drawing",
+  "by": "checked by hand, 2 Oct 2026"
+ },
+ "cover 44 & 45 - S13 & S14 Nardo": {
+  "shape": "other",
+  "why_not": "two separate covers, each with ends that slope in (hips: the front top edge 145 cm against 225 cm at the back); to build from the vector drawing",
+  "by": "checked by hand, 2 Oct 2026"
+ },
+ "D6": {
+  "shape": "other",
+  "why_not": "tapered in the top view (flat strip 121.6 cm, top edge 152.66 cm, 180 cm at the bottom) with sloping sides; to build from the vector drawing",
+  "by": "checked by hand, 2 Oct 2026"
+ },
+ "S38": {
+  "shape": "other",
+  "why_not": "tapered in the top view (narrower at the front than at the back); to build from the vector drawing",
+  "by": "checked by hand, 2 Oct 2026"
+ },
+ "S39": {
+  "shape": "other",
+  "why_not": "tapered in the top view (narrower at the front than at the back); to build from the vector drawing",
+  "by": "checked by hand, 2 Oct 2026"
+ },
+ "C24": {
+  "sizes": {
+   "strip_corner": "y"
+  },
+  "by": "read again: the left (y) strip runs through to the outside corner, the top strip butts on to it (2 Oct 2026)"
+ },
+ "C31": {
+  "shape": "other",
+  "why_not": "four arms at angles (not a right-angled L); to build from the vector drawing",
+  "by": "checked by hand, 2 Oct 2026"
+ },
+ "C1": {
+  "sizes": {
+   "x_back_strip_cm": 25,
+   "y_back_strip_cm": 25,
+   "end_length_cm": 40,
+   "end_back_height_cm": 26.4,
+   "end_front_height_cm": 17
+  },
+  "by": "read again: as C2, 25 cm strips, arm ends slope down over 40 cm to 26.4 / 17 cm (2 Oct 2026)"
+ },
+ "S18": {
+  "shape": "L shape",
+  "sizes": {
+   "x_length_cm": 380,
+   "y_length_cm": 110,
+   "x_arm_depth_cm": 110,
+   "y_arm_depth_cm": 110,
+   "x_back_strip_cm": 35,
+   "y_back_strip_cm": 35,
+   "back_height_cm": 82,
+   "front_height_cm": 37,
+   "strip_corner": "mitre"
+  },
+  "by": "read again: a sofa with one arm end, the strip also along the end; the second arm only as long as deep (2 Oct 2026)"
+ }
 }

@@ -391,6 +391,7 @@ function System() {
       )}
       <table className="list facts">
         <tbody>
+          <tr className="static"><td>Release (live)</td><td>{String(s.release)}</td></tr>
           <tr className="static"><td>Engine version</td><td>{String(s.engine)}</td></tr>
           <tr className="static"><td>Models</td><td>{String(s.models)}</td></tr>
           <tr className="static"><td>Disk free</td><td>{String(s.disk_free_gb)} of {String(s.disk_total_gb)} GB</td></tr>
@@ -400,6 +401,20 @@ function System() {
           <tr className="static"><td>AI key present</td><td>{yes(s.ai)}</td></tr>
         </tbody>
       </table>
+      {((s.releases as string[]) ?? []).length > 0 && (
+        <section className="card">
+          <h3>Releases</h3>
+          <p className="muted">
+            The last switches of the app. Back to the release before, on the server:{" "}
+            <code>scripts/rollback.sh</code> (handbook: server).
+          </p>
+          <ul>
+            {(s.releases as string[]).map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        </section>
+      )}
       <form
         className="card"
         onSubmit={async (e) => {

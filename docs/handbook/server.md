@@ -59,3 +59,27 @@ sudo systemctl restart cover-web
 ```
 
 The data (models, users) is not in git: that is what the backups are for.
+
+## Toegang via Tailscale (2 oktober 2026)
+
+SSH staat sinds 2 oktober 2026 dicht voor internet (`deploy/tailscale-setup.sh lock`). De server
+heet **cover-server** (100.76.72.19) in het Tailscale-netwerk van rick@.
+
+- Inloggen: `kitten ssh dev@cover-server` (of `ssh dev@cover-server`) met Tailscale aan.
+- Een collega toegang geven: uitnodigen in de Tailscale admin console (Users → Invite).
+- Noodtoegang als Tailscale niet werkt: de webconsole bij Hetzner, dan `sudo ufw allow OpenSSH`.
+- Open voor internet: alleen 80 en 443 (de website via Caddy).
+
+## Versies en terug naar een vorige versie (ADR-053)
+
+De app draait vanuit `~/releases/current`, een verwijzing naar de live versie (bijvoorbeeld
+`~/releases/v1.0.0`). De gegevens (modellen, gebruikers, uploads) staan daarbuiten en blijven
+bij elke wissel dezelfde.
+
+- Nieuwe versie live zetten: `scripts/release.sh v1.1.0 "wat er nieuw is"` (test eerst alles,
+  zet een versienummer in git, bouwt de versie in een eigen map en schakelt over). Antwoordt
+  de app daarna niet binnen een minuut, dan gaat hij vanzelf terug naar de vorige versie.
+- Terug naar de vorige versie: `scripts/rollback.sh` (ongeveer 10 seconden).
+- Terug naar een bepaalde versie: `scripts/rollback.sh v1.0.0`; welke er zijn:
+  `scripts/rollback.sh --list`.
+- Welke versie live is: de adminpagina, tab System ("Release (live)"), met de laatste wissels.

@@ -1,4 +1,5 @@
 # Cover Studio web app (ADR-048): one process on 127.0.0.1:8080, behind Caddy (deploy/Caddyfile).
+# It runs the live release, ~/releases/current (ADR-053: scripts/release.sh and rollback.sh).
 # Install: sudo cp deploy/cover-web.service /etc/systemd/system/ && sudo systemctl enable --now cover-web
 [Unit]
 Description=Cover Studio (S2DIO x SUNS) web app
@@ -8,12 +9,12 @@ Wants=network-online.target
 [Service]
 User=dev
 Group=dev
-WorkingDirectory=/home/dev/cover-pattern-engine
+WorkingDirectory=/home/dev/releases/current
 Environment=COVER_DATA_DIR=/home/dev/cover-data
 Environment=COVER_LOGIN=on
 Environment=COVER_HOST=127.0.0.1
 Environment=COVER_PORT=8080
-ExecStart=/home/dev/cover-pattern-engine/.venv/bin/cover-web
+ExecStart=/home/dev/releases/current/.venv/bin/cover-web
 Restart=always
 RestartSec=5
 # hardening: no privileges, own /tmp, the system read only

@@ -214,7 +214,9 @@ make api-dev    web app and API on :8080     make web-dev   Vite dev server on :
 make web-build  build the pages (apps/web/dist)
 make deploy     build the app image and `docker compose up -d app` (127.0.0.1:8080)
 cover-users list | add <name> --role admin --approve | invite <name>   users (ADR-047)
-sudo systemctl restart cover-web            the app as a service; Caddy serves https://covers.suns.nu
+scripts/release.sh v1.2.3 "what is new"     test, tag, build ~/releases/v1.2.3 and switch the app to it (ADR-053)
+scripts/rollback.sh [v1.2.3 | --list]       back to the release before (or a chosen one) in seconds
+sudo systemctl restart cover-web            the app as a service (runs ~/releases/current); Caddy serves https://covers.suns.nu
 make backup     push the data directory to R2 with rclone
 ```
 
@@ -228,7 +230,8 @@ make backup     push the data directory to R2 with rclone
   Finish each milestone with `docs/reports/M<n>.md` written for a non-developer: what works
   now, how to try it, what was measured, what comes next. Then stop.
 - `main` always works. Small commits, `make test` before every commit, push at the end of every
-  session. Deploy only from tagged commits and never leave the deployed app broken.
+  session. Deploy only from tagged commits (`scripts/release.sh`, ADR-053) and never leave the
+  deployed app broken.
 - At a physical gate produce the files, a printed checklist and a measurement sheet, then wait.
   Record results and every tolerance change in docs/DECISIONS.md.
 - A parameter change after a test is an edit to `config/defaults.yaml` or to the model's
