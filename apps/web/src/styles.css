@@ -195,3 +195,6 @@ svg.plan .proposal text { fill: var(--warn); cursor: pointer; }
 table.list tr.static:hover { background: none; cursor: default; }
 td.nowrap, .nowrap { white-space: nowrap; }
 td.detail { max-width: 520px; overflow-wrap: anywhere; font-size: 12px; }
+.login-card label.check, label.check { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.login-card input[inputmode="numeric"] { font-size: 22px; letter-spacing: 0.4em; text-align: center; font-variant-numeric: tabular-nums; }
+.login-card button.link { align-self: center; font-size: 13px; }

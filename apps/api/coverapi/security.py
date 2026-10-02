@@ -26,9 +26,20 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from coverapi import mailer
-from coverapi.auth import ROLES, SESSION_COOKIE, SESSION_DAYS, Auth, AuthError, User
+from coverapi.auth import (
+    CODE_MINUTES,
+    ROLES,
+    SESSION_COOKIE,
+    SESSION_DAYS,
+    TRUSTED_COOKIE,
+    TRUSTED_DAYS,
+    Auth,
+    AuthError,
+    User,
+)
 
-OPEN_PATHS = ("/api/health", "/api/auth/login", "/api/auth/invite/")
+OPEN_PATHS = ("/api/health", "/api/auth/login", "/api/auth/verify", "/api/auth/invite/")
+TWO_FACTOR_KEY = "two_factor"  # a code by mail after the password (owner, 2 Oct 2026)
 CHANGING = ("POST", "PUT", "PATCH", "DELETE")
 PUBLIC_URL_KEY = "public_url"
 DEFAULT_PUBLIC_URL = "https://covers.suns.nu"
@@ -44,6 +55,16 @@ CSP = (
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
+class VerifyRequest(BaseModel):
+    challenge: str
+    code: str
+    remember: bool = True
+
+
+class TwoFactorRequest(BaseModel):
+    on: bool
 
 
 class PasswordRequest(BaseModel):
@@ -100,6 +121,11 @@ def require(request: Request, right: str) -> User:
     if not user.may(right):
         raise HTTPException(403, f"your account may not {right}")
     return user
+
+
+def _mask(email: str) -> str:
+    name, _, domain = email.partition("@")
+    return f"{name[:2]}…@{domain}"
 
 
 def _address(request: Request) -> str:
@@ -167,14 +193,59 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
     # ---- login
     @app.post("/api/auth/login")
     def login(req: LoginRequest, request: Request, response: Response) -> dict[str, Any]:
+        """Step 1, the password. Then, unless this browser passed the mailed code in the last
+        14 days, step 2: a code by mail (/api/auth/verify)."""
+        address = _address(request)
         try:
-            user, token = auth.login(req.username, req.password, _address(request))
+            user = auth.check_login(req.username, req.password, address)
         except AuthError as exc:
-            auth.log(req.username[:64], "login failed", _address(request))
+            auth.log(req.username[:64], "login failed", address)
             raise HTTPException(exc.status, str(exc)) from None
-        auth.log(user, "login", _address(request))
+        if not _two_factor() or auth.trusted(user.id, request.cookies.get(TRUSTED_COOKIE)):
+            user, token = auth._session(user.id, address)
+            auth.log(user, "login", address)
+            _set_cookie(response, token, request)
+            return {"user": user.public()}
+        if not user.email:
+            auth.log(user, "login refused: no e-mail for the code", address)
+            raise HTTPException(
+                403, "your account has no e-mail address for the login code: ask an admin"
+            )
+        cid, code = auth.challenge(user, address)
+        try:
+            mailer.send(
+                auth, user.email, f"Cover Studio login code: {code}",
+                f"Hello {user.name},\n\nYour login code for Cover Studio is:\n\n    {code}\n\n"
+                f"It is valid for {CODE_MINUTES} minutes. If you did not just log in, change your "
+                f"password and tell an admin.\n",
+            )  # fmt: skip
+        except Exception as exc:  # noqa: BLE001
+            auth.log(user, "login code not sent", str(exc))
+            raise HTTPException(
+                503, "the login code could not be mailed: try again later"
+            ) from None
+        auth.log(user, "login code sent", address)
+        return {"two_factor": True, "challenge": cid, "sent_to": _mask(user.email)}
+
+    @app.post("/api/auth/verify")
+    def verify(req: VerifyRequest, request: Request, response: Response) -> dict[str, Any]:
+        address = _address(request)
+        try:
+            user, token = auth.verify(req.challenge, req.code, address)
+        except AuthError as exc:
+            raise HTTPException(exc.status, str(exc)) from None
+        auth.log(user, "login (with code)", address)
         _set_cookie(response, token, request)
+        if req.remember:
+            device = auth.trust(user.id, request.headers.get("user-agent", ""))
+            response.set_cookie(
+                TRUSTED_COOKIE, device, max_age=TRUSTED_DAYS * 86400, httponly=True,
+                secure=_https(request), samesite="strict", path="/",
+            )  # fmt: skip
         return {"user": user.public()}
+
+    def _two_factor() -> bool:
+        return bool(auth.setting(TWO_FACTOR_KEY, True)) and mailer.configured(auth)
 
     def _set_cookie(response: Response, token: str, request: Request) -> None:
         response.set_cookie(
@@ -296,7 +367,8 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
     def mail_settings(request: Request) -> dict[str, Any]:
         require(request, "admin")
         return {"mail": mailer.settings(auth), "public_url": auth.setting(
-            PUBLIC_URL_KEY, DEFAULT_PUBLIC_URL)}  # fmt: skip
+            PUBLIC_URL_KEY, DEFAULT_PUBLIC_URL), "two_factor": bool(auth.setting(
+            TWO_FACTOR_KEY, True))}  # fmt: skip
 
     @app.put("/api/admin/mail")
     def save_mail(req: MailRequest, request: Request) -> dict[str, Any]:
@@ -316,6 +388,13 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(400, f"the mail did not go: {exc}") from None
         return {"ok": True}
+
+    @app.put("/api/admin/two-factor")
+    def two_factor(req: TwoFactorRequest, request: Request) -> dict[str, Any]:
+        admin = require(request, "admin")
+        auth.set_setting(TWO_FACTOR_KEY, req.on)
+        auth.log(admin, "login code by mail " + ("on" if req.on else "off"))
+        return {"two_factor": req.on}
 
     @app.put("/api/admin/public-url")
     def public_url(req: PublicUrlRequest, request: Request) -> dict[str, Any]:

@@ -267,7 +267,11 @@ const send = (method: string, url: string, body?: unknown) =>
 export const auth = {
   me: () => fetch("/api/auth/me").then((r) => json<{ user: User; auth: boolean }>(r)),
   login: (username: string, password: string) =>
-    send("POST", "/api/auth/login", { username, password }).then((r) => json<{ user: User }>(r)),
+    send("POST", "/api/auth/login", { username, password }).then((r) =>
+      json<{ user?: User; two_factor?: boolean; challenge?: string; sent_to?: string }>(r),
+    ),
+  verify: (challenge: string, code: string, remember: boolean) =>
+    send("POST", "/api/auth/verify", { challenge, code, remember }).then((r) => json<{ user: User }>(r)),
   logout: () => send("POST", "/api/auth/logout").then((r) => json<{ ok: boolean }>(r)),
   invite: (token: string) =>
     fetch(`/api/auth/invite/${token}`).then((r) => json<{ username: string; name: string }>(r)),
@@ -298,7 +302,10 @@ export const admin = {
     fetch("/api/admin/audit").then((r) =>
       json<{ audit: { time: number; username: string | null; action: string; detail: string | null }[] }>(r),
     ),
-  mail: () => fetch("/api/admin/mail").then((r) => json<{ mail: MailSettings; public_url: string }>(r)),
+  mail: () =>
+    fetch("/api/admin/mail").then((r) => json<{ mail: MailSettings; public_url: string; two_factor: boolean }>(r)),
+  twoFactor: (on: boolean) =>
+    send("PUT", "/api/admin/two-factor", { on }).then((r) => json<{ two_factor: boolean }>(r)),
   saveMail: (m: MailSettings & { password?: string }) =>
     send("PUT", "/api/admin/mail", m).then((r) => json<{ mail: MailSettings }>(r)),
   testMail: (to: string) => send("POST", "/api/admin/mail/test", { to }).then((r) => json<{ ok: boolean }>(r)),

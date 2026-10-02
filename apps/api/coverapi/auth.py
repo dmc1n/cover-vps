@@ -30,6 +30,11 @@ from typing import Any
 
 ROLES = ("admin", "editor", "viewer")
 SESSION_COOKIE = "cover_session"
+TRUSTED_COOKIE = "cover_device"  # a device that passed the mailed code (TRUSTED_DAYS)
+TRUSTED_DAYS = 14
+CODE_MINUTES = 10
+CODE_TRIES = 5
+CODE_DIGITS = 6
 SESSION_DAYS = 14
 INVITE_HOURS = 72
 LOCK_AFTER = 5  # wrong passwords in a row
@@ -72,6 +77,21 @@ CREATE TABLE IF NOT EXISTS audit (
   username TEXT,
   action TEXT NOT NULL,
   detail TEXT
+);
+CREATE TABLE IF NOT EXISTS challenges (
+  id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires REAL NOT NULL,
+  tries INTEGER NOT NULL DEFAULT 0,
+  address TEXT
+);
+CREATE TABLE IF NOT EXISTS trusted (
+  token_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  created REAL NOT NULL,
+  expires REAL NOT NULL,
+  label TEXT
 );
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
@@ -235,6 +255,7 @@ class Auth:
                 db.execute(f"UPDATE users SET {key}=? WHERE id=?", (value, user_id))  # noqa: S608
             if changes.get("active") is False:
                 db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+                db.execute("DELETE FROM trusted WHERE user_id=?", (user_id,))
         return self.user(user_id)
 
     # ---- invites (first password, or a reset)
@@ -249,6 +270,7 @@ class Auth:
             )
             db.execute("UPDATE users SET pw_hash=NULL WHERE id=?", (user_id,))
             db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+            db.execute("DELETE FROM trusted WHERE user_id=?", (user_id,))
         return token
 
     def invite_user(self, token: str) -> User:
@@ -289,9 +311,90 @@ class Auth:
                 "DELETE FROM sessions WHERE user_id=? AND token_hash<>?",
                 (user_id, _hash_token(keep) if keep else ""),
             )
+            db.execute("DELETE FROM trusted WHERE user_id=?", (user_id,))
+
+    # ---- second step: a code by mail, and devices that passed it (owner, 2 Oct 2026)
+    def challenge(self, user: User, address: str) -> tuple[str, str]:
+        """A new code for this user (an older one stops working): (challenge id, code)."""
+        cid = secrets.token_urlsafe(24)
+        code = "".join(secrets.choice("0123456789") for _ in range(CODE_DIGITS))
+        with self._lock, self._db() as db:
+            db.execute(
+                "DELETE FROM challenges WHERE user_id=? OR expires<?", (user.id, time.time())
+            )
+            db.execute(
+                "INSERT INTO challenges (id, user_id, code_hash, expires, address) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (_hash_token(cid), user.id, _hash_token(code),
+                 time.time() + CODE_MINUTES * MINUTE_S, address),
+            )  # fmt: skip
+        return cid, code
+
+    def verify(self, cid: str, code: str, address: str) -> tuple[User, str]:
+        """The mailed code: a session for the user (the same as a login)."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT * FROM challenges WHERE id=? AND expires>?", (_hash_token(cid), time.time())
+            ).fetchone()
+        if row is None:
+            raise AuthError("the code has expired: log in again", 400)
+        if row["tries"] >= CODE_TRIES:
+            raise AuthError("too many wrong codes: log in again", 429)
+        if not hmac.compare_digest(_hash_token(code.strip()), row["code_hash"]):
+            with self._lock, self._db() as db:
+                db.execute("UPDATE challenges SET tries=tries+1 WHERE id=?", (row["id"],))
+            raise AuthError("wrong code", 400)
+        with self._lock, self._db() as db:
+            db.execute("DELETE FROM challenges WHERE id=?", (row["id"],))
+        return self._session(int(row["user_id"]), address)
+
+    def trust(self, user_id: int, label: str) -> str:
+        token = secrets.token_urlsafe(32)
+        with self._lock, self._db() as db:
+            db.execute(
+                "INSERT INTO trusted (token_hash, user_id, created, expires, label) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (_hash_token(token), user_id, time.time(), time.time() + TRUSTED_DAYS * DAY_S,
+                 label[:200]),
+            )  # fmt: skip
+        return token
+
+    def trusted(self, user_id: int, token: str | None) -> bool:
+        if not token:
+            return False
+        with self._db() as db:
+            row = db.execute(
+                "SELECT 1 FROM trusted WHERE token_hash=? AND user_id=? AND expires>?",
+                (_hash_token(token), user_id, time.time()),
+            ).fetchone()
+        return row is not None
+
+    def forget_devices(self, user_id: int) -> None:
+        with self._lock, self._db() as db:
+            db.execute("DELETE FROM trusted WHERE user_id=?", (user_id,))
+
+    def _session(self, user_id: int, address: str) -> tuple[User, str]:
+        now = time.time()
+        token = secrets.token_urlsafe(32)
+        with self._lock, self._db() as db:
+            db.execute("UPDATE users SET last_login=? WHERE id=?", (now, user_id))
+            db.execute(
+                "INSERT INTO sessions (token_hash, user_id, created, expires, address) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (_hash_token(token), user_id, now, now + SESSION_DAYS * DAY_S, address),
+            )
+        return self.user(user_id), token
+
+    def check_login(self, username: str, password: str, address: str) -> User:
+        """The first step: the password (with the lock-outs), without a session yet."""
+        return self._password(username, password, address)
 
     # ---- login and sessions
     def login(self, username: str, password: str, address: str) -> tuple[User, str]:
+        user = self._password(username, password, address)
+        return self._session(user.id, address)
+
+    def _password(self, username: str, password: str, address: str) -> User:
         now = time.time()
         with self._db() as db:
             arow = db.execute(
@@ -310,19 +413,12 @@ class Auth:
         if not ok:
             self._failed(row, address, now)
             raise AuthError("wrong user name or password")
-        token = secrets.token_urlsafe(32)
         with self._lock, self._db() as db:
-            db.execute("UPDATE users SET failed=0, locked_until=NULL, last_login=? WHERE id=?",
-                       (now, row["id"]))  # fmt: skip
+            db.execute("UPDATE users SET failed=0, locked_until=NULL WHERE id=?", (row["id"],))
             db.execute("DELETE FROM address_failures WHERE address=?", (address,))
-            db.execute(
-                "INSERT INTO sessions (token_hash, user_id, created, expires, address) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (_hash_token(token), row["id"], now, now + SESSION_DAYS * DAY_S, address),
-            )
         user = self._user(row)
         assert user is not None
-        return user, token
+        return user
 
     def _failed(self, row: sqlite3.Row | None, address: str, now: float) -> None:
         lock = now + LOCK_MINUTES * MINUTE_S

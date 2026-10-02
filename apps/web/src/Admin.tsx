@@ -186,12 +186,14 @@ function Mail() {
   const [url, setUrl] = useState("");
   const [to, setTo] = useState("");
   const [msg, setMsg] = useState("");
+  const [twoFactor, setTwoFactor] = useState(true);
   useEffect(() => {
     admin
       .mail()
       .then((r) => {
         setM(r.mail);
         setUrl(r.public_url);
+        setTwoFactor(r.two_factor);
       })
       .catch((e) => setMsg(String(e)));
   }, []);
@@ -259,6 +261,27 @@ function Mail() {
         </div>
         {msg && <p className="muted">{msg}</p>}
       </form>
+      <section className="card">
+        <h3>Login code by mail</h3>
+        <p className="muted">
+          After the password, a code of 6 digits by mail; a device that passed it is remembered for 14 days. Needs the
+          mail server above, and an e-mail address for every user.
+        </p>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={twoFactor}
+            onChange={async (e) => {
+              try {
+                setTwoFactor((await admin.twoFactor(e.target.checked)).two_factor);
+              } catch (err) {
+                setMsg(String(err));
+              }
+            }}
+          />{" "}
+          Ask for a login code by mail
+        </label>
+      </section>
       <form
         className="card"
         onSubmit={async (e) => {

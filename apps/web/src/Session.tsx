@@ -22,23 +22,77 @@ function Brand() {
 export function Login({ onDone }: { onDone: (u: User) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [step, setStep] = useState<{ challenge: string; sentTo: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const run = async (f: () => Promise<void>) => {
+    setBusy(true);
+    setError("");
+    try {
+      await f();
+    } catch (err) {
+      setError(String(err).replace(/^Error: /, ""));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (step)
+    return (
+      <div className="login-page">
+        <form
+          className="login-card"
+          onSubmit={(e) => {
+            e.preventDefault();
+            run(async () => onDone((await auth.verify(step.challenge, code, remember)).user));
+          }}
+        >
+          <Brand />
+          <h1>Your code</h1>
+          <p className="muted">We sent a code of 6 digits to {step.sentTo}. It is valid for 10 minutes.</p>
+          <label>
+            Code
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              autoFocus
+            />
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Remember this
+            device for 14 days
+          </label>
+          {error && <p className="error">{error}</p>}
+          <button className="primary" disabled={busy || code.length !== 6}>
+            {busy ? "Checking…" : "Log in"}
+          </button>
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              setStep(null);
+              setCode("");
+            }}
+          >
+            Back
+          </button>
+        </form>
+      </div>
+    );
   return (
     <div className="login-page">
       <form
         className="login-card"
-        onSubmit={async (e) => {
+        onSubmit={(e) => {
           e.preventDefault();
-          setBusy(true);
-          setError("");
-          try {
-            onDone((await auth.login(username, password)).user);
-          } catch (err) {
-            setError(String(err).replace(/^Error: /, ""));
-          } finally {
-            setBusy(false);
-          }
+          run(async () => {
+            const r = await auth.login(username, password);
+            if (r.user) onDone(r.user);
+            else if (r.challenge) setStep({ challenge: r.challenge, sentTo: r.sent_to ?? "your e-mail" });
+          });
         }}
       >
         <Brand />

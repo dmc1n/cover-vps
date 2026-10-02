@@ -117,3 +117,51 @@ def test_a_user_changes_their_own_password(app: Any) -> None:
     assert c.get("/api/models").status_code == 200  # this session goes on
     assert other.get("/api/models").status_code == 401  # the other one ended
     login(app, "vera", "a-brand-new-password")
+
+
+def test_login_code_by_mail_and_a_trusted_device(app: Any, monkeypatch: Any) -> None:
+    """Owner, 2 Oct 2026: a code by mail after the password; the device is trusted 14 days."""
+    from coverapi import mailer
+
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(mailer, "configured", lambda auth: True)
+    monkeypatch.setattr(mailer, "send", lambda auth, to, subject, text: sent.append((to, subject)))
+    c = TestClient(app)
+    r = c.post("/api/auth/login", json={"username": "rick", "password": "a-long-admin-password"})
+    assert r.status_code == 200 and r.json()["two_factor"]
+    assert c.get("/api/models").status_code == 401  # no session before the code
+    code = sent[-1][1].rsplit(" ", 1)[1]
+    challenge = r.json()["challenge"]
+    wrong = "111111" if code != "111111" else "222222"
+    assert (
+        c.post("/api/auth/verify", json={"challenge": challenge, "code": wrong}).status_code == 400
+    )
+    r = c.post("/api/auth/verify", json={"challenge": challenge, "code": code, "remember": True})
+    assert r.status_code == 200, r.text
+    assert c.get("/api/models").status_code == 200
+    c.post("/api/auth/logout")
+    # the same browser: trusted, no code this time
+    n = len(sent)
+    r = c.post("/api/auth/login", json={"username": "rick", "password": "a-long-admin-password"})
+    assert r.status_code == 200 and "user" in r.json() and len(sent) == n
+    # another browser: a code again; five wrong codes end the challenge
+    other = TestClient(app)
+    r = other.post(
+        "/api/auth/login", json={"username": "rick", "password": "a-long-admin-password"}
+    )
+    ch = r.json()["challenge"]
+    for _ in range(5):
+        other.post("/api/auth/verify", json={"challenge": ch, "code": "12345x"})
+    right = sent[-1][1].rsplit(" ", 1)[1]
+    assert other.post("/api/auth/verify", json={"challenge": ch, "code": right}).status_code == 429
+
+
+def test_without_an_email_the_code_cannot_be_sent(app: Any, monkeypatch: Any) -> None:
+    from coverapi import mailer
+
+    monkeypatch.setattr(mailer, "configured", lambda auth: True)
+    monkeypatch.setattr(mailer, "send", lambda *a: None)
+    r = TestClient(app).post(
+        "/api/auth/login", json={"username": "vera", "password": "a-long-viewer-password"}
+    )
+    assert r.status_code == 403
