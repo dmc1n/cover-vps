@@ -425,6 +425,7 @@ function KindCheck({ kind, onConfirm }: { kind: Kind; onConfirm: (k: "product" |
 }
 
 function ModelPage({ id }: { id: string }) {
+  const { user } = useSession();
   const [model, setModel] = useState<ModelDetail | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [tab, setTab] = useState<Tab>("3d");
@@ -536,7 +537,15 @@ function ModelPage({ id }: { id: string }) {
         ))}
       </nav>
       <section className="tab">
-        {tab === "3d" && <Viewer id={id} files={model.files} stamp={stamp} />}
+        {tab === "3d" && (
+          <Viewer
+            id={id}
+            files={model.files}
+            stamp={stamp}
+            onRain={user?.role === "viewer" ? undefined : () => run(["rain"], {})}
+            rainBusy={!!running && job?.steps.some((s) => s.name === "rain")}
+          />
+        )}
         {tab === "seams" && <SeamEditor id={id} stamp={stamp} onJob={setJob} />}
         {tab === "drawing" && <Drawing id={id} files={model.files} stamp={stamp} />}
         {tab === "ai" && <AiAdvice id={id} files={model.files} stamp={stamp} onJob={setJob} />}

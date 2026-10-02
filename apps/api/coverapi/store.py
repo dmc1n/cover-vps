@@ -40,6 +40,9 @@ EXTRA_FILES = [
     "audit.json",
     "balloons.glb",
     "chairs.glb",
+    "rain.json",
+    "rain.glb",
+    "rain.png",
     "audit.png",
 ]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)

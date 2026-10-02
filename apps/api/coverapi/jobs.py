@@ -18,7 +18,8 @@ from typing import Any
 from coverapi.store import STEPS, Store
 
 LOG_TAIL = 4000  # characters of each step's output kept in the job file
-EXTRA_STEPS = ["improve", "ai"]  # cover improve: the program adds seams; cover ai: AI advice
+# cover improve: the program adds seams; cover ai: AI advice; cover rain: the rain simulation
+EXTRA_STEPS = ["improve", "ai", "rain"]
 
 
 @dataclass

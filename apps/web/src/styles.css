@@ -198,3 +198,13 @@ td.detail { max-width: 520px; overflow-wrap: anywhere; font-size: 12px; }
 .login-card label.check, label.check { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .login-card input[inputmode="numeric"] { font-size: 22px; letter-spacing: 0.4em; text-align: center; font-variant-numeric: tabular-nums; }
 .login-card button.link { align-self: center; font-size: 13px; }
+
+/* ---- rain (ADR-049) ---- */
+.rain-buttons { margin-left: auto; display: flex; gap: 8px; }
+.card.rain { border-left: 4px solid var(--line); }
+.card.rain.dry { border-left-color: var(--ok); background: var(--ok-soft); }
+.card.rain.risk { border-left-color: var(--warn); background: var(--warn-soft); }
+.card.rain.wet { border-left-color: var(--bad); background: var(--bad-soft); }
+.card.rain .rain-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+.card.rain h4 { margin: 10px 0 4px; font-family: "Fraunces", Georgia, serif; font-weight: 400; }
+.card.rain ul { margin: 4px 0 4px 1.2rem; }

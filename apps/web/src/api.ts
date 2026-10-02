@@ -1,6 +1,6 @@
 // Types and calls for the cover API (apps/api/coverapi/main.py).
 
-export type Step = "import" | "hull" | "cut" | "flatten" | "export" | "improve" | "ai";
+export type Step = "import" | "hull" | "cut" | "flatten" | "export" | "improve" | "ai" | "rain";
 export const STEPS: Step[] = ["import", "hull", "cut", "flatten", "export"];
 export const STEP_LABEL: Record<Step, string> = {
   import: "Import",
@@ -10,7 +10,31 @@ export const STEP_LABEL: Record<Step, string> = {
   export: "Cut pieces",
   improve: "Seams added by the program",
   ai: "AI advice",
+  rain: "Rain simulation",
 };
+
+/** The rain simulation (rain.json, ADR-049). */
+export interface Rain {
+  cover_area_m2: number;
+  ponds: {
+    area_m2: number;
+    volume_l: number;
+    max_depth_mm: number;
+    span_mm: number;
+    volume_with_sag_l: number;
+    keeps_growing: boolean;
+    centre_mm: number[];
+  }[];
+  pond_area_m2: number;
+  pond_volume_l: number;
+  flat_area_m2: number;
+  growing_ponds: number;
+  exits: Record<string, number>;
+  seams_along: { seam: string; run_mm: number }[];
+  dry: boolean;
+  drops: { path: number[][]; ends: string }[];
+  ai?: { verdict?: string; summary?: string; risks?: string[]; suggestions?: string[]; error?: string };
+}
 
 export type Status = "draft" | "checked" | "production";
 

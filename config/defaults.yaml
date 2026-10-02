@@ -143,6 +143,15 @@ fabric:
   profile: acrylic-300           # testdata/fabrics/<profile>.json
   max_allowed_stretch_pct: 2.0   # above this the engine proposes an extra seam
 
+rain:                            # cover rain: where rain goes on a cover (ADR-049)
+  cell_mm: 15                    # grid seen from above
+  drops: 240                     # drops traced for the 3D view
+  pond_mm: 2.5                   # water deeper than this in a hollow is a pond
+  support_mm: 35                 # the cover rests on furniture or a balloon closer than this
+  fabric_tension_n_per_m: 800    # TO CONFIRM (swatch tests, M8): tension in the fitted fabric,
+                                 # for the sag of a pond between supports
+  seam_run_mm: 250               # water running along a seam further than this soaks in
+
 roll:
   width_mm: 1500
   usable_width_mm: 1480          # no panel wider than this in its narrowest orientation

@@ -402,6 +402,26 @@ def _cmd_ai(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_rain(args: argparse.Namespace) -> int:
+    """Where rain goes on the cover: ponds, flat parts, streams, drops, the AI's verdict."""
+    from coverengine.rain import simulate
+
+    cover_json = args.model / "cover.json"
+    params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    r = simulate(args.model, params, use_ai=not args.no_ai)
+    print(f"ponds   {len(r['ponds'])} ({r['pond_area_m2']:g} m2, {r['pond_volume_l']:g} l), "
+          f"{r['growing_ponds']} keep growing under their weight")  # fmt: skip
+    print(f"flat    {r['flat_area_m2']:g} m2 flatter than {params['hull.min_slope_deg']} degrees")
+    print(f"off at  {', '.join(f'{k} {v}' for k, v in r['exits'].items() if v)} (drops)")
+    for s in r["seams_along"]:
+        print(f"seam    water runs along {s['seam']} for {s['run_mm'] / MM_PER_CM:.0f} cm")
+    ai = r.get("ai") or {}
+    if ai.get("verdict"):
+        print(f"AI      {ai['verdict']}: {ai.get('summary', '')}")
+    print("dry" if r["dry"] else "water stays on the cover")
+    return 0
+
+
 def _cmd_audit(args: argparse.Namespace) -> int:
     """Check calculated covers (and ask the AI for a second opinion): audit.json per model."""
     import csv
@@ -717,6 +737,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--learn", metavar="COMPLAINT", help="why was this cover wrong? (a lesson)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_ai)
+
+    p = sub.add_parser("rain", help="where rain goes on the cover (rain.json, rain.glb)")
+    p.add_argument("model", type=Path, help="model directory with a cover surface")
+    p.add_argument("--no-ai", action="store_true", help="without the AI's verdict")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_rain)
 
     p = sub.add_parser("audit", help="check calculated covers, optionally with an AI opinion")
     p.add_argument("model", type=Path, nargs="*", help="model directories (default: all)")

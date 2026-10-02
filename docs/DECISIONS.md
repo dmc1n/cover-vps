@@ -832,3 +832,25 @@ Status: accepted, 1 Oct 2026.
   offenders), 4 tries per connection, no X11 or agent forwarding.
 - Backups: every night at 02:30 a tar of the data folder (models, users, settings) in
   ~/backups on the same disk; an off-site copy is still to be chosen (question).
+
+## ADR-049 — Rain on the cover: computed physics, the AI's verdict
+
+Status: accepted, 2 Oct 2026 (owner: an AI-driven rain simulation in the 3D view, as real as
+possible). Research and plan: docs/plans/rain-simulation.md.
+
+- `cover rain` (and the Rain buttons in the 3D view): the cover surface on a 15 mm grid seen
+  from above; hollows by priority flood (ponds deeper than 2.5 mm, with area, depth, volume);
+  flat parts from the faces' true slope (under the minimum slope less half a degree; a grid
+  reads a 5° face as 4 to 5°); streams by flow accumulation; 240 drops traced down the steepest
+  way for the animation, counted where they leave the cover; seams between top pieces that
+  water runs along for more than 25 cm.
+- Sag: a pond weighs on the fabric; between supports (where the cover rests on the furniture or
+  a balloon) it sags by water load × span² / (8 × tension), iterated: a pond whose volume grows
+  by more than half keeps growing (ponding). The tension (`rain.fabric_tension_n_per_m`, 800
+  N/m) is a placeholder until the swatch tests.
+- The AI (DeepSeek) gets the numbers and a top view with streams and ponds and gives the
+  verdict (dry / risk / wet), the risks and what would help; it computes nothing itself.
+- Not done (on purpose): water moving in time (shallow-water equations) and fabric finite
+  elements; the static answer is what matters for a cover, and the fabric is not measured yet.
+- First results: Kota 2-seater and Palermo 240 dry; C6 1.75 m² flat (its drawn strip); T1 5.8
+  m² flat (its flat top); the reference Blocchi 0.17 m² flat.
