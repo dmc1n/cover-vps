@@ -871,3 +871,22 @@ hello-suns.com).
   join the table family. Editable per model; filters in the model list and the catalogue.
 - 1 October data: 410 models, 407 by the rules, 3 by the AI (the D8 cover as a hocker is
   doubtful).
+
+## ADR-052 — The curved Blocchi (S44 / Cover 110) from its vector drawing
+
+Status: accepted, 2 Oct 2026 (owner, on blocchi-2seater-moon-right: "this one is still not
+good").
+
+- The owner's Blocchi cover drawing (testdata/models/cover.pdf) is drawing S44 of the 115. It
+  is a vector drawing: the outline (pink) and the seams (black) are read as they are, scaled by
+  the drawn 197.0 cm (`scripts/s44_cover.py`). Every piece is made of flat triangles between
+  its drawn edges, with the heights from the drawing (back and strip 88.0 cm, front and the
+  bottom of the nose 40.6 cm, the diagonal seams running down between); piecewise flat pieces
+  lie flat exactly. Result `drawing-s44`: 4 top pieces (strip, slope, nose, tip) and 6 walls,
+  0.00 % stretch, every seam equal on both sides, 197.0 × 192.4 × 88.0 cm as drawn.
+- Tried first and dropped: a curved cover from the SUNS 3D model's outline (height by
+  distance: 11 % stretch; ruled: 0.08 %, but the SUNS sofa's straight end is 89 cm where the
+  drawing has 141 cm, so it did not match the owner's cover).
+- Open: the drawn outline measures 642 cm, the drawing states a bottom circumference of 668 cm
+  (the walls are upright here; the drawing's side view shows the back leaning). Reading vector
+  drawings is the way for the other curved drawings too (S43, S46, C26, ...).
