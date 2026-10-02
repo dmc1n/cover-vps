@@ -932,3 +932,35 @@ an invitation mail"; "a short write-up in English of how the system works".
 - The guide **How Cover Studio works** is `docs/handbook/how-it-works.md`, shown in the app at
   `#/guide`, also without logging in. The invitation links to it. There is one source, so the
   handbook and the app cannot drift apart.
+
+## ADR-055 — No slivers; a fold instead of a seam on request; learning from every remark
+
+The owner, 2 October 2026, on the Lucia 2-seater right: "the top can be cut in one piece"; "we
+must learn from these mistakes and make sure this does not happen again" (plan:
+docs/plans/fewer-top-pieces.md). Questions 47 and 48 are answered: the fold only on request; the
+minimum width is to be learned (10 cm for now).
+
+- `seams/facets.py`:
+  - Two flat faces that share an edge unfold exactly into one flat piece. A group of faces is
+    laid flat face by face, each turned about its shared edge, which gives its size on the roll.
+  - A face narrower than `seams.min_piece_width_mm` (100, to confirm) always goes into its
+    neighbour on the same side, if the two fit the roll and the longest piece.
+  - With `seams.fold_merge` (off; on per model on request) the top faces are joined while they
+    fit.
+  - The joined edges are folds: a pen line `FOLD` in the pattern, the cut file and the size
+    drawing.
+- The box's choice of pieces sees, per option, the number of top pieces and the narrowest face.
+  The AI is told to prefer the fewest top pieces and never a sliver; the rule without AI skips
+  options with a sliver. The lesson is stored in `config/ai_lessons.json`.
+- The audit gets a check, *slivers*, and a note, *top pieces*: a top that would fit the roll in
+  one piece.
+- The owner's drawings keep their pieces as drawn.
+- **Working rule from now on.** An owner's remark on one model becomes four things in the same
+  commit:
+  - a stored lesson;
+  - a check in the audit;
+  - a test;
+  - a line here.
+
+  Then it is swept over all models (the scan of 2 October: 21 SUNS models with a piece under
+  8 cm, 168 with a top that would fit the roll in one piece).

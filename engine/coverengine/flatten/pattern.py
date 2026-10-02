@@ -88,6 +88,9 @@ def narrow_width(points: Array) -> tuple[float, float]:
     return best
 
 
+FOLD_ON_PANEL_MM = 1.0  # param-ok: a fold's middle within this of the panel lies in it
+
+
 def _panel_mesh(vertices: Array, faces: IntArray) -> tuple[trimesh.Trimesh, IntArray]:
     """The panel's own mesh (degenerate faces dropped) and its vertices' indices in the input."""
     tri = vertices[faces]
@@ -194,6 +197,7 @@ def build_patterns(
         }
         width, length = narrow_width(outline)
         pen = _pen_marks(name, outline, edges, v3, tick_spacing, tick_length, label_h)
+        pen += _folds(cut_report.get("folds_mm", []), mesh, flat)
         pattern = PanelPattern(k, name, outline, flat, edges, pen, stretch, width, length)
         if quantile * PERCENT > _p(params, "fabric.max_allowed_stretch_pct"):
             pattern.proposal = propose_seam(flat, v3, worst, area, quantile)
@@ -306,6 +310,28 @@ def compensation(params: EffectiveParams) -> float:
 def _areas(uv: Array, f: IntArray) -> Array:
     e1, e2 = uv[f[:, 1]] - uv[f[:, 0]], uv[f[:, 2]] - uv[f[:, 0]]
     return (e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0]) / 2
+
+
+def _folds(folds: list[Any], mesh: trimesh.Trimesh, flat: Any) -> list[dict[str, Any]]:
+    """The folds inside this panel (ADR-055), as pen lines in the pattern: a fold is straight
+    in the flat piece, from where its two 3D ends lie."""
+    if not folds:
+        return []
+    tree = cKDTree(np.asarray(flat.vertices))
+    out = []
+    for a, b in folds:
+        mid = (np.asarray(a) + np.asarray(b)) / 2
+        d2, _, _ = igl.point_mesh_squared_distance(
+            mid[None, :], np.asarray(mesh.vertices, np.float64), np.asarray(mesh.faces, np.int32)
+        )
+        if float(np.sqrt(d2[0])) > FOLD_ON_PANEL_MM:
+            continue
+        _, ends = tree.query(np.array([a, b]))
+        p, q = flat.uv[ends]
+        pts = [[round(float(x), 1) for x in p], [round(float(x), 1) for x in q]]
+        mid2 = [round((pts[0][i] + pts[1][i]) / 2, 1) for i in range(2)]
+        out.append({"type": "fold", "at": mid2, "points": pts, "text": "FOLD"})
+    return out
 
 
 def _pen_marks(

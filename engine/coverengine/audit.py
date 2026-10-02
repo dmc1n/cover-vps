@@ -8,7 +8,9 @@ The program measures, for each model:
 - balloons: a table has at least one balloon under its cover;
 - symmetric: a mirror-symmetric piece of furniture has a mirror-symmetric cover;
 - water: the cover sheds water;
-- pieces: the grade (stretch, seams, roll width) and no scrap pieces.
+- pieces: the grade (stretch, seams, roll width) and no scrap pieces;
+- slivers: no piece narrower than seams.min_piece_width_mm (ADR-055); a top that would fit
+  the roll in one piece with folds is noted.
 
 Then, with `--ai`, the AI gets three straight views (front, side, top: the furniture in grey,
 the cover in see-through blue, furniture outside the cover in red), the product photo and the
@@ -130,6 +132,31 @@ def views(furniture: trimesh.Trimesh, cover: trimesh.Trimesh, bad: Array, out: P
     return out
 
 
+def sliver_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
+    """No piece narrower than seams.min_piece_width_mm; and a top in several pieces that lie flat
+    together within the roll is noted (one piece with folds, seams.fold_merge; ADR-055)."""
+    path = model_dir / "pattern.json"
+    if not path.is_file():
+        return []
+    panels = json.loads(path.read_text(encoding="utf-8"))["panels"]
+    least = float(params["seams.min_piece_width_mm"])
+    thin = [f"{p['name']} {p['flat_width_mm'] / MM_PER_CM:.1f} cm" for p in panels
+            if p["flat_width_mm"] < least]  # fmt: skip
+    hull = json.loads((model_dir / "hull.json").read_text(encoding="utf-8"))
+    drawn = hull.get("top") == "given"  # the owner's drawing: its strips are as drawn
+    out = [_check("slivers", drawn or not thin,
+                  ("narrower than " + f"{least / MM_PER_CM:g} cm: " + ", ".join(thin)) if thin
+                  else f"no piece narrower than {least / MM_PER_CM:g} cm")]  # fmt: skip
+    tops = [p for p in panels if p["name"].startswith("top")]
+    roll = float(params["roll.usable_width_mm"])
+    together = sum(p["flat_width_mm"] for p in tops)
+    if len(tops) > 1 and together <= roll and not drawn:
+        out.append(_check("top pieces", True, f"the top is {len(tops)} pieces, together "
+                          f"{together / MM_PER_CM:.0f} cm wide: one piece with folds would fit "
+                          "the roll (seams.fold_merge, on request)"))  # fmt: skip
+    return out
+
+
 def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     """The program's checks for one model."""
     from coverengine.hull.box import Box
@@ -238,6 +265,7 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
             + (f"; {'; '.join(g.get('reasons', []))}" if g.get("reasons") else ""),
         )
     )
+    checks += sliver_checks(model_dir, params)
     views(furniture, cover, bad, model_dir / AUDIT_PNG)
     return {
         "checks": checks,

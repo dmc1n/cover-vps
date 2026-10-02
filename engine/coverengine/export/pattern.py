@@ -93,6 +93,10 @@ def write_dxf(path: Path, placed: list[Placed], params: EffectiveParams) -> None
             elif m["type"] == "tick":
                 end = at + np.asarray(m["dir"]) * float(m["length"])
                 sheet.pen_line((float(at[0]), float(at[1])), (float(end[0]), float(end[1])))
+            elif m["type"] == "fold":  # one piece folded here, no seam (ADR-055)
+                (ax, ay), (bx, by) = (np.asarray(m["points"]) + o).tolist()
+                sheet.pen_line((ax, ay), (bx, by))
+                sheet.pen_text(m["text"], (float(at[0]), float(at[1])), height * 0.6)
     sheet.save(path)
 
 
@@ -140,6 +144,13 @@ def write_svg(
                 out.append(
                     f'<line x1="{at[0]:.2f}" y1="{at[1]:.2f}" x2="{end[0]:.2f}" y2="{end[1]:.2f}"/>'
                 )
+            elif m["type"] == "fold":
+                (ax, ay), (bx, by) = (np.asarray(m["points"]) + pl.offset).tolist()
+                out.append(
+                    f'<line x1="{ax:.2f}" y1="{ay:.2f}" x2="{bx:.2f}" y2="{by:.2f}" '
+                    'stroke-dasharray="12 6"/>'
+                )
+                texts.append((at, label_h * 0.6, m["text"]))
     out.append("</g></g>")
     # text outside the flipped group so it reads the right way up
     out.append('<g id="pen-text" fill="#00c" font-family="sans-serif">')

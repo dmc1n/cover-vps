@@ -449,6 +449,25 @@ def _box_cut(
     """A box cover: every flat face is one panel and every box edge a seam (ADR-038); a cover
     drawn in parts: every part is one panel (ADR-045)."""
     label = drawn if drawn is not None else _flat_regions(hull)
+    joined: list[str] = []
+    folds: list[list[list[float]]] = []
+    if drawn is None:  # an owner's drawing keeps its pieces as drawn
+        from coverengine.seams import facets
+
+        weighted = np.zeros((label.max() + 1, 3))
+        np.add.at(weighted, label, hull.face_normals * hull.area_faces[:, None])
+        nz = np.abs(weighted[:, 2]) / np.maximum(np.linalg.norm(weighted, axis=1), 1e-9)
+        roll = _p(params, "roll.usable_width_mm") - 2 * _p(params, "stitching.allowance_mm")
+        label, joined, folds = facets.join(
+            hull,
+            label,
+            nz >= BOX_UPRIGHT_NZ,
+            _p(params, "seams.min_piece_width_mm"),
+            roll,
+            _p(params, "seams.max_skirt_panel_mm"),
+            bool(params["seams.fold_merge"]),
+        )
+        label = np.unique(label, return_inverse=True)[1].astype(np.int64)
     # a region's direction is its area-weighted normal (thin slivers have noisy normals)
     weighted = np.zeros((label.max() + 1, 3))
     np.add.at(weighted, label, hull.face_normals * hull.area_faces[:, None])
@@ -479,6 +498,8 @@ def _box_cut(
     result.report["skirt_height_mm"] = None
     result.report["walls_tried"] = False
     result.report["box"] = True
+    result.report["joined"] = joined  # slivers and (on request) top faces joined, with folds
+    result.report["folds_mm"] = folds  # the 3D ends of every fold, drawn in pen (ADR-055)
     return result
 
 

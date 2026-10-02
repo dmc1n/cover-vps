@@ -67,6 +67,12 @@ hull:                            # the cover surface (drape hull)
 
 seams:
   ridge_angle_deg: 40            # hull edges sharper than this become seam candidates
+  min_piece_width_mm: 100        # to confirm (owner, 2026-10-02: to learn from our analyses);
+                                 # a box cover's flat face narrower than this (a sliver) is
+                                 # joined to its neighbour, with a fold (ADR-055)
+  fold_merge: false              # true (per model, on the owner's request, ADR-055): neighbouring
+                                 # top faces that lie flat together on the roll are one piece,
+                                 # a fold line in pen instead of a seam
   min_weld_radius_mm: 150        # to confirm at the machine (weld curvature test, M8)
   seam_tolerance_mm: 1.0         # allowed seam length mismatch before ease is recorded
   lap_rule: upper_over_lower     # water run-off; on vertical seams: front over side

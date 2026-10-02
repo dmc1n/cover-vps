@@ -226,6 +226,34 @@ def room(box: Box, solid: ConvexHull, model: trimesh.Trimesh) -> Array:
     return np.sqrt(d2)
 
 
+def faces_of(solid: ConvexHull) -> tuple[int, int]:
+    """How many of the box's faces form the top, and the narrowest face's width (mm)."""
+    import shapely
+
+    planes: dict[tuple[float, ...], list[Array]] = {}
+    for simplex, e in zip(solid.simplices, solid.equations, strict=True):
+        if e[2] < -1 + 1e-6:  # param-ok: the open bottom
+            continue
+        planes.setdefault(tuple(np.round(e, 6)), []).append(solid.points[simplex])
+    tops, widths = 0, []
+    for key, tris in planes.items():
+        n = np.asarray(key[:3])
+        tops += int(abs(n[2]) >= UPRIGHT_NZ)
+        pts = np.vstack(tris)
+        steep = abs(n[2]) < 0.9  # param-ok: any helper axis not along n will do
+        helper = np.array([0.0, 0.0, 1.0]) if steep else np.array([1.0, 0.0, 0.0])
+        u = np.cross(helper, n)
+        u /= np.linalg.norm(u)
+        v = np.cross(n, u)
+        flat = shapely.MultiPoint(np.column_stack([pts @ u, pts @ v])).convex_hull
+        box = np.asarray(shapely.minimum_rotated_rectangle(flat).exterior.coords)[:4]
+        widths.append(min(np.linalg.norm(box[1] - box[0]), np.linalg.norm(box[2] - box[1])))
+    return tops, round(float(min(widths))) if widths else 0
+
+
+UPRIGHT_NZ = 0.1  # param-ok: a face steeper than this is a wall, not the top
+
+
 def options(box: Box, sets: list[list[Array]], model: trimesh.Trimesh) -> list[dict[str, Any]]:
     rows = []
     for planes in sets:
@@ -233,9 +261,12 @@ def options(box: Box, sets: list[list[Array]], model: trimesh.Trimesh) -> list[d
         if solid is None:
             continue
         dist = room(box, solid, model)
+        tops, narrowest = faces_of(solid)
         rows.append(
             {
                 "pieces": len(planes) - 1,
+                "top_pieces": tops,
+                "narrowest_piece_mm": narrowest,
                 "room_median_mm": round(float(np.median(dist))),
                 "room_95pct_mm": round(float(np.percentile(dist, 95))),
                 "extra_volume_pct": round(PERCENT * (solid.volume / box.volume - 1), 1),
@@ -251,7 +282,11 @@ cover and furniture, the room within which 95 % of the cover lies (large where t
 seat from the front edge to the top of the back, as intended) and how much bigger the box is than
 the furniture. The owner wants as few pieces as possible with a good fit; more pieces only when
 they clearly tighten the fit. A symmetric piece of furniture gets a symmetric cover, so the
-options of a symmetric product grow by mirror pairs. Answer with JSON only:
+options of a symmetric product grow by mirror pairs. Every option also says how many pieces form
+the top (top_pieces) and how narrow its narrowest piece is (narrowest_piece_mm): a seam on top
+is a weak point for water, so prefer the option with the fewest top pieces, and never choose an
+option with a piece narrower than __MIN__ mm (a sliver); more room round the furniture is a fair
+price for a top without seams (owner, 2 October 2026). Answer with JSON only:
 {"pieces": <one of the options>, "reason": "one or two plain sentences"}"""
 
 
@@ -264,6 +299,8 @@ def choose(
         best = min(rows, key=lambda r: abs(r["pieces"] - fixed))
         return int(best["pieces"]), "setting", f"hull.box_pieces = {fixed}"
     slack = _p(params, "hull.box_volume_slack_pct")
+    least = _p(params, "seams.min_piece_width_mm")
+    rows = [r for r in rows if r.get("narrowest_piece_mm", least) >= least] or rows  # no slivers
     tightest = min(r["extra_volume_pct"] for r in rows)
     rule = next(r for r in rows if r["extra_volume_pct"] <= tightest + slack)
     if params["ai.provider"] != "none":
@@ -273,7 +310,8 @@ def choose(
             facts = {"furniture": product, "options": rows}
             from coverengine.ai import lessons_text
 
-            answer = ask(params, AI_SYSTEM + lessons_text("box"), json.dumps(facts))
+            system = AI_SYSTEM.replace("__MIN__", str(round(least))) + lessons_text("box")
+            answer = ask(params, system, json.dumps(facts))
             n = int(answer["pieces"])
             if any(r["pieces"] == n for r in rows):
                 return n, "ai", str(answer.get("reason", ""))

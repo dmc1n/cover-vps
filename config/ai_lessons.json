@@ -8,5 +8,15 @@
     "check": "Mirror each panel's centre and normal across the furniture's left-right centre plane and verify that a matching panel with the same area exists within a small tolerance.",
     "applies_to": "all",
     "ai_model": "deepseek-flash"
+  },
+  {
+    "time": 1790950000,
+    "model_id": "suns-lounge-lucia-2-seater-right",
+    "complaint": "The top can be cut in one piece (the owner, 2 Oct 2026); it was 4 pieces with a 3.7 cm sliver.",
+    "cause": "The box with 7 pieces was chosen for a tighter fit; its top became four faces, one only 37 mm wide, although the whole top lies flat about 1.2 m wide and fits the 1.48 m roll.",
+    "rule": "Choose the box option with the fewest top pieces that fit the roll; never an option with a piece narrower than the minimum piece width (a sliver); more room round the furniture is a fair price for a top without seams.",
+    "check": "The audit's slivers check (no piece narrower than seams.min_piece_width_mm) and its top pieces note.",
+    "applies_to": "box",
+    "ai_model": "owner"
   }
 ]

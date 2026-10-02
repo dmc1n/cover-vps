@@ -908,6 +908,11 @@ def _panel_page(cover: Cover, p: dict[str, Any], params: EffectiveParams) -> Fig
         if m["type"] == "tick":
             end = at + np.asarray(m["dir"]) * float(m["length"]) * 2
             ax.plot([at[0], end[0]], [at[1], end[1]], color="#3050c0", lw=0.4)
+        elif m["type"] == "fold":  # one piece folded here (ADR-055)
+            fold = np.asarray(m["points"], dtype=np.float64)
+            ax.plot(fold[:, 0], fold[:, 1], color="#3050c0", lw=0.8, ls="--")
+            ax.text(float(at[0]), float(at[1]), "FOLD", fontsize=FONT, color="#3050c0",
+                    ha="center", va="bottom")  # fmt: skip
         elif m["type"] == "label":
             ax.text(
                 float(at[0]),

@@ -442,6 +442,10 @@ def finish(doc: dict[str, Any], params: EffectiveParams) -> tuple[list[Piece], l
             elif m["type"] == "tick":
                 end = at + np.asarray(m["dir"]) * float(m["length"])
                 piece.pen_lines.append(np.array([at, end]))
+            elif m["type"] == "fold":  # one piece folded here instead of a seam (ADR-055)
+                line = np.asarray(m["points"], dtype=np.float64)
+                piece.pen_lines.append(line)
+                piece.pen_text.append(("FOLD", line.mean(axis=0), label * 0.6))
         for rect in vents.get(p["name"], []):
             piece.openings.append(rect)
             # where the hood's edge goes: the opening grown by the seam allowance

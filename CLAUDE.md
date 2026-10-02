@@ -237,6 +237,9 @@ make backup     push the data directory to R2 with rclone
 - A parameter change after a test is an edit to `config/defaults.yaml` or to the model's
   `CoverDefinition`, never a change in code. If a test shows that a value needs to exist that is
   not yet a parameter, make it one first.
+- Learn from every remark (ADR-055): an owner's correction on one model becomes a stored AI
+  lesson, an audit check, a test and a DECISIONS line in the same commit, and is then swept
+  over all models. Fixing the one model is never the end.
 - Prefer the simplest approach that meets the acceptance criteria; write the better alternative
   into docs/DECISIONS.md instead of building it early.
 - Licences: this is an internal tool, so any OSI licence is acceptable, GPL included. Keep
