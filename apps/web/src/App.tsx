@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import Guide from "./Guide";
 import {
   api,
   Approval,
@@ -21,7 +22,14 @@ import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { Gallery } from "./Gallery";
 import { QuickSearch } from "./QuickSearch";
 import { Admin } from "./Admin";
-import { Account, Login, SessionContext, useSession, UserMenu, Welcome } from "./Session";
+import {
+  Account,
+  Login,
+  SessionContext,
+  useSession,
+  UserMenu,
+  Welcome,
+} from "./Session";
 import { Drawing, Learning } from "./Learning";
 import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
@@ -58,50 +66,68 @@ export function App() {
     return () => window.removeEventListener("login-needed", out);
   }, []);
   if (welcome) return <Welcome token={welcome[1]} onDone={setUser} />;
-  if (user === undefined) return <div className="login-page muted">Loading…</div>;
+  if (hash.startsWith("#/guide") && !user)
+    return (
+      <div className="guide-page">
+        <Guide loggedIn={false} />
+      </div>
+    );
+  if (user === undefined)
+    return <div className="login-page muted">Loading…</div>;
   if (user === null) return <Login onDone={setUser} />;
   return (
     <SessionContext.Provider value={{ user, loginRequired }}>
-    <div className="app">
-      <header>
-        <a href="#/" className="brand" title="Cover Studio">
-          <span className="logos">
-            <img src="/brand/s2dio-mark.svg" alt="S2DIO" />
-            <span className="wordmark">
-              s2dio
-              <br />
-              industries
+      <div className="app">
+        <header>
+          <a href="#/" className="brand" title="Cover Studio">
+            <span className="logos">
+              <img src="/brand/s2dio-mark.svg" alt="S2DIO" />
+              <span className="wordmark">
+                s2dio
+                <br />
+                industries
+              </span>
+              <span className="times">×</span>
+              <img src="/brand/suns.svg" alt="SUNS" />
             </span>
-            <span className="times">×</span>
-            <img src="/brand/suns.svg" alt="SUNS" />
-          </span>
-          <span className="title">Cover Studio</span>
-        </a>
-        <a href="#/" className="nav">
-          Models
-        </a>
-        <a href="#/catalogue" className="nav">
-          Catalogue
-        </a>
-        <a href="#/learning" className="nav">
-          Learning
-        </a>
-        {m && <span className="crumb">/ {m[1]}</span>}
-        <QuickSearch />
-        {loginRequired && <UserMenu user={user} onLogout={() => setUser(null)} />}
-      </header>
-      <main>{m ? <ModelPage id={m[1]} /> : hash.startsWith("#/catalogue") ? (
-          <Gallery />
-        ) : hash.startsWith("#/learning") ? (
-          <Learning />
-        ) : hash.startsWith("#/admin") && user.role === "admin" ? (
-          <Admin />
-        ) : hash.startsWith("#/account") ? (
-          <Account user={user} />
-        ) : (
-          <ModelList />
-        )}</main>
-    </div>
+            <span className="title">Cover Studio</span>
+          </a>
+          <a href="#/" className="nav">
+            Models
+          </a>
+          <a href="#/catalogue" className="nav">
+            Catalogue
+          </a>
+          <a href="#/learning" className="nav">
+            Learning
+          </a>
+          <a href="#/guide" className="nav">
+            Guide
+          </a>
+          {m && <span className="crumb">/ {m[1]}</span>}
+          <QuickSearch />
+          {loginRequired && (
+            <UserMenu user={user} onLogout={() => setUser(null)} />
+          )}
+        </header>
+        <main>
+          {m ? (
+            <ModelPage id={m[1]} />
+          ) : hash.startsWith("#/catalogue") ? (
+            <Gallery />
+          ) : hash.startsWith("#/learning") ? (
+            <Learning />
+          ) : hash.startsWith("#/admin") && user.role === "admin" ? (
+            <Admin />
+          ) : hash.startsWith("#/guide") ? (
+            <Guide loggedIn />
+          ) : hash.startsWith("#/account") ? (
+            <Account user={user} />
+          ) : (
+            <ModelList />
+          )}
+        </main>
+      </div>
     </SessionContext.Provider>
   );
 }
@@ -115,19 +141,30 @@ function ModelList() {
   const [grade, setGrade] = useState("");
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const load = useCallback(() => {
-    api.models().then(setModels).catch((e) => setError(String(e)));
+    api
+      .models()
+      .then(setModels)
+      .catch((e) => setError(String(e)));
   }, []);
   useEffect(load, [load]);
   const q = query.toLowerCase();
   const shown = (models ?? []).filter(
     (m) =>
-      (!q || m.id.includes(q) || m.tags.some((t) => t.toLowerCase().includes(q)) || m.notes.toLowerCase().includes(q)) &&
+      (!q ||
+        m.id.includes(q) ||
+        m.tags.some((t) => t.toLowerCase().includes(q)) ||
+        m.notes.toLowerCase().includes(q)) &&
       (!category ||
-        (category === "-" ? !m.category : (m.category ?? "") === category || (m.category ?? "").startsWith(`${category} ›`))) &&
+        (category === "-"
+          ? !m.category
+          : (m.category ?? "") === category ||
+            (m.category ?? "").startsWith(`${category} ›`))) &&
       (!status || m.status === status) &&
       (!grade || m.grade === grade),
   );
-  const cats = [...new Set((models ?? []).map((m) => m.category).filter(Boolean))].sort() as string[];
+  const cats = [
+    ...new Set((models ?? []).map((m) => m.category).filter(Boolean)),
+  ].sort() as string[];
   const groups = [...new Set(cats.map((c) => c.split(" › ")[0]))];
   const selected = shown.filter((m) => picked[m.id]);
   return (
@@ -137,15 +174,20 @@ function ModelList() {
         Models{" "}
         {models && (
           <span className="muted">
-            ({models.length}: {models.filter((m) => m.grade === "ready").length} ready,{" "}
-            {models.filter((m) => m.grade === "check").length} to check,{" "}
+            ({models.length}: {models.filter((m) => m.grade === "ready").length}{" "}
+            ready, {models.filter((m) => m.grade === "check").length} to check,{" "}
             {models.filter((m) => m.grade === "failed").length} failed)
           </span>
         )}
       </h2>
       {error && <p className="error">{error}</p>}
       <div className="row">
-        <input className="search" placeholder="Search name, tag or note…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input
+          className="search"
+          placeholder="Search name, tag or note…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
         <select value={category} onChange={(e) => setCategory(e.target.value)}>
           <option value="">all categories</option>
           {groups.map((g) => (
@@ -155,7 +197,8 @@ function ModelList() {
                 .filter((c) => c.startsWith(`${g} ›`))
                 .map((c) => (
                   <option key={c} value={c}>
-                    {c.split(" › ")[1]} ({(models ?? []).filter((m) => m.category === c).length})
+                    {c.split(" › ")[1]} (
+                    {(models ?? []).filter((m) => m.category === c).length})
                   </option>
                 ))}
             </optgroup>
@@ -188,7 +231,13 @@ function ModelList() {
                 <input
                   type="checkbox"
                   checked={shown.length > 0 && shown.every((m) => picked[m.id])}
-                  onChange={(e) => setPicked(Object.fromEntries(shown.map((m) => [m.id, e.target.checked])))}
+                  onChange={(e) =>
+                    setPicked(
+                      Object.fromEntries(
+                        shown.map((m) => [m.id, e.target.checked]),
+                      ),
+                    )
+                  }
                 />
               </th>
               <th>Model</th>
@@ -204,9 +253,18 @@ function ModelList() {
           </thead>
           <tbody>
             {shown.map((m) => (
-              <tr key={m.id} onClick={() => (window.location.hash = `#/model/${m.id}`)}>
+              <tr
+                key={m.id}
+                onClick={() => (window.location.hash = `#/model/${m.id}`)}
+              >
                 <td onClick={(e) => e.stopPropagation()}>
-                  <input type="checkbox" checked={!!picked[m.id]} onChange={(e) => setPicked({ ...picked, [m.id]: e.target.checked })} />
+                  <input
+                    type="checkbox"
+                    checked={!!picked[m.id]}
+                    onChange={(e) =>
+                      setPicked({ ...picked, [m.id]: e.target.checked })
+                    }
+                  />
                 </td>
                 <td>
                   <a href={`#/model/${m.id}`}>{m.id}</a>
@@ -219,16 +277,26 @@ function ModelList() {
                 <td title={m.reasons.join("\n")}>
                   <span className={`badge grade-${m.grade}`}>{m.grade}</span>
                 </td>
-                <td className="nowrap">{m.category ? m.category.split(" › ")[1] : ""}</td>
+                <td className="nowrap">
+                  {m.category ? m.category.split(" › ")[1] : ""}
+                </td>
                 <td>
                   <span className={`badge status-${m.status}`}>{m.status}</span>
                 </td>
-                <td>{m.size_mm ? m.size_mm.map((v) => (v / 10).toFixed(0)).join(" × ") : "–"}</td>
+                <td>
+                  {m.size_mm
+                    ? m.size_mm.map((v) => (v / 10).toFixed(0)).join(" × ")
+                    : "–"}
+                </td>
                 <td>
                   <Steps done={m.steps_done} />
                 </td>
                 <td>{m.panels ?? "–"}</td>
-                <td>{m.max_stretch_pct != null ? `${m.max_stretch_pct.toFixed(1)} %` : "–"}</td>
+                <td>
+                  {m.max_stretch_pct != null
+                    ? `${m.max_stretch_pct.toFixed(1)} %`
+                    : "–"}
+                </td>
                 <td>{m.warnings.length || ""}</td>
               </tr>
             ))}
@@ -243,7 +311,11 @@ function Steps({ done }: { done: Step[] }) {
   return (
     <span className="steps">
       {STEPS.map((s) => (
-        <span key={s} className={done.includes(s) ? "step done" : "step"} title={STEP_LABEL[s]} />
+        <span
+          key={s}
+          className={done.includes(s) ? "step done" : "step"}
+          title={STEP_LABEL[s]}
+        />
       ))}
     </span>
   );
@@ -271,12 +343,16 @@ function Upload() {
     <section className="card upload">
       <h2>New model</h2>
       <p className="muted">
-        STEP, IGES, STL, OBJ, PLY or GLB: the complete product, or only the cover surface. After the import
-        the program shows which one it thinks it is; you confirm, and the rest runs by itself: cover, seams,
-        patterns and the cut pieces.
+        STEP, IGES, STL, OBJ, PLY or GLB: the complete product, or only the
+        cover surface. After the import the program shows which one it thinks it
+        is; you confirm, and the rest runs by itself: cover, seams, patterns and
+        the cut pieces.
       </p>
       <div className="row">
-        <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <input
+          type="file"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
         <label>
           Units{" "}
           <select value={units} onChange={(e) => setUnits(e.target.value)}>
@@ -308,7 +384,18 @@ function Upload() {
   );
 }
 
-type Tab = "3d" | "drawing" | "seams" | "ai" | "patterns" | "sizes" | "cut" | "settings" | "revisions" | "files" | "log";
+type Tab =
+  | "3d"
+  | "drawing"
+  | "seams"
+  | "ai"
+  | "patterns"
+  | "sizes"
+  | "cut"
+  | "settings"
+  | "revisions"
+  | "files"
+  | "log";
 const TABS: [Tab, string][] = [
   ["3d", "3D"],
   ["drawing", "Your drawing"],
@@ -324,7 +411,13 @@ const TABS: [Tab, string][] = [
 ];
 
 /** The approval of the definitive drawing (ADR-047): who approved which revision, or why not. */
-function ApprovalCard({ model, onChange }: { model: ModelDetail; onChange: () => void }) {
+function ApprovalCard({
+  model,
+  onChange,
+}: {
+  model: ModelDetail;
+  onChange: () => void;
+}) {
   const { user } = useSession();
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState("");
@@ -342,7 +435,9 @@ function ApprovalCard({ model, onChange }: { model: ModelDetail; onChange: () =>
   };
   const date = a ? new Date(a.time * 1000).toLocaleString() : "";
   return (
-    <section className={`card approval ${a ? (a.valid ? "ok" : "stale") : "none"}`}>
+    <section
+      className={`card approval ${a ? (a.valid ? "ok" : "stale") : "none"}`}
+    >
       <div className="approval-state">
         {!a && <strong>Definitive drawing: not approved yet</strong>}
         {a && a.valid && (
@@ -353,7 +448,8 @@ function ApprovalCard({ model, onChange }: { model: ModelDetail; onChange: () =>
         )}
         {a && !a.valid && (
           <strong>
-            Changed after the approval by {a.name} ({date}): approve again before cutting
+            Changed after the approval by {a.name} ({date}): approve again
+            before cutting
           </strong>
         )}
         {a?.note && <span className="muted"> · {a.note}</span>}
@@ -361,31 +457,58 @@ function ApprovalCard({ model, onChange }: { model: ModelDetail; onChange: () =>
       <div className="row">
         {a?.valid && (
           <>
-            <a href={`/api/models/${model.id}/approved/sizes.pdf`} target="_blank" rel="noreferrer">
+            <a
+              href={`/api/models/${model.id}/approved/sizes.pdf`}
+              target="_blank"
+              rel="noreferrer"
+            >
               Approved size drawing
             </a>
-            <a href={`/api/models/${model.id}/approved/cutting-list.pdf`} target="_blank" rel="noreferrer">
+            <a
+              href={`/api/models/${model.id}/approved/cutting-list.pdf`}
+              target="_blank"
+              rel="noreferrer"
+            >
               Approved cutting list
             </a>
           </>
         )}
         {user?.can_approve && (!a || !a.valid) && (
           <>
-            <input placeholder="note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
-            <button className="primary" onClick={() => act(() => approvals.approve(model.id, note), "Approved.")}>
+            <input
+              placeholder="note (optional)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+            <button
+              className="primary"
+              onClick={() =>
+                act(() => approvals.approve(model.id, note), "Approved.")
+              }
+            >
               Approve the definitive drawing
             </button>
           </>
         )}
         {user?.can_approve && a && (
-          <button onClick={() => act(() => approvals.withdraw(model.id), "Approval withdrawn.")}>Withdraw</button>
+          <button
+            onClick={() =>
+              act(() => approvals.withdraw(model.id), "Approval withdrawn.")
+            }
+          >
+            Withdraw
+          </button>
         )}
         {!user?.can_approve && user?.role !== "viewer" && (!a || !a.valid) && (
           <button
             onClick={() =>
               act(async () => {
                 const r = await approvals.ask(model.id);
-                setMsg(r.mailed.length ? `Asked ${r.mailed.join(", ")} by mail.` : "No approver could be mailed.");
+                setMsg(
+                  r.mailed.length
+                    ? `Asked ${r.mailed.join(", ")} by mail.`
+                    : "No approver could be mailed.",
+                );
               }, "")
             }
           >
@@ -404,7 +527,13 @@ const KIND_LABEL = {
 } as const;
 
 /** After an upload: what the program thinks the file is; the owner confirms (ADR-039). */
-function KindCheck({ kind, onConfirm }: { kind: Kind; onConfirm: (k: "product" | "cover") => void }) {
+function KindCheck({
+  kind,
+  onConfirm,
+}: {
+  kind: Kind;
+  onConfirm: (k: "product" | "cover") => void;
+}) {
   const guess = kind.guess ?? "product";
   const other = guess === "product" ? "cover" : "product";
   return (
@@ -412,7 +541,8 @@ function KindCheck({ kind, onConfirm }: { kind: Kind; onConfirm: (k: "product" |
       <h3>Check: what is this file?</h3>
       <p>
         The program thinks this is <strong>{KIND_LABEL[guess]}</strong>
-        {kind.sure ? "." : ", but it is not sure."} Look at the 3D view below and confirm.
+        {kind.sure ? "." : ", but it is not sure."} Look at the 3D view below
+        and confirm.
       </p>
       {kind.reasons && (
         <ul className="muted">
@@ -422,14 +552,16 @@ function KindCheck({ kind, onConfirm }: { kind: Kind; onConfirm: (k: "product" |
         </ul>
       )}
       <p className="muted">
-        Complete product: the program makes the cover round it. Cover surface only: the surface is the
-        cover, and only its pieces are drawn.
+        Complete product: the program makes the cover round it. Cover surface
+        only: the surface is the cover, and only its pieces are drawn.
       </p>
       <div className="row">
         <button className="primary" onClick={() => onConfirm(guess)}>
           Yes, {KIND_LABEL[guess]}
         </button>
-        <button onClick={() => onConfirm(other)}>No, it is {KIND_LABEL[other]}</button>
+        <button onClick={() => onConfirm(other)}>
+          No, it is {KIND_LABEL[other]}
+        </button>
       </div>
     </section>
   );
@@ -488,15 +620,22 @@ function ModelPage({ id }: { id: string }) {
           <h2>{model.id}</h2>
           <p className="muted">
             {model.source}
-            {model.size_mm && ` · ${model.size_mm.map((v) => (v / 10).toFixed(1)).join(" × ")} cm`}
+            {model.size_mm &&
+              ` · ${model.size_mm.map((v) => (v / 10).toFixed(1)).join(" × ")} cm`}
             {model.cut && ` · hem ${cm(model.cut.hem_length_mm)}`}
-            {model.cut?.skirt_height_mm && ` · skirt ${cm(model.cut.skirt_height_mm[0])}`}
+            {model.cut?.skirt_height_mm &&
+              ` · skirt ${cm(model.cut.skirt_height_mm[0])}`}
             {model.pattern && ` · ${model.pattern.summary.panels} panels`}
-            {model.finished?.sheet && ` · about ${(model.finished.sheet.roll_length_mm / 1000).toFixed(2)} m of roll`}
+            {model.finished?.sheet &&
+              ` · about ${(model.finished.sheet.roll_length_mm / 1000).toFixed(2)} m of roll`}
           </p>
         </div>
         <div className="actions">
-          <button className="primary" disabled={!!running || !has("model.json")} onClick={() => run(null, {})}>
+          <button
+            className="primary"
+            disabled={!!running || !has("model.json")}
+            onClick={() => run(null, {})}
+          >
             Run again
           </button>
         </div>
@@ -516,34 +655,45 @@ function ModelPage({ id }: { id: string }) {
         />
       )}
       <ApprovalCard model={model} onChange={load} />
-      <ModelInfo key={`${model.id}-${model.family}-${model.status}`} model={model} onSaved={load} />
+      <ModelInfo
+        key={`${model.id}-${model.family}-${model.status}`}
+        model={model}
+        onSaved={load}
+      />
       {job && <JobBar job={job} />}
       {error && <p className="error">{error}</p>}
-      {model.diff && (model.diff.panels.length > 0 || model.diff.settings.length > 0) && (
-        <section className="card diff">
-          <strong>Since the run before:</strong>{" "}
-          {model.diff.settings.map((s) => (
-            <span key={s.key} className="chip">
-              {s.key}: {String(s.before)} → {String(s.after)}
-            </span>
-          ))}
-          {model.diff.panels.length === 0
-            ? " no panel changed by more than 1 mm."
-            : model.diff.panels.map((p) => (
-                <span key={p.name} className="chip">
-                  {p.name}:{" "}
-                  {p.change === "size" && p.before_mm && p.after_mm
-                    ? `${p.before_mm.map((v) => v.toFixed(0)).join("×")} → ${p.after_mm.map((v) => v.toFixed(0)).join("×")} mm`
-                    : p.change}
-                </span>
-              ))}
-        </section>
-      )}
+      {model.diff &&
+        (model.diff.panels.length > 0 || model.diff.settings.length > 0) && (
+          <section className="card diff">
+            <strong>Since the run before:</strong>{" "}
+            {model.diff.settings.map((s) => (
+              <span key={s.key} className="chip">
+                {s.key}: {String(s.before)} → {String(s.after)}
+              </span>
+            ))}
+            {model.diff.panels.length === 0
+              ? " no panel changed by more than 1 mm."
+              : model.diff.panels.map((p) => (
+                  <span key={p.name} className="chip">
+                    {p.name}:{" "}
+                    {p.change === "size" && p.before_mm && p.after_mm
+                      ? `${p.before_mm.map((v) => v.toFixed(0)).join("×")} → ${p.after_mm.map((v) => v.toFixed(0)).join("×")} mm`
+                      : p.change}
+                  </span>
+                ))}
+          </section>
+        )}
       <nav className="tabs">
         {TABS.map(([t, label]) => (
-          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
+          <button
+            key={t}
+            className={tab === t ? "active" : ""}
+            onClick={() => setTab(t)}
+          >
             {label}
-            {t === "log" && model.warnings.length > 0 && <span className="count">{model.warnings.length}</span>}
+            {t === "log" && model.warnings.length > 0 && (
+              <span className="count">{model.warnings.length}</span>
+            )}
           </button>
         ))}
       </nav>
@@ -553,17 +703,27 @@ function ModelPage({ id }: { id: string }) {
             id={id}
             files={model.files}
             stamp={stamp}
-            onRain={user?.role === "viewer" ? undefined : () => run(["rain"], {})}
+            onRain={
+              user?.role === "viewer" ? undefined : () => run(["rain"], {})
+            }
             rainBusy={!!running && job?.steps.some((s) => s.name === "rain")}
           />
         )}
         {tab === "seams" && <SeamEditor id={id} stamp={stamp} onJob={setJob} />}
-        {tab === "drawing" && <Drawing id={id} files={model.files} stamp={stamp} />}
-        {tab === "ai" && <AiAdvice id={id} files={model.files} stamp={stamp} onJob={setJob} />}
+        {tab === "drawing" && (
+          <Drawing id={id} files={model.files} stamp={stamp} />
+        )}
+        {tab === "ai" && (
+          <AiAdvice id={id} files={model.files} stamp={stamp} onJob={setJob} />
+        )}
         {tab === "patterns" && <Patterns model={model} stamp={stamp} />}
-        {tab === "sizes" && <Pdf id={id} name="sizes.pdf" has={has("sizes.pdf")} stamp={stamp} />}
+        {tab === "sizes" && (
+          <Pdf id={id} name="sizes.pdf" has={has("sizes.pdf")} stamp={stamp} />
+        )}
         {tab === "cut" && <CutPieces model={model} stamp={stamp} />}
-        {tab === "settings" && <Settings id={id} onRun={(steps, trial) => run(steps, trial)} />}
+        {tab === "settings" && (
+          <Settings id={id} onRun={(steps, trial) => run(steps, trial)} />
+        )}
         {tab === "revisions" && <Revisions model={model} />}
         {tab === "files" && <Files model={model} />}
         {tab === "log" && <Log model={model} job={job} />}
@@ -581,7 +741,8 @@ function JobBar({ job }: { job: Job }) {
         {job.status === "running" && "Running…"}
         {job.status === "done" && "Last run finished."}
         {job.status === "failed" && `Last run failed: ${job.error ?? ""}`}
-        {trial > 0 && ` (trial with ${trial} changed setting${trial > 1 ? "s" : ""}, not saved)`}
+        {trial > 0 &&
+          ` (trial with ${trial} changed setting${trial > 1 ? "s" : ""}, not saved)`}
       </span>
       <span className="steps">
         {job.steps.map((s) => (
@@ -602,10 +763,18 @@ function Patterns({ model, stamp }: { model: ModelDetail; stamp: number }) {
       <div className="row">
         {[
           ["pattern.svg", "Flat pieces"],
-          ["pattern-stretch.svg", "Stretch (red stretched, blue squeezed; full colour 2 %)"],
+          [
+            "pattern-stretch.svg",
+            "Stretch (red stretched, blue squeezed; full colour 2 %)",
+          ],
         ].map(([f, l]) => (
           <label key={f}>
-            <input type="radio" checked={view === f} onChange={() => setView(f)} /> {l}
+            <input
+              type="radio"
+              checked={view === f}
+              onChange={() => setView(f)}
+            />{" "}
+            {l}
           </label>
         ))}
       </div>
@@ -630,8 +799,12 @@ function Patterns({ model, stamp }: { model: ModelDetail; stamp: number }) {
               <td>
                 {cm(p.flat_width_mm)} × {cm(p.flat_length_mm)}
               </td>
-              <td className={p.stretch.quantile_pct > 2 ? "bad" : "ok"}>{p.stretch.quantile_pct.toFixed(1)} %</td>
-              <td className={p.fits_roll ? "ok" : "bad"}>{p.fits_roll ? "fits" : "too wide"}</td>
+              <td className={p.stretch.quantile_pct > 2 ? "bad" : "ok"}>
+                {p.stretch.quantile_pct.toFixed(1)} %
+              </td>
+              <td className={p.fits_roll ? "ok" : "bad"}>
+                {p.fits_roll ? "fits" : "too wide"}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -649,12 +822,19 @@ function CutPieces({ model, stamp }: { model: ModelDetail; stamp: number }) {
           Download cut.dxf for the cutting table
         </a>{" "}
         ·{" "}
-        <a href={fileUrl(model.id, "cutting-list.pdf")} target="_blank" rel="noreferrer">
+        <a
+          href={fileUrl(model.id, "cutting-list.pdf")}
+          target="_blank"
+          rel="noreferrer"
+        >
           cutting list (PDF)
         </a>
       </p>
       <div className="svgbox">
-        <img src={`${fileUrl(model.id, "cut.svg")}?v=${stamp}`} alt="cut pieces" />
+        <img
+          src={`${fileUrl(model.id, "cut.svg")}?v=${stamp}`}
+          alt="cut pieces"
+        />
       </div>
       <table className="list">
         <thead>
@@ -686,9 +866,25 @@ function CutPieces({ model, stamp }: { model: ModelDetail; stamp: number }) {
   );
 }
 
-function Pdf({ id, name, has, stamp }: { id: string; name: string; has: boolean; stamp: number }) {
+function Pdf({
+  id,
+  name,
+  has,
+  stamp,
+}: {
+  id: string;
+  name: string;
+  has: boolean;
+  stamp: number;
+}) {
   if (!has) return <p className="muted">Not made yet.</p>;
-  return <iframe className="pdf" title={name} src={`${fileUrl(id, name)}?v=${stamp}`} />;
+  return (
+    <iframe
+      className="pdf"
+      title={name}
+      src={`${fileUrl(id, name)}?v=${stamp}`}
+    />
+  );
 }
 
 const FILE_HELP: Record<string, string> = {

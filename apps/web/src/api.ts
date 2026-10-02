@@ -1,6 +1,7 @@
 // Types and calls for the cover API (apps/api/coverapi/main.py).
 
-export type Step = "import" | "hull" | "cut" | "flatten" | "export" | "improve" | "ai" | "rain";
+export type Step =
+  "import" | "hull" | "cut" | "flatten" | "export" | "improve" | "ai" | "rain";
 export const STEPS: Step[] = ["import", "hull", "cut", "flatten", "export"];
 export const STEP_LABEL: Record<Step, string> = {
   import: "Import",
@@ -33,7 +34,13 @@ export interface Rain {
   seams_along: { seam: string; run_mm: number }[];
   dry: boolean;
   drops: { path: number[][]; ends: string }[];
-  ai?: { verdict?: string; summary?: string; risks?: string[]; suggestions?: string[]; error?: string };
+  ai?: {
+    verdict?: string;
+    summary?: string;
+    risks?: string[];
+    suggestions?: string[];
+    error?: string;
+  };
 }
 
 export type Status = "draft" | "checked" | "production";
@@ -118,12 +125,20 @@ export interface Piece {
 }
 
 export interface Diff {
-  panels: { name: string; change: string; before_mm?: number[]; after_mm?: number[] }[];
+  panels: {
+    name: string;
+    change: string;
+    before_mm?: number[];
+    after_mm?: number[];
+  }[];
   settings: { key: string; before: unknown; after: unknown }[];
 }
 
 export interface ModelDetail extends ModelBrief {
-  hull?: { area_m2: number; hem: { length_mm: number; height_mm: number } } | null;
+  hull?: {
+    area_m2: number;
+    hem: { length_mm: number; height_mm: number };
+  } | null;
   cut?: {
     panels: { name: string; region: string; area_m2: number }[];
     seams: { id: string; kind: string; length_mm: number }[];
@@ -131,7 +146,11 @@ export interface ModelDetail extends ModelBrief {
     skirt_height_mm?: number[];
   };
   pattern?: {
-    summary: { panels: number; max_stretch_pct: number; fabric_area_m2: number };
+    summary: {
+      panels: number;
+      max_stretch_pct: number;
+      fabric_area_m2: number;
+    };
     panels: PatternPanel[];
     parameter_hash: string;
   };
@@ -166,7 +185,11 @@ async function json<T>(r: Response): Promise<T> {
     let msg = `${r.status} ${r.statusText}`;
     try {
       const body = await r.json();
-      if (body.detail) msg = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      if (body.detail)
+        msg =
+          typeof body.detail === "string"
+            ? body.detail
+            : JSON.stringify(body.detail);
     } catch {
       /* not JSON */
     }
@@ -177,10 +200,12 @@ async function json<T>(r: Response): Promise<T> {
 
 export const api = {
   models: () => fetch("/api/models").then((r) => json<ModelBrief[]>(r)),
-  model: (id: string) => fetch(`/api/models/${id}`).then((r) => json<ModelDetail>(r)),
+  model: (id: string) =>
+    fetch(`/api/models/${id}`).then((r) => json<ModelDetail>(r)),
   job: (id: string) => fetch(`/api/jobs/${id}`).then((r) => json<Job>(r)),
   specs: () => fetch("/api/parameters").then((r) => json<ParamSpec[]>(r)),
-  params: (id: string) => fetch(`/api/models/${id}/parameters`).then((r) => json<ModelParams>(r)),
+  params: (id: string) =>
+    fetch(`/api/models/${id}/parameters`).then((r) => json<ModelParams>(r)),
   saveParams: (id: string, values: Record<string, Scalar>) =>
     fetch(`/api/models/${id}/parameters`, {
       method: "PUT",
@@ -196,14 +221,28 @@ export const api = {
   families: () => fetch("/api/families").then((r) => json<string[]>(r)),
   categories: () =>
     fetch("/api/categories").then((r) =>
-      json<{ group: string; category: string; name: string; on_suns_site: boolean }[]>(r),
+      json<
+        {
+          group: string;
+          category: string;
+          name: string;
+          on_suns_site: boolean;
+        }[]
+      >(r),
     ),
-  setInfo: (id: string, info: Partial<Pick<ModelBrief, "family" | "category" | "status" | "tags" | "notes">>) =>
+  setInfo: (
+    id: string,
+    info: Partial<
+      Pick<ModelBrief, "family" | "category" | "status" | "tags" | "notes">
+    >,
+  ) =>
     fetch(`/api/models/${id}/info`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(info),
-    }).then((r) => json<Pick<ModelBrief, "family" | "status" | "tags" | "notes">>(r)),
+    }).then((r) =>
+      json<Pick<ModelBrief, "family" | "status" | "tags" | "notes">>(r),
+    ),
   compare: (id: string, a: number, b: number) =>
     fetch(`/api/models/${id}/compare?a=${a}&b=${b}`).then((r) => json<Diff>(r)),
   batch: (model_ids: string[], steps: Step[] | null) =>
@@ -229,11 +268,13 @@ export const api = {
   },
 };
 
-export const fileUrl = (id: string, name: string) => `/api/models/${id}/files/${name}`;
+export const fileUrl = (id: string, name: string) =>
+  `/api/models/${id}/files/${name}`;
 
 export const cm = (mm: number) => `${(mm / 10).toFixed(1)} cm`;
 
-export const revisionUrl = (id: string, n: number, name: string) => `/api/models/${id}/revisions/${n}/${name}`;
+export const revisionUrl = (id: string, n: number, name: string) =>
+  `/api/models/${id}/revisions/${n}/${name}`;
 
 export interface AiReview {
   time: number;
@@ -266,6 +307,7 @@ export interface User {
   active: boolean;
   last_login: number | null;
   has_password: boolean;
+  invited_until?: number | null;
 }
 
 export interface Approval {
@@ -294,61 +336,135 @@ const send = (method: string, url: string, body?: unknown) =>
   });
 
 export const auth = {
-  me: () => fetch("/api/auth/me").then((r) => json<{ user: User; auth: boolean }>(r)),
+  me: () =>
+    fetch("/api/auth/me").then((r) => json<{ user: User; auth: boolean }>(r)),
   login: (username: string, password: string) =>
     send("POST", "/api/auth/login", { username, password }).then((r) =>
-      json<{ user?: User; two_factor?: boolean; challenge?: string; sent_to?: string }>(r),
+      json<{
+        user?: User;
+        two_factor?: boolean;
+        challenge?: string;
+        sent_to?: string;
+      }>(r),
     ),
   verify: (challenge: string, code: string, remember: boolean) =>
-    send("POST", "/api/auth/verify", { challenge, code, remember }).then((r) => json<{ user: User }>(r)),
-  logout: () => send("POST", "/api/auth/logout").then((r) => json<{ ok: boolean }>(r)),
+    send("POST", "/api/auth/verify", { challenge, code, remember }).then((r) =>
+      json<{ user: User }>(r),
+    ),
+  logout: () =>
+    send("POST", "/api/auth/logout").then((r) => json<{ ok: boolean }>(r)),
   invite: (token: string) =>
-    fetch(`/api/auth/invite/${token}`).then((r) => json<{ username: string; name: string }>(r)),
+    fetch(`/api/auth/invite/${token}`).then((r) =>
+      json<{ username: string; name: string }>(r),
+    ),
   changePassword: (old: string, nw: string) =>
-    send("POST", "/api/auth/password", { old, new: nw }).then((r) => json<{ ok: boolean }>(r)),
+    send("POST", "/api/auth/password", { old, new: nw }).then((r) =>
+      json<{ ok: boolean }>(r),
+    ),
   setPassword: (token: string, password: string) =>
-    send("POST", `/api/auth/invite/${token}`, { password }).then((r) => json<{ user: User }>(r)),
+    send("POST", `/api/auth/invite/${token}`, { password }).then((r) =>
+      json<{ user: User }>(r),
+    ),
 };
 
 export interface Invite {
-  link: string;
+  link: string | null;
   mailed: boolean;
   mail_problem: string | null;
+  days?: number;
 }
 
 export const admin = {
-  users: () => fetch("/api/admin/users").then((r) => json<{ users: User[]; roles: string[] }>(r)),
-  addUser: (u: Partial<User> & { username: string }) =>
-    send("POST", "/api/admin/users", u).then((r) => json<{ user: User } & Invite>(r)),
+  users: () =>
+    fetch("/api/admin/users").then((r) =>
+      json<{ users: User[]; roles: string[] }>(r),
+    ),
+  addUser: (
+    u: Partial<User> & {
+      username: string;
+      send_invite?: boolean;
+      note?: string;
+    },
+  ) =>
+    send("POST", "/api/admin/users", u).then((r) =>
+      json<{ user: User } & Invite>(r),
+    ),
   changeUser: (id: number, changes: Partial<User>) =>
-    send("PUT", `/api/admin/users/${id}`, changes).then((r) => json<{ user: User }>(r)),
-  invite: (id: number) => send("POST", `/api/admin/users/${id}/invite`).then((r) => json<Invite>(r)),
+    send("PUT", `/api/admin/users/${id}`, changes).then((r) =>
+      json<{ user: User }>(r),
+    ),
+  invite: (id: number, note = "") =>
+    send("POST", `/api/admin/users/${id}/invite`, { note }).then((r) =>
+      json<Invite>(r),
+    ),
+  inviteAll: (note = "") =>
+    send("POST", "/api/admin/users/invite-all", { note }).then((r) =>
+      json<{
+        invited: {
+          name: string;
+          email: string;
+          mailed: boolean;
+          mail_problem: string | null;
+        }[];
+      }>(r),
+    ),
   sessions: () =>
     fetch("/api/admin/sessions").then((r) =>
-      json<{ sessions: { username: string; created: number; expires: number; address: string }[] }>(r),
+      json<{
+        sessions: {
+          username: string;
+          created: number;
+          expires: number;
+          address: string;
+        }[];
+      }>(r),
     ),
   audit: () =>
     fetch("/api/admin/audit").then((r) =>
-      json<{ audit: { time: number; username: string | null; action: string; detail: string | null }[] }>(r),
+      json<{
+        audit: {
+          time: number;
+          username: string | null;
+          action: string;
+          detail: string | null;
+        }[];
+      }>(r),
     ),
   mail: () =>
-    fetch("/api/admin/mail").then((r) => json<{ mail: MailSettings; public_url: string; two_factor: boolean }>(r)),
+    fetch("/api/admin/mail").then((r) =>
+      json<{ mail: MailSettings; public_url: string; two_factor: boolean }>(r),
+    ),
   twoFactor: (on: boolean) =>
-    send("PUT", "/api/admin/two-factor", { on }).then((r) => json<{ two_factor: boolean }>(r)),
+    send("PUT", "/api/admin/two-factor", { on }).then((r) =>
+      json<{ two_factor: boolean }>(r),
+    ),
   saveMail: (m: MailSettings & { password?: string }) =>
-    send("PUT", "/api/admin/mail", m).then((r) => json<{ mail: MailSettings }>(r)),
-  testMail: (to: string) => send("POST", "/api/admin/mail/test", { to }).then((r) => json<{ ok: boolean }>(r)),
+    send("PUT", "/api/admin/mail", m).then((r) =>
+      json<{ mail: MailSettings }>(r),
+    ),
+  testMail: (to: string) =>
+    send("POST", "/api/admin/mail/test", { to }).then((r) =>
+      json<{ ok: boolean }>(r),
+    ),
   publicUrl: (url: string) =>
-    send("PUT", "/api/admin/public-url", { url }).then((r) => json<{ public_url: string }>(r)),
-  system: () => fetch("/api/admin/system").then((r) => json<Record<string, unknown>>(r)),
+    send("PUT", "/api/admin/public-url", { url }).then((r) =>
+      json<{ public_url: string }>(r),
+    ),
+  system: () =>
+    fetch("/api/admin/system").then((r) => json<Record<string, unknown>>(r)),
   alertEmail: (to: string) =>
-    send("PUT", "/api/admin/alert-email", { to }).then((r) => json<{ alert_email: string }>(r)),
+    send("PUT", "/api/admin/alert-email", { to }).then((r) =>
+      json<{ alert_email: string }>(r),
+    ),
 };
 
 export const approvals = {
   approve: (id: string, note: string) =>
-    send("POST", `/api/models/${id}/approve`, { note }).then((r) => json<{ approval: Approval }>(r)),
-  withdraw: (id: string) => send("DELETE", `/api/models/${id}/approve`).then((r) => json<unknown>(r)),
+    send("POST", `/api/models/${id}/approve`, { note }).then((r) =>
+      json<{ approval: Approval }>(r),
+    ),
+  withdraw: (id: string) =>
+    send("DELETE", `/api/models/${id}/approve`).then((r) => json<unknown>(r)),
   ask: (id: string) =>
     send("POST", `/api/models/${id}/approval-request`).then((r) =>
       json<{ mailed: string[]; not_mailed: string[] }>(r),

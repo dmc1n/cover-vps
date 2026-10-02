@@ -5,7 +5,7 @@
         --role admin --approve
     COVER_DATA_DIR=~/cover-data uv run cover-users invite rick     # a new password link
 
-The links are printed here; they are as good as a password until used (3 days), so pass them
+The links are printed here; they are as good as a password until used (7 days), so pass them
 on privately.
 """
 

@@ -45,13 +45,15 @@ def configured(auth: Auth) -> bool:
     return bool(s.get("host") and s.get("sender"))
 
 
-def send(auth: Auth, to: str, subject: str, text: str) -> None:
+def send(auth: Auth, to: str, subject: str, text: str, html: str | None = None) -> None:
     s = settings(auth, with_password=True)
     if not (s.get("host") and s.get("sender")):
         raise RuntimeError("no mail server set (admin page, Mail)")
     msg = EmailMessage()
     msg["From"], msg["To"], msg["Subject"] = s["sender"], to, subject
     msg.set_content(text)
+    if html:  # the same message with layout, for mail programs that show it
+        msg.add_alternative(html, subtype="html")
     context = ssl.create_default_context()
     port = int(s.get("port") or 587)
     if s.get("security") == "ssl":

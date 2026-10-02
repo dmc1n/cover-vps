@@ -249,3 +249,19 @@ td.detail { max-width: 520px; overflow-wrap: anywhere; font-size: 12px; }
   .process-backdrop .pb-knife, .process-backdrop .pb-drop { display: none; }
 }
 @media (max-width: 720px) { .process-backdrop { opacity: 0.45; } }
+
+/* ---- invitations (ADR-054) ---- */
+.invitations textarea { width: 100%; box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; resize: vertical; margin: 4px 0 8px; }
+.invitations .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+td.access { white-space: nowrap; }
+button.danger { background: var(--bad); color: #fff; border-color: var(--bad); }
+
+/* ---- the guide (#/guide) ---- */
+.guide { max-width: 720px; margin: 24px auto 64px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 28px 36px; line-height: 1.6; font-size: 15px; }
+.guide h1 { font-family: "Fraunces", Georgia, serif; font-style: italic; font-weight: 400; font-size: 32px; margin: 0 0 12px; }
+.guide h2 { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sand); margin: 26px 0 6px; }
+.guide li { margin: 4px 0; }
+.guide code { background: var(--cream); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+.guide-page { min-height: 100vh; background: var(--bg); padding: 1px 16px; }
+@media (max-width: 600px) { .guide { padding: 20px 18px; } }

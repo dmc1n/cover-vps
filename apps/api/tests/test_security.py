@@ -165,3 +165,30 @@ def test_without_an_email_the_code_cannot_be_sent(app: Any, monkeypatch: Any) ->
         "/api/auth/login", json={"username": "vera", "password": "a-long-viewer-password"}
     )
     assert r.status_code == 403
+
+
+def test_invite_all_mails_only_those_without_a_password(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from coverapi import mailer
+
+    sent: list[tuple[str, str, str, str | None]] = []
+    admin = login(app, "rick", "a-long-admin-password")  # before the mail server (no 2FA code)
+    monkeypatch.setattr(mailer, "configured", lambda auth: True)
+    monkeypatch.setattr(
+        mailer,
+        "send",
+        lambda auth, to, subject, text, html=None: sent.append((to, subject, text, html)),
+    )
+    auth = app.state.auth
+    auth.add_user("pat", "Patrick", "viewer", "pat@example.com")
+    auth.add_user("ed", "Ed", "viewer")  # no address: not mailed
+    r = admin.post("/api/admin/users/invite-all", json={"note": "Kickoff on Monday at 10:00."})
+    assert r.status_code == 200, r.text
+    assert [i["email"] for i in r.json()["invited"]] == ["pat@example.com"]  # rick has a password
+    to, subject, text, html = sent[0]
+    assert "Cover Studio" in subject and "Kickoff on Monday at 10:00." in text
+    assert "/#/welcome/" in text and html and "Choose your password" in html
+    assert "7 days" in text
+    pat = next(u for u in admin.get("/api/admin/users").json()["users"] if u["username"] == "pat")
+    assert pat["invited_until"] is not None

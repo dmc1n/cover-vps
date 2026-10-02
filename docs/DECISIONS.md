@@ -913,3 +913,22 @@ mistake"; "start with version numbers in git so that we can go back".
   nightly scripts and `cover` on the command line use that working copy.
 - Why not `git checkout <tag>` in the working copy: that stops development while the old
   version runs, and a half-finished change would go live with any restart.
+
+## ADR-054 — Invitations in English, and the guide
+
+The owner, 2 October 2026: "a kickoff on Monday: invite all users, in English; a button with
+an invitation mail"; "a short write-up in English of how the system works".
+
+- The invitation mail (`coverapi/invitation.py`) is plain text plus the same in a simple layout
+  in the house colours: what Cover Studio is, the three steps to get in (choose a password,
+  log in, the code by mail with "remember this device"), the user name and a button with the
+  personal link. An admin can put a line of their own at the top (the kickoff's date).
+- Links are valid for 7 days instead of 3: invitations sent on a Friday must still work after
+  the weekend. Once only, as before.
+- Admin → Users: **Invite everyone not yet in** (active users with an address and no password),
+  **Send invitation** / **Send again** per person, **Reset password** only after a second
+  click (it stops the old password), and "send the invitation now" on adding a user, so people
+  can be added first and invited together. The list shows who is invited and until when.
+- The guide **How Cover Studio works** is `docs/handbook/how-it-works.md`, shown in the app at
+  `#/guide`, also without logging in. The invitation links to it. There is one source, so the
+  handbook and the app cannot drift apart.

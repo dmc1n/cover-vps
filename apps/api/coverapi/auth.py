@@ -36,7 +36,7 @@ CODE_MINUTES = 10
 CODE_TRIES = 5
 CODE_DIGITS = 6
 SESSION_DAYS = 14
-INVITE_HOURS = 72
+INVITE_HOURS = 168  # an invitation link is valid for 7 days (the owner, 2 Oct 2026: kickoff)
 LOCK_AFTER = 5  # wrong passwords in a row
 LOCK_MINUTES = 15
 MIN_PASSWORD = 12  # characters
@@ -205,6 +205,14 @@ class Auth:
         with self._db() as db:
             rows = db.execute("SELECT * FROM users ORDER BY name").fetchall()
         return [u for u in (self._user(r) for r in rows) if u]
+
+    def open_invites(self) -> dict[int, float]:
+        """user id -> until when their unused invitation link works."""
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT user_id, expires FROM invites WHERE used=0 AND expires>?", (time.time(),)
+            ).fetchall()
+        return {int(r["user_id"]): float(r["expires"]) for r in rows}
 
     def user(self, user_id: int) -> User:
         with self._db() as db:

@@ -5,10 +5,27 @@ account; nothing can be seen or changed without one.
 
 ## Logging in for the first time
 
-An admin makes your account and gives you a link (by mail when the mail server is set, or
-copied by hand). The link is valid for 3 days and works once. Open it, choose a password of
-at least 12 characters (not your user name), and you are logged in. Forgot your password? Ask
-an admin for a new link (Admin → Users → Reset); the old password stops working.
+An admin makes your account and sends you an invitation in English (by mail when the mail
+server is set, or the link copied by hand). It says what Cover Studio is, gives your user name
+and a personal link, valid for 7 days, that works once. Open it, choose a password of at least
+12 characters (not your user name), and you are logged in. Forgot your password? Ask an admin
+(Admin → Users → Reset password, then confirm); the old password stops working.
+
+## Inviting people (for example for a kickoff)
+
+Admin → Users:
+
+1. Add everyone (user name, name, e-mail, role, may approve). Untick **send the invitation
+   now** to add people first and invite them all at once later.
+2. Optional: write a line for the top of the mail in **Invitations**, for example the date and
+   time of the kickoff.
+3. **Invite everyone not yet in** sends the invitation to everyone with an e-mail address and no
+   password yet. **Send invitation** in the list sends it to one person; **Send again** gives a
+   new link (the old one stops working).
+
+The column **Access** shows who has a password, who is invited (and until when the link works)
+and who is not invited yet. The invitation links to the short guide **How Cover Studio works**
+(#/guide, readable without logging in).
 
 After five wrong passwords your account waits 15 minutes; ten wrong tries from one address
 block that address for a while.

@@ -82,6 +82,15 @@ class NewUserRequest(BaseModel):
     email: str | None = None
     role: str = "viewer"
     can_approve: bool = False
+    send_invite: bool = True  # false: add now, invite later (e.g. all at once for a kickoff)
+    note: str = ""
+
+
+class InviteRequest(BaseModel):
+    note: str = ""  # a line of your own at the top of the invitation (the kickoff's date)
+
+
+NOTE_MAX = 600  # characters of that line
 
 
 class UserChange(BaseModel):
@@ -304,7 +313,11 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
     @app.get("/api/admin/users")
     def users(request: Request) -> dict[str, Any]:
         require(request, "admin")
-        return {"users": [u.public() for u in auth.users()], "roles": list(ROLES)}
+        until = auth.open_invites()
+        return {
+            "users": [{**u.public(), "invited_until": until.get(u.id)} for u in auth.users()],
+            "roles": list(ROLES),
+        }
 
     @app.post("/api/admin/users")
     def add_user(req: NewUserRequest, request: Request) -> dict[str, Any]:
@@ -314,7 +327,9 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
         except AuthError as exc:
             raise HTTPException(exc.status, str(exc)) from None
         auth.log(admin, "user added", u.public())
-        return {"user": u.public(), **_invite(u, admin)}
+        if not req.send_invite:
+            return {"user": u.public(), "link": None, "mailed": False, "mail_problem": None}
+        return {"user": u.public(), **_invite(u, admin, req.note)}
 
     @app.put("/api/admin/users/{user_id}")
     def change_user(user_id: int, req: UserChange, request: Request) -> dict[str, Any]:
@@ -328,30 +343,49 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
         return {"user": u.public()}
 
     @app.post("/api/admin/users/{user_id}/invite")
-    def reinvite(user_id: int, request: Request) -> dict[str, Any]:
+    def reinvite(
+        user_id: int, request: Request, req: InviteRequest | None = None
+    ) -> dict[str, Any]:
         admin = require(request, "admin")
         try:
             u = auth.user(user_id)
         except AuthError as exc:
             raise HTTPException(exc.status, str(exc)) from None
-        return _invite(u, admin)
+        return _invite(u, admin, (req.note if req else "") or "")
 
-    def _invite(u: User, admin: User) -> dict[str, Any]:
+    @app.post("/api/admin/users/invite-all")
+    def invite_all(request: Request, req: InviteRequest | None = None) -> dict[str, Any]:
+        """Everyone active with an e-mail address who has no password yet (the kickoff)."""
+        admin = require(request, "admin")
+        if not mailer.configured(auth):
+            raise HTTPException(400, "no mail server set (Mail and address)")
+        out = []
+        for u in auth.users():
+            if u.active and u.email and not u.has_password:
+                r = _invite(u, admin, (req.note if req else "") or "")
+                out.append({"name": u.name, "email": u.email, "mailed": r["mailed"],
+                            "mail_problem": r["mail_problem"]})  # fmt: skip
+        return {"invited": out}
+
+    def _invite(u: User, admin: User, note: str = "") -> dict[str, Any]:
+        from coverapi import invitation
+        from coverapi.auth import INVITE_HOURS
+
         link = _link(auth.invite(u.id))
+        base = str(auth.setting(PUBLIC_URL_KEY, DEFAULT_PUBLIC_URL)).rstrip("/")
+        days = INVITE_HOURS // 24  # param-ok: hours per day
         mailed, problem = False, None
         if u.email and mailer.configured(auth):
+            args = (u.name or u.username, u.username, link, base, admin.name or admin.username,
+                    note[:NOTE_MAX], days)  # fmt: skip
             try:
-                mailer.send(
-                    auth, u.email, "Your account for Cover Studio",
-                    f"Hello {u.name},\n\nAn account was made for you on Cover Studio "
-                    f"(S2DIO x SUNS). Choose your password with this link (valid for 3 days, "
-                    f"once):\n\n{link}\n\nYour user name: {u.username}\n",
-                )  # fmt: skip
+                mailer.send(auth, u.email, invitation.SUBJECT, invitation.text(*args),
+                            invitation.html(*args))  # fmt: skip
                 mailed = True
             except Exception as exc:  # noqa: BLE001 - show the admin why
                 problem = str(exc)
         auth.log(admin, "invite", {"user": u.username, "mailed": mailed})
-        return {"link": link, "mailed": mailed, "mail_problem": problem}
+        return {"link": link, "mailed": mailed, "mail_problem": problem, "days": days}
 
     @app.get("/api/admin/sessions")
     def sessions(request: Request) -> dict[str, Any]:
