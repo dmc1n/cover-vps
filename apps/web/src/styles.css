@@ -208,3 +208,44 @@ td.detail { max-width: 520px; overflow-wrap: anywhere; font-size: 12px; }
 .card.rain .rain-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
 .card.rain h4 { margin: 10px 0 4px; font-family: "Fraunces", Georgia, serif; font-weight: 400; }
 .card.rain ul { margin: 4px 0 4px 1.2rem; }
+
+/* ---- the login page's background: sketch → pattern → cut → cover, one 20 s loop ---- */
+.login-page { position: relative; overflow: hidden; }
+.login-page > .login-card { position: relative; z-index: 1; }
+.process-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.process-backdrop .pb-thread { fill: none; stroke: var(--sand); stroke-opacity: 0.35; stroke-width: 1.5; stroke-dasharray: 3 9; }
+.process-backdrop .pb-label { fill: var(--sage-soft); font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; }
+.process-backdrop .pb-n { fill: var(--sand); font-family: "Fraunces", Georgia, serif; font-style: italic; font-size: 24px; letter-spacing: 0; }
+.process-backdrop .pb-sketch path { fill: none; stroke: var(--cream); stroke-opacity: 0.85; stroke-width: 1.6; stroke-linecap: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: pb-draw-1 20s infinite; }
+.process-backdrop .pb-hand text { fill: var(--sand); font-family: "Caveat", "Segoe Print", cursive; font-size: 17px; opacity: 0; animation: pb-hand 20s infinite; }
+.process-backdrop .pb-roll { fill: var(--cream); fill-opacity: 0.05; stroke: var(--sage); stroke-opacity: 0.6; stroke-dasharray: 10 6; }
+.process-backdrop .pb-dim { fill: var(--sage-soft); font-size: 12px; letter-spacing: 0.08em; }
+.process-backdrop .pb-exact polygon { fill: var(--sand); fill-opacity: 0.12; stroke: var(--cream); stroke-width: 1; }
+.process-backdrop .pb-knife { fill: var(--sand); }
+.process-backdrop .pb-wire path { fill: none; stroke: var(--cream); stroke-width: 1.4; stroke-dasharray: 1; stroke-dashoffset: 1; animation: pb-draw-3 20s infinite; }
+.process-backdrop .pb-cover polygon { stroke: var(--olive-deep); stroke-width: 1; }
+.process-backdrop .pb-cover .strip { fill: var(--cream); }
+.process-backdrop .pb-cover .slope { fill: url(#pb-slope); }
+.process-backdrop .pb-cover .front { fill: var(--sage); }
+.process-backdrop .pb-cover .end { fill: var(--sand); }
+.process-backdrop .pb-cover .vent { fill: var(--olive); }
+.process-backdrop .pb-drop { fill: none; stroke: #bcd3e6; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 0.1 1; stroke-dashoffset: 0.1;
+  animation: pb-rain 2.6s linear infinite; }
+.process-backdrop .pb-s1 { animation: pb-show-1 20s infinite; }
+.process-backdrop .pb-s2 { opacity: 0; animation: pb-show-2 20s infinite; }
+.process-backdrop .pb-s3 { opacity: 0; animation: pb-show-3 20s infinite; }
+.process-backdrop .pb-s4 { opacity: 0; animation: pb-show-4 20s infinite; }
+@keyframes pb-draw-1 { 0% { stroke-dashoffset: 1; } 16%, 100% { stroke-dashoffset: 0; } }
+@keyframes pb-hand { 0%, 12% { opacity: 0; } 18%, 100% { opacity: 1; } }
+@keyframes pb-draw-3 { 0%, 46% { stroke-dashoffset: 1; } 60%, 100% { stroke-dashoffset: 0; } }
+@keyframes pb-rain { 0% { stroke-dashoffset: 0.1; } 100% { stroke-dashoffset: -1; } }
+@keyframes pb-show-1 { 0% { opacity: 0; } 3%, 92% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes pb-show-2 { 0%, 20% { opacity: 0; } 27%, 92% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes pb-show-3 { 0%, 42% { opacity: 0; } 46%, 92% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes pb-show-4 { 0%, 62% { opacity: 0; } 70%, 92% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .process-backdrop *, .process-backdrop .pb-stage { animation: none !important; opacity: 1 !important; stroke-dashoffset: 0 !important; }
+  .process-backdrop .pb-knife, .process-backdrop .pb-drop { display: none; }
+}
+@media (max-width: 720px) { .process-backdrop { opacity: 0.45; } }

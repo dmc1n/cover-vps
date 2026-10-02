@@ -157,7 +157,16 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     for each of you (I explain how) so passwords and root login can be switched off.
 42. **Reboot:** a new kernel waits; the server needs one reboot (about a minute; the app and
     https start by themselves). When suits you?
+    **Answered 2 Oct 2026:** rebooted at 14:30 on the owner's word; everything came back.
 43. **The other users** (Rens, Patrick, Ed, Marcel, Jeffery, Kevin, Willard): e-mail addresses,
     role (viewer, editor, admin), and who may approve.
 44. **Releases:** from tomorrow every version that goes live gets a number (v1.0, v1.1, …) and
     going back is one command (docs/handbook/server.md). Agree?
+    **Answered 2 Oct 2026:** yes; v1.0.0 is live (ADR-053).
+41b. **SSH over the internet** is closed since 2 Oct 2026 (Tailscale only), so the password
+    risk of 41 is much smaller; switching off passwords and root login is still advised.
+45. **Very low tables** (the Conico small, 25 cm): an air vent of at least 10 cm does not fit
+    in the side of the cover. Leave the vent out, put it in the top, or make it smaller there?
+46. **Round tables** (Sorrento, the Conico tables): their cover is now a box with a roof over a
+    balloon. Should a round table get a round cover (a band and a round top, as your R
+    drawings), or is the box fine?
