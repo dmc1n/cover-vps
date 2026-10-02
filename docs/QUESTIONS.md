@@ -170,3 +170,11 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
 46. **Round tables** (Sorrento, the Conico tables): their cover is now a box with a roof over a
     balloon. Should a round table get a round cover (a band and a round top, as your R
     drawings), or is the box fine?
+47. **One piece with a fold instead of a seam on top** (docs/plans/fewer-top-pieces.md): where
+    neighbouring faces of the top lie flat together on the roll, cut them as one piece with a
+    fold line in pen, so there is no seam on top. Should this be the default for every cover, or
+    only where you ask (as now for the Lucia)? As default it also joins the Kota's back strip to
+    its slope.
+48. **Minimum piece width:** no piece narrower than 10 cm (now there are pieces of 3 to 8 cm on
+    21 SUNS models). Is 10 cm right?
+
