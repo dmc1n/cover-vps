@@ -24,8 +24,8 @@ export function Gallery() {
     api.models().then(setModels);
   }, []);
   const tags = useMemo(() => [...new Set((models ?? []).flatMap((m) => m.tags))].sort(), [models]);
-  const families = useMemo(
-    () => [...new Set((models ?? []).map((m) => m.family).filter(Boolean))].sort() as string[],
+  const cats = useMemo(
+    () => [...new Set((models ?? []).map((m) => m.category).filter(Boolean))].sort() as string[],
     [models],
   );
   const shown = useMemo(() => {
@@ -34,7 +34,8 @@ export function Gallery() {
       (m) =>
         (!f || m.id.includes(f.replace(/\s+/g, "-")) || m.notes.toLowerCase().includes(f)) &&
         (!grade || m.grade === grade) &&
-        (!family || (m.family ?? "") === (family === "-" ? "" : family)) &&
+        (!family ||
+          (family === "-" ? !m.category : m.category === family || (m.category ?? "").startsWith(`${family} ›`))) &&
         (!tag || m.tags.includes(tag)),
     );
     const vol = (m: ModelBrief) => (m.size_mm ? m.size_mm[0] * m.size_mm[1] * m.size_mm[2] : 0);
@@ -68,11 +69,20 @@ export function Gallery() {
           <option value="failed">failed</option>
         </select>
         <select value={family} onChange={(e) => setFamily(e.target.value)}>
-          <option value="">all families</option>
-          <option value="-">no family</option>
-          {families.map((f) => (
-            <option key={f}>{f}</option>
+          <option value="">all categories</option>
+          {[...new Set(cats.map((c) => c.split(" › ")[0]))].map((g) => (
+            <optgroup key={g} label={g}>
+              <option value={g}>all {g}</option>
+              {cats
+                .filter((c) => c.startsWith(`${g} ›`))
+                .map((c) => (
+                  <option key={c} value={c}>
+                    {c.split(" › ")[1]}
+                  </option>
+                ))}
+            </optgroup>
           ))}
+          <option value="-">no category</option>
         </select>
         <select value={tag} onChange={(e) => setTag(e.target.value)}>
           <option value="">all tags</option>
@@ -106,7 +116,7 @@ export function Gallery() {
             <div className="name">{title(m.id)}</div>
             <div className="facts">
               <span className={`badge grade-${m.grade}`}>{m.grade === "check" ? "to check" : m.grade}</span>
-              {m.family && <span className="badge">{m.family}</span>}
+              {m.category && <span className="badge">{m.category.split(" › ")[1]}</span>}
               {m.size_mm && <span>{m.size_mm.map((v) => Math.round(v / 10)).join("×")} cm</span>}
               {m.panels != null && <span>{m.panels} panels</span>}
               {m.max_stretch_pct != null && (

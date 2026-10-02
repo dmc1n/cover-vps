@@ -53,6 +53,7 @@ export interface Revision {
 export interface ModelBrief {
   id: string;
   family: string | null;
+  category?: string | null;
   status: Status;
   tags: string[];
   notes: string;
@@ -193,7 +194,11 @@ export const api = {
       body: JSON.stringify({ steps, trial }),
     }).then((r) => json<Job>(r)),
   families: () => fetch("/api/families").then((r) => json<string[]>(r)),
-  setInfo: (id: string, info: Partial<Pick<ModelBrief, "family" | "status" | "tags" | "notes">>) =>
+  categories: () =>
+    fetch("/api/categories").then((r) =>
+      json<{ group: string; category: string; name: string; on_suns_site: boolean }[]>(r),
+    ),
+  setInfo: (id: string, info: Partial<Pick<ModelBrief, "family" | "category" | "status" | "tags" | "notes">>) =>
     fetch(`/api/models/${id}/info`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

@@ -22,13 +22,14 @@ from coverengine.params.registry import list_families, read_cover_definition
 STATUSES = ("draft", "checked", "production")
 REVISIONS = "revisions"
 KEPT = ("pattern.json", "finished.json", "cut.dxf", "cover.json", "seams.json")
-INFO_FIELDS = ("family", "status", "tags", "notes")
+INFO_FIELDS = ("family", "category", "status", "tags", "notes")
 
 
 def info(model_dir: Path) -> dict[str, Any]:
     cover = read_cover_definition(model_dir)
     return {
         "family": cover.get("family"),
+        "category": cover.get("category"),
         "status": cover.get("status", "draft"),
         "tags": list(cover.get("tags", [])),
         "notes": cover.get("notes", ""),
@@ -36,7 +37,8 @@ def info(model_dir: Path) -> dict[str, Any]:
 
 
 def set_info(model_dir: Path, changes: dict[str, Any]) -> dict[str, Any]:
-    """Change family, status, tags or notes in the model's cover.json (everything else kept)."""
+    """Change family, category, status, tags or notes in the model's cover.json (everything
+    else kept)."""
     unknown = set(changes) - set(INFO_FIELDS)
     if unknown:
         raise CoverError(f"unknown field(s): {', '.join(sorted(unknown))}")
@@ -45,6 +47,11 @@ def set_info(model_dir: Path, changes: dict[str, Any]) -> dict[str, Any]:
     family = changes.get("family")
     if family and family not in list_families():
         raise CoverError(f"no family {family!r}; known: {', '.join(list_families()) or 'none yet'}")
+    if changes.get("category"):
+        from coverengine.category import NAMES
+
+        if changes["category"] not in NAMES:
+            raise CoverError(f"no category {changes['category']!r}; known: {', '.join(NAMES)}")
     if "tags" in changes:
         changes["tags"] = sorted({str(t).strip() for t in changes["tags"] if str(t).strip()})
     path = model_dir / "cover.json"

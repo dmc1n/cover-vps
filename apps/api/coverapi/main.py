@@ -42,6 +42,7 @@ class ParametersRequest(BaseModel):
 
 class InfoRequest(BaseModel):
     family: str | None = None
+    category: str | None = None
     status: str | None = None
     tags: list[str] | None = None
     notes: str | None = None
@@ -289,6 +290,13 @@ def create_app(
     @app.get("/api/families")
     def families() -> list[str]:
         return list_families()
+
+    @app.get("/api/categories")
+    def categories() -> list[dict[str, Any]]:
+        from coverengine.category import CATEGORIES
+
+        return [{"group": g, "category": c, "name": f"{g} › {c}", "on_suns_site": on}
+                for g, c, on in CATEGORIES]  # fmt: skip
 
     @app.put("/api/models/{model_id}/info")
     def model_info(model_id: str, req: InfoRequest) -> dict[str, Any]:

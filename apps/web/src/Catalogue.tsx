@@ -12,19 +12,25 @@ const STATUS_HELP: Record<Status, string> = {
 export function ModelInfo({ model, onSaved }: { model: ModelDetail; onSaved: () => void }) {
   const [families, setFamilies] = useState<string[]>([]);
   const [family, setFamily] = useState(model.family ?? "");
+  const [categories, setCategories] = useState<{ name: string; on_suns_site: boolean }[]>([]);
+  const [category, setCategory] = useState(model.category ?? "");
   const [status, setStatus] = useState<Status>(model.status);
   const [tags, setTags] = useState(model.tags.join(", "));
   const [notes, setNotes] = useState(model.notes);
   const [message, setMessage] = useState("");
   useEffect(() => {
     api.families().then(setFamilies);
+    api.categories().then(setCategories);
   }, []);
   const changed =
-    family !== (model.family ?? "") || status !== model.status || tags !== model.tags.join(", ") || notes !== model.notes;
+    family !== (model.family ?? "") ||
+    category !== (model.category ?? "") ||
+    status !== model.status || tags !== model.tags.join(", ") || notes !== model.notes;
   const save = async () => {
     try {
       await api.setInfo(model.id, {
         family: family || null,
+        category: category || null,
         status,
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
         notes,
@@ -42,6 +48,18 @@ export function ModelInfo({ model, onSaved }: { model: ModelDetail; onSaved: () 
   return (
     <section className="card info">
       <div className="row">
+        <label>
+          Category{" "}
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">none</option>
+            {categories.map((c) => (
+              <option key={c.name} value={c.name}>
+                {c.name}
+                {c.on_suns_site ? "" : " (not on the SUNS site)"}
+              </option>
+            ))}
+          </select>
+        </label>
         <label>
           Family{" "}
           <select value={family} onChange={(e) => setFamily(e.target.value)}>

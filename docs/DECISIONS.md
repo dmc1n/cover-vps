@@ -854,3 +854,20 @@ possible). Research and plan: docs/plans/rain-simulation.md.
   elements; the static answer is what matters for a cover, and the fabric is not measured yet.
 - First results: Kota 2-seater and Palermo 240 dry; C6 1.75 m² flat (its drawn strip); T1 5.8
   m² flat (its flat top); the reference Blocchi 0.17 m² flat.
+
+## ADR-050 — Categories with the SUNS names
+
+Status: accepted, 2 Oct 2026 (owner: categorise all models automatically, with the names on
+hello-suns.com).
+
+- The site's categories: Dining (Tafels, Stoelen, Low dining tafels, Low dining stoelen,
+  Barsets), Lounge (Sofasets, Loungestoelen), Relax (Ligbedden, Daybeds), Styling
+  (Bijzettafels, Poefs). Lounge tables, hockers and fire pits have no category of their own on
+  the site: Lounge › Loungetafels, Lounge › Hockers, Overig › Vuurtafels, marked "not on the
+  SUNS site"; Barsets is split into Bartafels and Barstoelen.
+- `cover categorise [--ai]`: rules on the model's name (a table lower than 55 cm is a lounge
+  table); the owner's drawings by the furniture type read from them; the AI (name and photo,
+  only from the list) for the rest. The category is kept in cover.json; tables without a family
+  join the table family. Editable per model; filters in the model list and the catalogue.
+- 1 October data: 410 models, 407 by the rules, 3 by the AI (the D8 cover as a hocker is
+  doubtful).

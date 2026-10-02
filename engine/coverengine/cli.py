@@ -402,6 +402,42 @@ def _cmd_ai(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_categorise(args: argparse.Namespace) -> int:
+    """Every model's category, with the SUNS names (ADR-050); tables join the table family."""
+    from collections import Counter
+
+    from coverengine.catalogue import info, set_info
+    from coverengine.category import TABLES, categorise
+
+    dirs = (
+        [d for d in args.model]
+        if args.model
+        else sorted(d for d in args.models.iterdir() if (d / "model.json").is_file())
+    )
+    counts: Counter[str] = Counter()
+    for d in dirs:
+        current = info(d)
+        if current["category"] and not args.force:
+            counts[current["category"]] += 1
+            continue
+        params = resolve_params(args, d / "cover.json")
+        got = categorise(d, params, use_ai=args.ai)
+        if not got["category"]:
+            print(f"{d.name}: no category ({got['why']})")
+            counts["(none)"] += 1
+            continue
+        changes: dict[str, object] = {"category": got["category"]}
+        if got["category"].split(" › ")[1] in TABLES and not current["family"]:
+            changes["family"] = "table"
+        set_info(d, changes)
+        counts[got["category"]] += 1
+        if got["by"] == "ai":
+            print(f"{d.name}: {got['category']} (AI: {got['why']})")
+    for cat, n in counts.most_common():
+        print(f"{n:5d}  {cat}")
+    return 0
+
+
 def _cmd_rain(args: argparse.Namespace) -> int:
     """Where rain goes on the cover: ponds, flat parts, streams, drops, the AI's verdict."""
     from coverengine.rain import simulate
@@ -737,6 +773,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--learn", metavar="COMPLAINT", help="why was this cover wrong? (a lesson)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_ai)
+
+    p = sub.add_parser("categorise", help="every model's category, with the SUNS names")
+    p.add_argument("model", type=Path, nargs="*", help="model directories (default: all)")
+    p.add_argument("--models", type=Path, default=Path("models"), help="models folder")
+    p.add_argument("--ai", action="store_true", help="the AI places what the rules cannot")
+    p.add_argument("--force", action="store_true", help="also models that have a category")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_categorise)
 
     p = sub.add_parser("rain", help="where rain goes on the cover (rain.json, rain.glb)")
     p.add_argument("model", type=Path, help="model directory with a cover surface")

@@ -110,7 +110,7 @@ function ModelList() {
   const [models, setModels] = useState<ModelBrief[] | null>(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [family, setFamily] = useState("");
+  const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");
   const [grade, setGrade] = useState("");
   const [picked, setPicked] = useState<Record<string, boolean>>({});
@@ -122,11 +122,13 @@ function ModelList() {
   const shown = (models ?? []).filter(
     (m) =>
       (!q || m.id.includes(q) || m.tags.some((t) => t.toLowerCase().includes(q)) || m.notes.toLowerCase().includes(q)) &&
-      (!family || (m.family ?? "") === (family === "-" ? "" : family)) &&
+      (!category ||
+        (category === "-" ? !m.category : (m.category ?? "") === category || (m.category ?? "").startsWith(`${category} ›`))) &&
       (!status || m.status === status) &&
       (!grade || m.grade === grade),
   );
-  const families = [...new Set((models ?? []).map((m) => m.family).filter(Boolean))] as string[];
+  const cats = [...new Set((models ?? []).map((m) => m.category).filter(Boolean))].sort() as string[];
+  const groups = [...new Set(cats.map((c) => c.split(" › ")[0]))];
   const selected = shown.filter((m) => picked[m.id]);
   return (
     <>
@@ -144,12 +146,21 @@ function ModelList() {
       {error && <p className="error">{error}</p>}
       <div className="row">
         <input className="search" placeholder="Search name, tag or note…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <select value={family} onChange={(e) => setFamily(e.target.value)}>
-          <option value="">all families</option>
-          <option value="-">no family</option>
-          {families.map((f) => (
-            <option key={f}>{f}</option>
+        <select value={category} onChange={(e) => setCategory(e.target.value)}>
+          <option value="">all categories</option>
+          {groups.map((g) => (
+            <optgroup key={g} label={g}>
+              <option value={g}>all {g}</option>
+              {cats
+                .filter((c) => c.startsWith(`${g} ›`))
+                .map((c) => (
+                  <option key={c} value={c}>
+                    {c.split(" › ")[1]} ({(models ?? []).filter((m) => m.category === c).length})
+                  </option>
+                ))}
+            </optgroup>
           ))}
+          <option value="-">no category</option>
         </select>
         <select value={grade} onChange={(e) => setGrade(e.target.value)}>
           <option value="">any cover</option>
@@ -182,7 +193,7 @@ function ModelList() {
               </th>
               <th>Model</th>
               <th>Cover</th>
-              <th>Family</th>
+              <th>Category</th>
               <th>Status</th>
               <th>Size (cm)</th>
               <th>Steps done</th>
@@ -208,7 +219,7 @@ function ModelList() {
                 <td title={m.reasons.join("\n")}>
                   <span className={`badge grade-${m.grade}`}>{m.grade}</span>
                 </td>
-                <td>{m.family ?? ""}</td>
+                <td className="nowrap">{m.category ? m.category.split(" › ")[1] : ""}</td>
                 <td>
                   <span className={`badge status-${m.status}`}>{m.status}</span>
                 </td>
