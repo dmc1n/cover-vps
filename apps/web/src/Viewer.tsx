@@ -435,7 +435,8 @@ export function Viewer({
 }
 
 function DrapeReport({ drape }: { drape: Drape }) {
-  const folds = drape.fold_share_pct > 10;
+  const ai = drape.ai;
+  const folds = ai?.verdict ? ai.verdict !== "good" : drape.fold_share_pct > 10;
   return (
     <section className={`card rain ${folds ? "risk" : "dry"}`}>
       <div className="rain-head">

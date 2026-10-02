@@ -464,8 +464,13 @@ def _cmd_drape(args: argparse.Namespace) -> int:
 
     cover_json = args.model / "cover.json"
     params = resolve_params(args, cover_json if cover_json.is_file() else None)
-    r = drape.simulate(args.model, params, log=print if args.verbose else lambda *_: None)
+    r = drape.simulate(
+        args.model, params, log=print if args.verbose else lambda *_: None, use_ai=not args.no_ai
+    )
     print(drape.summary(r))
+    ai = r.get("ai") or {}
+    if ai.get("verdict"):
+        print(f"AI      {ai['verdict']}: {ai.get('summary', '')}")
     return 0
 
 
@@ -796,6 +801,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("drape", help="the sewn cover falling over the furniture (folds, tension)")
     p.add_argument("model", type=Path, help="model directory (after cover flatten)")
     p.add_argument("--verbose", action="store_true", help="show the progress")
+    p.add_argument("--no-ai", action="store_true", help="without the AI's verdict")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_drape)
 

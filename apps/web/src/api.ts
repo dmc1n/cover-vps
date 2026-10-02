@@ -39,6 +39,13 @@ export interface Drape {
   faces: number[][];
   frame_box_mm: [number[], number[]];
   points_per_frame: number;
+  ai?: {
+    verdict?: string;
+    summary?: string;
+    problems?: string[];
+    advice?: string[];
+    error?: string;
+  };
 }
 
 /** The rain simulation (rain.json, ADR-049). */

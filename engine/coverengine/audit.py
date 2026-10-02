@@ -9,6 +9,7 @@ The program measures, for each model:
 - symmetric: a mirror-symmetric piece of furniture has a mirror-symmetric cover;
 - water: the cover sheds water;
 - pieces: the grade (stretch, seams, roll width) and no scrap pieces;
+- drape: once the cover was dropped over the furniture, not too many folds, no deep sag;
 - slivers: no piece narrower than seams.min_piece_width_mm (ADR-055); a top that would fit
   the roll in one piece with folds is noted.
 
@@ -130,6 +131,26 @@ def views(furniture: trimesh.Trimesh, cover: trimesh.Trimesh, bad: Array, out: P
     fig.tight_layout()
     fig.savefig(out, dpi=VIEW_DPI, metadata={"Software": None})
     return out
+
+
+def drape_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
+    """When the cover has been dropped over the furniture (cover drape, ADR-056): not too many
+    folds, and no deep sag on top where water would stand."""
+    path = model_dir / "drape.json"
+    if not path.is_file():
+        return []
+    d = json.loads(path.read_text(encoding="utf-8"))
+    folds, sag = float(d["fold_share_pct"]), float(d["max_sag_mm"]) / MM_PER_CM
+    most = float(params["drape.max_fold_share_pct"])
+    deepest = float(params["drape.max_sag_cm"])
+    problems = []
+    if folds > most:
+        problems.append(f"folds on {folds:g} % of the cover (more than {most:g} %)")
+    if sag > deepest:
+        problems.append(f"the top sags {sag:.0f} cm where nothing holds it (water)")
+    ai = (d.get("ai") or {}).get("verdict")
+    detail = "; ".join(problems) or f"folds on {folds:g} %, sags at most {sag:.0f} cm"
+    return [_check("drape", not problems, detail + (f"; AI: {ai}" if ai else ""))]
 
 
 def sliver_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
@@ -266,6 +287,7 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
         )
     )
     checks += sliver_checks(model_dir, params)
+    checks += drape_checks(model_dir, params)
     views(furniture, cover, bad, model_dir / AUDIT_PNG)
     return {
         "checks": checks,

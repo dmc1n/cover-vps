@@ -146,7 +146,8 @@ features:                        # per-cover defaults, overridden per model
   handles: 0
 
 fabric:
-  profile: acrylic-300           # testdata/fabrics/<profile>.json
+  profile: coverlast             # testdata/fabrics/<profile>.json (the owner's fabric, 2026-10-02:
+                                 # Sunbrella Coverlast; acrylic-300 is the earlier placeholder)
   max_allowed_stretch_pct: 2.0   # above this the engine proposes an extra seam
 
 rain:                            # cover rain: where rain goes on a cover (ADR-049)
@@ -159,12 +160,13 @@ rain:                            # cover rain: where rain goes on a cover (ADR-0
   seam_run_mm: 250               # water running along a seam further than this soaks in
 
 drape:                           # the drape simulation: the sewn cover falling over the furniture (ADR-056)
-  fabric_g_m2: 300               # to confirm: the fabric's weight (acrylic canvas, WeatherMax ~ 300)
+  fabric_g_m2: 250               # Sunbrella Coverlast, 250 g/m2 +-5 % (Dickson, 2026-10-02)
   max_stretch_pct: 1.6           # to confirm: how far the woven fabric gives before it is tight
   stretch_stiffness: 3000.0      # the solver's weight on stretch, N/m: above the max_stretch_pct
                                  # limit the fabric is held hard; higher than this the solver itself
                                  # damps the fall (tested on a tablecloth over a box, ADR-056)
-  bending_stiffness: 100.0       # to confirm: bending rigidity, N mm (1e-4 N m; high: big soft folds)
+  bending_stiffness: 60.0        # to confirm: bending rigidity (Coverlast is light and folds easily;
+                                 # lower than a 300 g canvas: more, smaller folds)
   thickness_mm: 3.5              # contact distance: the fabric's thickness and a little air
   contact_stiffness: 2000000.0   # how hard the furniture holds a point it touches (N/m, high: hard)
   friction: 0.65                 # share of the speed lost where it lies on something
@@ -174,6 +176,8 @@ drape:                           # the drape simulation: the sewn cover falling 
   iterations: 20                 # rounds per step (more: stiffer and truer, slower)
   rest_mm_s: 5                   # it lies still when 99 % of the cloth moves slower than this
   frames: 60                     # frames of the fall kept for the 3D view
+  max_fold_share_pct: 35         # to confirm: the audit's drape check fails above this share in folds
+  max_sag_cm: 24                 # to confirm: ... or where the top sags deeper than this (water)
   fold_deg: 28                   # a point bends at least this much between two triangles: a fold
 roll:
   width_mm: 1500

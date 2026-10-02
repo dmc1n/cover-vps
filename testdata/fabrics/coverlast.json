@@ -1,0 +1,13 @@
+{
+  "format_version": 1,
+  "id": "coverlast",
+  "name": "Sunbrella Coverlast (Dickson): 100% polyester, acrylic coating on the top side, 250 g/m2, roll 152 cm",
+  "status": "partly measured",
+  "weight_g_m2": 250,
+  "roll_width_mm": 1520,
+  "tensile_dan_5cm": { "warp": 195, "weft": 104 },
+  "stretch_pct": { "warp": 0.5, "weft": 1.0, "bias": 3.0 },
+  "weld_shrinkage_pct": { "along": 0.2, "across": 0.5 },
+  "thickness_mm": 0.4,
+  "source": "weight, width, composition: sunbrella.dickson-constant.com (Coverlast 3840/3841, +-5 %); tensile: mbsfabrics.co.uk; stretch, shrinkage and thickness are still placeholders (no elongation published; the weft is about half as strong as the warp, so it gives more): to measure (docs/CALIBRATION.md)"
+}

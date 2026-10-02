@@ -46,6 +46,7 @@ EXTRA_FILES = [
     "drape.json",
     "drape.glb",
     "drape.bin",
+    "drape.png",
     "audit.png",
 ]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)

@@ -42,6 +42,7 @@ IntArray = NDArray[np.int64]
 DRAPE_JSON = "drape.json"
 DRAPE_GLB = "drape.glb"
 DRAPE_BIN = "drape.bin"  # the fall, frame by frame, for the 3D view
+DRAPE_PNG = "drape.png"  # the cover as it lies next to the design, for the AI and the report
 G = 9810.0  # param-ok: gravity, mm/s2
 GRAMS_PER_KG = 1000.0  # param-ok: unit conversion
 MM2_PER_M2 = 1e6  # param-ok: unit conversion
@@ -232,13 +233,21 @@ def _colliders(model_dir: Path) -> list[trimesh.Trimesh]:
     return out
 
 
-def simulate(model_dir: Path, params: EffectiveParams, log: Any = print) -> dict[str, Any]:
+def simulate(
+    model_dir: Path, params: EffectiveParams, log: Any = print, use_ai: bool = True
+) -> dict[str, Any]:
     t0 = time.time()
     c = cloth(model_dir, params)
     contact = Contact(_colliders(model_dir))
     frames, report = run(c, contact, params, log)
     report["run_s"] = round(time.time() - t0, 1)
     write(model_dir, c, frames, report)
+    picture(model_dir, c, frames[-1])
+    if use_ai:
+        report["ai"] = verdict(model_dir, report, params)
+        doc = json.loads((model_dir / DRAPE_JSON).read_text(encoding="utf-8"))
+        doc["ai"] = report["ai"]
+        (model_dir / DRAPE_JSON).write_text(json.dumps(doc) + "\n", encoding="utf-8")
     return report
 
 
@@ -415,6 +424,105 @@ def write(model_dir: Path, c: Cloth, frames: list[Any], report: dict[str, Any]) 
         "points_per_frame": int(len(final)),
     }
     (model_dir / DRAPE_JSON).write_text(json.dumps(doc) + "\n", encoding="utf-8")
+
+
+PICTURE_IN = (15.0, 5.4)  # param-ok: picture size (inches)
+FRONT_AZ = -60  # param-ok: the camera's turn for the front view (degrees)
+
+
+def picture(model_dir: Path, c: Cloth, final: Any) -> Path:
+    """drape.png: the cover as it lies (folds in red) from two sides, next to the design."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from matplotlib.figure import Figure
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
+    from coverengine.io.model_io import load_model
+
+    x = np.asarray(final, np.float64)
+    designed = load_model(model_dir / "hull.glb")
+    light = np.array([0.3, -0.6, 0.75]) / np.linalg.norm([0.3, -0.6, 0.75])
+    fold = measures_fold(c, x)
+    lo, hi = x.min(axis=0), x.max(axis=0)
+    mid, r = (lo + hi) / 2, float((hi - lo).max()) / 2
+    fig = Figure(figsize=PICTURE_IN)
+    views = [("draped, from the front", x, c.faces, fold, FRONT_AZ),
+             ("designed", None, None, None, FRONT_AZ),
+             ("draped, from the back", x, c.faces, fold, FRONT_AZ + 180)]  # fmt: skip
+    for i, (title, v, f, hot, az) in enumerate(views):
+        ax = fig.add_subplot(1, 3, i + 1, projection="3d")
+        if v is None or f is None:
+            v, f = np.asarray(designed.vertices), np.asarray(designed.faces)
+        tri = v[f]
+        n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+        n /= np.linalg.norm(n, axis=1, keepdims=True) + 1e-9  # param-ok
+        shade = (0.35 + 0.65 * np.abs(n @ light))[:, None]  # param-ok: lighting
+        base = np.tile([0.52, 0.53, 0.44], (len(f), 1))  # param-ok: house sage
+        if hot is not None:
+            t = np.clip(hot[f].max(axis=1) / 60.0, 0, 1)[:, None]  # param-ok: full red at 60 deg
+            base = base * (1 - t) + np.array([0.70, 0.25, 0.17]) * t  # param-ok: house red
+        ax.add_collection3d(Poly3DCollection(tri, facecolors=np.clip(base * shade, 0, 1),
+                                             edgecolor="none"))  # fmt: skip
+        ax.set_xlim(mid[0] - r, mid[0] + r)
+        ax.set_ylim(mid[1] - r, mid[1] + r)
+        ax.set_zlim(0, 2 * r)
+        ax.view_init(22, az)  # param-ok: view
+        ax.set_axis_off()
+        ax.set_title(title)
+    fig.tight_layout()
+    out = model_dir / DRAPE_PNG
+    fig.savefig(out, dpi=80)  # param-ok: picture resolution
+    return out
+
+
+def measures_fold(c: Cloth, x: Array) -> Array:
+    """How sharply the cloth bends at every point (degrees), within the pieces."""
+    mesh = trimesh.Trimesh(x, c.faces, process=False)
+    same = c.piece[mesh.face_adjacency[:, 0]] == c.piece[mesh.face_adjacency[:, 1]]
+    fold = np.zeros(len(x))
+    edges = mesh.face_adjacency_edges[same]
+    np.maximum.at(fold, edges[:, 0], mesh.face_adjacency_angles[same])
+    np.maximum.at(fold, edges[:, 1], mesh.face_adjacency_angles[same])
+    return np.degrees(fold)
+
+
+AI_SYSTEM = """You judge a simulated outdoor furniture cover for a workshop. The cut pieces were
+sewn virtually and dropped over the furniture under gravity: the picture shows the cover as it
+lies (red where the fabric folds sharply), from the front and from the back, next to the designed
+shape. You also get the numbers: the share of the cover in folds, the tightest stretch, how far
+the top sags below the design (where nothing holds it), and how much of it lies on the
+furniture. A good cover lies smooth and taut, with few folds; folds mean a piece has more
+fabric than the shape needs; a deep sag on top means water may stand there (water must always
+run off). The fabric values are estimates, so judge places and shapes more than exact sizes.
+Answer with JSON only:
+{"verdict": "good" | "doubt" | "wrong", "summary": "one or two plain sentences",
+ "problems": ["where, what and why, short"], "advice": ["what to change in the pattern"]}"""
+
+
+def verdict(model_dir: Path, report: dict[str, Any], params: EffectiveParams) -> dict[str, Any]:
+    """DeepSeek's opinion on the drape: the picture and the numbers."""
+    import base64
+
+    from coverengine.ai import ask_parts, lessons_text
+
+    facts = {k: v for k, v in report.items() if not k.startswith("_") and k != "ai"}
+    png = base64.b64encode((model_dir / DRAPE_PNG).read_bytes()).decode()
+    parts: list[dict[str, Any]] = [
+        {"type": "text", "text": json.dumps(facts)},
+        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{png}"}},
+    ]
+    try:
+        ans = ask_parts(params, AI_SYSTEM + lessons_text("all"), parts)
+    except Exception as exc:  # noqa: BLE001 - the AI is a second opinion
+        return {"error": str(exc)}
+    return {
+        "model": str(params["ai.model"]),
+        "verdict": str(ans.get("verdict", "")),
+        "summary": str(ans.get("summary", "")),
+        "problems": [str(p) for p in ans.get("problems", [])],
+        "advice": [str(a) for a in ans.get("advice", [])],
+    }
 
 
 def summary(report: dict[str, Any]) -> str:
