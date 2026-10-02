@@ -175,6 +175,9 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     fold line in pen, so there is no seam on top. Should this be the default for every cover, or
     only where you ask (as now for the Lucia)? As default it also joins the Kota's back strip to
     its slope.
+    **Answered 2 Oct 2026:** only where the owner asks (`seams.fold_merge` off by default, on per
+    model).
 48. **Minimum piece width:** no piece narrower than 10 cm (now there are pieces of 3 to 8 cm on
     21 SUNS models). Is 10 cm right?
+    **Answered 2 Oct 2026:** to be learned from our analyses; 10 cm for now (marked to confirm).
 
