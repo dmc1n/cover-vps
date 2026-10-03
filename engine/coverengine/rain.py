@@ -36,6 +36,10 @@ from coverengine.params import EffectiveParams
 
 Array = NDArray[np.float64]
 RAIN_JSON, RAIN_GLB, RAIN_PNG = "rain.json", "rain.glb", "rain.png"
+STREAM_FROM = 0.45  # param-ok: display: a point is a stream from this share of the most flow
+POND_FULL_MM = 30.0  # param-ok: display: a pond this deep is full red
+# the rain on the cover as it really lies, after the drape (ADR-057): the same, and a heatmap
+WET_JSON, WET_GLB, WET_PNG = "drape_rain.json", "drape_rain.glb", "drape_rain.png"
 G = 9.81  # param-ok: gravity (m/s2)
 WATER_KG_M3 = 1000.0  # param-ok: density of water
 MM_PER_M = 1000.0  # param-ok: unit conversion
@@ -117,9 +121,20 @@ def accumulate(filled: Array, inside: NDArray[np.bool_]) -> tuple[Array, NDArray
     return acc.reshape(ni, nj), down
 
 
-def simulate(model_dir: Path, params: EffectiveParams, use_ai: bool = True) -> dict[str, Any]:
+def simulate(
+    model_dir: Path, params: EffectiveParams, use_ai: bool = True, surface: str = "design"
+) -> dict[str, Any]:
+    """surface: "design" (the designed cover surface, hull.glb) or "drape" (the sewn cover as
+    it lies after `cover drape`, drape.glb: ADR-057)."""
+    if surface not in ("design", "drape"):
+        raise ValueError(f"surface: design or drape, not {surface!r}")
+    draped = surface == "drape"
+    json_name, glb_name, png_name = (WET_JSON, WET_GLB, WET_PNG) if draped else (
+        RAIN_JSON, RAIN_GLB, RAIN_PNG)  # fmt: skip
+    if draped and not (model_dir / "drape.glb").is_file():
+        raise FileNotFoundError("no drape yet (cover drape first)")
     h = _p(params, "rain.cell_mm")
-    cover = load_model(model_dir / "hull.glb")
+    cover = load_model(model_dir / ("drape.glb" if draped else "hull.glb"))
     hm = rasterize(cover.vertices, cover.faces, h, 2 * h)
     z = np.where(np.isfinite(hm.z), hm.z, np.nan)
     z = np.where(np.isnan(z), np.inf * -1, z)
@@ -189,10 +204,12 @@ def simulate(model_dir: Path, params: EffectiveParams, use_ai: bool = True) -> d
     ponds.sort(key=lambda p: -p["volume_l"])
 
     drops, exits = _drops(hm, zf, inside, pond, down, params)
-    seams = _seams_along(model_dir, drops, params)
+    # the seams' places are the designed ones; on the draped cover they have moved
+    seams = [] if draped else _seams_along(model_dir, drops, params)
     stream_cells = acc > max(acc.max() * 0.05, 1.0)  # param-ok: the main streams
     out: dict[str, Any] = {
         "format_version": 1,
+        "surface": surface,
         "cell_mm": h,
         "cover_area_m2": round(float(inside.sum()) * h * h / M2, 2),
         "ponds": ponds,
@@ -206,12 +223,15 @@ def simulate(model_dir: Path, params: EffectiveParams, use_ai: bool = True) -> d
         "dry": not ponds and float(flat.sum()) * h * h < _p(params, "hull.flat_patch_mm") ** 2,
         "drops": drops,
     }
-    _write_glb(model_dir, hm, filled, pond, flat, h)
-    _picture(model_dir, hm, zf, acc, pond, flat, inside)
+    if draped:
+        out["heat"] = heatmap(model_dir / glb_name, cover, hm, zf, filled, acc, pond, flat, h)
+    else:
+        _write_glb(model_dir / glb_name, hm, filled, pond, flat, h)
+    _picture(model_dir / png_name, hm, zf, acc, pond, flat, inside)
     if use_ai:
-        out["ai"] = _advice(model_dir, out, params)
+        out["ai"] = _advice(model_dir / png_name, out, params)
     # strict JSON: a browser cannot read Infinity or NaN
-    (model_dir / RAIN_JSON).write_text(json.dumps(out, allow_nan=False) + "\n", encoding="utf-8")
+    (model_dir / json_name).write_text(json.dumps(out, allow_nan=False) + "\n", encoding="utf-8")
     return out
 
 
@@ -352,7 +372,7 @@ def _cells_mesh(
     return trimesh.Trimesh(v, f, process=False)
 
 
-def _write_glb(model_dir: Path, hm: Any, filled: Array, pond: Any, flat: Any, h: float) -> None:
+def _write_glb(path: Path, hm: Any, filled: Array, pond: Any, flat: Any, h: float) -> None:
     from coverengine.hull.build import _coloured
 
     parts = []
@@ -362,16 +382,13 @@ def _write_glb(model_dir: Path, hm: Any, filled: Array, pond: Any, flat: Any, h:
     fl = _cells_mesh(flat, np.where(np.isfinite(filled), filled, 0.0), hm, h)
     if fl is not None:
         parts.append(("flat", _coloured(fl, FLAT_RGBA)))
-    path = model_dir / RAIN_GLB
     if parts:
         path.write_bytes(glb_bytes(parts))
     else:
         path.unlink(missing_ok=True)
 
 
-def _picture(
-    model_dir: Path, hm: Any, zf: Array, acc: Array, pond: Any, flat: Any, inside: Any
-) -> None:
+def _picture(path: Path, hm: Any, zf: Array, acc: Array, pond: Any, flat: Any, inside: Any) -> None:
     """Top view: the cover in grey shades by height, streams dark blue, flat parts light blue,
     ponds blue (for the AI and the report)."""
     from matplotlib.figure import Figure
@@ -391,7 +408,56 @@ def _picture(
     ax.set_title("rain: streams dark blue, flat parts light blue, ponds blue (front at the bottom)",
                  fontsize=TITLE_PT)  # fmt: skip
     ax.axis("off")
-    fig.savefig(model_dir / RAIN_PNG, metadata={"Software": None})
+    fig.savefig(path, metadata={"Software": None})
+
+
+# the heatmap's colours, from dry to a pond (RGBA): it runs off, water streams past, it stands
+# on a flat part, a pond
+HEAT_RGBA = {
+    "dry": (133, 136, 111, 255),  # param-ok: display colour
+    "stream": (230, 190, 60, 255),  # param-ok: display colour
+    "flat": (230, 120, 40, 255),  # param-ok: display colour
+    "pond": (178, 40, 30, 255),  # param-ok: display colour
+}  # param-ok: display colours (house sage, amber, orange, red)
+
+
+def heatmap(
+    path: Path, cover: trimesh.Trimesh, hm: Any, zf: Array, filled: Array, acc: Array,
+    pond: Any, flat: Any, h: float,
+) -> dict[str, Any]:  # fmt: skip
+    """The draped cover coloured by where water goes (ADR-057): every point seen from above gets
+    the state of its grid cell: a pond (red, darker with depth), a flat part where water stands
+    (orange), a stream that much water runs through (amber, by how much) or dry (sage). Points
+    under the top (the sides) are dry: water runs down them."""
+    v = np.asarray(cover.vertices)
+    i = np.clip(np.searchsorted(hm.xs, v[:, 0]) - 1, 0, len(hm.xs) - 1)
+    j = np.clip(np.searchsorted(hm.ys, v[:, 1]) - 1, 0, len(hm.ys) - 1)
+    top = np.isfinite(zf[i, j]) & (v[:, 2] > zf[i, j] - 2 * h)  # seen from above
+    gap = np.nan_to_num(filled[i, j], nan=0.0, posinf=0.0, neginf=0.0) - np.nan_to_num(
+        zf[i, j], nan=0.0, posinf=0.0, neginf=0.0
+    )
+    depth = np.where(top & pond[i, j], gap, 0.0)
+    flow = np.where(top, np.log1p(acc[i, j]) / max(float(np.log1p(acc.max())), 1e-9), 0.0)
+    rgba = np.tile(np.array(HEAT_RGBA["dry"], float), (len(v), 1))
+    stream = flow > STREAM_FROM
+    t = np.clip((flow - STREAM_FROM) / (1 - STREAM_FROM), 0, 1)[:, None]
+    rgba[stream] = (rgba * (1 - t) + np.array(HEAT_RGBA["stream"], float) * t)[stream]
+    standing = top & flat[i, j]
+    rgba[standing] = HEAT_RGBA["flat"]
+    wet = depth > 0
+    shade = np.clip(depth / POND_FULL_MM, 0.4, 1.0)[:, None]  # param-ok: a light pond still shows
+    rgba[wet] = (np.array(HEAT_RGBA["flat"], float) * (1 - shade) +
+                 np.array(HEAT_RGBA["pond"], float) * shade)[wet]  # fmt: skip
+    from coverengine.io.model_io import linear_colours
+
+    mesh = trimesh.Trimesh(v, cover.faces, vertex_colors=linear_colours(rgba), process=False)
+    path.write_bytes(glb_bytes([("water", mesh)]))
+    share = 100.0 / max(len(v), 1)  # param-ok: percent
+    return {
+        "pond_points_pct": round(share * float(wet.sum()), 1),
+        "flat_points_pct": round(share * float((standing & ~wet).sum()), 1),
+        "stream_points_pct": round(share * float((stream & ~standing & ~wet).sum()), 1),
+    }
 
 
 AI_SYSTEM = """You judge how rain behaves on an outdoor furniture cover for a cover workshop.
@@ -406,12 +472,11 @@ slope of 5 degrees or more sheds water. Answer with JSON only:
  steeper slope, a seam moved, a gable instead of a flat top, ..."]}"""
 
 
-def _advice(model_dir: Path, result: dict[str, Any], params: EffectiveParams) -> dict[str, Any]:
+def _advice(pic: Path, result: dict[str, Any], params: EffectiveParams) -> dict[str, Any]:
     from coverengine.ai import ask_parts, lessons_text
 
     facts = {k: v for k, v in result.items() if k != "drops"}
     parts: list[dict[str, Any]] = [{"type": "text", "text": json.dumps(facts)}]
-    pic = model_dir / RAIN_PNG
     if pic.is_file():
         data = base64.b64encode(pic.read_bytes()).decode()
         parts.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{data}"}})

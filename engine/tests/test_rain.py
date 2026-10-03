@@ -69,3 +69,27 @@ def test_a_sloping_top_is_dry(tmp_path: Path) -> None:
     r = simulate(d, params, use_ai=False)
     assert not r["ponds"] and r["flat_area_m2"] == 0 and r["dry"]
     assert r["exits"]["front"] > r["exits"]["back"]  # it runs off the low side
+
+
+def test_the_design_is_dry_but_the_draped_cover_holds_water_where_it_sags(tmp_path: Path) -> None:
+    """ADR-057: the same rain on the cover as it lies after the drape; the heatmap marks the
+    pond in red and the dry parts in sage."""
+    from coverengine.rain import HEAT_RGBA, WET_GLB, WET_JSON
+
+    params = Registry.load(None).resolve()
+    d = _model(tmp_path, _surface(dip_mm=0, slope_deg=8))  # designed: a sloping, dry top
+    sagged = _surface(dip_mm=80, slope_deg=2)  # as it lies: sunk in the middle
+    (d / "drape.glb").write_bytes(glb_bytes([("drape", sagged)]))
+    assert simulate(d, params, use_ai=False)["dry"]
+    wet = simulate(d, params, use_ai=False, surface="drape")
+    assert wet["surface"] == "drape" and wet["ponds"] and not wet["dry"]
+    assert wet["heat"]["pond_points_pct"] > 0
+    assert json.loads((d / WET_JSON).read_text())["ponds"]
+    sc = trimesh.load(d / WET_GLB, force="scene")
+    colours = np.asarray(next(iter(sc.geometry.values())).visual.vertex_colors)[:, :3]
+    from coverengine.io.model_io import linear_colours
+
+    seen = {tuple(c) for c in colours.tolist()}
+    dry = tuple(linear_colours([HEAT_RGBA["dry"]])[0][:3].tolist())  # stored as linear light
+    assert dry in seen  # the sides run off
+    assert any(c[0] > 3 * max(c[1], 1) for c in seen)  # a pond in red

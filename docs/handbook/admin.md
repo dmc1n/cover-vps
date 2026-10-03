@@ -90,3 +90,17 @@ and shows the cover as it lies.
 
 **Back to the design** shows the designed surface again. The fabric values are estimates until
 the fabric has been measured.
+
+## Water on the cover as it lies (heatmap)
+
+After the drape simulation the rain falls on the cover as it really lies.
+
+- In the 3D view, choose **Drape**, then switch **Water** on. The cover is coloured:
+  - **sage**: water runs off;
+  - **amber**: water streams past;
+  - **orange**: flat, water stands;
+  - **red**: a pond (darker is deeper).
+- The card gives the number of ponds, the litres and the deepest point, and whether a pond
+  keeps growing under its own weight.
+
+The rain on the designed surface (the **Rain** button) stays, to compare.

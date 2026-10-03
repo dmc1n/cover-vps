@@ -46,6 +46,19 @@ export interface Drape {
     advice?: string[];
     error?: string;
   };
+  wet?: {
+    ponds: number;
+    pond_volume_l: number;
+    pond_area_m2: number;
+    deepest_mm: number;
+    flat_area_m2: number;
+    growing_ponds: number;
+    dry: boolean;
+    pond_points_pct?: number;
+    flat_points_pct?: number;
+    stream_points_pct?: number;
+    ai?: string | null;
+  };
 }
 
 /** The rain simulation (rain.json, ADR-049). */

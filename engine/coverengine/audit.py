@@ -148,6 +148,9 @@ def drape_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any
         problems.append(f"folds on {folds:g} % of the cover (more than {most:g} %)")
     if sag > deepest:
         problems.append(f"the top sags {sag:.0f} cm where nothing holds it (water)")
+    wet = d.get("wet") or {}  # the rain on the cover as it lies (ADR-057)
+    if float(wet.get("pond_volume_l", 0.0)) > float(params["drape.max_pond_l"]):
+        problems.append(f"{wet['pond_volume_l']} l of rain stays on it in {wet['ponds']} pond(s)")
     ai = (d.get("ai") or {}).get("verdict")
     detail = "; ".join(problems) or f"folds on {folds:g} %, sags at most {sag:.0f} cm"
     return [_check("drape", not problems, detail + (f"; AI: {ai}" if ai else ""))]

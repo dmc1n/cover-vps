@@ -444,7 +444,16 @@ def _cmd_rain(args: argparse.Namespace) -> int:
 
     cover_json = args.model / "cover.json"
     params = resolve_params(args, cover_json if cover_json.is_file() else None)
-    r = simulate(args.model, params, use_ai=not args.no_ai)
+    r = simulate(args.model, params, use_ai=not args.no_ai, surface=args.on)
+    if args.on == "drape":  # the drape's own record gets the rain too (ADR-057)
+        import json as _json
+
+        from coverengine.drape import DRAPE_JSON, wet_summary
+
+        path = args.model / DRAPE_JSON
+        doc = _json.loads(path.read_text(encoding="utf-8"))
+        doc["wet"] = wet_summary(r)
+        path.write_text(_json.dumps(doc) + "\n", encoding="utf-8")
     print(f"ponds   {len(r['ponds'])} ({r['pond_area_m2']:g} m2, {r['pond_volume_l']:g} l), "
           f"{r['growing_ponds']} keep growing under their weight")  # fmt: skip
     print(f"flat    {r['flat_area_m2']:g} m2 flatter than {params['hull.min_slope_deg']} degrees")
@@ -808,6 +817,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("rain", help="where rain goes on the cover (rain.json, rain.glb)")
     p.add_argument("model", type=Path, help="model directory with a cover surface")
     p.add_argument("--no-ai", action="store_true", help="without the AI's verdict")
+    p.add_argument(
+        "--on",
+        choices=["design", "drape"],
+        default="design",
+        help="the designed surface, or the cover as it lies after cover drape",
+    )
     _add_param_args(p)
     p.set_defaults(handler=_cmd_rain)
 

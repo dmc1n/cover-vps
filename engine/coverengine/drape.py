@@ -243,12 +243,33 @@ def simulate(
     report["run_s"] = round(time.time() - t0, 1)
     write(model_dir, c, frames, report)
     picture(model_dir, c, frames[-1])
+    # then the rain on the cover as it lies (ADR-057): where water would collect
+    from coverengine import rain
+
+    log("rain on the draped cover ...")
+    wet = rain.simulate(model_dir, params, use_ai=use_ai, surface="drape")
+    report["wet"] = wet_summary(wet)
     if use_ai:
         report["ai"] = verdict(model_dir, report, params)
-        doc = json.loads((model_dir / DRAPE_JSON).read_text(encoding="utf-8"))
-        doc["ai"] = report["ai"]
-        (model_dir / DRAPE_JSON).write_text(json.dumps(doc) + "\n", encoding="utf-8")
+    doc = json.loads((model_dir / DRAPE_JSON).read_text(encoding="utf-8"))
+    doc.update({k: report[k] for k in ("wet", "ai") if k in report})
+    (model_dir / DRAPE_JSON).write_text(json.dumps(doc) + "\n", encoding="utf-8")
     return report
+
+
+def wet_summary(wet: dict[str, Any]) -> dict[str, Any]:
+    """The rain on the draped cover, in short (for drape.json, the audit and the AI)."""
+    return {
+        "ponds": len(wet["ponds"]),
+        "pond_volume_l": wet["pond_volume_l"],
+        "pond_area_m2": wet["pond_area_m2"],
+        "deepest_mm": max((p["max_depth_mm"] for p in wet["ponds"]), default=0.0),
+        "flat_area_m2": wet["flat_area_m2"],
+        "growing_ponds": wet["growing_ponds"],
+        "dry": wet["dry"],
+        **wet.get("heat", {}),
+        "ai": (wet.get("ai") or {}).get("verdict"),
+    }
 
 
 def run(
@@ -408,9 +429,9 @@ def write(model_dir: Path, c: Cloth, frames: list[Any], report: dict[str, Any]) 
     base = np.array([133, 136, 111, 255.0])  # param-ok: house sage
     hot = np.array([178, 64, 44, 255.0])  # param-ok: house red
     colours = (base * (1 - t) + hot * t).astype(np.uint8)
-    from coverengine.io.model_io import glb_bytes
+    from coverengine.io.model_io import glb_bytes, linear_colours
 
-    m = trimesh.Trimesh(final, c.faces, vertex_colors=colours, process=False)
+    m = trimesh.Trimesh(final, c.faces, vertex_colors=linear_colours(colours), process=False)
     (model_dir / DRAPE_GLB).write_bytes(glb_bytes([("drape", m)]))
     # the fall: every frame's points as 16-bit numbers inside the box of all frames
     allp = np.stack(frames)
@@ -526,6 +547,16 @@ def verdict(model_dir: Path, report: dict[str, Any], params: EffectiveParams) ->
 
 
 def summary(report: dict[str, Any]) -> str:
+    w = report.get("wet") or {}
+    rain = (
+        f"; rain: {w['ponds']} pond(s), {w['pond_volume_l']} l, {w['flat_area_m2']} m2 flat"
+        if w
+        else ""
+    )
+    return rain_free(report) + rain
+
+
+def rain_free(report: dict[str, Any]) -> str:
     return (
         f"{report['points']} points, {report['seconds_simulated']} s simulated in "
         f"{report['run_s']} s; folds on {report['fold_area_m2']} m2 "

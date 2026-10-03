@@ -301,6 +301,17 @@ def _glb(parts: Sequence[Part]) -> bytes:
     return glb_bytes([(p.path, trimesh.Trimesh(p.vertices, p.faces, process=False)) for p in parts])
 
 
+def linear_colours(rgba: Any) -> Any:
+    """Colours per point for a GLB: glTF reads COLOR_0 as linear light, while our colours are
+    written as on screen (sRGB); without this the 3D view shows them far too dark."""
+    import numpy as np
+
+    c = np.asarray(rgba, dtype=np.float64) / 255.0
+    rgb = c[:, :3]
+    lin = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)  # param-ok: sRGB
+    return np.round(np.column_stack([lin, c[:, 3:]]) * 255.0).astype(np.uint8)  # param-ok
+
+
 def glb_bytes(meshes: Sequence[tuple[str, trimesh.Trimesh]]) -> bytes:
     """A GLB with canonical mm Z-up meshes under the glTF (metres, Y up) root node."""
     scene = trimesh.Scene()

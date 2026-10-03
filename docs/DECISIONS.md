@@ -1030,3 +1030,45 @@ docs/plans/drape-simulation.md).
     pieces do not give. The remedy is a question of design: something under the cover on the
     seat, or a tighter cut.
 
+
+## ADR-057 — Rain on the cover as it lies, with a water heatmap
+
+The owner, 3 October 2026: "after the fit is known we must do the rain simulation, and with a
+heatmap find where water would collect".
+
+- **The rain runs on the draped cover.** `cover rain --on drape` (and every `cover drape`,
+  right after the fall) runs the rain simulation on `drape.glb`, the sewn cover as it lies,
+  instead of on the designed surface. The method is the same:
+  - a top-view grid;
+  - priority flood for ponds;
+  - flat parts;
+  - flow;
+  - the sag of a pond under its weight.
+
+  The seams' places are left out on the draped cover, because they have moved.
+- **The files:**
+  - `drape_rain.json`: ponds, litres, depth, flat area, growing ponds;
+  - `drape_rain.png`: the top view;
+  - `drape_rain.glb`: the heatmap;
+  - `drape.json` gets a short `wet` summary.
+
+  The rain on the design (`rain.*`) stays, to compare.
+- **The heatmap.** Every point of the draped cover seen from above gets the state of its grid
+  cell:
+  - pond: red, darker with depth;
+  - flat, water stands: orange;
+  - water streams past: amber, by the share of the cover draining through it;
+  - runs off: sage.
+
+  Points under the top (the sides) are dry. The 3D view's drape mode shows it with the
+  **Water** switch and a legend; the drape card gives the rain numbers.
+- **The audit check *drape*** also fails when more than `drape.max_pond_l` (0.33 l, to confirm)
+  stays on the cover as it lies.
+- **The first case.** The Lucia 2-seater right: the design is dry; as it lies, 23 ponds
+  (0.5 l, up to 1.5 cm deep) and 0.31 m² flat, in the hollow over the seat and along the back.
+  DeepSeek: "risk".
+- **Limits:**
+  - The smallest ponds depend on the drape's resolution (about 2 cm) and the 20 mm rain grid.
+    Large ponds are sure; the smallest are an indication.
+  - The water's weight is not fed back into the drape yet (a pond deepening the hollow it
+    lies in, then a new fall). The analytic sag estimate stands in for it.

@@ -177,6 +177,7 @@ drape:                           # the drape simulation: the sewn cover falling 
   rest_mm_s: 5                   # it lies still when 99 % of the cloth moves slower than this
   frames: 60                     # frames of the fall kept for the 3D view
   max_fold_share_pct: 35         # to confirm: the audit's drape check fails above this share in folds
+  max_pond_l: 0.33               # to confirm: ... or more water than this stays on the cover as it lies
   max_sag_cm: 24                 # to confirm: ... or where the top sags deeper than this (water)
   fold_deg: 28                   # a point bends at least this much between two triangles: a fold
 roll:

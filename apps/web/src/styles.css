@@ -266,3 +266,6 @@ button.danger { background: var(--bad); color: #fff; border-color: var(--bad); }
 .guide-page { min-height: 100vh; background: var(--bg); padding: 1px 16px; }
 @media (max-width: 600px) { .guide { padding: 20px 18px; } }
 .swatch.fold { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: #b2402c; vertical-align: middle; }
+.wet { margin-top: 8px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; color: var(--muted); margin-top: 6px; }
+.legend .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }

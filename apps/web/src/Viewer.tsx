@@ -57,12 +57,16 @@ export function Viewer({
   const [raining, setRaining] = useState(false);
   const [draping, setDraping] = useState(false);
   const [drape, setDrape] = useState<Drape | null>(null);
+  const [water, setWater] = useState(true); // the water heatmap over the draped cover
   const drapeAnim = useRef<{
     mesh: THREE.Mesh;
     frames: Float32Array[];
     t: number;
     final: THREE.Object3D | null;
+    wet: THREE.Object3D | null;
   } | null>(null);
+  const waterRef = useRef(water);
+  waterRef.current = water;
   const groups = useRef<Record<string, THREE.Object3D>>({});
   const available = LAYERS.filter((l) => files.includes(l.file));
   const [shown, setShown] = useState<Record<string, boolean>>(
@@ -191,8 +195,10 @@ export function Viewer({
         pos.needsUpdate = true;
         fall.mesh.geometry.computeVertexNormals();
         if (fall.t >= fall.frames.length - 1 && fall.final) {
-          fall.mesh.visible = false; // the cover as it lies, coloured by its folds
-          fall.final.visible = true;
+          fall.mesh.visible = false; // the cover as it lies: its folds, or where water goes
+          const wetShown = waterRef.current && !!fall.wet;
+          fall.final.visible = !wetShown;
+          if (fall.wet) fall.wet.visible = wetShown;
         }
       }
       renderer.render(scene, camera);
@@ -315,7 +321,24 @@ export function Viewer({
         );
         scene.add(mesh);
         added.push(mesh);
-        drapeAnim.current = { mesh, frames, t: 0, final: null };
+        drapeAnim.current = { mesh, frames, t: 0, final: null, wet: null };
+        if (files.includes("drape_rain.glb"))
+          new GLTFLoader().load(
+            `${fileUrl(id, "drape_rain.glb")}?v=${stamp}`,
+            (gltf) => {
+              if (!alive || !sceneRef.current) return;
+              gltf.scene.traverse((o) => {
+                const m = o as THREE.Mesh;
+                if (m.isMesh)
+                  (m.material as THREE.MeshStandardMaterial).side =
+                    THREE.DoubleSide;
+              });
+              gltf.scene.visible = false;
+              sceneRef.current.add(gltf.scene);
+              added.push(gltf.scene);
+              if (drapeAnim.current) drapeAnim.current.wet = gltf.scene;
+            },
+          );
         new GLTFLoader().load(
           `${fileUrl(id, "drape.glb")}?v=${stamp}`,
           (gltf) => {
@@ -345,6 +368,14 @@ export function Viewer({
         obj.visible = !!shownRef.current[file];
     };
   }, [draping, id, stamp, files]);
+
+  useEffect(() => {
+    const fall = drapeAnim.current;
+    if (!fall || fall.t < fall.frames.length - 1 || !fall.final) return;
+    const wetShown = water && !!fall.wet;
+    fall.final.visible = !wetShown;
+    if (fall.wet) fall.wet.visible = wetShown;
+  }, [water]);
 
   const shownRef = useRef(shown);
   shownRef.current = shown;
@@ -409,6 +440,16 @@ export function Viewer({
               {draping ? "Back to the design" : "Drape"}
             </button>
           )}
+          {draping && files.includes("drape_rain.glb") && (
+            <label>
+              <input
+                type="checkbox"
+                checked={water}
+                onChange={(e) => setWater(e.target.checked)}
+              />{" "}
+              Water
+            </label>
+          )}
           {onDrape && (
             <button
               disabled={drapeBusy}
@@ -429,13 +470,14 @@ export function Viewer({
       </div>
       <div className="canvas" ref={host} />
       {raining && rain && <RainReport rain={rain} />}
-      {draping && drape && <DrapeReport drape={drape} />}
+      {draping && drape && <DrapeReport drape={drape} water={water} />}
     </div>
   );
 }
 
-function DrapeReport({ drape }: { drape: Drape }) {
+function DrapeReport({ drape, water }: { drape: Drape; water: boolean }) {
   const ai = drape.ai;
+  const wet = drape.wet;
   const folds = ai?.verdict ? ai.verdict !== "good" : drape.fold_share_pct > 10;
   return (
     <section className={`card rain ${folds ? "risk" : "dry"}`}>
@@ -464,6 +506,30 @@ function DrapeReport({ drape }: { drape: Drape }) {
           Lies on the furniture over {drape.touching_share_pct} % of its points.
         </li>
       </ul>
+      {wet && (
+        <div className="wet">
+          <strong>Rain on the cover as it lies:</strong>{" "}
+          {wet.dry
+            ? "dry: the water runs off."
+            : `${wet.ponds} pond(s), ${wet.pond_volume_l} l (deepest ${(wet.deepest_mm / 10).toFixed(1)} cm), ` +
+              `${wet.flat_area_m2} m² flat where water stands` +
+              (wet.growing_ponds
+                ? `; ${wet.growing_ponds} keep growing under their weight`
+                : "") +
+              "."}
+          {water && (
+            <div className="legend">
+              <span className="swatch" style={{ background: "#85886f" }} /> runs
+              off
+              <span className="swatch" style={{ background: "#e6be3c" }} />{" "}
+              water streams past
+              <span className="swatch" style={{ background: "#e67828" }} />{" "}
+              flat: water stands
+              <span className="swatch" style={{ background: "#b2281e" }} /> pond
+            </div>
+          )}
+        </div>
+      )}
       <p className="muted">
         The fabric values are best guesses until the fabric is measured: the
         places of the folds are right, their size is an estimate.
