@@ -708,7 +708,13 @@ function ModelPage({ id }: { id: string }) {
             }
             rainBusy={!!running && job?.steps.some((s) => s.name === "rain")}
             onDrape={
-              user?.role === "viewer" ? undefined : () => run(["drape"], {})
+              user?.role === "viewer"
+                ? undefined
+                : (engine: string) =>
+                    run(
+                      ["drape"],
+                      engine === "style3d" ? { "drape.engine": "style3d" } : {},
+                    )
             }
             drapeBusy={!!running && job?.steps.some((s) => s.name === "drape")}
           />

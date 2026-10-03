@@ -37,20 +37,35 @@ def _mm(arr: Any, n: int) -> Any:
     return arr.numpy()[:n].astype(np.float32) * MM_PER_M
 
 
-def grain(flat: Array, piece: NDArray[np.int64]) -> Array:
-    """Every piece's flat corners turned so its long side runs along y (the warp)."""
+def grain(flat: Array, piece: NDArray[np.int64], corners3d: Array) -> Array:
+    """Every piece's flat corners turned so the warp (flat +y) runs along the furniture's
+    length (3D x); on a piece across that (an end), along its depth (3D y). Mirror images then
+    get mirrored grain, so a symmetric cover drapes symmetrically. The best-fitting linear map
+    from the flat piece to 3D says which flat direction that is."""
     out = flat.copy()
     for k in np.unique(piece):
         sel = piece == k
-        pts = flat[sel].reshape(-1, 2)
-        c = pts.mean(axis=0)
-        _, _, vt = np.linalg.svd(pts - c, full_matrices=False)
-        long_axis = vt[0]
-        # rotate long_axis onto (0, 1)
-        ang = np.arctan2(long_axis[0], long_axis[1])
+        p2 = flat[sel].reshape(-1, 2)
+        p3 = corners3d[sel].reshape(-1, 3)
+        c2, c3 = p2.mean(axis=0), p3.mean(axis=0)
+        jac, *_ = np.linalg.lstsq(p2 - c2, p3 - c3, rcond=None)  # (2, 3): flat -> 3D
+        best = None
+        for axis in (np.array([1.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0])):
+            d = np.linalg.pinv(jac.T) @ axis  # the flat direction that goes along it in 3D
+            reach = float(np.linalg.norm(jac.T @ d))
+            if np.linalg.norm(d) > 0 and reach > ALONG:
+                best = d / np.linalg.norm(d)
+                break
+        if best is None:  # a piece lying across both: its long side
+            _, _, vt = np.linalg.svd(p2 - c2, full_matrices=False)
+            best = vt[0]
+        ang = np.arctan2(best[0], best[1])  # turn best onto (0, 1)
         r = np.array([[np.cos(ang), -np.sin(ang)], [np.sin(ang), np.cos(ang)]])
-        out[sel] = ((flat[sel].reshape(-1, 2) - c) @ r.T).reshape(-1, 3, 2)
+        out[sel] = ((p2 - c2) @ r.T).reshape(-1, 3, 2)
     return out
+
+
+ALONG = 0.5  # param-ok: the piece runs at least half along that 3D direction
 
 
 def run(
@@ -68,7 +83,7 @@ def run(
     thick = _p(params, "drape.thickness_mm") / MM_PER_M
     builder = newton.ModelBuilder()
     newton.solvers.SolverStyle3D.register_custom_attributes(builder)
-    flat = grain(c.flat, c.piece) / MM_PER_M
+    flat = grain(c.flat, c.piece, c.x[c.faces]) / MM_PER_M
     n = len(c.x)
     normals = trimesh.Trimesh(c.x, c.faces, process=False).vertex_normals
     start = (c.x + normals * _p(params, "drape.thickness_mm")) / MM_PER_M

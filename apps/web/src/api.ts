@@ -25,6 +25,7 @@ export const STEP_LABEL: Record<Step, string> = {
 
 /** The drape simulation (drape.json, ADR-056): the sewn cover falling over the furniture. */
 export interface Drape {
+  engine?: string;
   fold_area_m2: number;
   fold_share_pct: number;
   max_fold_deg: number;

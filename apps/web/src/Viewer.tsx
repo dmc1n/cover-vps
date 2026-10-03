@@ -43,7 +43,7 @@ export function Viewer({
   stamp: number;
   onRain?: () => void;
   rainBusy?: boolean;
-  onDrape?: () => void;
+  onDrape?: (engine: string) => void;
   drapeBusy?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -456,7 +456,7 @@ export function Viewer({
               title="The cut pieces sewn and dropped over the furniture: folds where there is too much fabric"
               onClick={() => {
                 setDraping(false);
-                onDrape();
+                onDrape("own");
               }}
             >
               {drapeBusy
@@ -464,6 +464,18 @@ export function Viewer({
                 : files.includes("drape.json")
                   ? "Drape again"
                   : "Drape simulation"}
+            </button>
+          )}
+          {onDrape && (
+            <button
+              disabled={drapeBusy}
+              title="Newton's garment solver (Style3D): the fabric's warp and weft, more lifelike; about 40 minutes for a sofa, the other jobs wait"
+              onClick={() => {
+                setDraping(false);
+                onDrape("style3d");
+              }}
+            >
+              Lifelike (Style3D, ~40 min)
             </button>
           )}
         </span>
@@ -484,6 +496,7 @@ function DrapeReport({ drape, water }: { drape: Drape; water: boolean }) {
       <div className="rain-head">
         <strong>The sewn cover, dropped over the furniture</strong>
         <span className="muted">
+          {drape.engine === "style3d" ? "Style3D (lifelike), " : ""}
           {drape.points.toLocaleString()} points, {drape.seconds_simulated} s of
           falling, worked out in {Math.round(drape.run_s)} s
         </span>
