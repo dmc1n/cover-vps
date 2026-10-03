@@ -18,6 +18,8 @@ dependencies = [
   "ruamel.yaml",
   "matplotlib",
   "pymupdf",
+  "newton>=1.6",
+  "warp-lang>=1.17",
 ]
 
 [project.optional-dependencies]

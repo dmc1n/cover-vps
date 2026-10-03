@@ -65,6 +65,7 @@ class Cloth:
     rest_area: Array  # (m,)
     names: list[str]
     bending: sp.csr_matrix  # (n, n) quadratic bending of the flat rest shape
+    flat: Array | None = None  # (m, 3, 2) every triangle's corners in its flat piece (mm)
 
 
 def cloth(model_dir: Path, params: EffectiveParams) -> Cloth:
@@ -81,7 +82,7 @@ def cloth(model_dir: Path, params: EffectiveParams) -> Cloth:
     x = np.zeros((n, D3))
     np.add.at(x, weld, v3)
     x /= np.bincount(weld, minlength=n)[:, None]
-    all_faces, all_piece, inv, area = [], [], [], []
+    all_faces, all_piece, inv, area, flats = [], [], [], [], []
     rows, cols, vals = [], [], []
     solver = str(params["flatten.solver"])
     iterations = int(params["flatten.iterations"])
@@ -102,6 +103,7 @@ def cloth(model_dir: Path, params: EffectiveParams) -> Cloth:
         area.append(np.abs(det[good]) / 2)
         all_faces.append(weld[used[local[good]]])
         all_piece.append(np.full(int(good.sum()), k))
+        flats.append(uv[local[good]])
         # bending: the cotangent Laplacian of the flat piece, its inner points only
         lap = igl.cotmatrix(np.column_stack([uv, np.zeros(len(uv))]), local.astype(np.int32))
         mass = igl.massmatrix(
@@ -131,7 +133,7 @@ def cloth(model_dir: Path, params: EffectiveParams) -> Cloth:
     )
     return Cloth(
         x, np.vstack(all_faces), np.concatenate(all_piece), np.vstack(inv),
-        np.concatenate(area), names, bending,
+        np.concatenate(area), names, bending, np.vstack(flats),
     )  # fmt: skip
 
 
@@ -150,7 +152,7 @@ def sheet(x: Array, faces: IntArray, uv: Array) -> Cloth:
     minv = sp.diags(1.0 / np.maximum(mass.diagonal()[inner], 1e-9))  # param-ok: no zero area
     bending = (lap[inner].T @ minv @ lap[inner]).tocsr()
     return Cloth(x.copy(), faces, np.zeros(len(faces), np.int64), np.linalg.inv(dm),
-                 np.abs(det) / 2, ["sheet"], bending)  # fmt: skip
+                 np.abs(det) / 2, ["sheet"], bending, uv[faces])  # fmt: skip
 
 
 TIGHTEST_PCT = 99  # param-ok: the measures leave out the odd 1 % (single triangles)
@@ -238,8 +240,17 @@ def simulate(
 ) -> dict[str, Any]:
     t0 = time.time()
     c = cloth(model_dir, params)
-    contact = Contact(_colliders(model_dir))
-    frames, report = run(c, contact, params, log)
+    meshes = _colliders(model_dir)
+    contact = Contact(meshes)
+    if str(params["drape.engine"]) == "style3d":  # Newton's garment solver (ADR-058)
+        from coverengine import drape_style3d
+
+        frames, extra = drape_style3d.run(c, meshes, params, log)
+        report = measures(c, frames[-1].astype(np.float64), contact, params)
+        report.update(extra, points=len(c.x), triangles=int(len(c.faces)), frames=len(frames))
+    else:
+        frames, report = run(c, contact, params, log)
+        report["engine"] = "own"
     report["run_s"] = round(time.time() - t0, 1)
     write(model_dir, c, frames, report)
     picture(model_dir, c, frames[-1])

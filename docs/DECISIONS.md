@@ -1072,3 +1072,32 @@ heatmap find where water would collect".
     Large ponds are sure; the smallest are an indication.
   - The water's weight is not fed back into the drape yet (a pond deepening the hollow it
     lies in, then a new fall). The analytic sag estimate stands in for it.
+
+## ADR-058 — Newton's Style3D as a second drape engine
+
+The owner, 3 October 2026: "first try option 1" (docs/plans/realistic-drape-engine.md):
+Newton's Style3D solver on this server's CPU, before a GPU is considered.
+
+- `drape.engine: own | style3d`, with `own` the default.
+- `coverengine/drape_style3d.py` gives Style3D the sewn cover in 3D, with every triangle's flat
+  shape (`panel_verts`), and the colliders: furniture, balloons, chair space and the ground.
+  Everything after the fall stays the same: playback, rain, heatmap and audit.
+- **The grain.** It is not known before nesting. The long side of every piece is taken along
+  the warp.
+- **The fabric**, all to confirm:
+  - stretch: warp 10,000 and weft 5,000 N/m (Coverlast's weft is about half as strong), shear
+    800;
+  - bending per direction.
+- **The tablecloth test:** on the box, the sides down, under 1 % stretch (own solver: 2.6 %).
+- **Kota 2-seater, Style3D against own:**
+  - folds 1 % against 26 %;
+  - stretch 0.7 % against 31 % (single triangles);
+  - sag 6.6 cm against 18;
+  - no ponds;
+  - 42 minutes against 5.
+
+  The cover lies smooth and taut with rounded edges, like a tensioned canvas.
+- **Lucia 2-seater right:** folds 12 %, stretch 0.6 %.
+- **The cost.** Warp runs its kernels on one CPU core, about 9 s per frame for a sofa (13,500
+  points). A night run over the catalogue would take days here. On a GPU it is many times
+  faster, with self-contact (VBD) as well: option 3 of the plan.

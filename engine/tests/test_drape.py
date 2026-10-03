@@ -49,3 +49,22 @@ def test_the_same_input_gives_the_same_drape() -> None:
     a, _ = drape.run(_square(600.0, 11, 320.0), drape.Contact([box]), PARAMS, lambda *_: None)
     b, _ = drape.run(_square(600.0, 11, 320.0), drape.Contact([box]), PARAMS, lambda *_: None)
     assert np.array_equal(a[-1], b[-1])
+
+
+def test_style3d_drapes_the_tablecloth_with_canvas_like_stretch() -> None:
+    """ADR-058: Newton's garment solver on the same tablecloth: on the box, down the sides,
+    and hardly any stretch (a woven fabric)."""
+    from coverengine import drape_style3d
+
+    params = Registry.load(None).resolve(trial={"drape.seconds": 1.0, "drape.engine": "style3d"})
+    cloth = _square(1200.0, 25, 520.0)
+    box = trimesh.creation.box(extents=(600.0, 600.0, 500.0))
+    box.apply_translation((0, 0, 250.0))
+    frames, extra = drape_style3d.run(cloth, [box], params, log=lambda *_: None)
+    x = frames[-1].astype(np.float64)
+    assert extra["engine"] == "style3d"
+    assert np.percentile(_stretch(cloth, x)[:, 0], 99) < 1.01  # under 1 % stretch
+    middle = np.linalg.norm(x[:, :2], axis=1) < 200
+    assert np.all(x[middle, 2] > 490.0)  # on the box
+    edge = (np.abs(cloth.x[:, 0]) > 580) & (np.abs(cloth.x[:, 1]) < 100)
+    assert np.all(x[edge, 2] < 400.0)  # the sides come down
