@@ -189,7 +189,7 @@ drape:                           # the drape simulation: the sewn cover falling 
   damping: 0.012                 # share of the speed lost every step (air, the fabric itself)
   steps_per_second: 60           # time steps per simulated second
   seconds: 5.0                   # at most this long; it stops sooner when the cover lies still
-  settle_seconds: 3.5            # then at most this long to come to rest, with extra damping (ADR-063)
+  settle_seconds: 1.75           # then at most this long to come to rest, with extra damping (ADR-063)
   settle_damping: 0.14           # share of the speed taken off every frame while settling
   iterations: 20                 # rounds per step (more: stiffer and truer, slower)
   rest_mm_s: 5                   # it lies still when 99 % of the cloth moves slower than this

@@ -1211,7 +1211,7 @@ The owner (4 Oct): the drape "makes assumptions that are not realistic". Two of 
 
 - **Settling.** Style3D stopped after `drape.seconds` (5 s), often while the cloth was still
   moving: the picture was a moment in the fall, not the shape the cover keeps.
-  - After the fall the same physics runs for at most `drape.settle_seconds` (3.5 s), with the
+  - After the fall the same physics runs for at most `drape.settle_seconds` (1.75 s), with the
     speed reduced by `drape.settle_damping` (14 %) every frame. It stops as soon as 99 % of
     the cloth moves slower than `drape.rest_mm_s`.
   - This damping only removes motion. It adds no force, so the rest shape is still where
@@ -1233,5 +1233,9 @@ The owner (4 Oct): the drape "makes assumptions that are not realistic". Two of 
     flip or a uniform remesh of the cloth.
   - That remesh, at about 25 mm per edge, is also the answer for the six models that took
     more than 3 hours. They have 36,000 to 129,000 points, against 15,000 for a typical sofa.
-- **Cost:** settling adds up to 3.5 s of simulation, about 70 % more time per model in the
-  worst case. Most models come to rest sooner.
+- **Cost, measured on the Lucia 2-seater:** 4 s of settling changed the sag from 42.6 to
+  42.9 cm. The fall had nearly come to rest after 5 s (6 mm/s at the end), but the run took
+  80 % longer. Settling is therefore kept short (1.75 s, about 35 % extra), enough to confirm the
+  rest shape.
+- **The Lucia's sag (42.9 cm) is the design, not the simulation:** a flat top at the arm's
+  height (87.5 cm) spans the lower back and seat, and the fabric sinks into that space.
