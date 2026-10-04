@@ -160,8 +160,8 @@ rain:                            # cover rain: where rain goes on a cover (ADR-0
   seam_run_mm: 250               # water running along a seam further than this soaks in
 
 drape:                           # the drape simulation: the sewn cover falling over the furniture (ADR-056)
-  engine: own                    # own (projective dynamics, ADR-056) | style3d (Newton's garment solver,
-                                 # stretch and bending per direction, ADR-058)
+  engine: style3d                # style3d (Newton's garment solver, lifelike, ~40 min a sofa; the owner,
+                                 # 2026-10-04: time is fine if it is kept, ADR-059) | own (fast, ADR-056)
   style3d_stretch_weft: 5000.0   # to confirm: Style3D stretch stiffness across the roll (weft), N/m
   style3d_stretch_warp: 10000.0  # to confirm: along the roll (warp); Coverlast's warp is ~2x the weft
   style3d_stretch_shear: 800.0   # to confirm: shear (on the bias a woven fabric gives most)

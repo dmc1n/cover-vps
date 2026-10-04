@@ -1,5 +1,9 @@
 """Background runs: the `cover` steps as subprocesses, one job at a time (a big model takes
-minutes and several GB), with each step's status and log in `jobs/<id>.json`."""
+minutes and several GB), with each step's status and log in `jobs/<id>.json`.
+
+The drape (about 40 minutes with Style3D) has a queue of its own, so it never holds up the other
+models; after a calculation that ends with `export`, the drape follows by itself and its result
+is kept with the model (ADR-059)."""
 
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ LOG_TAIL = 4000  # characters of each step's output kept in the job file
 # cover improve: the program adds seams; cover ai: AI advice; cover rain: the rain simulation;
 # cover drape: the sewn cover falling over the furniture
 EXTRA_STEPS = ["improve", "ai", "rain", "drape"]
+LONG_STEPS = {"drape"}  # a job of only these runs in the second queue
 
 
 @dataclass
@@ -34,11 +39,13 @@ class JobSpec:
 
 
 class Jobs:
-    def __init__(self, store: Store) -> None:
+    def __init__(self, store: Store, drape_after_export: bool = True) -> None:
         self.store = store
+        self.drape_after_export = drape_after_export
         self._queue: queue.Queue[tuple[str, JobSpec]] = queue.Queue()
-        self._thread = threading.Thread(target=self._work, daemon=True)
-        self._thread.start()
+        self._long: queue.Queue[tuple[str, JobSpec]] = queue.Queue()
+        for q in (self._queue, self._long):
+            threading.Thread(target=self._work, args=(q,), daemon=True).start()
 
     def submit(self, spec: JobSpec) -> dict[str, Any]:
         unknown = [s for s in spec.steps if s not in STEPS and s not in EXTRA_STEPS]
@@ -54,7 +61,8 @@ class Jobs:
             "steps": [{"name": s, "status": "waiting", "log": ""} for s in spec.steps],
         }
         self._write(doc)
-        self._queue.put((job_id, spec))
+        long = bool(spec.steps) and set(spec.steps) <= LONG_STEPS
+        (self._long if long else self._queue).put((job_id, spec))
         return doc
 
     def get(self, job_id: str) -> dict[str, Any]:
@@ -89,9 +97,9 @@ class Jobs:
         tmp.write_text(json.dumps(doc, indent=2), encoding="utf-8")
         tmp.replace(path)
 
-    def _work(self) -> None:
+    def _work(self, q: queue.Queue[tuple[str, JobSpec]]) -> None:
         while True:
-            job_id, spec = self._queue.get()
+            job_id, spec = q.get()
             try:
                 self._run(job_id, spec)
             except Exception as exc:  # noqa: BLE001 - a job must never kill the worker
@@ -139,6 +147,10 @@ class Jobs:
                 return
         doc["status"], doc["finished"] = "done", time.time()
         self._write(doc)
+        # a model calculated to the end gets its drape (and the rain on it), kept with the model;
+        # not after a trial run, which is not saved
+        if self.drape_after_export and "export" in spec.steps and not spec.trial:
+            self.submit(JobSpec(spec.model_id, ["drape"], {}))
 
 
 def _yaml(value: Any) -> str:

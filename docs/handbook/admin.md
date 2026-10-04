@@ -78,7 +78,10 @@ COVER_DATA_DIR=~/cover-data uv run cover-users invite <name>      # a new passwo
 ## The drape simulation (3D view)
 
 **Drape simulation** sews the cut pieces virtually and drops them over the furniture (and the
-balloons of a table). It takes a few minutes, in the background. **Drape** then plays the fall
+balloons and chairs of a table), with Newton's Style3D garment solver. It takes about 40
+minutes for a sofa, in a queue of its own, so other work goes on meanwhile. Every new model gets
+it by itself after its calculation; the result is kept with the model and in the nightly
+backup. **Drape** then plays the fall
 and shows the cover as it lies.
 
 - **Red** shows folds: there the piece has more fabric than the shape needs.

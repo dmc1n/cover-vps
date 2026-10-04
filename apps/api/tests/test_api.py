@@ -210,3 +210,36 @@ def test_approval_of_the_definitive_drawing(chair: dict[str, Any]) -> None:
     chair["app"].state.jobs.wait(r.json()["id"], RUN_TIMEOUT_S)
     assert c.get(f"/api/models/{mid}").json()["approval"]["valid"] is False
     assert c.delete(f"/api/models/{mid}/approve").status_code == 200
+
+
+def test_a_full_calculation_is_followed_by_its_drape_in_a_queue_of_its_own(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-059: after a job that ends with export comes the drape (kept with the model), in
+    its own queue; a trial run gets none."""
+    import subprocess
+    import time
+
+    from coverapi import jobs as jobs_mod
+    from coverapi.jobs import Jobs, JobSpec
+    from coverapi.store import Store
+
+    ran: list[list[str]] = []
+
+    def fake(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        ran.append(args[3:])  # after: python -m coverengine.cli
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(jobs_mod.subprocess, "run", fake)
+    store = Store(tmp_path / "data")
+    store.ensure()
+    (store.models / "m").mkdir()
+    jobs = Jobs(store, drape_after_export=True)
+    jobs.wait(jobs.submit(JobSpec("m", ["export"], {}))["id"], 10)
+    jobs.wait(jobs.submit(JobSpec("m", ["export"], {"hull.clearance_mm": 20}))["id"], 10)
+    end = time.time() + 10
+    while time.time() < end and sum(a[0] == "drape" for a in ran) < 1:
+        time.sleep(0.1)
+    time.sleep(0.5)
+    assert [a[0] for a in ran].count("export") == 2
+    assert [a[0] for a in ran].count("drape") == 1  # after the saved run only

@@ -346,7 +346,12 @@ def test_ai_review_and_actions(covers: dict[str, Any], tmp_path: Path) -> None:
     shutil.copytree(covers["root"] / "box_with_legs", d)
     assert main(["flatten", str(d)]) == 0
     assert main(["export", str(d)]) == 0
-    doc = ai.review(d, resolve_model(d))
+    try:
+        doc = ai.review(d, resolve_model(d))
+    except CoverError as exc:  # the AI service itself (no credit, a limit, no key): not our code
+        if any(code in str(exc) for code in ("402", "429", "401", "403")):
+            pytest.skip(f"the AI service is not available: {exc}")
+        raise
     assert doc["pieces_now"] == 5
     assert doc["summary"] and isinstance(doc["target_pieces"], int)
     assert all(s["action"] in ai.ACTIONS for s in doc["suggestions"])  # only known actions

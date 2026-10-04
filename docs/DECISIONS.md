@@ -1101,3 +1101,17 @@ Newton's Style3D solver on this server's CPU, before a GPU is considered.
 - **The cost.** Warp runs its kernels on one CPU core, about 9 s per frame for a sofa (13,500
   points). A night run over the catalogue would take days here. On a GPU it is many times
   faster, with self-contact (VBD) as well: option 3 of the plan.
+
+## ADR-059 — Style3D as the standard drape, made once per model and kept
+
+The owner, 4 October 2026: "40 minutes is no problem for us, as long as it is saved; if we
+add new models, it takes 40 minutes and then they are kept, that is fine".
+
+- `drape.engine` is now `style3d` by default. The 3D view has one **Drape simulation** button
+  (Style3D). The own solver stays for tests and quick batch checks (`--set drape.engine=own`).
+- **A queue of its own.** A drape-only job runs in a second queue. A 40-minute drape never holds
+  up uploads or other calculations.
+- **After a full calculation.** A job that ends with `export` (a new model, or "Run again") is
+  followed by a drape job on its own. The drape, the rain on it and the heatmap are stored with
+  the model (`drape.*`, `drape_rain.*`) and go into the nightly backup. Not after a trial run,
+  which is not saved. `COVER_AUTO_DRAPE=off` switches this off (the API tests do).
