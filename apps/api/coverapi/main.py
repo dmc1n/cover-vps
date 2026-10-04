@@ -82,7 +82,11 @@ def create_app(
     store = Store(data_dir)
     store.ensure()
     # the drape after every full calculation (ADR-059); COVER_AUTO_DRAPE=off for tests
-    jobs = Jobs(store, drape_after_export=os.environ.get("COVER_AUTO_DRAPE", "on") != "off")
+    jobs = Jobs(
+        store,
+        drape_after_export=os.environ.get("COVER_AUTO_DRAPE", "on") != "off",
+        drape_workers=int(os.environ.get("COVER_DRAPE_WORKERS", "4")),
+    )
     app = FastAPI(
         title="Cover Studio", version=__version__, docs_url=None, redoc_url=None, openapi_url=None
     )

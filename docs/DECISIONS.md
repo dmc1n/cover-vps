@@ -1115,3 +1115,7 @@ add new models, it takes 40 minutes and then they are kept, that is fine".
   followed by a drape job on its own. The drape, the rain on it and the heatmap are stored with
   the model (`drape.*`, `drape_rain.*`) and go into the nightly backup. Not after a trial run,
   which is not saved. `COVER_AUTO_DRAPE=off` switches this off (the API tests do).
+- **Four drapes side by side** (`COVER_DRAPE_WORKERS`, 4). Style3D works on one CPU core, so
+  20 new models take about 3.5 hours instead of 13 (the owner, 4 October 2026: "upload
+  everything").
+

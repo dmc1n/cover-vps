@@ -26,6 +26,7 @@ LOG_TAIL = 4000  # characters of each step's output kept in the job file
 # cover drape: the sewn cover falling over the furniture
 EXTRA_STEPS = ["improve", "ai", "rain", "drape"]
 LONG_STEPS = {"drape"}  # a job of only these runs in the second queue
+DRAPE_WORKERS = 4  # drapes side by side (one core each; the server has 8)
 
 
 @dataclass
@@ -39,13 +40,17 @@ class JobSpec:
 
 
 class Jobs:
-    def __init__(self, store: Store, drape_after_export: bool = True) -> None:
+    def __init__(
+        self, store: Store, drape_after_export: bool = True, drape_workers: int = DRAPE_WORKERS
+    ) -> None:
         self.store = store
         self.drape_after_export = drape_after_export
         self._queue: queue.Queue[tuple[str, JobSpec]] = queue.Queue()
         self._long: queue.Queue[tuple[str, JobSpec]] = queue.Queue()
-        for q in (self._queue, self._long):
-            threading.Thread(target=self._work, args=(q,), daemon=True).start()
+        threading.Thread(target=self._work, args=(self._queue,), daemon=True).start()
+        # Style3D works on one CPU core, so several drapes can run side by side
+        for _ in range(max(1, drape_workers)):
+            threading.Thread(target=self._work, args=(self._long,), daemon=True).start()
 
     def submit(self, spec: JobSpec) -> dict[str, Any]:
         unknown = [s for s in spec.steps if s not in STEPS and s not in EXTRA_STEPS]
