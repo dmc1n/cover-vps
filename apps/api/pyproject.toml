@@ -15,6 +15,7 @@ dependencies = [
 [project.scripts]
 cover-web = "coverapi.main:serve"
 cover-users = "coverapi.users_cli:main"
+cover-site = "coverapi.site_cli:main"
 
 [tool.uv.sources]
 coverengine = { workspace = true }

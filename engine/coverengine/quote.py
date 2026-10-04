@@ -31,6 +31,13 @@ from coverengine import drawn
 from coverengine.errors import CoverError
 from coverengine.params import EffectiveParams
 
+
+def _join(meshes: Any) -> trimesh.Trimesh:
+    m = trimesh.util.concatenate(list(meshes))
+    assert isinstance(m, trimesh.Trimesh)
+    return m
+
+
 MM_PER_CM = 10.0  # param-ok: unit conversion
 MM_PER_M = 1000.0  # param-ok: unit conversion
 MM2_PER_M2 = 1e6  # param-ok: unit conversion
@@ -373,3 +380,180 @@ def new_id() -> str:
 
 
 __all__ = ["PRODUCTS", "options", "proposal", "preview_glb", "nearest", "new_id", "trimesh"]
+
+
+# ---- the rain check and the upsell (ADR-062) ----------------------------------------------------
+
+SUPPORTS = ("none", "balloons", "frame")
+
+
+def full_sizes(product: str, given: dict[str, Any]) -> dict[str, Any]:
+    """The customer's sizes with the product's defaults for what was left out."""
+    if product not in PRODUCTS:
+        raise CoverError(f"unknown product {product!r}")
+    return {f: given.get(f, d) for f, (d, _, _) in PRODUCTS[product]["fields"].items()}
+
+
+def cover_mesh(product: str, given: dict[str, Any], params: EffectiveParams,
+               support: str = "none") -> trimesh.Trimesh:  # fmt: skip
+    """The proposed cover as one mesh (mm, Z up, centred in plan like `furniture.build`).
+
+    support:
+    - none: the shape as drawn (a flat top on a table);
+    - balloons: a hipped roof over the balloons; the fabric runs straight between them and
+      slopes down all round (the owner, 2026-09-30);
+    - frame: a gabled roof with a fixed slope.
+
+    Only box covers (tables, loungers, items) get a roof; the other shapes keep their own."""
+    shape, sizes, facts = _sizes(product, given, params)
+    if shape == "round" and support != "none":  # a cone over the balloon (or a frame)
+        key = "quote.balloon_rise_cm" if support == "balloons" else "quote.frame_rise_cm"
+        m = _cone(sizes["diameter_cm"] * MM_PER_CM / 2, sizes["height_cm"] * MM_PER_CM,
+                  _p(params, key) * MM_PER_CM)  # fmt: skip
+    elif shape != "box" or support == "none":
+        pieces = drawn.build(shape, sizes, math.inf)
+        m = _join(list(drawn.scene(pieces).geometry.values()))
+    else:
+        L, W, H = (sizes[k] * MM_PER_CM for k in ("length_cm", "depth_cm", "height_cm"))
+        rise = (
+            _p(params, "quote.balloon_rise_cm" if support == "balloons" else "quote.frame_rise_cm")
+            * MM_PER_CM
+        )
+        n = max(2, int(facts.get("balloons") or 1))
+        reach = 0.0 if support == "frame" else (L / 2) * (1 - 1 / n)  # the outer balloons' x
+        m = _roof(L, W, H, rise, reach, hip=support == "balloons")
+    c = (m.bounds[0] + m.bounds[1]) / 2
+    m.apply_translation((-c[0], -c[1], 0.0))
+    return m
+
+
+def _cone(R: float, H: float, rise: float) -> trimesh.Trimesh:
+    """A round cover with a cone-shaped top (the balloon in the middle) and its band."""
+    nr, na = 16, 72  # param-ok: grid of the cone
+    rs = np.linspace(0, R, nr)
+    ang = np.linspace(0, 2 * np.pi, na, endpoint=False)
+    v = [[0.0, 0.0, H + rise]]
+    for r in rs[1:]:
+        for a in ang:
+            v.append([r * np.cos(a), r * np.sin(a), H + rise * (1 - r / R)])
+    f = [[0, 1 + k, 1 + (k + 1) % na] for k in range(na)]
+    for i in range(nr - 2):
+        o0, o1 = 1 + i * na, 1 + (i + 1) * na
+        for k in range(na):
+            p0, p1 = o0 + k, o0 + (k + 1) % na
+            q1, q0 = o1 + (k + 1) % na, o1 + k
+            f += [[p0, q0, q1], [p0, q1, p1]]
+    o = len(v)
+    for a in ang:
+        v.append([R * np.cos(a), R * np.sin(a), 0.0])
+    rim = 1 + (nr - 2) * na
+    for k in range(na):
+        f += [[rim + k, o + k, o + (k + 1) % na], [rim + k, o + (k + 1) % na, rim + (k + 1) % na]]
+    return trimesh.Trimesh(np.array(v), np.array(f), process=False)
+
+
+def _roof(L: float, W: float, H: float, rise: float, reach: float, hip: bool) -> trimesh.Trimesh:
+    """A box cover with a roof: walls to the ground, the top rising `rise` to a ridge along x
+    (from -reach to +reach); hipped ends (balloons) or gable ends (frame)."""
+    nx, ny = 61, 31  # param-ok: grid of the roof
+    xs = np.linspace(-L / 2, L / 2, nx)
+    ys = np.linspace(-W / 2, W / 2, ny)
+    gx, gy = np.meshgrid(xs, ys, indexing="ij")
+    across = 1 - np.abs(gy) / (W / 2)
+    if hip:
+        along = 1 - np.clip(np.abs(gx) - reach, 0, None) / max(L / 2 - reach, 1.0)
+        z = H + rise * np.minimum(across, along)
+    else:
+        z = H + rise * across
+    v = np.column_stack([gx.ravel(), gy.ravel(), z.ravel()])
+    f = []
+    for i in range(nx - 1):
+        for j in range(ny - 1):
+            a, b, c, d = i * ny + j, (i + 1) * ny + j, (i + 1) * ny + j + 1, i * ny + j + 1
+            f += [[a, b, c], [a, c, d]]
+    top = trimesh.Trimesh(v, np.array(f), process=False)
+    # the walls: from the roof's edge down to the ground
+    ring = ([(i, 0) for i in range(nx)] + [(nx - 1, j) for j in range(1, ny)]
+            + [(i, ny - 1) for i in range(nx - 2, -1, -1)]
+            + [(0, j) for j in range(ny - 2, 0, -1)])  # fmt: skip
+    pts = np.array([[xs[i], ys[j], z[i, j]] for i, j in ring])
+    wv: list[list[float]] = []
+    wf: list[list[int]] = []
+    for k in range(len(pts)):
+        p, q = pts[k], pts[(k + 1) % len(pts)]
+        o = len(wv)
+        wv += [[p[0], p[1], 0.0], [q[0], q[1], 0.0], [q[0], q[1], q[2]], [p[0], p[1], p[2]]]
+        wf += [[o, o + 1, o + 2], [o, o + 2, o + 3]]
+    walls = trimesh.Trimesh(np.array(wv), np.array(wf), process=False)
+    return _join([top, walls])
+
+
+def rain_check(product: str, given: dict[str, Any], params: EffectiveParams) -> dict[str, Any]:
+    """Where rain stays on the proposed cover without support, with balloons and with a frame,
+    and what the shop advises (the upsell). Box covers only; the other shapes are checked
+    as they are."""
+    import tempfile
+
+    from coverengine import furniture, rain
+    from coverengine.io.model_io import glb_bytes
+
+    shape, sizes, facts = _sizes(product, given, params)
+    under = furniture.build(product, full_sizes(product, given))
+    options = SUPPORTS if shape in ("box", "round") else ("none",)
+    out: dict[str, Any] = {}
+    for support in options:
+        cover = cover_mesh(product, given, params, support)
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            (d / "model.glb").write_bytes(glb_bytes([("furniture", under)]))
+            (d / "hull.glb").write_bytes(glb_bytes([("cover", cover)]))
+            (d / "model.json").write_text(
+                json.dumps({"size_mm": list(np.ptp(under.vertices, axis=0))})
+            )
+            r = rain.simulate(d, params, use_ai=False)
+            wet = d / "rain.glb"  # ponds and flat parts in blue, for the 3D view
+            water = wet.read_bytes() if wet.is_file() else None
+        # dry enough: no water stays and at most a narrow flat line (the straight ridge between
+        # balloons sheds sideways)
+        dry = r["pond_volume_l"] == 0 and r["flat_area_m2"] <= _p(params, "quote.flat_ok_m2")
+        out[support] = {
+            "ponds": len(r["ponds"]),
+            "water_l": r["pond_volume_l"],
+            "flat_m2": r["flat_area_m2"],
+            "dry": dry,
+            "_water_glb": water,
+        }
+    advice = None
+    if "balloons" in out and not out["none"]["dry"]:
+        n = max(1, int(facts.get("balloons") or 1))
+        if out["balloons"]["dry"]:
+            advice = {"support": "balloons", "count": n,
+                      "price_eur": round(n * _p(params, "quote.balloon_eur")
+                                         * (1 + _p(params, "quote.markup_pct") / PERCENT)
+                                         * (1 + _p(params, "quote.vat_pct") / PERCENT), 2),
+                      "why": f"without support {out['none']['flat_m2']} m2 of the top is flat: "
+                             "water stays. "
+                             f"With {n} balloon(s) under the cover it runs off."}  # fmt: skip
+        elif out["frame"]["dry"]:
+            advice = {"support": "frame", "count": 1,
+                      "price_eur": round(_p(params, "quote.frame_eur")
+                                         * (1 + _p(params, "quote.markup_pct") / PERCENT)
+                                         * (1 + _p(params, "quote.vat_pct") / PERCENT), 2),
+                      "why": "a frame gives the top a fixed slope: water runs off."}  # fmt: skip
+    return {"options": out, "advice": advice}
+
+
+def scene_glb(product: str, given: dict[str, Any], params: EffectiveParams, support: str = "none",
+              colour_rgb: tuple[int, int, int] | None = None) -> bytes:  # fmt: skip
+    """The furniture and the cover over it, for the shop's configurator."""
+    from coverengine import furniture
+    from coverengine.hull.build import _coloured
+    from coverengine.io.model_io import glb_bytes
+
+    cover = cover_mesh(product, given, params, support)
+    under = furniture.build(product, full_sizes(product, given))
+    rgb = colour_rgb or (80, 84, 74)  # param-ok: charcoal-ish
+    return glb_bytes([
+        ("furniture", _coloured(under, (182, 160, 128, 255))),  # param-ok: wood display colour
+        ("cover", _coloured(cover, (*rgb, 255))),
+    ])  # fmt: skip

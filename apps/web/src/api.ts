@@ -453,6 +453,72 @@ export interface WebshopSettings {
   request_email: string;
 }
 
+export const shopAdmin = {
+  settings: () =>
+    fetch("/api/admin/shop/settings").then((r) =>
+      json<{ settings: Record<string, unknown>; missing: string[] }>(r),
+    ),
+  saveSettings: (body: Record<string, unknown>) =>
+    send("PUT", "/api/admin/shop/settings", body).then((r) =>
+      json<{ settings: Record<string, unknown>; missing: string[] }>(r),
+    ),
+  cms: () =>
+    fetch("/api/admin/cms").then((r) =>
+      json<{
+        draft: Record<string, unknown>;
+        live: Record<string, unknown>;
+        history: string[];
+        preview: string;
+      }>(r),
+    ),
+  command: (text: string) =>
+    send("POST", "/api/admin/cms/command", { text }).then((r) =>
+      json<{ summary: string; changes: { path: string; value: unknown }[] }>(r),
+    ),
+  publish: () =>
+    send("POST", "/api/admin/cms/publish").then((r) =>
+      json<{ previous_version: string }>(r),
+    ),
+  discard: () =>
+    send("POST", "/api/admin/cms/discard").then((r) => json<unknown>(r)),
+  restore: (v: string) =>
+    send("POST", `/api/admin/cms/restore/${v}`).then((r) => json<unknown>(r)),
+  orders: () =>
+    fetch("/api/admin/orders").then((r) =>
+      json<{ orders: ShopOrder[]; statuses: string[] }>(r),
+    ),
+  setStatus: (id: number, status: string) =>
+    send("PUT", `/api/admin/orders/${id}`, { status }).then((r) =>
+      json<unknown>(r),
+    ),
+  produce: (id: number) =>
+    send("POST", `/api/admin/orders/${id}/produce`).then((r) =>
+      json<{ model_id: string }>(r),
+    ),
+};
+
+export interface ShopOrder {
+  id: number;
+  created: number;
+  status: string;
+  email: string;
+  total_eur: number;
+  model_id: string | null;
+  token: string;
+  data: {
+    customer: Record<string, string | boolean>;
+    shipping_eur: number;
+    quote: {
+      input: { support: string };
+      quote: {
+        product: string;
+        colour: string;
+        sizes_cm: Record<string, number>;
+      };
+    };
+  };
+}
+
 export const admin = {
   requests: () =>
     fetch("/api/admin/requests").then((r) =>

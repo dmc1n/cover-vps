@@ -22,7 +22,7 @@ import { AiAdvice } from "./AiAdvice";
 import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { Gallery } from "./Gallery";
 import { QuickSearch } from "./QuickSearch";
-import { Admin } from "./Admin";
+import { Admin, Website } from "./Admin";
 import {
   Account,
   Login,
@@ -121,6 +121,17 @@ export function App() {
             <Learning />
           ) : hash.startsWith("#/admin") && user.role === "admin" ? (
             <Admin />
+          ) : hash.startsWith("#/website") && user.role !== "viewer" ? (
+            <>
+              <section className="card">
+                <h2>Website</h2>
+                <p className="muted">
+                  Draft changes to the shop with AI and check the preview; an
+                  admin publishes.
+                </p>
+              </section>
+              <Website canPublish={user.role === "admin"} />
+            </>
           ) : hash.startsWith("#/guide") ? (
             <Guide loggedIn />
           ) : hash.startsWith("#/account") ? (

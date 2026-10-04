@@ -5,5 +5,11 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   server: { port: 5173, proxy: { "/api": "http://127.0.0.1:8080" } },
-  build: { outDir: "dist", emptyOutDir: true, chunkSizeWarningLimit: 1500 },
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
+    chunkSizeWarningLimit: 1500,
+    // two front doors: Cover Studio (index.html) and the cover webshop (shop.html, ADR-062)
+    rollupOptions: { input: { main: "index.html", shop: "shop.html" } },
+  },
 });

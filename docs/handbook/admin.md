@@ -107,3 +107,27 @@ After the drape simulation the rain falls on the cover as it really lies.
   keeps growing under its own weight.
 
 The rain on the designed surface (the **Rain** button) stays, to compare.
+
+## The cover webshop
+
+The shop is at **/shop/**: the landing page, the configurator, checkout and the order status.
+Three tabs on the admin page belong to it.
+
+- **Shop settings:** everything the shop needs:
+  - company data and domain;
+  - prices (tick *confirmed* to drop "indicative");
+  - delivery costs per country;
+  - the Mollie key (`test_…` to try, `live_…` for real);
+  - the balloon and frame products, colours, and the film's address.
+
+  The empty fields are listed at the top.
+- **Website (AI):** type what should change on the site, in plain words, for example "add a
+  question about delivery time: about three weeks". The AI changes the draft in Dutch and
+  English. Open the preview, then **Publish** (or **Discard**). Earlier versions can be
+  brought back. The same works on the server: `cover-site "…"`, `cover-site --publish`.
+  Colleagues with the editor role find the same command line under **Website** at the top
+  right: they draft and check the preview; an admin publishes.
+- **Orders:** every order with its customer, cover, total and status.
+  - A paid order goes into production by itself: its pattern, then the drape. **Into
+    production** does it by hand (for a payment by bank transfer).
+  - Changing the status mails the customer.

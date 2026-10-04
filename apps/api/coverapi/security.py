@@ -44,6 +44,7 @@ OPEN_PATHS = (
     "/api/auth/verify",
     "/api/auth/invite/",
     "/api/public/",  # the webshop's API: its own key check and limits (webshop.py, ADR-061)
+    "/api/shop/",  # the cover webshop: its own limits; payments only through Mollie (ADR-062)
 )
 TWO_FACTOR_KEY = "two_factor"  # a code by mail after the password (owner, 2 Oct 2026)
 CHANGING = ("POST", "PUT", "PATCH", "DELETE")
@@ -166,7 +167,9 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
                 user = auth.session_user(request.cookies.get(SESSION_COOKIE))
                 if user is None and not path.startswith(OPEN_PATHS):
                     return JSONResponse({"detail": "please log in"}, status_code=401)
-                if request.method in CHANGING and not path.startswith("/api/public/"):
+                if request.method in CHANGING and not path.startswith(
+                    ("/api/public/", "/api/shop/")
+                ):
                     origin = request.headers.get("origin")
                     host = request.headers.get("x-forwarded-host") or request.headers.get("host")
                     if origin and urlparse(origin).netloc != host:
@@ -208,6 +211,8 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
     def _change_allowed(user: User, path: str) -> bool:
         if path.startswith("/api/auth/"):
             return True
+        if path.startswith("/api/admin/cms"):
+            return user.may("edit")  # colleagues change the website text (ADR-062)
         if path.startswith("/api/admin/"):
             return user.may("admin")
         if path.endswith("/approve") or path.endswith("/approval-request"):

@@ -1151,3 +1151,56 @@ cost price" (plan: docs/plans/webshop-configurator.md; handbook: docs/handbook/w
   - the definitive pattern made automatically from a request (the full route, with the drape);
   - prices per colour or fabric;
   - payment in the webshop.
+
+## ADR-062 — Our own cover webshop, with an AI CMS
+
+The owner, 4 October 2026:
+
+- "no public API; on this server we build a webshop made purely for covers, with our own 3D
+  model from all the input and a rain simulation to upsell balloons or a frame; a hyper-modern
+  site with a welcome film, then straight to the configurator";
+- "the information you lack goes on a settings page";
+- "an AI-driven CMS: a command line where colleagues change the website, optimised for AI
+  engines, with a preview before it goes live".
+
+Plan: docs/plans/cover-webshop.md. The public API of ADR-061 is not used. The shop runs on our
+own internal routes (`/api/shop/...`).
+
+- **The shop** is `/shop/...`, its own front door (`apps/web/shop.html`, `src/shop/`), separate
+  from Cover Studio:
+  - a landing page (the film from the settings, else the 3D cover turning), how it works, the
+    green story, FAQ, NL/EN;
+  - the configurator: our own furniture in 3D from the sizes (`coverengine/furniture.py`), the
+    cover over it, colours, vents;
+  - checkout, the order status, and legal pages.
+- **The rain check and the upsell** (`quote.rain_check`). The cover without support, with
+  balloons (a hipped roof: straight between the balloons, sloping all round, as the owner
+  described) and with a frame (a gable); a round table gets a cone. Each is rained on
+  (`rain.py`), the water is shown in blue on the cover, and the shop advises the cheapest
+  support that keeps it dry, with its price.
+- **Orders** (`orders` in app.db):
+  - Mollie payments as soon as a key is set; until then "awaiting payment";
+  - the webhook asks Mollie itself (never trusts the call);
+  - mails on every status;
+  - the admin tab **Orders**;
+  - paid → **into production**: the cover shape imported as a cover model (`order-<n>`),
+    calculated to the end, then the drape follows by itself.
+- **Settings** (admin tab **Shop settings**): company data, domain, prices (overriding
+  `quote.*`; "confirmed" drops "indicative"), shipping per country, the Mollie key (never shown
+  in full), the balloon and frame products, colours, the film's address, and the notify
+  address. The missing fields are listed.
+- **The AI CMS.** The site's text is JSON (`data/site/draft.json`, `live.json`,
+  `history/`), NL and EN.
+  - A colleague types what should change: admin tab **Website (AI)**, or `cover-site "…"` on
+    the server.
+  - DeepSeek returns changes to the draft only: both languages, no invented facts.
+  - The preview link shows the draft (noindex), then **Publish** or **Discard**. Every
+    published version is kept and can be restored.
+- **For search engines and AI assistants:**
+  - the server puts the content into the HTML: title, description, canonical, Open Graph, and
+    JSON-LD for Organization, Product (MadeToOrder), HowTo and FAQPage;
+  - `/robots.txt`, `/sitemap.xml`, and `/llms.txt` (the shop in plain words, from the live
+    content).
+- **Still open (QUESTIONS 52–56 and the plan):** the prices, the domain, the Mollie account,
+  the legal texts, the film, the balloon and frame products, and the first physical test
+  before the first paid order.

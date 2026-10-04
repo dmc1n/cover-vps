@@ -240,6 +240,11 @@ export function UserMenu({
           Admin
         </a>
       )}
+      {user.role === "editor" && (
+        <a href="#/website" className="nav">
+          Website
+        </a>
+      )}
       <a
         href="#/account"
         className="nav"

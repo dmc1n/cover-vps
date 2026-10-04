@@ -4,11 +4,22 @@ import {
   CustomerRequest,
   Invite,
   MailSettings,
+  shopAdmin,
+  ShopOrder,
   User,
   WebshopSettings,
 } from "./api";
 
-type Tab = "users" | "webshop" | "mail" | "sessions" | "audit" | "system";
+type Tab =
+  | "users"
+  | "orders"
+  | "shop"
+  | "website"
+  | "webshop"
+  | "mail"
+  | "sessions"
+  | "audit"
+  | "system";
 const when = (t: number | null) =>
   t ? new Date(t * 1000).toLocaleString() : "—";
 
@@ -35,7 +46,10 @@ export function Admin() {
               {
                 {
                   users: "Users",
-                  webshop: "Webshop",
+                  orders: "Orders",
+                  shop: "Shop settings",
+                  website: "Website (AI)",
+                  webshop: "Requests",
                   mail: "Mail and address",
                   sessions: "Logged in",
                   audit: "Audit log",
@@ -53,6 +67,9 @@ export function Admin() {
         {tab === "audit" && <Audit />}
         {tab === "system" && <System />}
         {tab === "webshop" && <Webshop />}
+        {tab === "orders" && <Orders />}
+        {tab === "shop" && <ShopSettings />}
+        {tab === "website" && <Website />}
       </section>
     </>
   );
@@ -908,6 +925,375 @@ function Webshop() {
           </p>
         )}
       </section>
+    </>
+  );
+}
+
+// ---- the cover webshop (ADR-062) ----------------------------------------------------------------
+
+function Orders() {
+  const [orders, setOrders] = useState<ShopOrder[]>([]);
+  const [statuses, setStatuses] = useState<string[]>([]);
+  const [msg, setMsg] = useState("");
+  const load = () =>
+    shopAdmin
+      .orders()
+      .then((r) => {
+        setOrders(r.orders);
+        setStatuses(r.statuses);
+      })
+      .catch((e) => setMsg(String(e)));
+  useEffect(() => {
+    load();
+  }, []);
+  return (
+    <section className="card">
+      <h3>Orders from the shop</h3>
+      <p className="muted">
+        The shop: <a href="/shop/">/shop/</a>. A paid order goes into production
+        by itself (its pattern, then the drape); a status change mails the
+        customer.
+      </p>
+      {msg && <p className="error">{msg}</p>}
+      <table className="list">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>When</th>
+            <th>Customer</th>
+            <th>Cover</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Model</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.length === 0 && (
+            <tr className="static">
+              <td colSpan={7} className="muted">
+                No orders yet.
+              </td>
+            </tr>
+          )}
+          {orders.map((o) => {
+            const c = o.data.customer;
+            const q = o.data.quote.quote;
+            return (
+              <tr key={o.id} className="static">
+                <td>{o.id}</td>
+                <td>{when(o.created)}</td>
+                <td>
+                  {String(c.name)}
+                  <br />
+                  <span className="muted">
+                    {o.email} · {String(c.postcode)} {String(c.city)}{" "}
+                    {String(c.country)}
+                  </span>
+                </td>
+                <td>
+                  {q.product}, {q.colour}, support {o.data.quote.input.support}
+                  <br />
+                  <span className="muted">
+                    {Object.entries(q.sizes_cm)
+                      .filter(([, v]) => typeof v === "number")
+                      .map(([k, v]) => `${k.replace(/_cm$/, "")} ${v}`)
+                      .join(", ")}
+                  </span>
+                </td>
+                <td>€ {o.total_eur.toFixed(2)}</td>
+                <td>
+                  <select
+                    value={o.status}
+                    onChange={async (e) => {
+                      await shopAdmin.setStatus(o.id, e.target.value);
+                      load();
+                    }}
+                  >
+                    {statuses.map((s) => (
+                      <option key={s}>{s}</option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  {o.model_id ? (
+                    <a href={`#/model/${o.model_id}`}>{o.model_id}</a>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await shopAdmin.produce(o.id);
+                          load();
+                        } catch (e) {
+                          setMsg(String(e));
+                        }
+                      }}
+                    >
+                      Into production
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+// Every setting the shop needs; what is empty is listed at the top, to fill in later.
+function ShopSettings() {
+  const [s, setS] = useState<Record<string, unknown> | null>(null);
+  const [missing, setMissing] = useState<string[]>([]);
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    shopAdmin
+      .settings()
+      .then((r) => {
+        setS(r.settings);
+        setMissing(r.missing);
+      })
+      .catch((e) => setMsg(String(e)));
+  }, []);
+  if (!s) return <p className="muted">{msg || "Loading…"}</p>;
+  const set = (path: string[], value: unknown) => {
+    const copy = JSON.parse(JSON.stringify(s));
+    let cur = copy;
+    for (const k of path.slice(0, -1)) cur = cur[k];
+    cur[path[path.length - 1]] = value;
+    setS(copy);
+  };
+  const field = (path: string[], v: unknown): React.ReactNode => {
+    const key = path.join(".");
+    if (typeof v === "boolean")
+      return (
+        <label key={key} className="check">
+          <input
+            type="checkbox"
+            checked={v}
+            onChange={(e) => set(path, e.target.checked)}
+          />{" "}
+          {path[path.length - 1]}
+        </label>
+      );
+    if (v !== null && typeof v === "object" && !Array.isArray(v))
+      return (
+        <fieldset key={key} className="card">
+          <legend>{path[path.length - 1]}</legend>
+          {Object.entries(v as Record<string, unknown>).map(([k, x]) =>
+            field([...path, k], x),
+          )}
+        </fieldset>
+      );
+    if (Array.isArray(v))
+      return (
+        <fieldset key={key} className="card">
+          <legend>{path[path.length - 1]}</legend>
+          {v.map((x, i) => field([...path, String(i)], x))}
+        </fieldset>
+      );
+    const numeric = path[0] === "prices" || path[path.length - 1] === "eur";
+    return (
+      <label key={key} className="setting">
+        {path[path.length - 1]}
+        <input
+          value={v === null || v === undefined ? "" : String(v)}
+          placeholder="to fill in"
+          onChange={(e) =>
+            set(
+              path,
+              numeric
+                ? e.target.value === ""
+                  ? null
+                  : Number(e.target.value)
+                : e.target.value,
+            )
+          }
+        />
+      </label>
+    );
+  };
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        try {
+          const r = await shopAdmin.saveSettings(s);
+          setS(r.settings);
+          setMissing(r.missing);
+          setMsg("Saved.");
+        } catch (err) {
+          setMsg(String(err));
+        }
+      }}
+    >
+      <section className="card">
+        <h3>Shop settings</h3>
+        <p className="muted">
+          Everything the shop needs. Empty fields are shown as placeholders in
+          the shop; payments work as soon as a Mollie key is filled in (test_…
+          for testing, live_… for real). Prices: set them and tick{" "}
+          <i>confirmed</i> to drop "indicative".
+        </p>
+        {missing.length > 0 && (
+          <p className="error">Still to fill in: {missing.join(", ")}</p>
+        )}
+        {msg && <p className="muted">{msg}</p>}
+        <button className="primary">Save</button>
+      </section>
+      {Object.entries(s).map(([k, v]) => field([k], v))}
+      <button className="primary">Save</button>
+    </form>
+  );
+}
+
+// The AI CMS: a colleague says what should change, the AI changes the draft, a preview shows it,
+// then it goes live (or not). Every published version is kept.
+// Admins see this as a tab; editors on #/website (they draft and preview, an admin publishes).
+export function Website({ canPublish = true }: { canPublish?: boolean }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [log, setLog] = useState<
+    { q: string; a: string; changes: { path: string; value: unknown }[] }[]
+  >([]);
+  const [state, setState] = useState<{
+    history: string[];
+    preview: string;
+    changed: boolean;
+  } | null>(null);
+  const [msg, setMsg] = useState("");
+  const load = () =>
+    shopAdmin
+      .cms()
+      .then((r) =>
+        setState({
+          history: r.history,
+          preview: r.preview,
+          changed: JSON.stringify(r.draft) !== JSON.stringify(r.live),
+        }),
+      )
+      .catch((e) => setMsg(String(e)));
+  useEffect(() => {
+    load();
+  }, []);
+  return (
+    <>
+      <section className="card cms">
+        <h3>Change the website with AI</h3>
+        <p className="muted">
+          Say in plain words what should change (Dutch or English): for example
+          "add a FAQ about how long delivery takes: about three weeks" or "make
+          the homepage title more inviting". The AI changes the draft in both
+          languages; check the preview, then publish. Also on the server:{" "}
+          <code>cover-site "…"</code>.
+        </p>
+        <form
+          className="cms-line"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!text.trim()) return;
+            setBusy(true);
+            setMsg("");
+            try {
+              const r = await shopAdmin.command(text);
+              setLog([{ q: text, a: r.summary, changes: r.changes }, ...log]);
+              setText("");
+              load();
+            } catch (err) {
+              setMsg(String(err));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <span className="prompt">›</span>
+          <input
+            autoFocus
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="What should change on the website?"
+          />
+          <button className="primary" disabled={busy}>
+            {busy ? "Working…" : "Change"}
+          </button>
+        </form>
+        {msg && <p className="error">{msg}</p>}
+        {log.map((l, i) => (
+          <div key={i} className="cms-entry">
+            <div>
+              <b>› {l.q}</b>
+            </div>
+            <div className="muted">{l.a}</div>
+            <ul>
+              {l.changes.map((c) => (
+                <li key={c.path}>
+                  <code>{c.path}</code>: {JSON.stringify(c.value).slice(0, 160)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </section>
+      {state && (
+        <section className="card">
+          <h3>Preview and publish</h3>
+          <p>
+            {state.changed
+              ? "The draft has changes that are not live yet."
+              : "The draft is the same as the live site."}{" "}
+            <a href={state.preview} target="_blank" rel="noreferrer">
+              Open the preview
+            </a>
+          </p>
+          <div className="row">
+            <button
+              className="primary"
+              disabled={!state.changed || !canPublish}
+              title={canPublish ? undefined : "An admin publishes the draft"}
+              onClick={async () => {
+                const r = await shopAdmin.publish();
+                setMsg(
+                  `Published; the previous version (${r.previous_version}) is kept.`,
+                );
+                load();
+              }}
+            >
+              Publish
+            </button>
+            <button
+              disabled={!state.changed}
+              onClick={async () => {
+                await shopAdmin.discard();
+                setMsg("The draft is the live site again.");
+                load();
+              }}
+            >
+              Discard the draft
+            </button>
+          </div>
+          {state.history.length > 0 && (
+            <p className="muted">
+              Earlier versions:{" "}
+              {state.history.slice(0, 8).map((v) => (
+                <button
+                  key={v}
+                  className="link"
+                  disabled={!canPublish}
+                  onClick={async () => {
+                    await shopAdmin.restore(v);
+                    setMsg(
+                      `Version ${v} is in the draft: check the preview, then publish.`,
+                    );
+                    load();
+                  }}
+                >
+                  {v}
+                </button>
+              ))}
+            </p>
+          )}
+        </section>
+      )}
     </>
   );
 }

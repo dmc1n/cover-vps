@@ -96,6 +96,9 @@ def create_app(
     from coverapi import webshop
 
     webshop.install(app, auth, store.root / "quotes", store.models)
+    from coverapi import shop
+
+    shop.install(app, auth, store.root, jobs, store)
 
     def model_or_404(model_id: str) -> Path:
         try:
@@ -430,6 +433,10 @@ def create_app(
         except KeyError:
             raise HTTPException(404, f"no job {job_id!r}") from None
 
+    if web_dir is not None and (web_dir / "shop.html").is_file():
+        from coverapi.shop import install_pages
+
+        install_pages(app, auth, web_dir)  # /shop/..., robots.txt, sitemap.xml, llms.txt
     if web_dir is not None and (web_dir / "index.html").is_file():
         app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
     return app
