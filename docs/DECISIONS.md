@@ -1204,3 +1204,34 @@ own internal routes (`/api/shop/...`).
 - **Still open (QUESTIONS 52–56 and the plan):** the prices, the domain, the Mollie account,
   the legal texts, the film, the balloon and frame products, and the first physical test
   before the first paid order.
+
+## ADR-063 — The drape settles to rest, and seams bend less easily
+
+The owner (4 Oct): the drape "makes assumptions that are not realistic". Two of those are fixed.
+
+- **Settling.** Style3D stopped after `drape.seconds` (5 s), often while the cloth was still
+  moving: the picture was a moment in the fall, not the shape the cover keeps.
+  - After the fall the same physics runs for at most `drape.settle_seconds` (3.5 s), with the
+    speed reduced by `drape.settle_damping` (14 %) every frame. It stops as soon as 99 % of
+    the cloth moves slower than `drape.rest_mm_s`.
+  - This damping only removes motion. It adds no force, so the rest shape is still where
+    gravity, the fabric and the contacts balance.
+  - The report gains `at_rest`, `settled_frames` and `end_speed_mm_s`.
+- **Seams.** A double-stitched seam is two layers with the allowance folded over and stitched,
+  so it bends far less easily than the fabric alone.
+  - The bending hinges on the line between two pieces are made `drape.seam_bend_factor` times
+    stiffer (5.5, to confirm).
+  - This keeps seams as straight, crisp lines, as on a real cover, instead of letting them
+    buckle like plain fabric.
+  - The wider band of the allowance is not modelled (one hinge row). If photos of real covers
+    show that matters, the band follows.
+- **Needle triangles.** The Fiora L-part blew up (6.5 m sag) because of 1004 needle
+  triangles: the cut left pairs of points 0.04 mm apart. Before the fall, points joined by an
+  edge shorter than `drape.merge_mm` (1 mm, far inside the ±5 mm fit) become one point, and
+  the needles drop out.
+  - Flat "cap" triangles (one angle near 180°) remain on a few large models. They need an edge
+    flip or a uniform remesh of the cloth.
+  - That remesh, at about 25 mm per edge, is also the answer for the six models that took
+    more than 3 hours. They have 36,000 to 129,000 points, against 15,000 for a typical sofa.
+- **Cost:** settling adds up to 3.5 s of simulation, about 70 % more time per model in the
+  worst case. Most models come to rest sooner.

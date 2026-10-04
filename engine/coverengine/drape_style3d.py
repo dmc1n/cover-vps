@@ -68,6 +68,24 @@ def grain(flat: Array, piece: NDArray[np.int64], corners3d: Array) -> Array:
 ALONG = 0.5  # param-ok: the piece runs at least half along that 3D direction
 
 
+def seam_hinges(faces: NDArray[np.int64], piece: NDArray[np.int64], hinges: Any) -> Any:
+    """Which bending hinges (rows [o0, o1, v1, v2], v1-v2 the shared edge) lie on a seam: the
+    two triangles at the edge belong to different pieces."""
+    e = np.sort(np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]]), axis=1)
+    pc = np.tile(piece, 3)  # param-ok: three edges per triangle
+    n = int(faces.max()) + 1
+    key = e[:, 0].astype(np.int64) * n + e[:, 1]
+    order = np.argsort(key, kind="stable")
+    key, pc = key[order], pc[order]
+    first = np.r_[True, key[1:] != key[:-1]]
+    lo = np.minimum.reduceat(pc, np.flatnonzero(first))
+    hi = np.maximum.reduceat(pc, np.flatnonzero(first))
+    seam_keys = key[first][lo != hi]
+    rows = np.asarray(hinges).reshape(-1, 4)  # param-ok: [o0, o1, v1, v2]
+    h = np.sort(rows[:, 2:], axis=1).astype(np.int64)
+    return np.isin(h[:, 0] * n + h[:, 1], seam_keys)
+
+
 def run(
     c: Any, colliders: list[trimesh.Trimesh], params: EffectiveParams, log: Any = print
 ) -> tuple[list[Any], dict[str, Any]]:
@@ -127,6 +145,15 @@ def run(
             flags[hem] = flags[hem] & ~int(newton.ParticleFlags.ACTIVE)
             model.particle_flags = wp.array(flags, dtype=wp.int32)
             log(f"the hem held: {len(hem)} points")
+    stiffer = _p(params, "drape.seam_bend_factor")
+    if model.edge_bending_properties is not None and model.edge_indices is not None:
+        # a sewn seam (two layers, the allowance folded over, the stitching) bends less easily
+        on = seam_hinges(c.faces, c.piece, model.edge_indices.numpy())
+        bend: Any = model.edge_bending_properties
+        props = bend.numpy()
+        props[on, 0] *= stiffer
+        bend.assign(props)
+        log(f"the seams {stiffer:g}x stiffer: {int(on.sum())} hinges")
     model.soft_contact_ke = _p(params, "drape.style3d_contact_ke")
     model.soft_contact_kd = _p(params, "drape.style3d_contact_kd")
     model.soft_contact_mu = _p(params, "drape.friction")
@@ -141,27 +168,38 @@ def run(
     sub = int(params["drape.style3d_substeps"])
     dt = 1.0 / fps / sub
     steps = int(_p(params, "drape.seconds") * fps)
-    every = max(1, steps // int(params["drape.frames"]))
+    settle = int(_p(params, "drape.settle_seconds") * fps)
+    every = max(1, (steps + settle) // int(params["drape.frames"]))
     rest = _p(params, "drape.rest_mm_s") / MM_PER_M
     frames = [_mm(s0.particle_q, n)]
     log(f"Style3D: {n} points, {len(c.faces)} triangles, {steps} frames of {sub} substeps")
-    step = 0
-    for step in range(steps):
+    # the fall, then (if it still moves) settling: the same physics with the speed damped every
+    # frame, so the cover reaches the shape it keeps at rest instead of a moment in the fall
+    keep = 1.0 - _p(params, "drape.settle_damping")
+    step, speed, rested = 0, float("inf"), False
+    for step in range(steps + settle):
         pipeline.collide(s0, contacts)
         for _ in range(sub):
             s0.clear_forces()
             solver.step(s0, s1, control, contacts, dt)
             s0, s1 = s1, s0
+        if step >= steps and s0.particle_qd is not None:
+            s0.particle_qd.assign(s0.particle_qd.numpy() * keep)
         if (step + 1) % every == 0:
             frames.append(_mm(s0.particle_q, n))
         speed = float(np.percentile(np.linalg.norm(_mm(s0.particle_qd, n), axis=1), 99))  # param-ok
         if step % 20 == 0:  # param-ok: a progress line every 20 frames
-            log(f"  frame {step + 1}/{steps}: 99 % slower than {speed:.0f} mm/s")
+            phase = "settling" if step >= steps else "falling"
+            log(f"  frame {step + 1}/{steps}, {phase}: 99 % slower than {speed:.0f} mm/s")
         if step > steps // 4 and speed < rest * MM_PER_M:  # param-ok: rests only after a quarter
             frames.append(_mm(s0.particle_q, n))
+            rested = True
             break
     return frames, {
         "engine": "style3d",
         "steps": step + 1,
         "seconds_simulated": round((step + 1) / fps, 2),
+        "settled_frames": max(0, step + 1 - steps),
+        "at_rest": rested,
+        "end_speed_mm_s": round(speed, 1),
     }

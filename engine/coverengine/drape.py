@@ -31,6 +31,7 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 import trimesh
 from numpy.typing import NDArray
+from scipy.sparse.csgraph import connected_components
 
 from coverengine.errors import CoverError
 from coverengine.flatten.solve import flatten
@@ -78,7 +79,8 @@ def cloth(model_dir: Path, params: EffectiveParams) -> Cloth:
     v3, faces, labels, orig = d["vertices"], d["faces"], d["labels"], d["original_vertex"]
     names = [p["name"] for p in json.loads((model_dir / "panels.json").read_text())["panels"]]
     ids, weld = np.unique(orig, return_inverse=True)  # the seam's two sides: one point
-    n = len(ids)
+    weld = _merge_close(weld, v3, faces, _p(params, "drape.merge_mm"))
+    n = int(weld.max()) + 1
     x = np.zeros((n, D3))
     np.add.at(x, weld, v3)
     x /= np.bincount(weld, minlength=n)[:, None]
@@ -99,6 +101,8 @@ def cloth(model_dir: Path, params: EffectiveParams) -> Cloth:
         dm = np.stack([e1, e2], axis=2)  # (t, 2, 2): columns are the rest edges
         det = dm[:, 0, 0] * dm[:, 1, 1] - dm[:, 0, 1] * dm[:, 1, 0]
         good = np.abs(det) > 1e-9  # param-ok: degenerate triangles carry no stretch
+        g3 = weld[used[local]]
+        good &= (g3[:, 0] != g3[:, 1]) & (g3[:, 1] != g3[:, 2]) & (g3[:, 2] != g3[:, 0])
         inv.append(np.linalg.inv(dm[good]))
         area.append(np.abs(det[good]) / 2)
         all_faces.append(weld[used[local[good]]])
@@ -135,6 +139,21 @@ def cloth(model_dir: Path, params: EffectiveParams) -> Cloth:
         x, np.vstack(all_faces), np.concatenate(all_piece), np.vstack(inv),
         np.concatenate(area), names, bending, np.vstack(flats),
     )  # fmt: skip
+
+
+def _merge_close(weld: IntArray, v3: Array, faces: IntArray, within_mm: float) -> IntArray:
+    """Points joined by an edge shorter than `within_mm` become one point. Such needle-thin
+    triangles (two corners a hair apart, left by the cut) carry no fabric, but their stiffness
+    over a near-zero width makes a garment solver blow up (the Fiora L-part, ADR-063)."""
+    e = np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]])
+    short = np.linalg.norm(v3[e[:, 0]] - v3[e[:, 1]], axis=1) < within_mm
+    n = int(weld.max()) + 1
+    if not short.any():
+        return weld
+    a, b = weld[e[short, 0]], weld[e[short, 1]]
+    graph = sp.coo_matrix((np.ones(len(a)), (a, b)), shape=(n, n))
+    _, group = connected_components(graph, directed=False)
+    return np.asarray(group[weld], dtype=np.int64)
 
 
 def sheet(x: Array, faces: IntArray, uv: Array) -> Cloth:

@@ -174,6 +174,8 @@ drape:                           # the drape simulation: the sewn cover falling 
   style3d_contact_ke: 1200.0     # contact stiffness with the furniture
   style3d_contact_kd: 2.0e-4     # contact damping
   style3d_substeps: 10           # solver steps per frame
+  seam_bend_factor: 5.5          # to confirm: a sewn seam bends this many times less easily than the fabric
+  merge_mm: 1.0                  # points of the cut closer than this become one point (no needle triangles)
   fabric_g_m2: 250               # Sunbrella Coverlast, 250 g/m2 +-5 % (Dickson, 2026-10-02)
   max_stretch_pct: 1.6           # to confirm: how far the woven fabric gives before it is tight
   stretch_stiffness: 3000.0      # the solver's weight on stretch, N/m: above the max_stretch_pct
@@ -187,6 +189,8 @@ drape:                           # the drape simulation: the sewn cover falling 
   damping: 0.012                 # share of the speed lost every step (air, the fabric itself)
   steps_per_second: 60           # time steps per simulated second
   seconds: 5.0                   # at most this long; it stops sooner when the cover lies still
+  settle_seconds: 3.5            # then at most this long to come to rest, with extra damping (ADR-063)
+  settle_damping: 0.14           # share of the speed taken off every frame while settling
   iterations: 20                 # rounds per step (more: stiffer and truer, slower)
   rest_mm_s: 5                   # it lies still when 99 % of the cloth moves slower than this
   frames: 60                     # frames of the fall kept for the 3D view

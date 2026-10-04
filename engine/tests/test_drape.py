@@ -59,8 +59,9 @@ def test_style3d_drapes_the_tablecloth_with_canvas_like_stretch() -> None:
     from coverengine import drape_style3d
 
     params = Registry.load(None).resolve(
-        trial={"drape.seconds": 1.0, "drape.engine": "style3d", "drape.hem": "free"}
-    )
+        trial={"drape.seconds": 1.0, "drape.settle_seconds": 1.0, "drape.engine": "style3d",
+               "drape.hem": "free"}
+    )  # fmt: skip
     cloth = _square(1200.0, 25, 520.0)
     box = trimesh.creation.box(extents=(600.0, 600.0, 500.0))
     box.apply_translation((0, 0, 250.0))
@@ -72,6 +73,23 @@ def test_style3d_drapes_the_tablecloth_with_canvas_like_stretch() -> None:
     assert np.all(x[middle, 2] > 490.0)  # on the box
     edge = (np.abs(cloth.x[:, 0]) > 580) & (np.abs(cloth.x[:, 1]) < 100)
     assert np.all(x[edge, 2] < 400.0)  # the sides come down
+    assert extra["end_speed_mm_s"] < 100.0  # settling: it has come (nearly) to rest
+
+
+def test_the_seam_hinges_are_found_between_two_pieces() -> None:
+    """ADR-063: the bending hinges on the line where two pieces are sewn get the seam's
+    stiffness, the others keep the fabric's."""
+    from coverengine import drape_style3d
+
+    cloth = _square(400.0, 5, 0.0)  # 4 x 4 squares, two triangles each
+    centre = cloth.x[cloth.faces].mean(axis=1)
+    piece = (centre[:, 0] > 0).astype(np.int64)  # sewn along x = 0
+    hinges = [[0, 0, int(a), int(b)] for a, b in {tuple(sorted(e)) for f in cloth.faces
+              for e in ((f[0], f[1]), (f[1], f[2]), (f[2], f[0]))}]  # fmt: skip
+    on = drape_style3d.seam_hinges(cloth.faces, piece, np.array(hinges))
+    seam = [h for h, o in zip(hinges, on, strict=True) if o]
+    assert len(seam) == 4  # the four edges on x = 0
+    assert all(abs(cloth.x[h[2], 0]) < 1e-6 and abs(cloth.x[h[3], 0]) < 1e-6 for h in seam)
 
 
 def test_a_held_hem_stays_where_it_is() -> None:
@@ -89,3 +107,13 @@ def test_a_held_hem_stays_where_it_is() -> None:
     start = cloth.x[hem] + 0.0
     moved = np.linalg.norm(frames[-1].astype(np.float64)[hem] - start, axis=1)
     assert moved.max() < 10.0  # the hem points stay (the start offset only)
+
+
+def test_points_a_hair_apart_become_one() -> None:
+    """ADR-063: a needle triangle (two corners 0.04 mm apart, left by the cut) is merged away
+    before the fall; it made the Fiora L-part blow up."""
+    v3 = np.array([[0, 0, 0], [100, 0, 0], [100.04, 0, 0], [50, 80, 0]], dtype=np.float64)
+    faces = np.array([[0, 1, 3], [1, 2, 3]], dtype=np.int64)
+    weld = drape._merge_close(np.arange(4), v3, faces, 1.0)
+    assert weld[1] == weld[2] and len(set(weld.tolist())) == 3
+    assert drape._merge_close(np.arange(4), v3, faces, 0.01).tolist() == [0, 1, 2, 3]

@@ -84,6 +84,10 @@ it by itself after its calculation; the result is kept with the model and in the
 backup. **Drape** then plays the fall
 and shows the cover as it lies.
 
+The fall is followed by a short settling phase: the cover comes to rest, so what you see is the
+shape it keeps, not a moment in the fall. Sewn seams bend less easily than the plain fabric, as
+on a real cover.
+
 - **Red** shows folds: there the piece has more fabric than the shape needs.
 - The card below gives:
   - the fold area;
