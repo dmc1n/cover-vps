@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import Configure from "./Configure";
 import Guide from "./Guide";
 import {
   api,
@@ -66,6 +67,7 @@ export function App() {
     return () => window.removeEventListener("login-needed", out);
   }, []);
   if (welcome) return <Welcome token={welcome[1]} onDone={setUser} />;
+  if (hash.startsWith("#/configure")) return <Configure />; // the customers' configurator: no login
   if (hash.startsWith("#/guide") && !user)
     return (
       <div className="guide-page">

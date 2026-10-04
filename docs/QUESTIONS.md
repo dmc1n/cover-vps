@@ -190,4 +190,13 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     known: 250 g/m², 152 cm wide, tensile 195/104 daN per 5 cm. Can Vyva or Dickson give the
     elongation at a working load (for example at 10 % of the break load), lengthways and
     across? Otherwise the 1 kg strip test on Monday.
+52. **Webshop prices** (`quote.*`, now placeholders): the purchase price of Coverlast per metre,
+    sewing minutes (per cover, per piece, per metre of seam, per vent) and the hourly rate, the
+    parts (vent, cord per metre, balloon), and the markup. Until then the price shows as
+    "indicative".
+53. **Which webshop** (Shopify, WooCommerce, …) and its address(es), for the iframe and an API
+    key.
+54. **Colours** to offer in the configurator (now Charcoal, Navy, Light Grey, Taupe).
+55. **Who gets the customers' requests** (now rick@s2dio.industries)?
+56. **Should customers see the pieces and the fabric**, or only the 3D view and the price?
 

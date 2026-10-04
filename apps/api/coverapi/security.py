@@ -38,7 +38,13 @@ from coverapi.auth import (
     User,
 )
 
-OPEN_PATHS = ("/api/health", "/api/auth/login", "/api/auth/verify", "/api/auth/invite/")
+OPEN_PATHS = (
+    "/api/health",
+    "/api/auth/login",
+    "/api/auth/verify",
+    "/api/auth/invite/",
+    "/api/public/",  # the webshop's API: its own key check and limits (webshop.py, ADR-061)
+)
 TWO_FACTOR_KEY = "two_factor"  # a code by mail after the password (owner, 2 Oct 2026)
 CHANGING = ("POST", "PUT", "PATCH", "DELETE")
 PUBLIC_URL_KEY = "public_url"
@@ -160,7 +166,7 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
                 user = auth.session_user(request.cookies.get(SESSION_COOKIE))
                 if user is None and not path.startswith(OPEN_PATHS):
                     return JSONResponse({"detail": "please log in"}, status_code=401)
-                if request.method in CHANGING:
+                if request.method in CHANGING and not path.startswith("/api/public/"):
                     origin = request.headers.get("origin")
                     host = request.headers.get("x-forwarded-host") or request.headers.get("host")
                     if origin and urlparse(origin).netloc != host:
@@ -172,9 +178,18 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
                 request.state.user = LOCAL
         response: Response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        # the configurator may be shown in an iframe on the webshop addresses set on the admin
+        # page (ADR-061); everything else only on our own pages
+        shops = [o for o in (auth.setting("embed_origins", []) or []) if o]
+        if shops:
+            response.headers.setdefault(
+                "Content-Security-Policy",
+                CSP.replace("frame-ancestors 'self'", "frame-ancestors 'self' " + " ".join(shops)),
+            )
+        else:
+            response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+            response.headers.setdefault("Content-Security-Policy", CSP)
         response.headers.setdefault("Referrer-Policy", "same-origin")
-        response.headers.setdefault("Content-Security-Policy", CSP)
         response.headers.setdefault(
             "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
         )

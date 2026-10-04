@@ -6,7 +6,9 @@ import trimesh
 from coverengine import drape
 from coverengine.params import Registry
 
-PARAMS = Registry.load(None).resolve(trial={"drape.seconds": 1.0})
+PARAMS = Registry.load(None).resolve(
+    trial={"drape.seconds": 1.0, "drape.hem": "free"}
+)  # a cloth, no hem
 
 
 def _square(size: float, n: int, z: float) -> drape.Cloth:
@@ -56,7 +58,9 @@ def test_style3d_drapes_the_tablecloth_with_canvas_like_stretch() -> None:
     and hardly any stretch (a woven fabric)."""
     from coverengine import drape_style3d
 
-    params = Registry.load(None).resolve(trial={"drape.seconds": 1.0, "drape.engine": "style3d"})
+    params = Registry.load(None).resolve(
+        trial={"drape.seconds": 1.0, "drape.engine": "style3d", "drape.hem": "free"}
+    )
     cloth = _square(1200.0, 25, 520.0)
     box = trimesh.creation.box(extents=(600.0, 600.0, 500.0))
     box.apply_translation((0, 0, 250.0))
@@ -68,3 +72,20 @@ def test_style3d_drapes_the_tablecloth_with_canvas_like_stretch() -> None:
     assert np.all(x[middle, 2] > 490.0)  # on the box
     edge = (np.abs(cloth.x[:, 0]) > 580) & (np.abs(cloth.x[:, 1]) < 100)
     assert np.all(x[edge, 2] < 400.0)  # the sides come down
+
+
+def test_a_held_hem_stays_where_it_is() -> None:
+    """ADR-060: with the hem held (the drawcord pulled tight), the bottom edge does not ride
+    up, even where the cloth above it sinks."""
+    params = Registry.load(None).resolve(trial={"drape.seconds": 0.5, "drape.hem": "held"})
+    cloth = _square(800.0, 17, 400.0)
+    low = cloth.x[:, 1] < -390  # one edge a little lower: that is the "hem"
+    cloth.x[low, 2] = 380.0
+    box = trimesh.creation.box(extents=(200.0, 200.0, 100.0))
+    box.apply_translation((0, 0, 50.0))
+    frames, _ = drape.run(cloth, drape.Contact([box]), params, log=lambda *_: None)
+    hem = drape.hem_points(cloth, float(params["drape.hem_band_mm"]))
+    assert len(hem) > 0
+    start = cloth.x[hem] + 0.0
+    moved = np.linalg.norm(frames[-1].astype(np.float64)[hem] - start, axis=1)
+    assert moved.max() < 10.0  # the hem points stay (the start offset only)

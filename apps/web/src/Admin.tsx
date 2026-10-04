@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { admin, Invite, MailSettings, User } from "./api";
+import {
+  admin,
+  CustomerRequest,
+  Invite,
+  MailSettings,
+  User,
+  WebshopSettings,
+} from "./api";
 
-type Tab = "users" | "mail" | "sessions" | "audit" | "system";
+type Tab = "users" | "webshop" | "mail" | "sessions" | "audit" | "system";
 const when = (t: number | null) =>
   t ? new Date(t * 1000).toLocaleString() : "—";
 
@@ -28,6 +35,7 @@ export function Admin() {
               {
                 {
                   users: "Users",
+                  webshop: "Webshop",
                   mail: "Mail and address",
                   sessions: "Logged in",
                   audit: "Audit log",
@@ -44,6 +52,7 @@ export function Admin() {
         {tab === "sessions" && <Sessions />}
         {tab === "audit" && <Audit />}
         {tab === "system" && <System />}
+        {tab === "webshop" && <Webshop />}
       </section>
     </>
   );
@@ -718,6 +727,187 @@ function System() {
           <pre>{alerts.join("\n")}</pre>
         )}
       </form>
+    </>
+  );
+}
+
+// The webshop (ADR-061): customers' requests from the configurator, the API keys, and which
+// webshop addresses may show the configurator in an iframe.
+function Webshop() {
+  const [reqs, setReqs] = useState<CustomerRequest[]>([]);
+  const [set, setSet] = useState<WebshopSettings | null>(null);
+  const [origins, setOrigins] = useState("");
+  const [to, setTo] = useState("");
+  const [keyName, setKeyName] = useState("");
+  const [newKey, setNewKey] = useState("");
+  const [msg, setMsg] = useState("");
+  const load = () => {
+    admin
+      .requests()
+      .then((r) => setReqs(r.requests))
+      .catch((e) => setMsg(String(e)));
+    admin
+      .webshop()
+      .then((w) => {
+        setSet(w);
+        setOrigins(w.embed_origins.join("\n"));
+        setTo(w.request_email);
+      })
+      .catch((e) => setMsg(String(e)));
+  };
+  useEffect(load, []);
+  return (
+    <>
+      {msg && <p className="muted">{msg}</p>}
+      <section className="card">
+        <h3>Requests from customers</h3>
+        <p className="muted">
+          From the configurator (<a href="#/configure">#/configure</a>, also in
+          a webshop). The cost price is only shown here.
+        </p>
+        <table className="list">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>When</th>
+              <th>Customer</th>
+              <th>What</th>
+              <th>Fabric</th>
+              <th>Cost</th>
+              <th>Price</th>
+              <th>From</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reqs.length === 0 && (
+              <tr className="static">
+                <td colSpan={8} className="muted">
+                  No requests yet.
+                </td>
+              </tr>
+            )}
+            {reqs.map((r) => (
+              <tr key={r.id} className="static" title={r.note ?? ""}>
+                <td>{r.id}</td>
+                <td>{when(r.created)}</td>
+                <td>
+                  {r.name}
+                  <br />
+                  <span className="muted">
+                    {r.email} {r.phone}
+                  </span>
+                </td>
+                <td>
+                  {r.quote?.product} ({r.quote?.shape})<br />
+                  <span className="muted">
+                    {Object.entries(r.quote?.sizes_cm ?? {})
+                      .filter(([, v]) => typeof v === "number")
+                      .map(([k, v]) => `${k.replace(/_cm$/, "")} ${v}`)
+                      .join(", ")}
+                    ; {r.quote?.colour}
+                  </span>
+                </td>
+                <td>
+                  {r.quote?.fabric_m2} m² / {r.quote?.roll_m} m
+                </td>
+                <td>€ {r.quote?.price.cost_eur}</td>
+                <td>
+                  € {r.quote?.price.sale_eur}
+                  {r.quote?.price.placeholder_prices ? " *" : ""}
+                </td>
+                <td className="muted">{r.source}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="muted">
+          * indicative: the prices in the cost model (quote.*) are still
+          placeholders.
+        </p>
+      </section>
+      <form
+        className="card"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          try {
+            setSet(
+              await admin.setWebshop({
+                embed_origins: origins.split(/\s+/).filter(Boolean),
+                request_email: to,
+              }),
+            );
+            setMsg("Saved.");
+          } catch (err) {
+            setMsg(String(err));
+          }
+        }}
+      >
+        <h3>Configurator in the webshop</h3>
+        <p className="muted">
+          Webshop addresses that may show the configurator in an iframe, one per
+          line (for example https://hello-suns.com). Embed with:{" "}
+          <code>
+            &lt;iframe src="https://covers.suns.nu/#/configure"
+            style="width:100%;height:900px;border:0"&gt;&lt;/iframe&gt;
+          </code>
+        </p>
+        <textarea
+          rows={3}
+          value={origins}
+          onChange={(e) => setOrigins(e.target.value)}
+          placeholder="https://hello-suns.com"
+        />
+        <label>
+          Requests are mailed to{" "}
+          <input value={to} onChange={(e) => setTo(e.target.value)} />
+        </label>
+        <button className="primary">Save</button>
+      </form>
+      <section className="card">
+        <h3>API keys</h3>
+        <p className="muted">
+          For a webshop that calls the API from its own server
+          (docs/handbook/webshop-api.md). A key is shown once.
+        </p>
+        <ul>
+          {(set?.keys ?? []).map((k) => (
+            <li key={k.name}>
+              {k.name} <span className="muted">(made {when(k.created)})</span>{" "}
+              <button
+                className="link"
+                onClick={async () => {
+                  setSet(await admin.setWebshop({ revoke: k.name }));
+                }}
+              >
+                revoke
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="row">
+          <input
+            placeholder="name, e.g. hello-suns shop"
+            value={keyName}
+            onChange={(e) => setKeyName(e.target.value)}
+          />
+          <button
+            disabled={!keyName}
+            onClick={async () => {
+              const r = await admin.newKey(keyName);
+              setNewKey(r.key);
+              setKeyName("");
+              load();
+            }}
+          >
+            Make a key
+          </button>
+        </div>
+        {newKey && (
+          <p>
+            New key (copy it now, it is not shown again): <code>{newKey}</code>
+          </p>
+        )}
+      </section>
     </>
   );
 }

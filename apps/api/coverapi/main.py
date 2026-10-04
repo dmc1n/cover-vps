@@ -93,6 +93,9 @@ def create_app(
     app.state.store, app.state.jobs = store, jobs
     auth = Auth(store.root / "app.db")
     install(app, auth, login_required)
+    from coverapi import webshop
+
+    webshop.install(app, auth, store.root / "quotes", store.models)
 
     def model_or_404(model_id: str) -> Path:
         try:

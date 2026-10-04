@@ -422,7 +422,52 @@ export interface Invite {
   days?: number;
 }
 
+export interface CustomerRequest {
+  id: number;
+  created: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  note: string | null;
+  source: string;
+  status: string;
+  quote: {
+    product: string;
+    shape: string;
+    sizes_cm: Record<string, number>;
+    colour: string;
+    pieces: unknown[];
+    fabric_m2: number;
+    roll_m: number;
+    price: {
+      cost_eur: number;
+      sale_eur: number;
+      labour_minutes: number;
+      placeholder_prices: boolean;
+    };
+  } | null;
+}
+export interface WebshopSettings {
+  keys: { name: string; created: number }[];
+  embed_origins: string[];
+  request_email: string;
+}
+
 export const admin = {
+  requests: () =>
+    fetch("/api/admin/requests").then((r) =>
+      json<{ requests: CustomerRequest[] }>(r),
+    ),
+  webshop: () =>
+    fetch("/api/admin/webshop").then((r) => json<WebshopSettings>(r)),
+  setWebshop: (body: Partial<WebshopSettings> & { revoke?: string }) =>
+    send("PUT", "/api/admin/webshop", body).then((r) =>
+      json<WebshopSettings>(r),
+    ),
+  newKey: (name: string) =>
+    send("POST", "/api/admin/webshop/keys", { name }).then((r) =>
+      json<{ name: string; key: string; note: string }>(r),
+    ),
   users: () =>
     fetch("/api/admin/users").then((r) =>
       json<{ users: User[]; roles: string[] }>(r),

@@ -118,6 +118,15 @@ def run(
         )
     builder.add_ground_plane()
     model = builder.finalize()
+    if str(params["drape.hem"]) == "held":  # the drawcord pulled tight: the hem stays (ADR-060)
+        from coverengine.drape import hem_points
+
+        flags = model.particle_flags.numpy() if model.particle_flags is not None else None
+        if flags is not None:
+            hem = hem_points(c, _p(params, "drape.hem_band_mm"))
+            flags[hem] = flags[hem] & ~int(newton.ParticleFlags.ACTIVE)
+            model.particle_flags = wp.array(flags, dtype=wp.int32)
+            log(f"the hem held: {len(hem)} points")
     model.soft_contact_ke = _p(params, "drape.style3d_contact_ke")
     model.soft_contact_kd = _p(params, "drape.style3d_contact_kd")
     model.soft_contact_mu = _p(params, "drape.friction")

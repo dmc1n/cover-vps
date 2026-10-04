@@ -192,3 +192,44 @@ def test_invite_all_mails_only_those_without_a_password(
     assert "7 days" in text
     pat = next(u for u in admin.get("/api/admin/users").json()["users"] if u["username"] == "pat")
     assert pat["invited_until"] is not None
+
+
+def test_the_webshop_api_keys_limits_and_requests(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-061: the public API needs a key from outside; our own page needs none; the
+    customer never sees the cost price; a request is stored; framing only from set shops."""
+    from coverapi import mailer
+
+    monkeypatch.setattr(mailer, "configured", lambda auth: False)
+    out = TestClient(app)
+    body = {"product": "sofa", "sizes": {"length_cm": 210}}
+    assert out.post("/api/public/v1/quote", json=body).status_code == 401  # no key, not our page
+    same = out.post("/api/public/v1/quote", json=body, headers={"Origin": "http://testserver"})
+    assert same.status_code == 200, same.text
+    q = same.json()
+    assert "cost_eur" not in q["price"] and q["price"]["sale_eur"] > 0
+    assert out.get(q["preview"]).content[:4] == b"glTF"
+    admin = login(app, "rick", "a-long-admin-password")
+    key = admin.post("/api/admin/webshop/keys", json={"name": "shop"}).json()["key"]
+    with_key = out.post("/api/public/v1/quote", json=body, headers={"X-Api-Key": key})
+    assert with_key.status_code == 200
+    assert (
+        out.post("/api/public/v1/quote", json=body, headers={"X-Api-Key": "nope"}).status_code
+        == 401
+    )
+    r = out.post(
+        "/api/public/v1/request",
+        json={"quote_id": q["id"], "name": "Anna", "email": "anna@example.com"},
+        headers={"Origin": "http://testserver"},
+    )
+    assert r.status_code == 200, r.text
+    listed = admin.get("/api/admin/requests").json()["requests"]
+    assert listed[0]["name"] == "Anna" and listed[0]["quote"]["price"]["cost_eur"] > 0
+    assert "frame-ancestors 'self';" in admin.get("/api/health").headers["content-security-policy"]
+    admin.put("/api/admin/webshop", json={"embed_origins": ["https://hello-suns.com"]})
+    csp = admin.get("/api/health").headers["content-security-policy"]
+    assert "frame-ancestors 'self' https://hello-suns.com" in csp
+    assert (
+        admin.put("/api/admin/webshop", json={"embed_origins": ["javascript:x"]}).status_code == 400
+    )

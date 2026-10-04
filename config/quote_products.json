@@ -1,0 +1,143 @@
+{
+ "_about": "What a customer can cover in the webshop configurator (ADR-061): per product its label and fields [default, min, max] in cm (min null: a yes/no). Edit freely; the API and the configurator follow.",
+ "dining_set": {
+  "label": "Dining set (table and chairs)",
+  "fields": {
+   "table_length_cm": [
+    200,
+    80,
+    400
+   ],
+   "table_width_cm": [
+    100,
+    60,
+    160
+   ],
+   "table_height_cm": [
+    75,
+    40,
+    110
+   ],
+   "chairs": [
+    true,
+    null,
+    null
+   ]
+  }
+ },
+ "round_set": {
+  "label": "Round dining set",
+  "fields": {
+   "table_diameter_cm": [
+    120,
+    60,
+    220
+   ],
+   "table_height_cm": [
+    75,
+    40,
+    110
+   ],
+   "chairs": [
+    true,
+    null,
+    null
+   ]
+  }
+ },
+ "sofa": {
+  "label": "Sofa",
+  "fields": {
+   "length_cm": [
+    200,
+    80,
+    400
+   ],
+   "depth_cm": [
+    90,
+    60,
+    150
+   ],
+   "back_height_cm": [
+    80,
+    50,
+    120
+   ],
+   "front_height_cm": [
+    60,
+    30,
+    100
+   ]
+  }
+ },
+ "corner_sofa": {
+  "label": "Corner sofa (L)",
+  "fields": {
+   "long_side_cm": [
+    280,
+    150,
+    450
+   ],
+   "short_side_cm": [
+    220,
+    120,
+    400
+   ],
+   "depth_cm": [
+    95,
+    60,
+    150
+   ],
+   "back_height_cm": [
+    80,
+    50,
+    120
+   ],
+   "front_height_cm": [
+    60,
+    30,
+    100
+   ]
+  }
+ },
+ "lounger": {
+  "label": "Sun lounger",
+  "fields": {
+   "length_cm": [
+    200,
+    150,
+    230
+   ],
+   "width_cm": [
+    75,
+    50,
+    120
+   ],
+   "height_cm": [
+    50,
+    25,
+    110
+   ]
+  }
+ },
+ "item": {
+  "label": "Chair, side table, hocker (a box)",
+  "fields": {
+   "length_cm": [
+    60,
+    30,
+    250
+   ],
+   "width_cm": [
+    60,
+    30,
+    250
+   ],
+   "height_cm": [
+    80,
+    30,
+    150
+   ]
+  }
+ }
+}

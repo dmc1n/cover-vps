@@ -162,6 +162,9 @@ rain:                            # cover rain: where rain goes on a cover (ADR-0
 drape:                           # the drape simulation: the sewn cover falling over the furniture (ADR-056)
   engine: style3d                # style3d (Newton's garment solver, lifelike, ~40 min a sofa; the owner,
                                  # 2026-10-04: time is fine if it is kept, ADR-059) | own (fast, ADR-056)
+  hem: held                      # held: the drawcord pulled tight and the corner elastics hold the hem in
+                                 # place (the owner, 2026-10-04: the cover must not ride up) | free
+  hem_band_mm: 15                # the hem: the open bottom edge's points this close to the lowest point
   style3d_stretch_weft: 5000.0   # to confirm: Style3D stretch stiffness across the roll (weft), N/m
   style3d_stretch_warp: 10000.0  # to confirm: along the roll (warp); Coverlast's warp is ~2x the weft
   style3d_stretch_shear: 800.0   # to confirm: shear (on the bias a woven fabric gives most)
@@ -191,6 +194,25 @@ drape:                           # the drape simulation: the sewn cover falling 
   max_pond_l: 0.33               # to confirm: ... or more water than this stays on the cover as it lies
   max_sag_cm: 24                 # to confirm: ... or where the top sags deeper than this (water)
   fold_deg: 28                   # a point bends at least this much between two triangles: a fold
+quote:                           # the webshop configurator's proposal and price (ADR-061); ALL prices are
+                                 # placeholders until the owner gives the real ones (QUESTIONS 52)
+  prices_are_placeholders: true  # shown as "indicative" until the owner has set the prices
+  ease_cm: 2.5                   # to confirm: room added on every side of the customer's sizes
+  back_strip_cm: 30              # flat strip along the back of a sofa cover (the owner's drawings: 25-35)
+  fabric_eur_per_m: 24.5         # to confirm: Coverlast purchase price per metre of roll (152 cm)
+  waste_pct: 12.5                # to confirm: cutting waste beyond the simple row layout
+  labour_eur_per_hour: 42.5      # to confirm: sewing and cutting, per hour
+  minutes_base: 27.5             # to confirm: per cover (cutting setup, hem, packing)
+  minutes_per_piece: 6.5         # to confirm
+  minutes_per_seam_m: 2.5        # to confirm: double stitching per metre of seam
+  minutes_per_vent: 9.5          # to confirm: opening, hood, insert, logo
+  vent_eur: 3.75                 # to confirm: insert, membrane, logo
+  cord_eur_per_m: 0.65           # to confirm: drawcord per metre
+  cord_extra_m: 1.25             # cord beyond the hem's length (to tie)
+  balloon_eur: 14.5              # to confirm: one table balloon
+  markup_pct: 87.5               # to confirm: on the cost price
+  vat_pct: 21                    # Dutch VAT
+  colours: "Charcoal, Navy, Light Grey, Taupe"  # to confirm: the Coverlast colours offered (comma separated)
 roll:
   width_mm: 1500
   usable_width_mm: 1480          # no panel wider than this in its narrowest orientation

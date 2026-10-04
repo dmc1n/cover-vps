@@ -183,6 +183,17 @@ def limit_stretch(f: Array, limit: float) -> Array:
     return f @ m
 
 
+def hem_points(c: Cloth, band_mm: float) -> NDArray[np.int64]:
+    """The points of the open bottom edge: on an edge of one triangle only, and within band_mm
+    of the lowest point. A tightened drawcord (and the elastics at the corners) hold them
+    (ADR-060)."""
+    e = np.sort(np.concatenate([c.faces[:, [0, 1]], c.faces[:, [1, 2]], c.faces[:, [2, 0]]]), 1)
+    e, count = np.unique(e, axis=0, return_counts=True)
+    edge = np.unique(e[count == 1].ravel())
+    low = c.x[:, 2].min()
+    return edge[c.x[edge, 2] < low + band_mm]
+
+
 class Contact:
     """The furniture and the balloons as one surface. A point that has come closer than the
     fabric's thickness, or has gone through, is put back on the side it came from: the
@@ -325,6 +336,10 @@ def run(
     # start just outside the designed surface: the cover slipped on
     normals = trimesh.Trimesh(x, c.faces, process=False).vertex_normals
     x += normals * thick
+    held_hem = np.zeros(n, bool)  # the drawcord pulled tight: the hem stays (ADR-060)
+    if str(params["drape.hem"]) == "held":
+        held_hem[hem_points(c, _p(params, "drape.hem_band_mm"))] = True
+    hem_at = x.copy()
     v = np.zeros_like(x)
     gravity = np.array([0.0, 0.0, -G])
     steps = int(seconds / h)
@@ -347,6 +362,8 @@ def run(
                 low = t[:, 2] < thick
                 t[low, 2] = thick
                 hit |= low
+                t[held_hem] = hem_at[held_hem]
+                hit |= held_hem
             if k == 0:  # the held points, once a step; the matrix only when they changed
                 changed = int((hit != factored_for).sum())
                 if changed > REFACTOR_SHARE * n:
@@ -364,6 +381,7 @@ def run(
             y = solve(rhs)
         # what still lies too deep after the rounds is put on the surface
         y, hit = contact.project(y, x, thick, near)
+        y[held_hem] = hem_at[held_hem]
         y[:, 2] = np.maximum(y[:, 2], thick)
         touching = held | hit
         # a point held by the furniture this step but pulled away by the fabric is released

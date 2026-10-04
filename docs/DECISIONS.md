@@ -1119,3 +1119,35 @@ add new models, it takes 40 minutes and then they are kept, that is fine".
   20 new models take about 3.5 hours instead of 13 (the owner, 4 October 2026: "upload
   everything").
 
+
+## ADR-061 — The webshop: a configurator and a public API
+
+The owner, 4 October 2026: "customers make their own cover through a webshop, by an API or a
+3D interface in an iframe; from rough sizes a proposal with all options, the volumes and the
+cost price" (plan: docs/plans/webshop-configurator.md; handbook: docs/handbook/webshop-api.md).
+
+- **The proposal** (`coverengine/quote.py`). The rough sizes plus a fit allowance go into the
+  shapes we build from the owner's drawings (`drawn.py`: box, sloped box, L, round), with the
+  company rules: chair space and balloons for tables, vents per metre of side, drawcords, and
+  pieces split by the roll.
+  - The pieces are flat, so sizes and areas are exact.
+  - The roll length is a simple row layout, and the seams are the shared edges.
+  - It takes a few milliseconds.
+  - The products and their ranges are in `config/quote_products.json`; the cost model is
+    `quote.*` (placeholders, to confirm).
+  - The nearest SUNS models are given, with their drape result.
+- **The public API** `/api/public/v1/` (`coverapi/webshop.py`):
+  - an API key for a webshop's server; none for our own page;
+  - 30 calls a minute per address;
+  - no cost price to the customer;
+  - nothing internal reachable.
+
+  Requests are stored (`requests` in app.db), shown on the admin page with the cost price, and
+  mailed.
+- **The configurator** `#/configure`: no login, made for an iframe. Framing is allowed only from
+  the origins set on the admin page (`frame-ancestors`); without any, the app stays
+  `SAMEORIGIN`.
+- **Later:**
+  - the definitive pattern made automatically from a request (the full route, with the drape);
+  - prices per colour or fabric;
+  - payment in the webshop.
