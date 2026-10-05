@@ -574,6 +574,16 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
     return () => clearTimeout(t);
   }, [product, sizes, colour, vents, support, stock, matchToken]);
 
+  // how solid the cover is drawn (the owner, 6 Oct 2026: "too dark, a slider for the
+  // transparency"); remembered per browser
+  const [solid, setSolid] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem("cover-solid"));
+      return v >= 0.15 && v <= 1 ? v : 0.6;
+    } catch {
+      return 0.6;
+    }
+  });
   const rain = quote?.rain;
   // the shop offers no support or balloons; the frame is off for now (the owner, 5 Oct 2026)
   const supports = Object.entries(rain?.options ?? {}).filter(
@@ -582,7 +592,26 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   return (
     <section className="s-config">
       <div className="s-config-view">
-        <Scene url={quote?.scene ?? null} />
+        <Scene url={quote?.scene ?? null} coverOpacity={solid} />
+        <label className="s-solid">
+          <span>{w("see_through")}</span>
+          <input
+            type="range"
+            min={0.15}
+            max={1}
+            step={0.01}
+            value={solid}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setSolid(v);
+              try {
+                localStorage.setItem("cover-solid", String(v));
+              } catch {
+                /* the slider still works without storage */
+              }
+            }}
+          />
+        </label>
         {busy && <span className="s-busy">…</span>}
         {rain && (
           <div className="s-rain">

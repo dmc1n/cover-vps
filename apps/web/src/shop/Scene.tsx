@@ -10,13 +10,29 @@ export function Scene({
   overlays = [],
   spin = false,
   dark = false,
+  coverOpacity,
 }: {
   url: string | null;
   overlays?: string[];
   spin?: boolean;
   dark?: boolean;
+  /** 0..1: how solid the cover is drawn (the configurator's slider); unset: the default */
+  coverOpacity?: number;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const covers = useRef<THREE.MeshStandardMaterial[]>([]);
+  const opacity = useRef<number | undefined>(coverOpacity);
+  opacity.current = coverOpacity;
+  const setSolid = (mat: THREE.MeshStandardMaterial, o: number) => {
+    mat.transparent = o < 0.999;
+    mat.opacity = o;
+    mat.depthWrite = o >= 0.9; // see-through: what is under it shows
+    mat.needsUpdate = true;
+  };
+  useEffect(() => {
+    if (coverOpacity === undefined) return;
+    for (const mat of covers.current) setSolid(mat, coverOpacity);
+  }, [coverOpacity]);
   const keyOver = overlays.join("|");
   useEffect(() => {
     const el = host.current;
@@ -69,6 +85,7 @@ export function Scene({
       gltf.scene.traverse((o) => {
         if (named(o, "balloon")) balloons = true;
       });
+      covers.current = [];
       gltf.scene.traverse((o) => {
         const m = o as THREE.Mesh;
         if (!m.isMesh) return;
@@ -78,9 +95,8 @@ export function Scene({
         mat.side = THREE.DoubleSide;
         if (named(m, "cover")) {
           mat.roughness = 0.9;
-          mat.transparent = true;
-          mat.opacity = balloons ? 0.55 : 0.93;
-          mat.depthWrite = !balloons;
+          setSolid(mat, opacity.current ?? (balloons ? 0.55 : 0.93));
+          covers.current.push(mat);
           m.renderOrder = 1;
         } else if (named(m, "balloon")) {
           mat.roughness = 0.35;

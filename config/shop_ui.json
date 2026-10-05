@@ -256,6 +256,12 @@
   "fit_thanks": {
    "nl": "Dank je voor je reactie! Daar leren we van.",
    "en": "Thank you for your answer! We learn from it."
+  },
+  "see_through": {
+   "nl": "Doorzichtigheid hoes",
+   "en": "Cover see-through",
+   "de": "Transparenz der Schutzhülle",
+   "fr": "Transparence de la housse"
   }
  },
  "status": {
