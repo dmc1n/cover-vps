@@ -45,7 +45,15 @@ def configured(auth: Auth) -> bool:
     return bool(s.get("host") and s.get("sender"))
 
 
-def send(auth: Auth, to: str, subject: str, text: str, html: str | None = None) -> None:
+def send(
+    auth: Auth,
+    to: str,
+    subject: str,
+    text: str,
+    html: str | None = None,
+    attachments: list[tuple[str, bytes, str]] | None = None,
+) -> None:
+    """One mail; `attachments` are (file name, content, MIME type such as application/pdf)."""
     s = settings(auth, with_password=True)
     if not (s.get("host") and s.get("sender")):
         raise RuntimeError("no mail server set (admin page, Mail)")
@@ -54,6 +62,9 @@ def send(auth: Auth, to: str, subject: str, text: str, html: str | None = None) 
     msg.set_content(text)
     if html:  # the same message with layout, for mail programs that show it
         msg.add_alternative(html, subtype="html")
+    for name, data, mime in attachments or []:
+        main, sub = mime.split("/", 1)
+        msg.add_attachment(data, maintype=main, subtype=sub, filename=name)
     context = ssl.create_default_context()
     port = int(s.get("port") or 587)
     if s.get("security") == "ssl":
