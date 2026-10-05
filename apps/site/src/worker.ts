@@ -1,24 +1,26 @@
-// The cover website at the edge (ADR-066). The shop's own files (scripts, styles, pictures) are
-// served here; every page and every question about covers goes to the studio (covers.suns.nu)
+// The cover website at the edge (ADR-066). Everything comes from the studio (covers.suns.nu)
 // with the website's key, so the studio stays the one place for the catalogue, the match, the
-// prices, orders and the content. Pages, the demo 3D and the film are cached at the edge, so a
-// busy day does not reach the studio; quotes, matches and orders always do.
+// prices, orders, the content and the shop's own build (its scripts always match its pages).
+// The build's files (named by their content) are cached at the edge for a year; pages, the demo
+// 3D and the film for a while, so a busy day does not reach the studio; quotes, matches and
+// orders always do.
 
 export interface Env {
-  ASSETS: Fetcher;
   STUDIO_URL: string;
   LINK_KEY: string;
   PAGE_TTL: string;
   MEDIA_TTL: string;
 }
 
-const FILES = /^\/(assets|brand)\//; // the build's own files (never the studio's app)
+const FILES = /^\/(assets|brand)\//; // the shop's build (hashed names: never change)
+const YEAR = 31536000;
 const API = /^\/(api\/shop\/|media\/)/;
 const FEEDS = new Set(["/robots.txt", "/sitemap.xml", "/llms.txt"]);
 const HOP = ["cookie", "host", "x-link-key", "x-client-ip", "cf-connecting-ip"];
 
 function cacheFor(url: URL, method: string, env: Env): number {
   if (method !== "GET" || url.searchParams.has("preview")) return 0;
+  if (FILES.test(url.pathname)) return YEAR;
   if (url.pathname.startsWith("/media/") || url.pathname === "/api/shop/demo.glb")
     return Number(env.MEDIA_TTL);
   if (API.test(url.pathname)) return 0; // quotes, matches, orders: always fresh
@@ -28,12 +30,15 @@ function cacheFor(url: URL, method: string, env: Env): number {
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
-    if (FILES.test(url.pathname)) return env.ASSETS.fetch(req);
+    if (url.hostname.startsWith("www.")) {
+      url.hostname = url.hostname.slice(4); // one address for search engines: without www
+      return Response.redirect(url.toString(), 301);
+    }
     if (url.pathname.startsWith("/api/") && !API.test(url.pathname))
       return new Response("not here", { status: 404 });
     // the studio's address for this: the API and feeds as they are, a page under /shop/
     const path =
-      API.test(url.pathname) || FEEDS.has(url.pathname)
+      API.test(url.pathname) || FEEDS.has(url.pathname) || FILES.test(url.pathname)
         ? url.pathname
         : `/shop${url.pathname}`;
     const target = new URL(path + url.search, env.STUDIO_URL);
