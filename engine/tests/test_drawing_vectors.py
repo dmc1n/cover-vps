@@ -47,3 +47,28 @@ def test_a_drawing_without_a_closed_free_outline_gives_none(tmp_path: Path) -> N
     doc.new_page().insert_text((60, 500), "Height 45cm")
     doc.save(tmp_path / "box.pdf")
     assert outline_shape(tmp_path / "box.pdf") is None
+
+
+def test_vents_without_a_number_are_counted_from_their_arrows(tmp_path: Path) -> None:
+    """S21: "Air Vents" with six arrows and no number: six vents (ADR-075)."""
+    from coverengine.drawing_vectors import features
+
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((300, 300), "Air Vents")
+    leaders, heads = page.new_shape(), page.new_shape()
+    for tx, ty in ((100, 500), (200, 520), (420, 480)):
+        leaders.draw_line((310, 305), (tx, ty))
+        dx, dy = tx - 310, ty - 305
+        n = (dx**2 + dy**2) ** 0.5
+        ux, uy = dx / n, dy / n
+        bx, by = tx - 5 * ux, ty - 5 * uy
+        heads.draw_polyline([(tx, ty), (bx - 1.6 * uy, by + 1.6 * ux),
+                             (bx + 1.6 * uy, by - 1.6 * ux), (tx, ty)])  # fmt: skip
+    leaders.finish(color=(0, 0, 0))
+    leaders.commit()
+    heads.finish(color=(0, 0, 0), fill=(0, 0, 0))
+    heads.commit()
+    doc.save(tmp_path / "v.pdf")
+    got = features(tmp_path / "v.pdf")
+    assert (got["vents_total"], got["vents_from"]) == (3, "arrows")

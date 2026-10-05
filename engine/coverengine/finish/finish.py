@@ -164,8 +164,18 @@ def side_of(panel: str) -> str:
 
 def per_side(lengths: dict[str, float], params: EffectiveParams) -> dict[str, int]:
     """Vents per side of the cover: one per full metre of that side, at least one (owner, 1 Oct
-    2026: each side separately; 2.10 m: 2, 2.90 m: 2, 3.10 m: 3, 1.40 m: 1)."""
-    return {k: vent_count(v, params) for k, v in lengths.items()}
+    2026: each side separately; 2.10 m: 2, 2.90 m: 2, 3.10 m: 3, 1.40 m: 1). A number written
+    on the drawing (`features.vents_total`) always wins: spread over the sides by length."""
+    total = int(params["features.vents_total"])
+    if total <= 0 or not lengths:
+        return {k: vent_count(v, params) for k, v in lengths.items()}
+    # the drawing's own number (owner, 5 Oct 2026): spread by length, largest remainder first
+    whole = sum(lengths.values()) or 1.0
+    exact = {k: total * v / whole for k, v in lengths.items()}
+    out = {k: int(x) for k, x in exact.items()}
+    for k in sorted(exact, key=lambda k: (out[k] - exact[k], k))[: total - sum(out.values())]:
+        out[k] += 1
+    return out
 
 
 @dataclass

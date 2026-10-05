@@ -605,6 +605,8 @@ def _overview(cover: Cover, params: EffectiveParams, reference: dict[str, Any] |
 
 
 def vent_count(hem_mm: float, params: EffectiveParams) -> int:
+    if int(params["features.vents_total"]) > 0:  # the drawing's own number wins (owner)
+        return int(params["features.vents_total"])
     per_m = float(params["features.vents_per_metre"])  # type: ignore[arg-type]
     return max(
         int(params["features.vents_min"]), int(hem_mm / 1000.0 * per_m)

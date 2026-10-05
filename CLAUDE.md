@@ -208,6 +208,9 @@ cover drape models/<id>/ [--verbose]         the sewn pieces dropped over the fu
 uv run python scripts/warehouse.py list|fetch|photos   products from 3D Warehouse (GLB, photos)
 uv run python scripts/drawing_outline.py OUT --pdfs DIR [--only S45]   free plan shapes read from the PDF's own lines (ADR-072)
 uv run python scripts/drawing_crosscheck.py OUT --pdfs DIR   Gemini and DeepSeek check drawing covers and each other (ADR-072)
+uv run python scripts/drawing_features.py --pdfs DIR   vent count and features from each drawing's text onto its cover (ADR-075)
+uv run python scripts/drawing_rebuild.py OUT --pdfs DIR [--dry-run]   drawing covers rebuilt from their own views; better ones replace (ADR-075)
+uv run python scripts/drawing_merge.py [--only ...] [--dry-run]   free-form drawing covers in fewer pieces (ADR-076)
 make e2e        the web app flow in a real browser (Playwright in Docker)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs

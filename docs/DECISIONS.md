@@ -1708,3 +1708,118 @@ did you do with our information, as a kind of double check".
   S45's 141.1 in circumference is checked by the AIs, not by the size search. Checking each
   inch size that has no metric twin, against sums of edges (a circumference is the band's
   pieces together), would let the numbers check it too.
+
+## ADR-075 — The program reads the drawing's views and builds the cover from them; the AIs judge
+
+The owner (5 October, evening) approved phases 1–4 of docs/plans/drawings-own-reading.md for
+the night:
+- a vent count on the drawing always wins;
+- a better cover replaces the old one live, with a mail;
+- every drawing cover is exported again;
+- about €50 for paid calls;
+- release when all tests are green.
+
+**Phase 1: features from the text** (`drawing_vectors.features`, `scripts/drawing_features.py`).
+- "4 Air Pocket", "6 Airpockets" and "Air Pocket four side" are read by the program; 97 of
+  the 115 drawings write a number.
+- Without a number, the arrows that run from the "Air Vents" label to the cover are counted
+  (S21: 6, S26: 4, D5: 4, ...). S45, which has both, gives 4 either way.
+- The count becomes the new setting `features.vents_total` per cover. It always wins over
+  one per metre, and is spread over the sides by their length (largest remainder).
+- All drawing covers were exported again, so the cut file, the cutting list and `vents.json`
+  follow.
+
+**Phase 2: views and size arrows** (`drawing_views`).
+- **The views.** Every view on the sheets is a rendered picture with a transparency mask: the
+  mask is the exact silhouette.
+- **The 3D view** is the one whose outline runs at ±30°; when curves hide that, it is the
+  largest picture.
+- **The dimensions** are two filled arrowheads on one line, pointing apart, with the size
+  written beside the line. A size thus belongs to a length on the page, never to a guess.
+- **The scale per page** is the median of those dimensions. On S38, 12 of 15 dimensions agree
+  within 0.1 %.
+- A vertical dimension in the 3D view counts with the isometric factor 0.816. This is how
+  S45's only arrowed size (45 cm) gives the same scale as its written circumference.
+- **Which view is which.** An elevation as wide as the plan is the front; as wide as the plan
+  is deep, the side. Every orthographic view is also tried as the plan.
+
+**Phase 3: the solid** (`drawing_solid`).
+- **The shape.** The plan is extruded up and cut by each elevation extruded across: the shape
+  a CAD drawer built.
+- **Every way is built.** Each elevation is tried as front or side, and from either end.
+- **The check.** Each candidate is drawn isometrically from the four corners. The one whose
+  silhouette covers the drawing's 3D view best (IoU, at the sheet's scale, no fitting of size)
+  wins.
+- **A plan alone.** The height is the one whose 3D view fits best, snapped to a written size.
+  S47 lands on 38.1 cm and S37 on 45.1 cm, both as written.
+- **The pieces.** The surface is split at folds sharper than 10°; between two upright faces
+  only a real corner (35°) counts, so a curved wall stays one piece. A ring is cut in two, and
+  a piece wider than the roll is cut across.
+- **Results:**
+
+  | Cover | Fits the 3D view | Old cover |
+  |---|---|---|
+  | S38 | 0.98 | 0.86 |
+  | S39 | 1.00 | 0.97 |
+  | S47 | 0.99 | |
+  | S45 | 1.00 | |
+  | S46 | 0.96 | 0.82 |
+
+**What replaces a live cover** (`scripts/drawing_rebuild.py`, each drawing in its own process).
+1. The new solid must fit the 3D view clearly better than the live cover's own surface: at
+   least 0.85 and 0.03 higher. Or, when the AIs found the live cover poor (below 60), it must
+   fit fairly (0.80).
+2. It is built beside the live cover, and Gemini and DeepSeek check it (ADR-072).
+3. It replaces the live cover only when the AIs also find it better: "agreed: same" where the
+   old was not, or 5 points higher.
+4. The replacement is a new revision in the cover's own folder: history, references and
+   settings are kept, and the old drape results are removed.
+5. Everything was backed up first (cover-data/backup-drawings-before-night-2026-10-05).
+
+- **The rule works both ways:**
+  - S46's new solid fits the 3D view better (0.96 against 0.82), but the AIs scored it 30–45
+    against 100 for the live cover, so the live one stays.
+  - S38 goes from 57.5 to 90.
+- **Not yet:**
+  - drawings with only a 3D view (phase 4: fitting a footprint to the 3D view's lines);
+  - rounded edges (the extruded silhouettes give sharp ones; S44 0.83);
+  - vent positions written as "at middle" or "at top" (the owner's rule puts them 5 cm above
+    the hem; question 66).
+
+## ADR-076 — Drawing covers in as few pieces as the shape allows
+
+The owner (5 October, night) on drawing-s43: "this seems to have far too many panels, it must
+be much simpler."
+
+- **Why S43 had 37 pieces.** The shape the AI read (ADR-068) had profile points 4 cm and
+  0.5 mm apart, and its curve was cut into many strips. The swept builder made each strip a
+  piece, and drawing covers kept every part as a piece.
+- **The joining** (`coverengine/drawn_merge.py`). Two neighbouring pieces are joined when all
+  of these hold:
+  - the fold between them is gentler than `drawn.merge_fold_deg` (15°), so a real crease
+    stays a seam: the back strip and the slope, a wall and the top;
+  - the joined piece is one sheet with one outline (a ring is never closed);
+  - flattened, it stretches at most `drawn.merge_max_stretch_pct` (1 %) over 98 % of its
+    area;
+  - it fits the roll.
+
+  The gentlest folds are joined first, until nothing more can be joined.
+- **Where it applies.** Only to the covers whose seams the program made (swept, outline, the
+  views of ADR-075), both when they are built (`scripts/drawing_cover.py`) and to the existing
+  ones (`scripts/drawing_merge.py`, a new revision, the shape unchanged). The box-family
+  drawing covers keep their seams: they follow the seams on the drawing, as the workshop sews
+  them.
+- **Result on 12 covers**, among them:
+
+  | Cover | Pieces before | Pieces after |
+  |---|---|---|
+  | S43 | 37 | 9 |
+  | C27 | 34 | 7 |
+  | C31 | 30 | 14 |
+  | S44 | 20 | 10 |
+  | S13/S14 Nardo | 14 | 6 |
+  | C26 | 14 | 7 |
+
+  C28 still fails at the cut, as before; it was restored as it was.
+- **Better later:** S43 still has a few small pieces where the back strip meets the round end.
+  Joining across a crease with a fold line (as for box tops, ADR-055) would remove them.

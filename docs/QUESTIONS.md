@@ -228,3 +228,14 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     view: a match at exactly the isometric angle). The cover now follows 358.4 cm round,
     125.8 cm long, 45 cm high, 4 vents. Is that right, or is it 152.4 cm long (then 434 cm
     round)?
+65. **The night of 5 October** (answered by the owner, 5 Oct 2026):
+    - build phases 1–4 of docs/plans/drawings-own-reading.md;
+    - a vent count on a drawing always wins over the rule;
+    - a better cover replaces the old one live, with a mail saying what was replaced;
+    - re-export all drawing covers;
+    - about €50 for paid calls;
+    - release when all tests are green;
+    - Rens, Rick and Wouter may approve covers at the drawing desk.
+66. **Vent position on the drawings:** many drawings write "4 Air Pockets at Middle" or "at
+    Top" (R1–R3). The rule from 1 October puts every vent 5 cm above the lower edge. Does the
+    drawing's position win here too, as the number now does?

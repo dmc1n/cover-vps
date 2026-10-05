@@ -151,3 +151,88 @@ def outline_shape(pdf: Path) -> dict[str, Any] | None:
                              / CM2_PER_M2, 3),
         },
     }  # fmt: skip
+
+
+WORD_NUMBERS = dict(zip("one two three four five six seven eight nine ten eleven twelve".split(),
+                        range(1, 13), strict=True))  # fmt: skip
+# fmt: skip
+VENTS = re.compile(
+    r"(?<![\d.,])(\d{1,2}|"
+    + "|".join(WORD_NUMBERS)
+    + r")\s*(?:x\s*)?air\s*-?(?:pockets?|vents?)\b",
+    re.I,
+)
+VENTS_PER_SIDE = re.compile(r"air\s*-?(?:pockets?|vents?)\s+(" + "|".join(WORD_NUMBERS)
+                            + r")\s+sides?", re.I)  # fmt: skip
+VENT_PLACE = re.compile(r"air\s*-?(?:pockets?|vents?)\s+at\s+(?:the\s+)?(middle|top|bottom)", re.I)
+
+
+def _number(word: str) -> int:
+    return int(word) if word.isdigit() else WORD_NUMBERS[word.lower()]
+
+
+def features(pdf: Path) -> dict[str, Any]:
+    """What the drawing's text says about the cover's features, read by the program itself:
+    the number of air vents ("4 Air Pocket", "Air Pocket four side"), where they sit (at the
+    middle, at the top), open bottom, drawstring, elastic, zip. Without a written number the
+    vents are counted from the arrows that run from their label (`vents_from`: "arrows")."""
+    import pymupdf
+
+    text = " ".join(p.get_text() for p in pymupdf.open(pdf).pages()).replace("\n", " ")
+    counts = [_number(m.group(1)) for m in VENTS.finditer(text)]
+    per_side = [_number(m.group(1)) for m in VENTS_PER_SIDE.finditer(text)]
+    total = max(counts) if counts else (max(per_side) if per_side else None)
+    how = "written" if total else None
+    if total is None and re.search(r"air\s*-?(?:pocket|vent)", text, re.I):
+        total = vent_arrows(pdf) or None  # no number: the arrows from the label, one per vent
+        how = "arrows" if total else None
+    place = VENT_PLACE.search(text)
+    low = text.lower()
+    return {
+        "vents_total": total,
+        "vents_from": how,
+        "vents_mentioned": bool(re.search(r"air\s*-?(?:pocket|vent)", low)),
+        "vents_at": place.group(1).lower() if place else None,
+        "open_bottom": "open from bottom" in low,
+        "drawstring": "drawstring" in low or "draw cord" in low,
+        "elastic": bool(re.search(r"\d+\s*elastic|elastic\s+at", low)),
+        "zip": "zip" in low,
+    }
+
+
+LABEL_REACH_PT = 25.0  # param-ok: a leader starts this close to its label
+
+
+def vent_arrows(pdf: Path) -> int:
+    """The arrows that run from an "Air Vents" label to the cover: one per vent drawn."""
+    import pymupdf
+
+    from coverengine.drawing_views import _arrows
+
+    n = 0
+    for page in pymupdf.open(pdf).pages():
+        labels = [b for b in page.get_text("blocks")
+                  if re.search(r"air\s*-?(?:pocket|vent)", b[4], re.I)]  # fmt: skip
+        if not labels:
+            continue
+        tips = [(float(t[0]), -float(t[1])) for t, _ in _arrows(page)]
+        r = LABEL_REACH_PT
+        for b in labels:
+            near = pymupdf.Rect(b[:4]) + (-r, -r, r, r)
+            ends = set()
+            for d in page.get_drawings():
+                for it in d["items"]:
+                    if it[0] != "l":
+                        continue
+                    for a, z in ((it[1], it[2]), (it[2], it[1])):
+                        if (
+                            near.contains(a)
+                            and not near.contains(z)
+                            and any(
+                                math.dist((z.x, z.y), t) < 3
+                                for t in tips  # param-ok: pt
+                            )
+                        ):
+                            ends.add((round(z.x), round(z.y)))
+            n += len(ends)
+    return n

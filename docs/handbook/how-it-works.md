@@ -43,6 +43,25 @@ cutting list and a size drawing. It runs at **covers.suns.nu**.
   PDFs are stamped. Any change after approval cancels it, so production always cuts what was
   approved.
 
+## Covers from your drawings (ADR-072, ADR-075)
+
+The program reads the drawing's own lines and pictures, not the AI:
+- the views, with their exact outlines;
+- every size, through its two arrows;
+- the number of air vents ("4 Air Pocket", or the arrows from "Air Vents").
+
+From the top view and the side or front view it builds the cover as a CAD drawer would. It
+checks the result against the drawing's 3D view. Then Gemini (it looks at the drawing) and
+DeepSeek (it reads all words and numbers) each judge the cover and check each other. When they
+disagree, a person looks.
+
+Where the program made the seams itself (free shapes), neighbouring pieces without a real
+crease are joined into one, as long as the piece still lies flat and fits the roll (S43: from 37
+pieces to 9). Covers whose seams follow the drawing keep them.
+
+A drawing cover is only replaced when the new one fits the 3D view better **and** both AIs
+find it better. It then becomes a new revision of the same cover, so nothing is lost.
+
 ## What you find where
 
 - **Models:** every model with its state. Open one for the 3D view, the pieces, the files and

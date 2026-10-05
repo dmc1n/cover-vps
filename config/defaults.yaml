@@ -140,6 +140,9 @@ features:                        # per-cover defaults, overridden per model
                                  # 1 Oct 2026: each side separately; 2.90 m: 2, 3.10 m: 3)
   vents_min: 1                   # every cover has at least one vent, and every side of it too
                                  # (owner, 1 Oct 2026: one per metre, at least one on each side)
+  vents_total: 0                 # the number of vents written on the drawing ("4 Air Pocket"); it
+                                 # always wins over the rule above (owner, 5 Oct 2026); 0 = rule.
+                                 # Spread over the sides by their length.
   vent_seam_clearance_mm: 100    # to confirm; a vent keeps this far from a vertical seam; a short
                                  # side gets its vent centred, closer (owner: it must have one)
   vent_hood_depth_mm: 80         # to confirm; the hood piece is this much deeper than the vent
@@ -249,6 +252,12 @@ export:
 drawing:
   plan_rotation_deg: 0           # sizes.pdf: turn the top view counter-clockwise by this angle, so
                                  # it matches the workshop drawing of the model
+
+
+drawn:
+  merge_fold_deg: 15             # drawing covers: neighbouring pieces whose fold is gentler than this are
+                                 # joined (owner, 5 Oct 2026, S43: "far too many panels"); a crease stays a seam
+  merge_max_stretch_pct: 1.0     # ... when the joined piece still lies flat within this stretch
 
 pen:
   label_height_mm: 15

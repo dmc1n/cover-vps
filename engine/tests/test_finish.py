@@ -142,6 +142,17 @@ def test_vents_one_per_full_metre_of_each_side() -> None:
     assert per_side(sides, params()) == {"a": 2, "b": 2, "c": 3, "d": 1, "e": 1}
 
 
+def test_the_number_on_the_drawing_always_wins_spread_by_length() -> None:
+    """Owner, 5 Oct 2026: "4 Air Pocket" on the drawing beats one per metre."""
+    from coverengine.finish.finish import per_side
+
+    sides = {"back": 3000, "front": 3000, "left": 900, "right": 900}
+    assert sum(per_side(sides, params()).values()) == 8
+    four = per_side(sides, params(**{"features.vents_total": 4}))
+    assert four == {"back": 2, "front": 2, "left": 0, "right": 0}
+    assert sum(per_side(sides, params(**{"features.vents_total": 7})).values()) == 7
+
+
 def test_a_short_side_still_gets_its_vent() -> None:
     """Owner, 1 Oct 2026: a short side (a 34 cm chair side) needs a vent too."""
     d = doc(square("skirt-left", 340, ["hem", "seam", "seam", "seam"], [False] * 4))
