@@ -28,7 +28,7 @@ from coverengine.errors import CoverError
 
 MM = 10.0  # param-ok: cm to mm
 Face = list[tuple[float, float, float]]
-SHAPES = ("box", "sloped box", "L shape", "round")
+SHAPES = ("box", "sloped box", "L shape", "round", "swept")
 ROUND_SEGMENTS = 96  # param-ok: the circle as this many straight bits
 
 
@@ -52,10 +52,16 @@ def _poly(face: Face) -> tuple[np.ndarray, np.ndarray]:
     uv = (v - c) @ vt[:2].T
     where = {(round(a, 6), round(b, 6)): i for i, (a, b) in enumerate(uv)}
     tris = []
-    for t in shapely.constrained_delaunay_triangles(shapely.Polygon(uv)).geoms:
-        corners = list(t.exterior.coords)[:3]
-        i, j, k = (where[(round(a, 6), round(b, 6))] for a, b in corners)
-        tris.append((i, j, k))
+    try:
+        poly = shapely.Polygon(uv)
+        if not poly.is_valid:  # touching or folded outline (a free-form end): mend it
+            poly = shapely.make_valid(poly)
+        for t in shapely.constrained_delaunay_triangles(poly).geoms:
+            corners = list(t.exterior.coords)[:3]
+            i, j, k = (where[(round(a, 6), round(b, 6))] for a, b in corners)
+            tris.append((i, j, k))
+    except (shapely.errors.GEOSException, KeyError, ValueError):
+        tris = [(0, k, k + 1) for k in range(1, len(face) - 1)]  # a fan, as for a quad
     return v, np.array(tris, dtype=np.int64)
 
 
@@ -344,4 +350,9 @@ def build(shape: str, params: dict[str, Any], roll_mm: float) -> list[Piece]:
         return conform(l_shape(params, roll_mm))
     if shape == "round":
         return round_cover(params, roll_mm)
+    if shape == "swept":  # free form: a cross-section along a path (ADR-068)
+        from coverengine import swept
+
+        # along the roll the machine cuts long pieces (the owner, 5 Oct 2026): no limit unless set
+        return swept.build(params, roll_mm, float(params.get("max_piece_mm") or math.inf))
     raise CoverError(f"no generator for the shape {shape!r} yet")

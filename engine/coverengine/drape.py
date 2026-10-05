@@ -271,17 +271,47 @@ def simulate(
     t0 = time.time()
     c = cloth(model_dir, params)
     meshes = _colliders(model_dir)
-    contact = Contact(meshes)
     if str(params["drape.engine"]) == "style3d":  # Newton's garment solver (ADR-058)
-        from coverengine import drape_style3d
+        frames, extra = _style3d(c, meshes, params, log)
+        return finish(model_dir, c, meshes, frames, extra, params, log, use_ai, t0)
+    frames, report = run(c, Contact(meshes), params, log)
+    report["engine"] = "own"
+    return finish(model_dir, c, meshes, frames, report, params, log, use_ai, t0, measured=True)
 
-        frames, extra = drape_style3d.run(c, meshes, params, log)
-        report = measures(c, frames[-1].astype(np.float64), contact, params)
-        report.update(extra, points=len(c.x), triangles=int(len(c.faces)), frames=len(frames))
+
+def _style3d(
+    c: Cloth, meshes: list[trimesh.Trimesh], params: EffectiveParams, log: Any
+) -> tuple[list[Any], dict[str, Any]]:
+    """On a GPU by API when it is set and reachable (ADR-069), otherwise on this server."""
+    from coverengine import drape_gpu, drape_style3d
+
+    if str(params["drape.gpu"]) == "modal" and drape_gpu.configured():
+        try:
+            return drape_gpu.run(c, meshes, params, log)
+        except Exception as exc:  # noqa: BLE001 - the GPU is a speed-up, never a must
+            log(f"the GPU did not answer ({exc}); on this server instead")
+    return drape_style3d.run(c, meshes, params, log)
+
+
+def finish(
+    model_dir: Path,
+    c: Cloth,
+    meshes: list[trimesh.Trimesh],
+    frames: list[Any],
+    extra: dict[str, Any],
+    params: EffectiveParams,
+    log: Any = print,
+    use_ai: bool = True,
+    t0: float | None = None,
+    measured: bool = False,
+) -> dict[str, Any]:
+    """After the fall (here or on a GPU): measure it, write drape.*, the rain on it, the AI."""
+    if measured:
+        report = extra
     else:
-        frames, report = run(c, contact, params, log)
-        report["engine"] = "own"
-    report["run_s"] = round(time.time() - t0, 1)
+        report = measures(c, frames[-1].astype(np.float64), Contact(meshes), params)
+        report.update(extra, points=len(c.x), triangles=int(len(c.faces)), frames=len(frames))
+    report["run_s"] = round(time.time() - (t0 or time.time()), 1)
     write(model_dir, c, frames, report)
     picture(model_dir, c, frames[-1])
     # then the rain on the cover as it lies (ADR-057): where water would collect

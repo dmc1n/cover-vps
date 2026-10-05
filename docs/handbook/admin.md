@@ -178,3 +178,15 @@ covers comes from this studio (ADR-066).
    - then `npm run deploy` (after `make web-build`).
 4. **Check the website.** Then set `website_link.closed` on: the studio's `/shop/` is then
    only a preview for colleagues, and visitors go to the website.
+
+## Your reference: compare the program with your own drawing or model
+
+On a model's page, tab **Your reference**, upload what you know is right:
+- **a 3D model of the cover** (STEP, IGES, STL, OBJ, GLB). You get how far the program's cover
+  lies from yours in mm, the share within ±5 mm, and a 3D view in colour: green within ±5 mm,
+  sand where ours is roomier, red where it is tighter;
+- **a PDF** (your drawing or pattern). You get which of its sizes are found in the program's
+  pieces, the AI's list of differences, and lessons. Press **Accept** on a lesson and the AI
+  follows it for every cover from then on.
+
+Every comparison is kept, as material for improving the program.

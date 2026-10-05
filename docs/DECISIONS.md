@@ -1433,3 +1433,98 @@ book by IS Creative (docs/brand.md). The plan is docs/plans/scroll-site.md.
   own fresh build and the studio's data, noindex.
   - The studio now accepts one link key per Worker (a list of hashes), so each can be revoked
     alone.
+
+## ADR-068 — Free-form covers from the drawings: a cross-section along a path, read by Gemini
+
+The owner (5 October 2026): the organic, mostly round shapes in the drawings did not come
+through, and the seams often did not match. 26 drawings were "other": quarter rings, U and
+horseshoe sofas, crescents, D, kidney and lens shapes, tapered and angled sofas, arms that come
+down along their length.
+
+- **The new shape, `swept`** (`engine/coverengine/swept.py`): the sloped box of drawn.py along a
+  path, which is the cover's back edge in the top view.
+  - The path is made of `line`, `arc` (radius, angle; positive towards the front) and `turn`
+    (a mitred corner).
+  - The cross-section is a list of points (plan offset from the back edge, height); each point
+    is a seam along the cover. It may change along the path ("profiles", interpolated), which
+    covers tapers and arms that come down.
+  - **Hips:** a line on top shorter than the cover (`line_lengths_cm`, as written) stops early at
+    both ends, and the top slopes down to the end wall (S24).
+  - **Seams across:** where drawn, plus at every corner and every change between line and arc.
+  - **Ends:** square, angled or round (half round).
+  - A band too wide for the roll **in both directions** gets a seam. Along the roll a piece may
+    be any length (the owner: the machine cuts long), unless `max_piece_mm` is set.
+  - A curve towards the front tighter than the cover is deep is refused, because the inside of
+    a U would fold over (C26, C27).
+- **Reading the drawings** (`scripts/drawing_swept.py`): **Gemini 3.1 Pro** (`ai.vision_*`) reads
+  all the pages into the shape.
+  - The program builds it and measures every length a drawing can show: each line along the
+    cover, in total and per piece; the heights; the bands across, along the surface and in
+    plan; the depth.
+  - Every size written on the drawing must come back within 1 cm (or 0.6 %). The ones that do
+    not are sent back to the AI with the model's own lengths, for up to 3 rounds.
+  - Inch-only drawings are converted (S38, S39).
+  - Each cover is calculated in its own process with a time limit, and its result is kept at
+    once, so one cover that hangs never stops the others.
+- **Results on 5 October** (out/drawings/swept): built with every written size found:
+  - S24 and S25 (quarter rings with hips), 12/12 each;
+  - D5 (14/14), D1 (7/7) and D6 (9/9);
+  - L4 and L4/L8 (10/10), the Nardo S13/S14 (8/8);
+  - S26 and S27 (9/9), S37 (4/4), S43 (8/8), S47 (5/5), U2 (8/8).
+  - Built with most sizes: C26 8/9, C31 11/14, S32 6/7, S38 and S39 9/13, S44 6/8, S46 7/8.
+  - Still open: C27 and C28 (the tight bend, retried with the new check), S45 (a radius equal to
+    the depth: a pie piece), and S20 (Bora, not ordered).
+- `drawn._poly` mends an invalid outline (`make_valid`), or falls back to a fan.
+
+## ADR-069 — The Style3D drape on a GPU on demand (Modal)
+
+The owner (5 October): a control check with the GPU through the API.
+
+- **`engine/coverengine/drape_gpu.py`.** This server prepares the cloth (the flat pieces: a
+  CPU job of seconds) and the furniture. Modal runs the same Style3D fall on an **NVIDIA L4** and
+  sends the frames back. Measuring, writing `drape.*`, the rain and the AI's verdict stay here.
+  - The engine is shipped as plain files into a container with newton 1.6, warp 1.17 and the
+    same numpy, scipy and trimesh as here.
+  - The cloth is sent as plain arrays.
+  - `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` come from deploy/.env.
+- **Measured on the Kota 2-seater:** 405 frames in 396 s on the GPU (about 1 s a frame, against
+  9 s on the CPU). With the start-up that is about 7 minutes a sofa instead of about an hour, at
+  roughly €0.10.
+- **`drape.gpu: modal`** is the default. With no keys, or no answer from Modal, it runs on this
+  server as before.
+- **The control check** (`scripts/gpu_check.py`): many covers at once, one GPU each. The account
+  runs 10 at a time; the rest wait in the queue. Each cover is then measured, rained on and
+  judged by the audit's drape check (folds, sag, water). One CSV comes out.
+
+## ADR-070 — The workshop's own reference per model, compared and learned from
+
+The owner (5 October): upload our own 3D model or pattern PDF per model, so the system can
+compare and learn from our input.
+
+- **Model page, tab "Your reference".** Upload a 3D model of the cover (STEP, IGES, STL, OBJ,
+  PLY, GLB) and/or a PDF (the drawing or the pattern). The files are kept in
+  `models/<id>/reference/`, and the comparison runs in the background
+  (`engine/coverengine/compare.py`).
+- **3D against 3D.**
+  - The reference is read as it is, in its own file.
+  - Its unit (mm, cm, inch, m) and up axis (Z or Y) are the ones that match the program's cover
+    best.
+  - It is turned about the vertical in 15° steps to the best fit, then fitted with ICP (Kabsch,
+    libigl distances, no scaling or mirroring).
+  - Per point the signed distance (+ ours roomier): mean, 95 %, largest, the share within
+    ±5 mm, roomier and tighter.
+  - `compare.glb` shows the program's cover coloured by the distance.
+- **A PDF against the pattern.**
+  - Every size written on it is looked for among the program's lengths (each piece's edges and
+    flat size, the cover's size).
+  - Gemini then puts the PDF beside the program's size drawing and cover picture, and lists the
+    differences: pieces, seams, sizes, features.
+  - It also proposes lessons. **A person accepts each one**; accepted lessons go to the data
+    folder's `learning/lessons.json`, so they last across releases, and into every AI prompt.
+- **The learning record.** Every comparison is logged in `learning/references.jsonl`. That is
+  the material for tuning the seams and the shapes.
+- **Checked:**
+  - S24's cover against its own drawn surface: 0.0 mm, 100 % within ±5 mm;
+  - a test box uploaded in metres and 1 cm higher: found as metres, its top flagged.
+- **Downloads carry the model's name.** The cutting table's file is `<model>.dxf` (with `-r<n>`
+  for a kept revision); other files are `<model>-<file>` (the owner, 5 October).

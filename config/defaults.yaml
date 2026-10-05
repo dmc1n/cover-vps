@@ -162,6 +162,8 @@ rain:                            # cover rain: where rain goes on a cover (ADR-0
 drape:                           # the drape simulation: the sewn cover falling over the furniture (ADR-056)
   engine: style3d                # style3d (Newton's garment solver, lifelike, ~40 min a sofa; the owner,
                                  # 2026-10-04: time is fine if it is kept, ADR-059) | own (fast, ADR-056)
+  gpu: modal                     # modal: the Style3D fall on an NVIDIA GPU by API (ADR-069, ~7 min a sofa
+                                 # instead of ~60); none: on this server. No keys or no answer: this server
   hem: held                      # held: the drawcord pulled tight and the corner elastics hold the hem in
                                  # place (the owner, 2026-10-04: the cover must not ride up) | free
   hem_band_mm: 15                # the hem: the open bottom edge's points this close to the lowest point
@@ -273,11 +275,14 @@ tolerance:
   cover_mm: 5.0                  # overall fit target: ±5 mm
 
 ai:                              # AI advice on cover layouts (the key: DEEPSEEK_API_KEY in deploy/.env)
-  provider: deepseek             # deepseek | none
+  provider: deepseek             # deepseek | gemini | none
   model: deepseek-flash          # deepseek-flash = V4.1 Flash (fast, since 10 Sep 2026) |
                                  # deepseek-v4-pro = V4 Pro (stronger, slower; no 4.1 Pro yet)
   base_url: https://api.deepseek.com
   timeout_s: 120                 # how long to wait for an answer
+  vision_provider: gemini        # who reads the drawings (pictures): gemini | deepseek (ADR-068)
+  vision_model: gemini-3.1-pro-preview
+  vision_base_url: https://generativelanguage.googleapis.com/v1beta/openai
 
 match:                           # the customer's sizes against the covers we already make (ADR-064)
   tight_cm: 1.25                 # to confirm (Q57): an existing cover may be this much smaller and still count as exact

@@ -243,3 +243,13 @@ def test_a_full_calculation_is_followed_by_its_drape_in_a_queue_of_its_own(
     time.sleep(0.5)
     assert [a[0] for a in ran].count("export") == 2
     assert [a[0] for a in ran].count("drape") == 1  # after the saved run only
+
+
+def test_downloads_carry_the_models_name() -> None:
+    """The owner (5 Oct 2026): the cutting table's file is named after the model, not cut.dxf."""
+    from coverapi.main import _named
+
+    assert _named("suns-lounge-lucia", "cut.dxf") == ("suns-lounge-lucia.dxf", "attachment")
+    assert _named("suns-lounge-lucia", "cut.dxf", 3) == ("suns-lounge-lucia-r3.dxf", "attachment")
+    assert _named("suns-lounge-lucia", "pattern.dxf")[0] == "suns-lounge-lucia-pattern.dxf"
+    assert _named("suns-lounge-lucia", "drape.glb")[1] == "inline"

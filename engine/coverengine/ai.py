@@ -30,7 +30,7 @@ MM_PER_CM = 10.0  # param-ok: unit conversion
 # "A calmer cover surface": the owner's 5 mm more room, and gaps up to 15 cm bridged.
 SMOOTH_CLEARANCE_MM = 15.0  # param-ok: the action's value (owner, 1 Oct 2026)
 SMOOTH_BRIDGE_MM = 150.0  # param-ok: the action's value
-KEY_ENV = {"deepseek": "DEEPSEEK_API_KEY"}
+KEY_ENV = {"deepseek": "DEEPSEEK_API_KEY", "gemini": "GEMINI_API_KEY"}
 
 # What the AI may suggest, and what each does (shown to the AI and in the web app).
 ACTIONS: dict[str, str] = {
@@ -264,10 +264,14 @@ that would have caught it. Plain words, no jargon. Answer with JSON only:
 
 
 def lessons() -> list[dict[str, Any]]:
-    path = repo_root() / LESSONS_JSON
-    if not path.is_file():
-        return []
-    doc: list[dict[str, Any]] = json.loads(path.read_text(encoding="utf-8"))
+    """The lessons in the repository, and those accepted on the web app (in the data folder's
+    learning/lessons.json, so they last across releases; ADR-070)."""
+
+    doc: list[dict[str, Any]] = []
+    accepted = Path(os.environ.get("COVER_DATA_DIR", "data")) / "learning" / "lessons.json"
+    for path in (repo_root() / LESSONS_JSON, accepted):
+        if path.is_file():
+            doc += json.loads(path.read_text(encoding="utf-8"))
     return doc
 
 

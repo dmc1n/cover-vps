@@ -23,6 +23,7 @@ import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { Gallery } from "./Gallery";
 import { QuickSearch } from "./QuickSearch";
 import { Admin, Website } from "./Admin";
+import { Reference } from "./Reference";
 import {
   Account,
   Login,
@@ -400,6 +401,7 @@ function Upload() {
 type Tab =
   | "3d"
   | "drawing"
+  | "reference"
   | "seams"
   | "ai"
   | "patterns"
@@ -412,6 +414,7 @@ type Tab =
 const TABS: [Tab, string][] = [
   ["3d", "3D"],
   ["drawing", "Your drawing"],
+  ["reference", "Your reference"],
   ["seams", "Seams"],
   ["ai", "AI advice"],
   ["patterns", "Patterns"],
@@ -727,6 +730,9 @@ function ModelPage({ id }: { id: string }) {
           />
         )}
         {tab === "seams" && <SeamEditor id={id} stamp={stamp} onJob={setJob} />}
+        {tab === "reference" && (
+          <Reference id={id} canEdit={user?.role !== "viewer"} />
+        )}
         {tab === "drawing" && (
           <Drawing id={id} files={model.files} stamp={stamp} />
         )}
@@ -836,7 +842,7 @@ function CutPieces({ model, stamp }: { model: ModelDetail; stamp: number }) {
     <>
       <p>
         <a href={fileUrl(model.id, "cut.dxf")} download>
-          Download cut.dxf for the cutting table
+          Download the DXF for the cutting table
         </a>{" "}
         ·{" "}
         <a

@@ -72,6 +72,16 @@ class SeamsRequest(BaseModel):
     run: bool = True  # cut and flatten again straight away
 
 
+def _named(model_id: str, name: str, revision: int | None = None) -> tuple[str, str]:
+    """A download carries the model's name, not "cut.dxf": the cutting table's file is
+    <model>.dxf (with -r<n> for a kept revision), the others <model>-<file> (the owner, 5 Oct)."""
+    rev = f"-r{revision}" if revision is not None else ""
+    stem, suffix = Path(name).stem, Path(name).suffix
+    file = f"{model_id}{rev}{suffix}" if stem == "cut" else f"{model_id}{rev}-{name}"
+    kind = "attachment" if suffix in (".dxf", ".pdf", ".svg", ".json") else "inline"
+    return file, kind
+
+
 def create_app(
     data_dir: Path, web_dir: Path | None = None, login_required: bool = False
 ) -> FastAPI:
@@ -96,6 +106,9 @@ def create_app(
     from coverapi import webshop
 
     webshop.install(app, auth, store.root / "quotes", store.models)
+    from coverapi import own_reference
+
+    own_reference.install(app, store)  # the workshop's own reference per model (ADR-070)
     from coverapi import shop
 
     shop.install(app, auth, store.root, jobs, store)
@@ -163,7 +176,9 @@ def create_app(
         if name not in ALLOWED or not (d / name).is_file():
             raise HTTPException(404, f"no file {name!r}")
         suffix = Path(name).suffix
-        return FileResponse(d / name, media_type=MEDIA.get(suffix, "application/octet-stream"))
+        file, kind = _named(model_id, name)
+        return FileResponse(d / name, media_type=MEDIA.get(suffix, "application/octet-stream"),
+                            filename=file, content_disposition_type=kind)  # fmt: skip
 
     @app.get("/api/parameters")
     def parameters() -> list[dict[str, Any]]:
@@ -344,7 +359,9 @@ def create_app(
         path = revision_file(d, number, name)
         if not path.is_file():
             raise HTTPException(404, f"revision {number} has no {name}")
-        return FileResponse(path, media_type=MEDIA.get(path.suffix, "application/octet-stream"))
+        file, kind = _named(model_id, name, number)
+        return FileResponse(path, media_type=MEDIA.get(path.suffix, "application/octet-stream"),
+                            filename=file, content_disposition_type=kind)  # fmt: skip
 
     @app.post("/api/batch")
     def batch(req: BatchRequest) -> dict[str, Any]:

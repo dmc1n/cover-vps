@@ -27,6 +27,7 @@ Note column.
 | pymupdf | 1.28.2 | see package | reading the owner's PDF drawings (learning) | AGPL-3.0: fine for internal use (ADR-037); review before distributing |
 | newton | 1.6.0 | Apache-2.0 |  |  |
 | warp-lang | 1.17.0 | Apache-2.0 |  |  |
+| modal | 1.6.1 | Apache-2.0 |  |  |
 | fastapi | 0.141.1 | MIT | API (M6) |  |
 | uvicorn | 0.54.0 | BSD-3-Clause | API server (M6) |  |
 | pytest | 9.1.1 | MIT | tests (dev) |  |
