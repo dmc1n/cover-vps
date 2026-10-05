@@ -200,3 +200,11 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
 55. **Who gets the customers' requests** (now rick@s2dio.industries)?
 56. **Should customers see the pieces and the fabric**, or only the 3D view and the price?
 
+57. **Allowed size band for an existing cover** (docs/plans/hosting-scale-and-matching.md): how
+    much larger than the furniture may it be and still count as a good fit (e.g. +4 cm in
+    length and depth, +3 cm in height)? Is anything smaller ever acceptable?
+58. **Off-the-shelf covers:** which of the 302 are sold as they are, at what price, and with
+    what delivery time against custom?
+59. **The shop's domain on Cloudflare** (DNS) and an API token for Pages, Workers, KV and R2.
+60. **GPU on demand:** Modal or RunPod, and a monthly cap (e.g. €50)?
+61. **The fit question** by mail two weeks after delivery, with an optional photo: OK?
