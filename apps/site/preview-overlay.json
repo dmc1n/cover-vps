@@ -1,0 +1,16 @@
+{
+  "content": {},
+  "settings": {
+    "home_story": true,
+    "story_media": {
+      "hero": "/media/hero-sand.mp4",
+      "hero_poster": "/media/hero-sand.jpg",
+      "rain": "/media/rain2.mp4",
+      "measure": "/media/measure.mp4",
+      "cut": "/media/cut.mp4",
+      "sew": "/media/sew2.mp4",
+      "pack": "/media/pack.mp4",
+      "frames": "/media/story3-"
+    }
+  }
+}

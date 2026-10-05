@@ -23,7 +23,7 @@ from pathlib import Path
 import bpy
 import numpy as np
 
-CH = 40  # frames per chapter
+CH = 40  # the timeline's frames per chapter; --count pictures are taken along it (subframes)
 LAST = 6 * CH
 SAND = "b39a6e"  # the cover (the owner, 5 Oct: our covers are sand)
 PIECES = ["c2a77a", "b0956a", "cdb68c", "a68c62", "bba27a", "d2bf98", "9c8460"]
@@ -38,10 +38,12 @@ def args() -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--frames", default=f"1-{LAST}")
+    ap.add_argument("--frames", default="")
     ap.add_argument("--size", default="1600x900")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--gpu", action="store_true")
+    ap.add_argument("--count", type=int, default=360, help="pictures over the whole story")
+    ap.add_argument("--quality", type=int, default=80)
     return ap.parse_args(sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else [])
 
 
@@ -120,8 +122,23 @@ def fabric(name: str, by_piece: bool) -> bpy.types.Material:
         nt.links.new(base.outputs[0], mix.inputs[7])
         col = mix.outputs[2]
     darker = node(nt, "ShaderNodeMix", data_type="RGBA", blend_type="MULTIPLY")
-    darker.inputs[7].default_value = (0.8, 0.78, 0.74, 1)
-    nt.links.new(wet.outputs[0], darker.inputs[0])
+    darker.inputs[7].default_value = (0.74, 0.7, 0.64, 1)
+    # wet is patchy: runoff streaks down the slopes (noise stretched along z) and drier patches
+    streak_map = node(nt, "ShaderNodeMapping")
+    streak_map.inputs["Scale"].default_value = (9.0, 9.0, 0.9)
+    nt.links.new(tc.outputs["Object"], streak_map.inputs["Vector"])
+    streak = node(nt, "ShaderNodeTexNoise")
+    streak.inputs["Scale"].default_value = 3.0
+    streak.inputs["Detail"].default_value = 6.0
+    nt.links.new(streak_map.outputs[0], streak.inputs["Vector"])
+    patch = node(nt, "ShaderNodeMapRange")
+    patch.inputs["From Min"].default_value, patch.inputs["From Max"].default_value = 0.38, 0.62
+    patch.inputs["To Min"].default_value, patch.inputs["To Max"].default_value = 0.75, 1.0
+    nt.links.new(streak.outputs["Fac"], patch.inputs["Value"])
+    wetness = node(nt, "ShaderNodeMath", operation="MULTIPLY")
+    nt.links.new(wet.outputs[0], wetness.inputs[0])
+    nt.links.new(patch.outputs["Result"], wetness.inputs[1])
+    nt.links.new(wetness.outputs[0], darker.inputs[0])
     nt.links.new(col, darker.inputs[6])
     nt.links.new(darker.outputs[2], b.inputs["Base Color"])
     warp = node(nt, "ShaderNodeTexWave", wave_type="BANDS", bands_direction="X")
@@ -147,15 +164,33 @@ def fabric(name: str, by_piece: bool) -> bpy.types.Material:
     nt.links.new(wetbead.outputs[0], height.inputs[0])
     height.inputs[1].default_value = 5.0
     nt.links.new(weave.outputs[0], height.inputs[2])
+    # soft large wrinkles under the fine weave
+    folds = node(nt, "ShaderNodeTexNoise")
+    folds.inputs["Scale"].default_value = 2.5
+    folds.inputs["Detail"].default_value = 3.0
+    nt.links.new(tc.outputs["Object"], folds.inputs["Vector"])
+    fold_bump = node(nt, "ShaderNodeBump")
+    fold_bump.inputs["Strength"].default_value = 0.06
+    fold_bump.inputs["Distance"].default_value = 0.02
+    nt.links.new(folds.outputs["Fac"], fold_bump.inputs["Height"])
     bump = node(nt, "ShaderNodeBump")
-    bump.inputs["Strength"].default_value = 0.35
-    bump.inputs["Distance"].default_value = 0.0006
+    bump.inputs["Strength"].default_value = 0.55
+    bump.inputs["Distance"].default_value = 0.0005
     nt.links.new(height.outputs[0], bump.inputs["Height"])
+    nt.links.new(fold_bump.outputs["Normal"], bump.inputs["Normal"])
     nt.links.new(bump.outputs["Normal"], b.inputs["Normal"])
-    rough = node(nt, "ShaderNodeMapRange")
-    rough.inputs["To Min"].default_value, rough.inputs["To Max"].default_value = 0.72, 0.4
-    nt.links.new(wet.outputs[0], rough.inputs["Value"])
-    nt.links.new(rough.outputs["Result"], b.inputs["Roughness"])
+    # roughness: a little variation in the coating, much glossier where wet
+    grain = node(nt, "ShaderNodeTexNoise")
+    grain.inputs["Scale"].default_value = 40.0
+    nt.links.new(tc.outputs["Object"], grain.inputs["Vector"])
+    dry = node(nt, "ShaderNodeMapRange")
+    dry.inputs["To Min"].default_value, dry.inputs["To Max"].default_value = 0.62, 0.8
+    nt.links.new(grain.outputs["Fac"], dry.inputs["Value"])
+    rough = node(nt, "ShaderNodeMix", data_type="FLOAT")
+    nt.links.new(wetness.outputs[0], rough.inputs[0])
+    nt.links.new(dry.outputs["Result"], rough.inputs[2])
+    rough.inputs[3].default_value = 0.28
+    nt.links.new(rough.outputs[0], b.inputs["Roughness"])
     nt.links.new(wetbead.outputs[0], b.inputs["Coat Weight"])
     b.inputs["Coat Roughness"].default_value = 0.03
     b.inputs["Sheen Weight"].default_value = 0.3
@@ -193,6 +228,43 @@ def piping(mat: bpy.types.Material) -> bpy.types.NodeTree:
     ng.links.new(setm.outputs[0], join.inputs[0])
     ng.links.new(join.outputs[0], gout.inputs[0])
     return ng
+
+
+def cord(m: bpy.types.Material) -> None:
+    """The piping as a twisted cord: fine diagonal ridges, visible at close range."""
+    nt = m.node_tree
+    tc = node(nt, "ShaderNodeTexCoord")
+    w = node(nt, "ShaderNodeTexWave", wave_type="BANDS", bands_direction="DIAGONAL")
+    w.inputs["Scale"].default_value = 260.0
+    nt.links.new(tc.outputs["Object"], w.inputs["Vector"])
+    bump = node(nt, "ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.6
+    bump.inputs["Distance"].default_value = 0.0008
+    nt.links.new(w.outputs["Fac"], bump.inputs["Height"])
+    nt.links.new(bump.outputs["Normal"], nt.nodes["Principled BSDF"].inputs["Normal"])
+    nt.nodes["Principled BSDF"].inputs["Sheen Weight"].default_value = 0.4
+
+
+def woven(m: bpy.types.Material, scale: float, strength: float) -> None:
+    """An upholstery weave and sheen on a simple material."""
+    nt = m.node_tree
+    tc = node(nt, "ShaderNodeTexCoord")
+    a = node(nt, "ShaderNodeTexWave", wave_type="BANDS", bands_direction="X")
+    b_ = node(nt, "ShaderNodeTexWave", wave_type="BANDS", bands_direction="Z")
+    for t in (a, b_):
+        t.inputs["Scale"].default_value = scale
+        nt.links.new(tc.outputs["Object"], t.inputs["Vector"])
+    mul = node(nt, "ShaderNodeMath", operation="MULTIPLY")
+    nt.links.new(a.outputs["Fac"], mul.inputs[0])
+    nt.links.new(b_.outputs["Fac"], mul.inputs[1])
+    bump = node(nt, "ShaderNodeBump")
+    bump.inputs["Strength"].default_value = strength
+    bump.inputs["Distance"].default_value = 0.0008
+    nt.links.new(mul.outputs[0], bump.inputs["Height"])
+    bsdf = nt.nodes["Principled BSDF"]
+    nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    bsdf.inputs["Sheen Weight"].default_value = 0.5
+    bsdf.inputs["Sheen Roughness"].default_value = 0.5
 
 
 def simple(name: str, hexcol: str, rough: float, metal: float = 0.0) -> bpy.types.Material:
@@ -238,7 +310,7 @@ def build(a: argparse.Namespace) -> None:
         # OpenImageDenoise: the OptiX denoiser needs driver parts cloud GPUs often lack
         sc.cycles.denoiser = "OPENIMAGEDENOISE"
     sc.render.image_settings.file_format = "WEBP"
-    sc.render.image_settings.quality = 82
+    sc.render.image_settings.quality = a.quality
 
     # the studio: soft light, an off-white sweep
     world = bpy.data.worlds.new("studio")
@@ -249,18 +321,30 @@ def build(a: argparse.Namespace) -> None:
     bg = world.node_tree.nodes["Background"]
     bg.inputs["Strength"].default_value = 0.55
     world.node_tree.links.new(env.outputs["Color"], bg.inputs["Color"])
+    # the camera sees a plain studio tone where no wall is; the HDRI only lights the scene
+    wnt = world.node_tree
+    seen = node(wnt, "ShaderNodeBackground")
+    seen.inputs["Color"].default_value = lin("d9dbda")
+    seen.inputs["Strength"].default_value = 1.0
+    path = node(wnt, "ShaderNodeLightPath")
+    pick = node(wnt, "ShaderNodeMixShader")
+    wnt.links.new(path.outputs["Is Camera Ray"], pick.inputs[0])
+    wnt.links.new(bg.outputs[0], pick.inputs[1])
+    wnt.links.new(seen.outputs[0], pick.inputs[2])
+    wnt.links.new(pick.outputs[0], wnt.nodes["World Output"].inputs["Surface"])
     bpy.ops.mesh.primitive_plane_add(size=1)
     sweep = bpy.context.object
     me = sweep.data
     verts = []
     for i in range(25):  # a cyclorama: floor curving up into the back wall
         t = i / 24
-        y = -6 + 10 * min(t / 0.7, 1.0)
+        y = -24 + 28 * min(t / 0.7, 1.0)  # a deep floor: no edge in any shot
         z = 0.0 if t < 0.7 else 2.5 * (1 - math.cos((t - 0.7) / 0.3 * math.pi / 2))
         y = y if t < 0.7 else 4 + 2.5 * math.sin((t - 0.7) / 0.3 * math.pi / 2)
-        verts += [(-14, y, z), (14, y, z)]
+        verts += [(-30, y, z), (30, y, z)]
+    verts += [(-30, 6.5, 12.0), (30, 6.5, 12.0)]  # the wall runs on up, out of every shot
     me.clear_geometry()
-    me.from_pydata(verts, [], [(2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2) for i in range(24)])
+    me.from_pydata(verts, [], [(2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2) for i in range(25)])
     for p in me.polygons:
         p.use_smooth = True
     sweep_mat = simple("sweep", OFFWHITE, 0.9)
@@ -270,22 +354,22 @@ def build(a: argparse.Namespace) -> None:
     k = bpy.data.objects.new("key", key)
     k.location, k.rotation_euler = (3.5, -3.5, 4.5), (math.radians(45), 0, math.radians(40))
     sc.collection.objects.link(k)
+    k.visible_camera = False
     rim = bpy.data.lights.new("rim", "AREA")
     rim.energy, rim.size = 700, 2
     r = bpy.data.objects.new("rim", rim)
     r.location, r.rotation_euler = (-3.0, 3.5, 3.0), (math.radians(-50), 0, math.radians(-140))
     sc.collection.objects.link(r)
+    r.visible_camera = False
 
     s = story(a.data)
     # the furniture (its cushions and plinth from the glb's colours), fading where asked
     bpy.ops.import_scene.gltf(filepath=str(a.data / "furniture.glb"))
     sofa = [o for o in bpy.context.selected_objects if o.type == "MESH"]
-    up = simple("upholstery", "c9cbc5", 0.85)
-    vc = node(up.node_tree, "ShaderNodeAttribute", attribute_name="Color")  # the glb's colours
-    up.node_tree.links.new(
-        vc.outputs["Color"], up.node_tree.nodes["Principled BSDF"].inputs["Base Color"]
-    )
-    plinth = simple("plinth", "2b302b", 0.45, 0.3)  # the dark aluminium base
+    up = simple("upholstery", "8f8a80", 0.9)  # a warm light-grey outdoor fabric
+    woven(up, 300.0, 0.6)
+    plinth = simple("plinth", "3a3e3a", 0.32, 0.85)  # the anodised aluminium base
+    plinth.node_tree.nodes["Principled BSDF"].inputs["Anisotropic"].default_value = 0.6
     for o in sofa:
         o.data.materials.clear()
         o.data.materials.append(up)
@@ -331,6 +415,7 @@ def build(a: argparse.Namespace) -> None:
     keys(kb["lifted"], "value", [(4 * c + 1, 0.0), (4 * c + 14, 1.0), (4 * c + 28, 0.0)])
     keys(kb["drape"], "value", [(4 * c + 14, 0.0), (4 * c + 28, 1.0)])
     pipe = simple("piping", SEAM, 0.55)
+    cord(pipe)
     cover.modifiers.new("seams", "NODES").node_group = piping(pipe)
     cover.modifiers.new("thickness", "SOLIDIFY").thickness = 0.0015
     cover.modifiers.new("smooth", "SUBSURF").levels = 1
@@ -374,32 +459,41 @@ def build(a: argparse.Namespace) -> None:
         keys(m_.node_tree.nodes["alpha"].outputs[0], "", fade)
     # the rain
     bpy.ops.mesh.primitive_uv_sphere_add(
-        radius=0.0016, segments=8, ring_count=6, location=(0, 0, -5)
+        radius=0.0019, segments=8, ring_count=6, location=(0, 0, -5)
     )
     drop = bpy.context.object
-    drop.scale = (1.0, 1.0, 55)  # a streak, as the eye sees falling rain
+    drop.scale = (1.0, 1.0, 2.2)  # a drop; the camera's shutter draws its streak
     bpy.ops.object.transform_apply(scale=True)  # particles ignore the object's own scale
-    water = simple("water", "eef3f7", 0.05)
-    water.node_tree.nodes["alpha"].outputs[0].default_value = 0.7
-    water.node_tree.nodes["Principled BSDF"].inputs["Emission Color"].default_value = lin("e6eef4")
-    water.node_tree.nodes["Principled BSDF"].inputs["Emission Strength"].default_value = 1.1
+    water = simple("water", "ffffff", 0.02)
+    wb = water.node_tree.nodes["Principled BSDF"]
+    wb.inputs["Transmission Weight"].default_value = 0.6
+    wb.inputs["IOR"].default_value = 1.33
+    wb.inputs["Emission Color"].default_value = lin("dfe7ee")
+    wb.inputs["Emission Strength"].default_value = 1.2  # catches the light against the green
     # the studio darkens to the house green for the rain, so the lit drops show
     base = sweep_mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"]
     keys(base, "", [(5 * c - 6, lin(OFFWHITE)), (5 * c + 10, lin(DARK))])
     keys(bg.inputs["Strength"], "", [(5 * c - 6, 0.55), (5 * c + 10, 0.18)])
     keys(rim, "energy", [(5 * c - 6, 700.0), (5 * c + 10, 2600.0)])
     drop.data.materials.append(water)
-    bpy.ops.mesh.primitive_plane_add(size=4.5, location=(0, 0, 4.0))
+    bpy.ops.mesh.primitive_plane_add(size=9.0, location=(0, -1.0, 4.0))  # rain over the shot
     sky = bpy.context.object
     sky.show_instancer_for_render = False
     ps = sky.modifiers.new("rain", "PARTICLE_SYSTEM").particle_system
     st = ps.settings
-    st.count, st.lifetime = 90000, 40
+    st.count, st.lifetime = 420000, 40
     st.frame_start, st.frame_end = 5 * c + 1, LAST
     st.normal_factor, st.object_align_factor = 0.0, (0.15, 0.0, -7.0)
     st.effector_weights.gravity = 0.0
     st.render_type, st.instance_object = "OBJECT", drop
-    st.particle_size, st.size_random = 1.0, 0.3  # the default 0.05 shrank every drop
+    st.particle_size, st.size_random = 1.0, 0.3
+    clear = bpy.data.materials.new("clear")  # the rain's source plane overhead: invisible
+    clear.use_nodes = True
+    out = clear.node_tree.nodes["Material Output"]
+    clear.node_tree.links.new(
+        node(clear.node_tree, "ShaderNodeBsdfTransparent").outputs[0], out.inputs["Surface"]
+    )
+    sky.data.materials.append(clear)
     ps.seed = 5
     cover.modifiers.new("collision", "COLLISION")
     cover.collision.use_particle_kill = True
@@ -407,9 +501,10 @@ def build(a: argparse.Namespace) -> None:
     cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
     sc.collection.objects.link(cam)
     sc.camera = cam
-    cam.data.lens = 50
+    cam.data.lens = 38  # wide enough that the cover keeps to the right half of the picture
+    cam.data.shift_x = -0.19  # the subject right of centre: the captions sit on the left
     cam.data.dof.use_dof = True
-    cam.data.dof.aperture_fstop = 8
+    cam.data.dof.aperture_fstop = 4.5
     aim = bpy.data.objects.new("aim", None)
     sc.collection.objects.link(aim)
     cam.data.dof.focus_object = aim
@@ -419,15 +514,15 @@ def build(a: argparse.Namespace) -> None:
     shots = [
         (1, (3.4, -4.0, 1.6), (0, 0, 0.45)), (c, (3.1, -3.6, 1.5), (0, 0, 0.45)),
         (2 * c, (2.8, -3.3, 1.7), (0, 0, 0.5)), (3 * c - 6, (3.6, -4.2, 2.2), (0, 0, 0.5)),
-        (3 * c + 24, (mid[0] + 1.0, mid[1] - 7.5, 8.0), mid),
-        (4 * c + 6, (mid[0] + 0.6, mid[1] - 7.0, 7.4), mid),
-        (4 * c + 30, (-3.2, -3.8, 1.6), (0, 0, 0.45)), (5 * c + 4, (-2.9, -3.4, 1.5), (0, 0, 0.45)),
-        (LAST, (2.6, -3.2, 1.3), (0, 0, 0.45)),
+        # along the cutting table, close: every piece large and crisp
+        (3 * c + 22, (lo[0] + 0.6, mid[1] - 2.9, TABLE_Z + 2.3), (lo[0] + 1.5, mid[1], TABLE_Z)),
+        (4 * c + 6, (hi[0] - 2.4, mid[1] - 2.9, TABLE_Z + 2.3), (hi[0] - 1.5, mid[1], TABLE_Z)),
+        (4 * c + 30, (-3.2, -3.8, 1.6), (0, 0, 0.45)), (5 * c + 4, (-4.0, -4.9, 1.9), (0, 0, 0.5)),
+        (LAST, (4.0, -4.9, 1.7), (0, 0, 0.5)),
     ]  # fmt: skip
     for f, pos, look in shots:
         keys(cam, "location", [(f, pos)])
         keys(aim, "location", [(f, look)])
-    cam.data.dof.aperture_fstop = 8
 
 
 def main() -> None:
@@ -435,15 +530,22 @@ def main() -> None:
     build(a)
     sc = bpy.context.scene
     a.out.mkdir(parents=True, exist_ok=True)
-    first, last = (int(x) for x in a.frames.split("-"))
-    if any(o.particle_systems for o in sc.objects) and last > 5 * CH:
+    first, last = (int(x) for x in (a.frames or f"1-{a.count}").split("-"))
+
+    def when(i: int) -> float:  # picture i of --count along the 240-frame timeline
+        return 1 + (i - 1) * (LAST - 1) / max(a.count - 1, 1)
+
+    if any(o.particle_systems for o in sc.objects) and when(last) > 5 * CH:
         sc.frame_set(1)
         bpy.ops.ptcache.bake_all(bake=True)
-    for f in range(first, last + 1):
-        path = a.out / f"story-{f:03d}.webp"
+    sc.render.motion_blur_shutter = 0.5
+    for i in range(first, last + 1):
+        path = a.out / f"story-{i:03d}.webp"
         if path.is_file():
             continue
-        sc.frame_set(f)
+        t = when(i)
+        sc.frame_set(int(t), subframe=t - int(t))
+        sc.render.use_motion_blur = t > 5 * CH + 2  # the rain streaks; the rest stays crisp
         sc.render.filepath = str(path)
         bpy.ops.render.render(write_still=True)
 

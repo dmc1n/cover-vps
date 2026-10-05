@@ -159,6 +159,7 @@ export function Story({
           {clip("hero") ? (
             <video
               src={clip("hero")}
+              poster={clip("hero_poster") || undefined}
               autoPlay={!calm}
               muted
               loop
@@ -191,7 +192,7 @@ export function Story({
         >
           {frames ? (
             <StoryFrames
-              base={media.frames || "/media/story-"}
+              base={media.frames || "/media/story3-"}
               progress={progress}
               onMissing={noFrames}
             />

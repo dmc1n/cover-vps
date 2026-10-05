@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "wrangler dev --local",
     "deploy": "wrangler deploy",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "deploy:preview": "mkdir -p ../web/dist/preview && cp preview-overlay.json ../web/dist/preview/overlay.json && wrangler deploy --env preview"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261001.1",

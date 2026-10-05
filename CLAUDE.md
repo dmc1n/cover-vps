@@ -223,7 +223,7 @@ scripts/release.sh v1.2.3 "what is new"     test, tag, build ~/releases/v1.2.3 a
 scripts/rollback.sh [v1.2.3 | --list]       back to the release before (or a chosen one) in seconds
 sudo systemctl restart cover-web            the app as a service (runs ~/releases/current); Caddy serves https://covers.suns.nu
 make backup     push the data directory to R2 with rclone
-cd apps/site && npm run dev | npm run deploy   the website's Worker, locally or to Cloudflare (ADR-066)
+cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build
 ```
 
 ## How to work in this repo (instructions for Claude Code)
