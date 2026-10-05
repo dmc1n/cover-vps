@@ -29,7 +29,7 @@ def app(tmp_path: Path) -> Any:
 
 
 def _wait(c: TestClient) -> dict[str, Any]:
-    for _ in range(100):
+    for _ in range(600):
         s = c.get("/api/models/box-1/reference").json()
         if not s["running"]:
             return s

@@ -27,7 +27,6 @@ MAX_BYTES = 200 * 1024 * 1024  # param-ok: a large STEP file
 def install(app: FastAPI, store: Any) -> None:
     from coverapi.security import require
 
-    running: set[str] = set()
     lock = threading.Lock()
     learning = store.root / "learning"
 
@@ -52,7 +51,7 @@ def install(app: FastAPI, store: Any) -> None:
             if ref.is_dir()
             else []
         )
-        return {"files": files, "compare": doc, "running": model_id in running,
+        return {"files": files, "compare": doc, "running": (ref / "running").is_file(),
                 "has_view": (ref / "compare.glb").is_file()}  # fmt: skip
 
     def compare(model_id: str, kind: str, path: Path, by: str) -> None:
@@ -61,27 +60,27 @@ def install(app: FastAPI, store: Any) -> None:
 
         ref = path.parent
         try:
-            params = Registry.load(None).resolve()
-            model_dir = ref.parent
-            if kind == "surface":
-                res = cmp.surface(model_dir, path, params)
-            else:
-                res = cmp.drawing(model_dir, path, params, use_ai=True)
-        except Exception as exc:  # noqa: BLE001 - shown on the page, never a crash
-            res = {"kind": kind, "reference": path.name, "error": str(exc)}
-        res["time"], res["by"] = time.time(), by
-        with lock:
-            doc = (
-                json.loads((ref / "compare.json").read_text())
-                if (ref / "compare.json").is_file()
-                else {}
-            )
-            doc[kind] = res
-            (ref / "compare.json").write_text(json.dumps(doc, indent=1))
-            learning.mkdir(parents=True, exist_ok=True)
-            with (learning / "references.jsonl").open("a") as fh:
-                fh.write(json.dumps({"model": model_id, **res}) + "\n")
-            running.discard(model_id)
+            try:
+                params = Registry.load(None).resolve()
+                if kind == "surface":
+                    res = cmp.surface(ref.parent, path, params)
+                else:
+                    res = cmp.drawing(ref.parent, path, params, use_ai=True)
+            except Exception as exc:  # noqa: BLE001 - shown on the page, never a crash
+                res = {"kind": kind, "reference": path.name, "error": str(exc)}
+            res["time"], res["by"] = time.time(), by
+            with lock:
+                done = ref / "compare.json"
+                doc = json.loads(done.read_text()) if done.is_file() else {}
+                doc[kind] = res
+                tmp = ref / "compare.tmp"
+                tmp.write_text(json.dumps(doc, indent=1))
+                tmp.replace(done)  # never half written
+                learning.mkdir(parents=True, exist_ok=True)
+                with (learning / "references.jsonl").open("a") as fh:
+                    fh.write(json.dumps({"model": model_id, **res}) + "\n")
+        finally:
+            (ref / "running").unlink(missing_ok=True)
 
     @app.get("/api/models/{model_id}/reference")
     def get_reference(model_id: str) -> dict[str, Any]:
@@ -113,7 +112,7 @@ def install(app: FastAPI, store: Any) -> None:
         path.write_bytes(data)
         (ref / f"{kind}.source.json").write_text(json.dumps(
             {"name": name, "by": user.username, "time": time.time()}))  # fmt: skip
-        running.add(model_id)
+        (ref / "running").write_text(kind)
         threading.Thread(target=compare, args=(model_id, kind, path, user.username),
                          daemon=True).start()  # fmt: skip
         return state(model_id)
