@@ -1365,7 +1365,8 @@ to check whether it fits, and so on". suns.nu itself stays at Bunny DNS.
     for a year (their names are hashes), so the scripts always match the studio's pages. The
     studio app is never part of it.
   - `www.` is sent to the bare domain with a 301 (one address for search engines).
-  - Domain for now: s2dio.living (the owner, 5 October 2026), on Cloudflare.
+  - Address for now: shop.s2dio.living (the owner, 5 October 2026); the zone s2dio.living is
+    on Cloudflare.
   - Every page and every API call goes to the studio with the website's key (`x-link-key`),
     plus the visitor's address (`x-client-ip`) for the rate limits.
   - Pages, the feeds, the demo 3D and the film are cached at the edge (60 s; the media a day).

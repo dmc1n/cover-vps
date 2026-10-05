@@ -1,13 +1,10 @@
-# The cover website (ADR-066): its own domain on Cloudflare (for now s2dio.living). The edge
+# The cover website (ADR-066): its own domain on Cloudflare (for now shop.s2dio.living). The edge
 # caches; everything about covers (the match, the price, the rain, 3D, orders, the content) from the
 # studio at STUDIO_URL, through the key LINK_KEY (wrangler secret put LINK_KEY).
 name = "cover-site"
 main = "src/worker.ts"
 compatibility_date = "2026-09-01"
-routes = [
-  { pattern = "s2dio.living", custom_domain = true },
-  { pattern = "www.s2dio.living", custom_domain = true },
-]
+routes = [{ pattern = "shop.s2dio.living", custom_domain = true }]
 
 [vars]
 STUDIO_URL = "https://covers.suns.nu"
