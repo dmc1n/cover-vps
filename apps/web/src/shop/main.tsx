@@ -9,6 +9,7 @@ import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./shop.css";
 import { Scene } from "./Scene";
+import { Story, StoryContent } from "./Story";
 
 type T = Record<string, string>;
 interface Content {
@@ -18,6 +19,7 @@ interface Content {
   green: { title: T; points: T[] };
   faq: { q: T; a: T }[];
   legal: Record<string, T>;
+  story?: StoryContent;
   ui: {
     words: Record<string, T>;
     status: Record<string, T>;
@@ -42,6 +44,9 @@ interface Info {
     film_url: string;
     film_poster: string;
     logo_url: string;
+    home_story: boolean;
+    story_model: string;
+    story_media: Record<string, string>;
     colours: string[];
     indicative: boolean;
     languages: string[];
@@ -177,11 +182,30 @@ function Reveal({
 
 function Header({ info, tx, page }: { info: Info; tx: Tx; page: string }) {
   const langs = info.settings.languages;
+  // over the film the header is clear with light type; further down it turns light
+  const [light, setLight] = useState(page !== "");
+  useEffect(() => {
+    if (page !== "") return;
+    const on = () => setLight(window.scrollY > window.innerHeight * 0.8);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, [page]);
   return (
-    <header className="s-head">
+    <header className={`s-head ${light ? "light" : ""}`}>
       <a href={tx.href("")} className="s-logo">
-        {info.settings.logo_url && <img src={info.settings.logo_url} alt="" />}{" "}
-        {info.settings.company.name || "Covers"}
+        {info.settings.logo_url ? (
+          <img
+            src={
+              light
+                ? info.settings.logo_url.replace("-white", "-color")
+                : info.settings.logo_url
+            }
+            alt={info.settings.company.name || "S2DIO"}
+          />
+        ) : (
+          info.settings.company.name || "Covers"
+        )}
       </a>
       <nav>
         <a href={`${tx.href("")}#how`}>{tx.w("how")}</a>
@@ -225,6 +249,36 @@ function Home({ info, tx }: { info: Info; tx: Tx }) {
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     [],
   );
+  // the scroll story (ADR-067): live once switched on, always on the preview address
+  const story =
+    info.settings.home_story || window.location.hostname.startsWith("preview.");
+  if (story && c.story && info.settings.story_model)
+    return (
+      <Story
+        t={t}
+        hero={c.hero}
+        story={c.story}
+        media={{
+          ...info.settings.story_media,
+          hero: info.settings.story_media?.hero || info.settings.film_url,
+        }}
+        model={info.settings.story_model}
+        cta={t(c.hero.cta)}
+        configure={tx.href("configure")}
+      >
+        <section className="s-section" id="faq">
+          <h2>{w("faq")}</h2>
+          <div className="s-faq">
+            {c.faq.map((f, i) => (
+              <details key={i}>
+                <summary>{t(f.q)}</summary>
+                <p>{t(f.a)}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      </Story>
+    );
   return (
     <>
       <section className="s-hero">

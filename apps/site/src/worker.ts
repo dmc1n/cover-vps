@@ -6,6 +6,8 @@
 // orders always do.
 
 export interface Env {
+  ASSETS?: Fetcher; // the preview only: its own fresh build of the shop
+  PREVIEW?: string;
   STUDIO_URL: string;
   LINK_KEY: string;
   PAGE_TTL: string;
@@ -17,6 +19,27 @@ const YEAR = 31536000;
 const API = /^\/(api\/shop\/|media\/)/;
 const FEEDS = new Set(["/robots.txt", "/sitemap.xml", "/llms.txt"]);
 const HOP = ["cookie", "host", "x-link-key", "x-client-ip", "cf-connecting-ip"];
+
+interface Info {
+  content: Record<string, unknown>;
+  settings: Record<string, unknown>;
+}
+
+// one request to the studio with the website's key and the visitor's address
+function studio(req: Request, url: URL, env: Env, path: string): Promise<Response> {
+  const headers = new Headers();
+  for (const [k, v] of req.headers) if (!HOP.includes(k.toLowerCase())) headers.set(k, v);
+  headers.set("x-link-key", env.LINK_KEY);
+  headers.set("x-client-ip", req.headers.get("cf-connecting-ip") ?? "");
+  headers.set("x-forwarded-host", url.host);
+  headers.set("x-forwarded-proto", "https");
+  return fetch(new URL(path + url.search, env.STUDIO_URL), {
+    method: req.method,
+    headers,
+    body: ["GET", "HEAD"].includes(req.method) ? undefined : req.body,
+    redirect: "manual",
+  });
+}
 
 function cacheFor(url: URL, method: string, env: Env): number {
   if (method !== "GET" || url.searchParams.has("preview")) return 0;
@@ -30,6 +53,40 @@ function cacheFor(url: URL, method: string, env: Env): number {
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
+    if (url.protocol === "http:") {
+      url.protocol = "https:";
+      return Response.redirect(url.toString(), 301);
+    }
+    // the preview (preview.<domain>): this build's own pages and files, the studio's data,
+    // never indexed; the live site changes only with a studio release
+    if (env.PREVIEW && env.ASSETS) {
+      if (url.pathname === "/robots.txt") return new Response("User-agent: *\nDisallow: /\n");
+      // a bridge until the studio's next release: the story's data and texts from this build
+      if (url.pathname.startsWith("/api/shop/story/")) {
+        const own = await env.ASSETS.fetch(
+          new Request(new URL(url.pathname.replace("/api/shop/story/", "/preview/story/"), url)),
+        );
+        if (own.ok) return own;
+      }
+      if (url.pathname === "/api/shop/info") {
+        const [live, extra] = await Promise.all([
+          studio(req, url, env, "/api/shop/info").then((r) => r.json() as Promise<Info>),
+          env.ASSETS.fetch(new Request(new URL("/preview/overlay.json", url))).then(
+            (r) => (r.ok ? (r.json() as Promise<Info>) : { content: {}, settings: {} }),
+          ),
+        ]);
+        live.content = { ...extra.content, ...live.content };
+        live.settings = { ...live.settings, ...extra.settings };
+        return Response.json(live, { headers: { "x-robots-tag": "noindex" } });
+      }
+      if (!API.test(url.pathname)) {
+        const asset = FILES.test(url.pathname) ? url.pathname : "/shop.html";
+        const res = await env.ASSETS.fetch(new Request(new URL(asset, url), req));
+        const out = new Response(res.body, res);
+        out.headers.set("x-robots-tag", "noindex, nofollow");
+        return out;
+      }
+    }
     if (url.hostname.startsWith("www.")) {
       url.hostname = url.hostname.slice(4); // one address for search engines: without www
       return Response.redirect(url.toString(), 301);

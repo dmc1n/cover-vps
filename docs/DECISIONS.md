@@ -1394,3 +1394,42 @@ to check whether it fits, and so on". suns.nu itself stays at Bunny DNS.
   - the website's pages in four languages, with the right canonical and hreflang;
   - the API through the key, and the match in the German configurator;
   - the studio's `/shop/` redirected, its API refused, the studio app not reachable.
+
+## ADR-067 — The website as one scrolling story in the S2DIO house style
+
+The owner (5 October 2026): a very modern single page where something happens with every
+scroll, following how we work, and a lifelike opening animation. The house style is the brand
+book by IS Creative (docs/brand.md). The plan is docs/plans/scroll-site.md.
+
+- **The page** (`apps/web/src/shop/Story.tsx`, with Lenis smooth scrolling and GSAP
+  ScrollTrigger):
+  - the opening clip shrinks into the arch of the logo;
+  - a pinned 3D scene of six chapters (`StoryScene.tsx`): the furniture, the cover around it,
+    the pieces stepping apart, every piece flat on the 152 cm roll, the pieces rising and
+    falling over the furniture, and the rain;
+  - the workshop in arch-framed clips that slide sideways;
+  - true numbers (0 in stock, 100 % made to order, 302 models, the 152 cm roll);
+  - the FAQ.
+  - Visitors who asked for less motion get the same story without the motion.
+- **The 3D is our own data**: `coverengine/story.py`.
+  - One model's cover as three shapes of the same points: the designed pieces (seams split),
+    every piece flat with its true lengths and laid out on the roll, and the Style3D drape.
+  - The furniture is merged into one mesh.
+  - The studio serves it at `/api/shop/story/<model>.json|.bin|-furniture.glb`, built once into
+    `data/story/`, for the model in `story_model` only (default the Kota 2-seater).
+  - Each change between shapes is done at 60 % of its chapter, so every stage is seen at rest.
+- **Clips: Gemini Veo 3.1** (Fast for the workshop, the standard model for the rain), 8 s each,
+  re-encoded for the web with Blender's ffmpeg (1280 wide; the opening clip 1600, about 9 MB).
+  - Settings `story_media` point at `/media/…`.
+  - A Veo clip made between our own first and last render (the cover being laid over) zoomed in
+    and made the fabric fuzzy twice, so it is not used. The cover's fall is shown by our 3D,
+    which is our real simulation; Veo shows people, the workshop and the rain.
+- **Texts** are content (`story`: chapters, work, numbers), so the AI CMS edits and translates
+  them.
+- **Colours and type** follow the brand: off white `#F1F2F2`, the greens, Work Sans. The header
+  is clear over the film and light further down, with the S2DIO website logo.
+- **Rolled out carefully.** `home_story` (Shop settings) switches the live home page over. Until
+  then the story shows only at `preview.s2dio.living`: a second Worker (`--env preview`) with its
+  own fresh build and the studio's data, noindex.
+  - The studio now accepts one link key per Worker (a list of hashes), so each can be revoked
+    alone.

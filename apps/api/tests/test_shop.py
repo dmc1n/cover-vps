@@ -285,3 +285,13 @@ def test_the_website_reaches_the_studio_with_its_key_and_the_public_does_not(app
     wrong = TestClient(app, headers={"x-link-key": "not-the-key"})
     assert wrong.post("/api/shop/quote", json={"product": "item"}).status_code == 403
     assert admin.get("/shop/?preview=x").status_code == 200  # colleagues still see the preview
+
+
+def test_the_story_is_only_for_its_own_model(app: Any) -> None:
+    """ADR-067: the scroll story's data comes for the one model set (no other model leaks)."""
+    c = TestClient(app)
+    assert c.get("/api/shop/story/suns-other.json").status_code == 404
+    info = c.get("/api/shop/info").json()
+    assert info["settings"]["story_model"] == "suns-2-seater-kota"
+    assert info["settings"]["home_story"] is False  # the live home stays until switched on
+    assert len(info["content"]["story"]["chapters"]) == 6

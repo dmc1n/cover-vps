@@ -1,16 +1,17 @@
-/* The cover webshop (ADR-062): calm, modern, large type, the 3D cover as the hero. The house
-   colours of S2DIO x SUNS (olive, sage, sand, cream), Inter for text, Fraunces for headings. */
+/* The cover webshop (ADR-062, ADR-067): calm, modern, large light type, in the S2DIO house
+   style (docs/brand.md): off white and three greens, Work Sans. */
 :root {
-  --ink: #1d211b;
-  --muted: #6b6f63;
-  --bg: #f6f4ee;
+  /* S2DIO house style (docs/brand.md): off white, three greens, Work Sans */
+  --ink: #3c443c;
+  --muted: #6e776b;
+  --bg: #f1f2f2;
   --card: #ffffff;
-  --line: #e4e0d4;
-  --olive: #2b3125;
-  --olive-2: #1b2017;
-  --sage: #8d9278;
-  --sand: #b49a72;
-  --cream: #fbf8ef;
+  --line: #d9dcd8;
+  --olive: #3c443c;
+  --olive-2: #2c322c;
+  --sage: #778074;
+  --sand: #6e776b;
+  --cream: #f7f8f7;
   --ok: #4f7a3a;
   --bad: #b2402c;
   --water: #3f8fd6;
@@ -26,7 +27,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: "Work Sans", "DM Sans", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 a {
@@ -35,7 +36,7 @@ a {
 h1,
 h2,
 h3 {
-  font-family: Fraunces, Georgia, serif;
+  font-family: "Work Sans", "DM Sans", sans-serif;
   font-weight: 300;
   letter-spacing: -0.02em;
   line-height: 1.05;
@@ -139,11 +140,11 @@ p {
     transform 0.2s,
     background 0.2s,
     box-shadow 0.2s;
-  box-shadow: 0 10px 30px rgba(180, 154, 114, 0.35);
+  box-shadow: 0 10px 30px rgba(60, 68, 60, 0.22);
 }
 .s-btn:hover {
   transform: translateY(-2px);
-  background: #a68b62;
+  background: #5d665b;
 }
 .s-btn:disabled {
   opacity: 0.5;
@@ -264,7 +265,7 @@ p {
   border-radius: 50%;
   background: var(--olive);
   color: var(--cream);
-  font-family: Fraunces, serif;
+  font-family: "Work Sans", "DM Sans", sans-serif;
   font-size: 20px;
   margin-bottom: 18px;
 }
@@ -471,7 +472,7 @@ p {
   color: var(--muted);
 }
 .s-price strong {
-  font-family: Fraunces, serif;
+  font-family: "Work Sans", "DM Sans", sans-serif;
   font-weight: 400;
   font-size: 40px;
 }
@@ -586,7 +587,7 @@ p {
   border-color: var(--sand);
 }
 .s-match-pct {
-  font-family: Fraunces, Georgia, serif;
+  font-family: "Work Sans", "DM Sans", sans-serif;
   font-size: 22px;
   margin: 0;
 }
@@ -635,4 +636,382 @@ select.s-lang {
 }
 select.s-lang option {
   color: var(--ink);
+}
+
+/* ---- the scroll story (ADR-067) ---------------------------------------------------------- */
+.st {
+  background: var(--bg);
+}
+.st-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 16px 30px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition:
+    transform 0.3s,
+    background 0.3s;
+}
+.st-btn:hover {
+  transform: translateY(-2px);
+  background: #fff;
+}
+.st-btn.dark {
+  background: var(--ink);
+  color: var(--bg);
+}
+.st-btn.dark:hover {
+  background: var(--olive-2);
+}
+
+.st-hero {
+  position: relative;
+  height: 175vh;
+  background: var(--bg);
+}
+.st-hero-frame {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--olive-2);
+  will-change: clip-path;
+}
+.st-hero-frame video,
+.st-hero-fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.st-hero-fallback {
+  background: radial-gradient(
+    120% 90% at 70% 20%,
+    #5d665b 0%,
+    var(--olive-2) 70%
+  );
+}
+.st-hero-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(44, 50, 44, 0.15) 30%,
+    rgba(44, 50, 44, 0.72) 100%
+  );
+  pointer-events: none;
+}
+.st-hero-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 22px;
+  padding: 0 clamp(20px, 7vw, 120px) clamp(56px, 12vh, 140px);
+  color: var(--bg);
+  z-index: 2;
+}
+.st-hero-text h1 {
+  font-size: clamp(44px, 7.4vw, 112px);
+  font-weight: 300;
+  letter-spacing: -0.035em;
+  max-width: 12ch;
+  margin: 0;
+}
+.st-hero-text p {
+  font-size: clamp(17px, 1.6vw, 21px);
+  max-width: 560px;
+  opacity: 0.9;
+  margin: 0;
+  line-height: 1.55;
+}
+.st-hero-text .st-btn {
+  align-self: flex-start;
+}
+.st-scroll {
+  position: absolute;
+  top: calc(100vh - 56px);
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--bg);
+  z-index: 3;
+  font-size: 20px;
+  animation: st-bob 2.4s ease-in-out infinite;
+}
+@keyframes st-bob {
+  50% {
+    transform: translate(-50%, 8px);
+  }
+}
+
+.st-chapters {
+  position: relative;
+}
+.st-pinned {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+.st-scene {
+  position: absolute;
+  inset: 0;
+}
+.st-scene canvas {
+  display: block;
+}
+.st-captions {
+  position: absolute;
+  left: clamp(20px, 6vw, 96px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(430px, 38vw);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  height: 50vh;
+  pointer-events: none;
+}
+.st-captions li {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s ease;
+}
+.st-captions li.on {
+  opacity: 1;
+  transform: none;
+}
+.st-step {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 18px;
+}
+.st-captions h2 {
+  font-size: clamp(32px, 4.2vw, 60px);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  margin: 0 0 18px;
+  color: var(--ink);
+}
+.st-captions p {
+  font-size: clamp(16px, 1.3vw, 19px);
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0;
+}
+.st-rain {
+  position: absolute;
+  right: clamp(20px, 5vw, 80px);
+  bottom: 12vh;
+  width: min(30vw, 420px);
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 50% 50% 18px 18px / 34% 34% 18px 18px;
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  transition:
+    opacity 0.9s ease,
+    transform 0.9s ease;
+  box-shadow: 0 30px 60px rgba(44, 50, 44, 0.25);
+}
+.st-rain.on {
+  opacity: 1;
+  transform: none;
+}
+.st-rain video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.st-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+}
+.st-bar span {
+  width: 28px;
+  height: 2px;
+  background: var(--line);
+  transition: background 0.4s;
+}
+.st-bar span.on {
+  background: var(--ink);
+}
+
+.st-work {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5vh;
+  background: var(--ink);
+  color: var(--bg);
+}
+.st-work-title {
+  font-size: clamp(34px, 5vw, 72px);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  margin: 0;
+  padding: 0 clamp(20px, 6vw, 96px);
+}
+.st-track {
+  display: flex;
+  gap: clamp(20px, 3vw, 48px);
+  padding: 0 clamp(20px, 6vw, 96px);
+  will-change: transform;
+}
+.st-card {
+  flex: 0 0 auto;
+  width: min(380px, 72vw);
+  margin: 0;
+}
+.st-arch {
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 50% 50% 16px 16px / 36% 36% 16px 16px;
+  background: var(--olive-2);
+}
+.st-arch video,
+.st-arch-empty {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.st-arch-empty {
+  background: linear-gradient(160deg, var(--sage), var(--olive-2));
+}
+.st-card figcaption {
+  padding-top: 18px;
+}
+.st-card h3 {
+  font-size: 22px;
+  font-weight: 400;
+  margin: 0 0 6px;
+  color: var(--bg);
+}
+.st-card p {
+  margin: 0;
+  color: rgba(241, 242, 242, 0.7);
+}
+
+.st-numbers {
+  padding: clamp(80px, 16vh, 180px) clamp(20px, 6vw, 96px);
+  max-width: 1320px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+}
+.st-numbers h2 {
+  font-size: clamp(34px, 5vw, 72px);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  margin: 0;
+  max-width: 14ch;
+}
+.st-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 32px;
+}
+.st-figure {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.st-figure strong {
+  font-size: clamp(52px, 6.5vw, 96px);
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.st-figure span:last-child {
+  color: var(--muted);
+}
+.st-numbers .st-btn {
+  align-self: flex-start;
+}
+
+@media (max-width: 860px) {
+  .st-captions {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    top: auto;
+    bottom: 64px;
+    transform: none;
+    height: 34vh;
+  }
+  .st-captions li {
+    justify-content: flex-end;
+    background: linear-gradient(
+      180deg,
+      rgba(241, 242, 242, 0) 0%,
+      rgba(241, 242, 242, 0.92) 30%
+    );
+    padding: 24px 4px 0;
+  }
+  .st-rain {
+    width: 38vw;
+    top: 90px;
+    bottom: auto;
+  }
+}
+
+/* the header: clear over the film, light further down (ADR-067) */
+.s-head {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition:
+    background 0.4s,
+    color 0.4s;
+}
+.s-head.light {
+  background: rgba(241, 242, 242, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--ink);
+}
+.s-head.light .s-lang {
+  border-color: rgba(60, 68, 60, 0.3);
+}
+.s-logo img {
+  height: 22px;
+}
+.st-figure > span {
+  color: var(--muted);
+}
+.st-figure small {
+  font-size: 0.42em;
+  letter-spacing: 0;
+  margin-left: 0.15em;
+  color: var(--muted);
 }

@@ -73,6 +73,9 @@ SHOP_DEFAULTS: dict[str, Any] = {
     "film_url": "",
     "film_poster": "",
     "logo_url": "",
+    "home_story": False,  # the scroll story as the home page (on: live; preview.<domain> always)
+    "story_model": "suns-2-seater-kota",  # the catalogue model the scroll story shows (ADR-067)
+    "story_media": {"hero": "", "rain": "", "measure": "", "cut": "", "sew": "", "pack": ""},
     "notify_email": "",
     "languages": "nl,en,de,fr",
     "matching": {
@@ -213,6 +216,68 @@ CONTENT_DEFAULTS: dict[str, Any] = {
         "warranty": {"nl": "", "en": ""},
     },
 }
+CONTENT_DEFAULTS["story"] = {
+    "chapters": [
+        {"title": {"nl": "Jouw meubel", "en": "Your furniture"},
+         "text": {"nl": "Het begint met jouw meubel: een bank, een tafel, een ligbed. Wij kennen "
+                        "meer dan driehonderd modellen tot op de centimeter.",
+                  "en": "It starts with your furniture: a sofa, a table, a lounger. We know more "
+                        "than three hundred models to the centimetre."}},
+        {"title": {"nl": "Wij rekenen de hoes uit", "en": "We calculate the cover"},
+         "text": {"nl": "Onze software legt de hoes om het meubel, met de ruimte die hij nodig "
+                        "heeft en een dak waar het water vanaf loopt.",
+                  "en": "Our software wraps the cover around the furniture, with the room it needs "
+                        "and a top the water runs off."}},
+        {"title": {"nl": "Naden en stukken", "en": "Seams and pieces"},
+         "text": {"nl": "Daarna kiest hij waar de naden komen: rechte, rustige lijnen, en zo min "
+                        "mogelijk stukken.",
+                  "en": "Then it decides where the seams go: straight, calm lines, and as few "
+                        "pieces as possible."}},
+        {"title": {"nl": "Plat, op de rol", "en": "Flat, on the roll"},
+         "text": {"nl": "Elk stuk vouwt open tot een vlak patroon, met de lengtes precies zoals op "
+                        "het meubel, en past op de rol van 152 cm.",
+                  "en": "Every piece unfolds to a flat pattern, with the lengths exactly as on the "
+                        "furniture, and fits the 152 cm roll."}},
+        {"title": {"nl": "Gesneden, genaaid, gepast", "en": "Cut, sewn, fitted"},
+         "text": {"nl": "De snijtafel snijdt, wij naaien, en voordat er iets gesneden wordt laten "
+                        "we de hoes al virtueel over het meubel vallen.",
+                  "en": "The table cuts, we sew, and before anything is cut we already let the "
+                        "cover fall over the furniture, virtually."}},
+        {"title": {"nl": "Getest in de regen", "en": "Tested in the rain"},
+         "text": {"nl": "En we laten het regenen: blijft er nergens water staan, dan is hij klaar.",
+                  "en": "And we let it rain: when no water stays anywhere, it is ready."}},
+    ],
+    "work": {
+        "title": {"nl": "Zo werken we", "en": "How we work"},
+        "items": [
+            {"clip": "measure", "title": {"nl": "Meten", "en": "Measuring"},
+             "text": {"nl": "Een paar maten zijn genoeg.", "en": "A few sizes are enough."}},
+            {"clip": "cut", "title": {"nl": "Snijden", "en": "Cutting"},
+             "text": {"nl": "Op de snijtafel, met weinig afval.", "en": "On the cutting table, "
+                      "with little waste."}},
+            {"clip": "sew", "title": {"nl": "Naaien", "en": "Sewing"},
+             "text": {"nl": "Dubbel gestikt, in onze werkplaats.", "en": "Double stitched, in "
+                      "our workshop."}},
+            {"clip": "pack", "title": {"nl": "Bezorgen", "en": "Delivering"},
+             "text": {"nl": "Netjes gevouwen, bij jou thuis.", "en": "Neatly folded, at your "
+                      "home."}},
+        ],
+    },
+    "numbers": {
+        "title": {"nl": "Op bestelling, niet op voorraad", "en": "Made to order, not for stock"},
+        "items": [
+            {"value": 0, "suffix": "", "label": {"nl": "hoezen op voorraad",
+                                                 "en": "covers in stock"}},
+            {"value": 100, "suffix": " %", "label": {"nl": "op bestelling gemaakt",
+                                                     "en": "made to order"}},
+            {"value": 302, "suffix": "", "label": {"nl": "modellen in onze collectie",
+                                                   "en": "models in our range"}},
+            {"value": 152, "suffix": " cm", "label": {"nl": "rolbreedte, zo min mogelijk afval",
+                                                      "en": "roll width, as little waste as "
+                                                            "possible"}},
+        ],
+    },
+}  # fmt: skip
 CONTENT_DEFAULTS["ui"] = {
     k: v for k, v in json.loads(UI_JSON.read_text(encoding="utf-8")).items() if k[0] != "_"
 }
@@ -231,9 +296,9 @@ def link_ok(auth: Any, request: Request) -> bool:
 
     key = request.headers.get(LINK_HEADER, "")
     stored = auth.setting(LINK_SETTING, "") or ""
-    return bool(key and stored) and secrets.compare_digest(
-        hashlib.sha256(key.encode()).hexdigest(), str(stored)
-    )
+    hashes = [stored] if isinstance(stored, str) else list(stored)  # one per Worker
+    given = hashlib.sha256(key.encode()).hexdigest()
+    return bool(key) and any(h and secrets.compare_digest(given, str(h)) for h in hashes)
 
 
 def shop_root(auth: Any, request: Request) -> str:
@@ -728,6 +793,9 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             "film_url": s["film_url"],
             "film_poster": s["film_poster"],
             "logo_url": s["logo_url"],
+            "home_story": bool(s["home_story"]),
+            "story_model": s["story_model"],
+            "story_media": s["story_media"],
             "colours": q.colours(p),
             "products": s["products"],
             "indicative": bool(p["quote.prices_are_placeholders"]),
@@ -1059,6 +1127,44 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         return {"bands": out, "threshold_pct": float(p["match.threshold_pct"]),
                 "choice_pct": float(p["match.choice_pct"]),
                 "mode": str(p["match.mode"])}  # fmt: skip
+
+    # ---- the scroll story's data (ADR-067) ---------------------------------------------------
+    story_dir = data / "story"
+
+    def _story(model: str) -> Path:
+        from coverengine import story as st
+
+        if model != settings()["story_model"] or not re.fullmatch(r"suns-[a-z0-9-]{1,120}", model):
+            raise HTTPException(404, "no such story")
+        out = story_dir / model
+        if not (out / "story.bin").is_file():
+            out.mkdir(parents=True, exist_ok=True)
+            try:
+                meta, blob = st.build(store.models / model, shop_params(auth))
+                glb = st.furniture_glb(store.models / model)
+            except (OSError, ValueError, CoverError) as exc:
+                raise HTTPException(404, f"no story for {model}: {exc}") from None
+            (out / "story.json").write_text(json.dumps(meta), encoding="utf-8")
+            (out / "furniture.glb").write_bytes(glb)
+            (out / "story.bin").write_bytes(blob)
+        return out
+
+    @app.get("/api/shop/story/{model}.json")
+    def story_meta(model: str) -> Response:
+        return Response((_story(model) / "story.json").read_bytes(), media_type="application/json",
+                        headers={"Cache-Control": "public, max-age=3600"})  # fmt: skip
+
+    @app.get("/api/shop/story/{model}.bin")
+    def story_bin(model: str) -> Response:
+        return Response((_story(model) / "story.bin").read_bytes(),
+                        media_type="application/octet-stream",
+                        headers={"Cache-Control": "public, max-age=3600"})  # fmt: skip
+
+    @app.get("/api/shop/story/{model}-furniture.glb")
+    def story_furniture(model: str) -> Response:
+        return Response((_story(model) / "furniture.glb").read_bytes(),
+                        media_type="model/gltf-binary",
+                        headers={"Cache-Control": "public, max-age=3600"})  # fmt: skip
 
     # ---- the fit question after delivery -----------------------------------------------------
     def fit_mails() -> int:
