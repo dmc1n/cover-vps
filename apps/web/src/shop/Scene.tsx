@@ -27,6 +27,8 @@ export function Scene({
     mat.transparent = o < 0.999;
     mat.opacity = o;
     mat.depthWrite = o >= 0.9; // see-through: what is under it shows
+    // see-through: only the side facing you, so you look through one layer, not two
+    mat.side = o < 0.999 ? THREE.FrontSide : THREE.DoubleSide;
     mat.needsUpdate = true;
   };
   useEffect(() => {
@@ -91,8 +93,20 @@ export function Scene({
         if (!m.isMesh) return;
         m.castShadow = true;
         m.receiveShadow = true;
-        const mat = m.material as THREE.MeshStandardMaterial;
+        let mat = m.material as THREE.MeshStandardMaterial;
+        if (named(m, "cover")) {
+          // the file's parts share one material: the cover gets its own, so only the cover
+          // turns see-through (the owner, 6 Oct 2026)
+          mat = mat.clone();
+          m.material = mat;
+        }
         mat.side = THREE.DoubleSide;
+        if (!named(m, "cover")) {
+          // the furniture (and balloons) always solid: only the cover turns see-through
+          mat.transparent = false;
+          mat.opacity = 1;
+          mat.depthWrite = true;
+        }
         if (named(m, "cover")) {
           mat.roughness = 0.9;
           setSolid(mat, opacity.current ?? (balloons ? 0.55 : 0.93));
