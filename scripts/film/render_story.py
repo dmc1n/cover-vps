@@ -25,10 +25,13 @@ import numpy as np
 
 CH = 40  # frames per chapter
 LAST = 6 * CH
-SAND = "c4ad86"  # the cover (the owner, 5 Oct: our covers are sand)
-PIECES = ["cbb999", "bfab88", "d6c7aa", "b39f7d", "c6b392", "ddd0b6", "a99474"]
+SAND = "b39a6e"  # the cover (the owner, 5 Oct: our covers are sand)
+PIECES = ["c2a77a", "b0956a", "cdb68c", "a68c62", "bba27a", "d2bf98", "9c8460"]
+SEAM = "6b5434"  # the piping: a darker sand, so every seam reads
+DARK = "3c443c"  # S2DIO dark green: the rain chapter's backdrop
 OFFWHITE = "f1f2f2"  # S2DIO off white
 TABLE_Z = 0.82  # the cutting table's top (m)
+PLINTH_M = 0.11  # the sofa's dark base: its lowest 11 cm
 
 
 def args() -> argparse.Namespace:
@@ -178,7 +181,7 @@ def piping(mat: bpy.types.Material) -> bpy.types.NodeTree:
     ng.links.new(one.outputs[0], curve.inputs["Selection"])
     circ = node(ng, "GeometryNodeCurvePrimitiveCircle")
     circ.inputs["Resolution"].default_value = 6
-    circ.inputs["Radius"].default_value = 0.003
+    circ.inputs["Radius"].default_value = 0.0055
     tube = node(ng, "GeometryNodeCurveToMesh")
     ng.links.new(curve.outputs[0], tube.inputs["Curve"])
     ng.links.new(circ.outputs["Curve"], tube.inputs["Profile Curve"])
@@ -217,7 +220,8 @@ def build(a: argparse.Namespace) -> None:
     sc.cycles.use_denoising = True
     sc.cycles.seed = 3
     sc.view_settings.view_transform = "AgX"
-    sc.view_settings.look = "AgX - Base Contrast"
+    sc.view_settings.look = "AgX - Medium High Contrast"
+    sc.view_settings.exposure = -0.3
     if a.gpu:
         prefs = bpy.context.preferences.addons["cycles"].preferences
         for kind in ("OPTIX", "CUDA"):
@@ -231,7 +235,8 @@ def build(a: argparse.Namespace) -> None:
         for d in prefs.devices:
             d.use = d.type != "CPU"
         sc.cycles.device = "GPU"
-        sc.cycles.denoiser = "OPTIX" if prefs.compute_device_type == "OPTIX" else "OPENIMAGEDENOISE"
+        # OpenImageDenoise: the OptiX denoiser needs driver parts cloud GPUs often lack
+        sc.cycles.denoiser = "OPENIMAGEDENOISE"
     sc.render.image_settings.file_format = "WEBP"
     sc.render.image_settings.quality = 82
 
@@ -258,9 +263,10 @@ def build(a: argparse.Namespace) -> None:
     me.from_pydata(verts, [], [(2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2) for i in range(24)])
     for p in me.polygons:
         p.use_smooth = True
-    me.materials.append(simple("sweep", OFFWHITE, 0.9))
+    sweep_mat = simple("sweep", OFFWHITE, 0.9)
+    me.materials.append(sweep_mat)
     key = bpy.data.lights.new("key", "AREA")
-    key.energy, key.size = 1600, 3
+    key.energy, key.size = 1300, 3
     k = bpy.data.objects.new("key", key)
     k.location, k.rotation_euler = (3.5, -3.5, 4.5), (math.radians(45), 0, math.radians(40))
     sc.collection.objects.link(k)
@@ -275,17 +281,19 @@ def build(a: argparse.Namespace) -> None:
     bpy.ops.import_scene.gltf(filepath=str(a.data / "furniture.glb"))
     sofa = [o for o in bpy.context.selected_objects if o.type == "MESH"]
     up = simple("upholstery", "c9cbc5", 0.85)
-    vc = node(
-        up.node_tree, "ShaderNodeVertexColor"
-    )  # the glb's colours: dark plinth, light cushions
+    vc = node(up.node_tree, "ShaderNodeAttribute", attribute_name="Color")  # the glb's colours
     up.node_tree.links.new(
         vc.outputs["Color"], up.node_tree.nodes["Principled BSDF"].inputs["Base Color"]
     )
+    plinth = simple("plinth", "2b302b", 0.45, 0.3)  # the dark aluminium base
     for o in sofa:
         o.data.materials.clear()
         o.data.materials.append(up)
+        o.data.materials.append(plinth)
+        low = min(v.co.z for v in o.data.vertices) + PLINTH_M
         for p in o.data.polygons:
             p.use_smooth = True
+            p.material_index = 1 if p.center.z < low else 0
     # the cover: one mesh, shape keys for its stages
     cover_me = bpy.data.meshes.new("cover")
     cover_me.from_pydata(s["design"].tolist(), [], s["faces"].tolist())
@@ -322,7 +330,7 @@ def build(a: argparse.Namespace) -> None:
     )
     keys(kb["lifted"], "value", [(4 * c + 1, 0.0), (4 * c + 14, 1.0), (4 * c + 28, 0.0)])
     keys(kb["drape"], "value", [(4 * c + 14, 0.0), (4 * c + 28, 1.0)])
-    pipe = simple("piping", "a8936f", 0.6)
+    pipe = simple("piping", SEAM, 0.55)
     cover.modifiers.new("seams", "NODES").node_group = piping(pipe)
     cover.modifiers.new("thickness", "SOLIDIFY").thickness = 0.0015
     cover.modifiers.new("smooth", "SUBSURF").levels = 1
@@ -334,7 +342,8 @@ def build(a: argparse.Namespace) -> None:
     keys(nt.nodes["wet"].outputs[0], "", [(5 * c + 1, 0.0), (5 * c + 34, 1.0)])
     # the sofa steps aside while the pieces lie on the table
     for f, v in ((3 * c + 1, 1.0), (3 * c + 22, 0.0), (4 * c + 8, 0.0), (4 * c + 24, 1.0)):
-        keys(up.node_tree.nodes["alpha"].outputs[0], "", [(f, v)])
+        for m_ in (up, plinth):
+            keys(m_.node_tree.nodes["alpha"].outputs[0], "", [(f, v)])
     # the cutting table, with the unrolled fabric under the pieces
     lo, hi = flat.min(axis=0), flat.max(axis=0)
     bpy.ops.mesh.primitive_cube_add(
@@ -365,25 +374,32 @@ def build(a: argparse.Namespace) -> None:
         keys(m_.node_tree.nodes["alpha"].outputs[0], "", fade)
     # the rain
     bpy.ops.mesh.primitive_uv_sphere_add(
-        radius=0.0014, segments=8, ring_count=6, location=(0, 0, -5)
+        radius=0.0016, segments=8, ring_count=6, location=(0, 0, -5)
     )
     drop = bpy.context.object
-    drop.scale = (1.4, 1.4, 45)
+    drop.scale = (1.0, 1.0, 55)  # a streak, as the eye sees falling rain
+    bpy.ops.object.transform_apply(scale=True)  # particles ignore the object's own scale
     water = simple("water", "eef3f7", 0.05)
-    water.node_tree.nodes["Principled BSDF"].inputs["Emission Color"].default_value = lin("cfd8df")
-    water.node_tree.nodes["Principled BSDF"].inputs["Emission Strength"].default_value = 0.25
+    water.node_tree.nodes["alpha"].outputs[0].default_value = 0.7
+    water.node_tree.nodes["Principled BSDF"].inputs["Emission Color"].default_value = lin("e6eef4")
+    water.node_tree.nodes["Principled BSDF"].inputs["Emission Strength"].default_value = 1.1
+    # the studio darkens to the house green for the rain, so the lit drops show
+    base = sweep_mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"]
+    keys(base, "", [(5 * c - 6, lin(OFFWHITE)), (5 * c + 10, lin(DARK))])
+    keys(bg.inputs["Strength"], "", [(5 * c - 6, 0.55), (5 * c + 10, 0.18)])
+    keys(rim, "energy", [(5 * c - 6, 700.0), (5 * c + 10, 2600.0)])
     drop.data.materials.append(water)
     bpy.ops.mesh.primitive_plane_add(size=4.5, location=(0, 0, 4.0))
     sky = bpy.context.object
     sky.show_instancer_for_render = False
     ps = sky.modifiers.new("rain", "PARTICLE_SYSTEM").particle_system
     st = ps.settings
-    st.count, st.lifetime = 45000, 40
+    st.count, st.lifetime = 90000, 40
     st.frame_start, st.frame_end = 5 * c + 1, LAST
     st.normal_factor, st.object_align_factor = 0.0, (0.15, 0.0, -7.0)
     st.effector_weights.gravity = 0.0
     st.render_type, st.instance_object = "OBJECT", drop
-    st.size_random = 0.3
+    st.particle_size, st.size_random = 1.0, 0.3  # the default 0.05 shrank every drop
     ps.seed = 5
     cover.modifiers.new("collision", "COLLISION")
     cover.collision.use_particle_kill = True

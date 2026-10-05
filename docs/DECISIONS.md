@@ -1529,6 +1529,38 @@ compare and learn from our input.
 - **Downloads carry the model's name.** The cutting table's file is `<model>.dxf` (with `-r<n>`
   for a kept revision); other files are `<model>-<file>` (the owner, 5 October).
 
+## ADR-071 — The website's story as rendered frames, scrubbed by the scroll
+
+The owner (5 October): the steps on the one-page site were "too basic: fine for internal use, not
+for the website; it must be tighter and better", and the covers are sand, not dark green.
+
+- **Rendered, not drawn live.** `scripts/film/render_story.py` builds the story in Blender
+  Cycles from our own data, the same shapes the live 3D used (`coverengine/story.py`):
+  - the SUNS sofa with its dark aluminium plinth;
+  - the cover in its sand pieces, with a darker sand piping on every seam;
+  - the pieces stepping apart;
+  - every piece flat with its true lengths on the roll, on a white cutting table;
+  - the cover falling over the sofa as Style3D drapes it;
+  - rain in streaks on a backdrop that darkens to the house green (#3C443C), the fabric
+    darkening and beading.
+  - Six chapters of 40 frames: 240 WEBP pictures at 1600 × 900, about 20 KB each.
+- **On GPUs.** `scripts/film/gpu_render.py` runs Blender 4.2 on Modal, one L4 per 12 frames,
+  10 at a time.
+  - Blender is fetched from mirrors, because blender.org refuses some cloud builders.
+  - Denoising is OpenImageDenoise: the OptiX denoiser needs driver parts the cloud GPUs lack.
+  - All 240 frames take about 15 minutes, roughly 2 GPU-hours, under $2.
+- **On the page** (`apps/web/src/shop/StoryFrames.tsx`):
+  - The pinned section draws the frame that matches the scroll on a canvas.
+  - Every 8th frame loads first, so the whole story scrubs at once; the rest fill in.
+  - On a wide screen the picture sits right of centre, beside the captions.
+  - The rain chapter turns the captions light.
+  - Without the frames (`/media/story-NNN.webp`, or `media.frames` for another base), the live
+    3D scene is shown as before.
+- **Where:** the frames are in the studio's data folder (`media/`), served at
+  `/media/story-001.webp` … `story-240.webp` and cached a day at the edge.
+- **Live:** the preview (preview.s2dio.living) shows the story at once. The live website shows
+  it when the owner turns `home_story` on, after approving the design.
+
 ## ADR-072 — Free plan shapes from the drawing's own lines; the AIs only check, and check each other
 
 The owner (5 October): "S45 looks nothing like it: it is an organic top and we make a square box

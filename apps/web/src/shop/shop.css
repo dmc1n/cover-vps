@@ -818,6 +818,64 @@ select.s-lang option {
   color: var(--muted);
   margin: 0;
 }
+/* the rendered frames: a soft scrim behind the captions, light, or the house green in the rain */
+.st-pinned.frames .st-scene {
+  z-index: 0;
+}
+.st-pinned.frames::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(241, 242, 242, 0.92) 0%,
+    rgba(241, 242, 242, 0.7) 30%,
+    rgba(241, 242, 242, 0) 50%
+  );
+  transition: opacity 0.6s ease;
+}
+.st-pinned.frames.dark::before {
+  background: linear-gradient(
+    90deg,
+    rgba(60, 68, 60, 0.92) 0%,
+    rgba(60, 68, 60, 0.7) 30%,
+    rgba(60, 68, 60, 0) 50%
+  );
+}
+.st-pinned.frames .st-captions,
+.st-pinned.frames .st-bar {
+  z-index: 2;
+}
+@media (max-width: 900px) {
+  .st-pinned.frames::before {
+    background: linear-gradient(
+      0deg,
+      rgba(241, 242, 242, 0.9) 0%,
+      rgba(241, 242, 242, 0) 45%
+    );
+  }
+  .st-pinned.frames.dark::before {
+    background: linear-gradient(
+      0deg,
+      rgba(60, 68, 60, 0.9) 0%,
+      rgba(60, 68, 60, 0) 45%
+    );
+  }
+}
+/* the rendered rain chapter darkens to the house green: light captions on it */
+.st-pinned.dark .st-captions h2 {
+  color: #f1f2f2;
+}
+.st-pinned.dark .st-captions p,
+.st-pinned.dark .st-step {
+  color: #c9cdc6;
+}
+.st-pinned .st-captions h2,
+.st-pinned .st-captions p {
+  transition: color 0.6s ease;
+}
 .st-rain {
   position: absolute;
   right: clamp(20px, 5vw, 80px);

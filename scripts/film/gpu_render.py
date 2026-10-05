@@ -14,11 +14,18 @@ from pathlib import Path
 
 import modal
 
-BLENDER = "https://download.blender.org/release/Blender4.2/blender-4.2.3-linux-x64.tar.xz"
+TAR = "Blender4.2/blender-4.2.3-linux-x64.tar.xz"
+MIRRORS = [  # blender.org refuses some cloud builders: mirrors first
+    "https://ftp.nluug.nl/pub/graphics/blender/release/",
+    "https://mirrors.ocf.berkeley.edu/blender/release/",
+    "https://download.blender.org/release/",
+]
+FETCH = " || ".join(f"curl -fsSL --retry 3 {m}{TAR} -o /tmp/b.tar.xz" for m in MIRRORS)
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .apt_install(
-        "wget",
+        "curl",
+        "ca-certificates",
         "xz-utils",
         "libxi6",
         "libxrender1",
@@ -32,7 +39,7 @@ image = (
         "libx11-6",
     )  # fmt: skip
     .run_commands(
-        f"wget -q {BLENDER} -O /tmp/b.tar.xz && tar xf /tmp/b.tar.xz -C /opt "
+        f"({FETCH}) && tar xf /tmp/b.tar.xz -C /opt "
         "&& rm /tmp/b.tar.xz && ln -s /opt/blender-4.2.3-linux-x64/blender /usr/local/bin/blender"
     )  # fmt: skip
 )

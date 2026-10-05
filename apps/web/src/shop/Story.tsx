@@ -4,11 +4,12 @@
 // the rain); then the workshop in arch-framed clips sliding sideways; true numbers; the FAQ.
 // Smooth scrolling (Lenis) and scrubbed motion (GSAP ScrollTrigger); visitors who asked their
 // device for less motion get the same story without the motion.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { StoryScene } from "./StoryScene";
+import { StoryFrames } from "./StoryFrames";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -46,6 +47,9 @@ export function Story({
   const pinned = useRef<HTMLDivElement>(null);
   const progress = useRef(0);
   const [chapter, setChapter] = useState(0);
+  // the rendered frames (ADR-071); the live 3D when they are not there
+  const [frames, setFrames] = useState(true);
+  const noFrames = useCallback(() => setFrames(false), []);
 
   // smooth scrolling, tied to ScrollTrigger
   useEffect(() => {
@@ -181,8 +185,19 @@ export function Story({
         className="st-chapters"
         style={{ height: `${story.chapters.length * 110}vh` }}
       >
-        <div className="st-pinned" ref={pinned}>
-          <StoryScene model={model} progress={progress} />
+        <div
+          className={`st-pinned ${frames ? "frames" : ""} ${frames && chapter === story.chapters.length - 1 ? "dark" : ""}`}
+          ref={pinned}
+        >
+          {frames ? (
+            <StoryFrames
+              base={media.frames || "/media/story-"}
+              progress={progress}
+              onMissing={noFrames}
+            />
+          ) : (
+            <StoryScene model={model} progress={progress} />
+          )}
           <ol className="st-captions">
             {story.chapters.map((c, i) => (
               <li key={i} className={i === chapter ? "on" : ""}>
@@ -195,7 +210,7 @@ export function Story({
               </li>
             ))}
           </ol>
-          {clip("rain") && (
+          {clip("rain") && !frames && (
             <div
               className={`st-rain ${chapter === story.chapters.length - 1 ? "on" : ""}`}
             >
