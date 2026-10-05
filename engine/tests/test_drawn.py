@@ -90,3 +90,39 @@ def test_an_l_whose_second_arm_is_only_a_corner_end_is_built() -> None:
     pieces = build("L shape", sizes, ROLL)
     assert "front-y" not in [p.name for p in pieces]  # no front on a corner end
     assert _open_above_hem(pieces) == 0
+
+
+def _kidney(n: int = 60) -> list[list[float]]:
+    t = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    r = 1 + 0.25 * np.cos(2 * t)  # a waist: concave on two sides
+    return [[float(60 * r[i] * np.cos(t[i])), float(40 * r[i] * np.sin(t[i]))] for i in range(n)]
+
+
+@pytest.mark.parametrize("roll", [ROLL, 500.0])
+def test_a_free_outline_is_its_own_top_and_the_pieces_meet_without_gaps(roll: float) -> None:
+    """S45 (ADR-072): a kidney seen from above, straight up; never a box."""
+    pieces = build("outline", {"outline_cm": _kidney(), "height_cm": 45}, roll)
+    tops = [p for p in pieces if p.name.startswith("top")]
+    assert sum(p.name.startswith("band") for p in pieces) == 2
+    assert len(tops) == (1 if roll == ROLL else 2)  # about 80 cm across: split on a narrow roll
+    raw = _mesh(pieces)
+    m = trimesh.Trimesh(raw.vertices, raw.faces, process=True)
+    once = trimesh.grouping.group_rows(m.edges_sorted, require_count=1)
+    assert np.allclose(m.vertices[m.edges_sorted[once].ravel(), 2], 0)
+    top_area = sum(trimesh.Trimesh(*_tri(p)).area for p in tops)
+    import shapely
+
+    assert top_area == pytest.approx(shapely.Polygon(np.array(_kidney()) * 10).area, rel=0.002)
+
+
+def _tri(p):  # type: ignore[no-untyped-def]
+    from coverengine.drawn import _poly
+
+    v, f = _poly(p.faces[0])
+    return v, f
+
+
+def test_an_outline_that_crosses_itself_is_refused() -> None:
+    with pytest.raises(CoverError):
+        build("outline", {"outline_cm": [[0, 0], [100, 100], [100, 0], [0, 100]],
+                          "height_cm": 40}, ROLL)  # fmt: skip

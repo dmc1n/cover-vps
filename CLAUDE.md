@@ -206,6 +206,8 @@ cover ai models/<id>/ [--apply ACTION [--value N] --run]   AI advice on the layo
 cover preview models/<id>/                   3D picture of the cover (cover.png; export makes it too)
 cover drape models/<id>/ [--verbose]         the sewn pieces dropped over the furniture: drape.glb/.bin/.json (ADR-056)
 uv run python scripts/warehouse.py list|fetch|photos   products from 3D Warehouse (GLB, photos)
+uv run python scripts/drawing_outline.py OUT --pdfs DIR [--only S45]   free plan shapes read from the PDF's own lines (ADR-072)
+uv run python scripts/drawing_crosscheck.py OUT --pdfs DIR   Gemini and DeepSeek check drawing covers and each other (ADR-072)
 make e2e        the web app flow in a real browser (Playwright in Docker)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs

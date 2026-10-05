@@ -51,6 +51,7 @@ EXTRA_FILES = [
     "drape_rain.glb",
     "drape_rain.png",
     "audit.png",
+    "vents.json",
 ]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)
 MEDIA = {

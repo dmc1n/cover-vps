@@ -232,7 +232,15 @@ def _cmd_export(args: argparse.Namespace) -> int:
     (out / FINISHED_JSON).write_text(
         _json.dumps(finished, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(f"export -> {out / 'cut.dxf'}, cut.svg, cutting-list.pdf, cover.png, {FINISHED_JSON}")
+    from coverengine.finish.vents3d import VENTS_JSON, vents_3d
+
+    try:  # where the air vents sit on the cover, for the viewer (ADR-073)
+        vents = vents_3d(args.model, doc, params)
+    except (OSError, KeyError, ValueError) as exc:
+        vents = {"vents": [], "warnings": [f"vents not placed in 3D: {exc}"]}
+    (out / VENTS_JSON).write_text(_json.dumps(vents, indent=1) + "\n", encoding="utf-8")
+    print(f"export -> {out / 'cut.dxf'}, cut.svg, cutting-list.pdf, cover.png, {FINISHED_JSON}, "
+          f"{VENTS_JSON}")  # fmt: skip
     for pc in finished["pieces"]:
         w, h = pc["size_mm"]
         print(f"  {pc['id']:<4} {pc['name']:<16} x{pc['quantity']}  {w:6.0f} x {h:6.0f} mm")

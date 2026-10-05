@@ -190,3 +190,26 @@ On a model's page, tab **Your reference**, upload what you know is right:
   follows it for every cover from then on.
 
 Every comparison is kept, as material for improving the program.
+
+**What the program did with your upload.** At the top of the tab, per upload, a report in plain
+words with one verdict:
+- **Your reference agrees with the program's cover**, **differs: see below**, or **a person must
+  look** (the checks do not agree, or one could not be done).
+- The steps, each marked ✓ (fine), ! (look at it), ✗ (failed) or · (for your information):
+  1. **Received:** the file, its size, who uploaded it and when.
+  2. **Read:** a 3D model with its triangles, the unit and up axis the program chose, and how far
+     it was turned and moved to lie over the program's cover (never scaled or mirrored); a PDF
+     with its pages and the sizes found on it.
+  3. **Compared:** for a 3D model, the share within ±5 mm (it agrees from 90 %), the mean, 95 %
+     and largest deviation, roomier and tighter, the sizes side by side; for a PDF, which sizes
+     are found in the program's pattern and which are not.
+  4. **Double check by two AIs:** for a PDF, Gemini looks at your drawing beside the program's
+     cover, DeepSeek reads every word and number, and they check each other (when they disagree
+     Gemini looks once more with DeepSeek's points). For a 3D model, DeepSeek says in plain
+     words what the deviation means. Their answers are advice: when they disagree with the
+     numbers, the verdict is "a person must look".
+  5. **What changed in the program:** nothing by itself. The lessons the AI proposes wait for a
+     person; the ones accepted for this model are listed with who and when.
+- **Earlier uploads** are listed below the report (when, file, who, verdict); open one to read
+  its steps.
+

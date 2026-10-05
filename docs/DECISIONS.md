@@ -1528,3 +1528,133 @@ compare and learn from our input.
   - a test box uploaded in metres and 1 cm higher: found as metres, its top flagged.
 - **Downloads carry the model's name.** The cutting table's file is `<model>.dxf` (with `-r<n>`
   for a kept revision); other files are `<model>-<file>` (the owner, 5 October).
+
+## ADR-072 — Free plan shapes from the drawing's own lines; the AIs only check, and check each other
+
+The owner (5 October): "S45 looks nothing like it: it is an organic top and we make a square box
+of it". And: "why do we use Gemini for everything? We must decide it ourselves and use AI as a
+check", "and DeepSeek too, let them check each other".
+
+- **What went wrong with S45.** The free-form route (ADR-068) asks Gemini for a swept shape: a
+  cross-section along a path. A kidney seen from above, straight up, is no swept shape. Gemini
+  said so in its `why_not`, gave a 152.4 × 50 cm box "anyway", and the run built it because
+  the one written size it found (45 cm) came back. Two faults: the AI decided the shape, and
+  a reader that said "this does not fit" was not listened to.
+- **Never a stand-in.** `drawing_swept.py` no longer builds a drawing whose reader gives a
+  `why_not`: its status becomes "not a swept shape".
+- **The program reads the drawing itself** (`coverengine/drawing_vectors.py`). The PDFs come out
+  of CAD, so every view is vector lines. A plan view of a free shape is one closed path, with
+  its outline there point by point.
+  - The path is found as a closed path with at least 20 segments above the order table.
+  - Its scale comes from a written circumference (perimeter) or a length/diameter (longest
+    distance).
+  - Sizes are read deterministically from the text next to the words height, length,
+    circumference, diameter, width and depth.
+  - Two written sizes that disagree by more than 3 % are reported as a conflict, never chosen
+    between silently.
+  - Among the 130 drawings, closed outlines are found in S45, D5, C28 and R1 to R3.
+- **The shape "outline"** (`drawn.outline_cover`): the plan outline is the top. It is split
+  across the roll only when it is wider than the roll in every direction. The band runs round
+  it, cut at `band_seams_cm`; the default is the leftmost point and halfway, because a closed
+  band needs a seam and two pieces lie flat.
+- **The AIs check, and check each other** (`coverengine/crosscheck.py`).
+  1. Gemini looks: the drawing's pages beside the program's picture and piece list.
+  2. DeepSeek reads: every word and number on the drawing, against the cover's measured
+     sizes and Gemini's verdict.
+  3. When they disagree, Gemini gets DeepSeek's points once more.
+  4. The outcome is "agreed: same", "agreed: different" or "person to check". It never
+     changes the cover.
+  - Both get the workshop's terms: an air pocket is a vent, covers are open at the bottom,
+    fabric and colour are finishing.
+  - `scripts/drawing_outline.py` builds and checks the outline drawings.
+  - `scripts/drawing_crosscheck.py` checks any built drawing cover.
+- **S45 now:**
+  - the kidney from the drawing's lines, 358.4 cm round (141.1 in, as written), 125.8 cm
+    long, 45 cm high, 4 vents (`features.vents_min` 2 per side);
+  - 3 pieces plus the vents;
+  - the old box scored 10 (Gemini) and 20 (DeepSeek), the new cover "agreed: same" after
+    Gemini's second look.
+  - The drawing's "152.4" contradicts the circumference. The program checked it against the
+    drawing's own 3D view: projecting the outline fits that view better at 358.4 cm (IoU
+    0.93, at exactly the isometric angle) than at 152.4 cm (0.89). Question 64 asks the owner.
+- **Next, the better alternative.** Free shapes that are drawn only as a 3D view (S44, S47,
+  S32, C26) have no closed plan path. Their outline can be recovered the same way the S45
+  check did: fit a plan outline whose isometric projection matches the view's lines. The
+  cross-check shows which of them need it.
+
+## ADR-073 — Air vents shown in 3D
+
+The owner (5 October): "a checkbox to show the air vents in the 3D model".
+
+- **Where a vent sits.** The vents are placed on the flat skirt panels (`finish.place_vents`,
+  in `pattern.json`'s coordinates). `coverengine/finish/vents3d.py` carries them back to 3D:
+  1. it flattens that panel again exactly as `cover flatten` did (the same mesh, solver and
+     settings, so the same flat panel);
+  2. it checks the result against the stored outline (within 1 mm, otherwise a warning and
+     no vent);
+  3. it carries each corner and the centre to 3D through the flat triangle it lies in
+     (barycentric);
+  4. the normal points out of the cover.
+  Skirt panels flatten in about a second, so this costs little.
+- **Written by `cover export`** as `vents.json`, next to `finished.json`, for every model on its
+  next export. It is served like the other model files.
+- **The viewer.** A tick box **Show air vents** (off by default, remembered per browser)
+  draws each opening as a dark rectangle with a red frame, 4 mm outside the cover, plus a sand
+  hood hint from its top edge.
+- **Not chosen:** storing every panel's flat mesh at `cover flatten`. That needs a new file
+  and a re-flatten of all models before any vent shows, whereas re-flattening one skirt
+  panel at export works for every model as it is.
+- **Checked:**
+  - the test box: as many vents as the cutting list's hoods, every point within 3 mm of the
+    cover surface, the bottom edge `features.vent_above_hem_mm` above the hem, the normals
+    pointing out;
+  - S45: 4 vents round the kidney's band, two per side.
+
+## ADR-074 — Feedback on your own reference
+
+The owner (5 October): "when we upload our own 3D models or PDFs there must be feedback: what
+did you do with our information, as a kind of double check".
+
+- **A report per upload** (`compare.report`, saved in `compare.json` with the comparison and
+  shown at the top of the tab Your reference). It has one verdict and five steps in plain
+  words.
+  - **Verdict:** agrees, differs, or a person must look.
+  - **Steps:**
+    1. Received: the file, its size, who, when.
+    2. Read: a 3D model's triangles, the chosen unit and up axis, its turn and fit move
+       (`compare.surface` now returns `read_as`); a PDF's pages and the sizes found.
+    3. Compared: the deviation numbers, or the sizes found and not found.
+    4. Double check by two AIs.
+    5. What changed in the program.
+- **The double check** (`compare.double_check`; advice, never a stop; a failure is shown in the
+  step):
+  - **a PDF:** `crosscheck.run` (ADR-072). Gemini looks, DeepSeek reads the numbers, and they
+    check each other. It needs the program's `cover.png` and `finished.json`; without them the
+    step says so.
+  - **a 3D model:** DeepSeek gets the measured numbers and says what they mean, with its own
+    verdict.
+- **The verdict comes from the numbers first; the AIs can only send it to a person.**
+  - **A 3D model:** it agrees when at least 90 % of the program's cover is within ±5 mm. When
+    DeepSeek's verdict differs, "a person must look".
+  - **A PDF:**
+    - "agreed: same" with every written size found → agrees;
+    - "agreed: same" with sizes missing → a person looks;
+    - "agreed: different" → differs;
+    - "person to check", or no AI answer → a person looks (differs when sizes are missing).
+- **What changed is filled in when the page is shown** (`compare.changes_step`). Lessons are
+  accepted later, so this step is built each time from `learning/lessons.json`.
+  - It says: nothing changed by itself.
+  - It counts the lessons the AI proposed, waiting for a person.
+  - It lists the lessons accepted for this model, with who and when.
+  - It points to the log in `learning/references.jsonl`.
+- **History:** every upload's report is also written to
+  `models/<id>/reference/history/<time>-<kind>.json` (atomic). The tab lists them under the
+  current one: when, file, who, verdict, and the steps.
+- **S45, its own drawing as the reference:** "Your reference agrees with the program's cover".
+  - Gemini and DeepSeek both said "same", score 100.
+  - The step lists the drawing's 152.4 against 141.1 in contradiction for a person
+    (question 64).
+- **Better later:** `written_mm` takes the inch sizes only when a PDF has no metric ones. So
+  S45's 141.1 in circumference is checked by the AIs, not by the size search. Checking each
+  inch size that has no metric twin, against sums of edges (a circumference is the band's
+  pieces together), would let the numbers check it too.

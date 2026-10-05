@@ -29,6 +29,78 @@ const DROP_SPEED = 0.6; // path points per frame
 const DROPS_SHOWN = 160;
 const DRAPE_SPEED = 0.35; // frames of the fall per screen frame
 
+// Air vents (vents.json, ADR-073): the opening drawn just outside the cover, with its hood.
+interface Vent {
+  piece: string;
+  centre_mm: number[];
+  corners_mm: number[][]; // bottom left, bottom right, top right, top left, from outside
+  normal: number[];
+  size_mm: number[];
+}
+const VENT_LIFT_MM = 4; // the opening sits this far outside the cover, so it is never hidden
+const HOOD_MM = 60; // how far the hood hint stands out at its lower edge
+const VENTS_KEY = "viewer.vents";
+const ventsSaved = () => {
+  try {
+    return localStorage.getItem(VENTS_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+function ventGroup(vents: Vent[]): THREE.Group {
+  const group = new THREE.Group();
+  const opening = new THREE.MeshBasicMaterial({
+    color: "#26241f",
+    side: THREE.DoubleSide,
+  });
+  const hood = new THREE.MeshStandardMaterial({
+    color: "#b89f74",
+    side: THREE.DoubleSide,
+    roughness: 0.8,
+  });
+  const frame = new THREE.LineBasicMaterial({ color: "#d4472e" });
+  for (const v of vents) {
+    const n = v.normal;
+    const at = (p: number[], out: number) =>
+      toScene([p[0] + n[0] * out, p[1] + n[1] * out, p[2] + n[2] * out]);
+    const [bl, br, tr, tl] = v.corners_mm.map((c) => at(c, VENT_LIFT_MM));
+    const quad = new THREE.BufferGeometry().setFromPoints([
+      bl,
+      br,
+      tr,
+      bl,
+      tr,
+      tl,
+    ]);
+    quad.computeVertexNormals();
+    group.add(new THREE.Mesh(quad, opening));
+    group.add(
+      new THREE.LineLoop(
+        new THREE.BufferGeometry().setFromPoints([bl, br, tr, tl]),
+        frame,
+      ),
+    );
+    // the hood: from the opening's top edge, out and down over its upper part
+    const mid = (a: number[], b: number[], t: number) =>
+      a.map((x, i) => x + (b[i] - x) * t);
+    const [cbl, cbr, ctr, ctl] = v.corners_mm;
+    const lowL = at(mid(ctl, cbl, 0.35), HOOD_MM);
+    const lowR = at(mid(ctr, cbr, 0.35), HOOD_MM);
+    const hoodGeo = new THREE.BufferGeometry().setFromPoints([
+      tl,
+      tr,
+      lowR,
+      tl,
+      lowR,
+      lowL,
+    ]);
+    hoodGeo.computeVertexNormals();
+    group.add(new THREE.Mesh(hoodGeo, hood));
+  }
+  return group;
+}
+
 export function Viewer({
   id,
   files,
@@ -58,6 +130,7 @@ export function Viewer({
   const [draping, setDraping] = useState(false);
   const [drape, setDrape] = useState<Drape | null>(null);
   const [water, setWater] = useState(true); // the water heatmap over the draped cover
+  const [showVents, setShowVents] = useState(ventsSaved);
   const drapeAnim = useRef<{
     mesh: THREE.Mesh;
     frames: Float32Array[];
@@ -377,6 +450,26 @@ export function Viewer({
     if (fall.wet) fall.wet.visible = wetShown;
   }, [water]);
 
+  // the air vents, on request (remembered in this browser)
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!showVents || !scene || !files.includes("vents.json")) return;
+    let alive = true;
+    let group: THREE.Group | null = null;
+    fetch(`${fileUrl(id, "vents.json")}?v=${stamp}`)
+      .then((r) => (r.ok ? r.json() : { vents: [] }))
+      .then((doc: { vents: Vent[] }) => {
+        if (!alive || !sceneRef.current) return;
+        group = ventGroup(doc.vents ?? []);
+        sceneRef.current.add(group);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+      if (group) scene.remove(group);
+    };
+  }, [showVents, id, stamp, files]);
+
   const shownRef = useRef(shown);
   shownRef.current = shown;
   useEffect(() => {
@@ -403,6 +496,23 @@ export function Viewer({
             {l.label}
           </label>
         ))}
+        {files.includes("vents.json") && (
+          <label title="Where the air vents sit on the cover: the opening and its hood">
+            <input
+              type="checkbox"
+              checked={showVents}
+              onChange={(e) => {
+                setShowVents(e.target.checked);
+                try {
+                  localStorage.setItem(VENTS_KEY, e.target.checked ? "1" : "0");
+                } catch {
+                  /* a private window: not remembered */
+                }
+              }}
+            />
+            Show air vents
+          </label>
+        )}
         <span className="muted">
           Drag to turn, scroll to zoom, right-drag to move.
         </span>

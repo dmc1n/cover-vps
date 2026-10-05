@@ -387,3 +387,36 @@ def test_box_cover(covers: dict[str, Any], tmp_path: Path, name: str) -> None:
                 assert e["ease_mm"] < 1.0, (p["name"], e["seam"])
     mesh = trimesh.load(d / "hull.glb", force="mesh")
     assert mesh.face_normals[:, 1].max() < 0.999  # no flat top: in glTF y is up
+
+
+def test_export_places_the_air_vents_on_the_cover_in_3d(
+    covers: dict[str, Any], tmp_path: Path
+) -> None:
+    """vents.json (ADR-073): every vent of the cutting list, on the cover's surface, its bottom
+    edge features.vent_above_hem_mm above the hem, its normal pointing out."""
+    import igl
+    from coverengine.params import resolve_model
+
+    d = tmp_path / "box"
+    shutil.copytree(covers["root"] / "box_with_legs", d)
+    assert main(["flatten", str(d)]) == 0
+    assert main(["export", str(d)]) == 0
+    p = resolve_model(d)
+    doc = json.loads((d / "vents.json").read_text())
+    vents = doc["vents"]
+    hoods = [x for x in json.loads((d / "finished.json").read_text())["pieces"]
+             if x["name"] == "vent-hood"]  # fmt: skip
+    assert vents and len(vents) == hoods[0]["quantity"] and doc["warnings"] == []
+    data = np.load(d / "panels.npz")
+    v, f = data["vertices"].astype(np.float64), data["faces"].astype(np.int64)
+    pts = np.array([c for x in vents for c in x["corners_mm"]] + [x["centre_mm"] for x in vents])
+    dist2, _, _ = igl.point_mesh_squared_distance(pts, v, f)
+    assert float(np.sqrt(dist2).max()) < 3.0  # param-ok: on the surface, within 3 mm
+    hem = float(v[:, 2].min())
+    above = float(p["features.vent_above_hem_mm"])  # type: ignore[arg-type]
+    middle = (v.min(axis=0) + v.max(axis=0)) / 2
+    for x in vents:
+        bottom = [c[2] for c in x["corners_mm"][:2]]
+        assert bottom == pytest.approx([hem + above] * 2, abs=3.0)  # param-ok: mm
+        out = np.asarray(x["centre_mm"]) - middle
+        assert float(np.dot(x["normal"][:2], out[:2])) > 0

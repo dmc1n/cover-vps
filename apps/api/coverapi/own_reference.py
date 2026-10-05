@@ -7,6 +7,12 @@ mm with a coloured 3D view, the PDF's sizes found or not, the AI's list of diffe
 lessons it proposes. A person accepts a lesson; accepted lessons go to the data folder's
 learning/lessons.json (they last across releases) and from there into every AI prompt. Every
 comparison is logged in learning/references.jsonl, the material the program learns from.
+
+Every upload gets a report in plain words (ADR-074): what was received, how it was read, what
+the comparison found, the double check by two AIs (a PDF: Gemini looks, DeepSeek reads the
+numbers, they check each other; a 3D model: DeepSeek explains the deviation), what changed in
+the program (nothing by itself; the lessons a person accepted), and one verdict on top. Each
+report is kept in reference/history/ as well, so earlier uploads stay visible.
 """
 
 from __future__ import annotations
@@ -39,20 +45,46 @@ def install(app: FastAPI, store: Any) -> None:
             raise HTTPException(404, f"no model {model_id!r}")
         return Path(d) / "reference"
 
+    def accepted(model_id: str) -> list[dict[str, Any]]:
+        path = learning / "lessons.json"
+        kept = json.loads(path.read_text()) if path.is_file() else []
+        return [k for k in kept if k.get("model_id") == model_id and k.get("from") == "reference"]
+
+    def history(ref: Path) -> list[dict[str, Any]]:
+        h = ref / "history"
+        if not h.is_dir():
+            return []
+        out = []
+        for p in sorted(h.glob("*.json"), reverse=True):
+            try:
+                out.append(json.loads(p.read_text()))
+            except (OSError, json.JSONDecodeError):
+                continue
+        return out
+
     def state(model_id: str) -> dict[str, Any]:
+        from coverengine import compare as cmp
+
         ref = folder(model_id)
         doc = (
             json.loads((ref / "compare.json").read_text())
             if (ref / "compare.json").is_file()
             else {}
         )
+        mine = accepted(model_id)
+        for res in doc.values():  # the last step is today's: lessons are accepted later
+            if isinstance(res, dict) and isinstance(res.get("report"), dict):
+                steps = [s for s in res["report"].get("steps", [])
+                         if s.get("title") != "What changed in the program"]  # fmt: skip
+                res["report"]["steps"] = [*steps, cmp.changes_step(res, mine)]
         files = (
             sorted(p.name for p in ref.glob("*") if p.stem in ("surface", "drawing"))
             if ref.is_dir()
             else []
         )
         return {"files": files, "compare": doc, "running": (ref / "running").is_file(),
-                "has_view": (ref / "compare.glb").is_file()}  # fmt: skip
+                "has_view": (ref / "compare.glb").is_file(), "history": history(ref),
+                "accepted": mine}  # fmt: skip
 
     def compare(model_id: str, kind: str, path: Path, by: str) -> None:
         from coverengine import compare as cmp
@@ -69,6 +101,19 @@ def install(app: FastAPI, store: Any) -> None:
             except Exception as exc:  # noqa: BLE001 - shown on the page, never a crash
                 res = {"kind": kind, "reference": path.name, "error": str(exc)}
             res["time"], res["by"] = time.time(), by
+            src = ref / f"{kind}.source.json"
+            source = json.loads(src.read_text()) if src.is_file() else {}
+            source.setdefault("name", path.name)
+            source.setdefault("by", by)
+            source.setdefault("time", res["time"])
+            source["bytes"] = path.stat().st_size
+            try:  # the report and its AI double check are advice: never lose the comparison
+                dc = {} if res.get("error") else cmp.double_check(kind, res, path, ref.parent)
+                res["report"] = cmp.report(kind, res, source, dc)
+            except Exception as exc:  # noqa: BLE001
+                res["report"] = {"verdict": "look", "headline": cmp.VERDICTS["look"],
+                                 "steps": [{"title": "Report", "status": "bad",
+                                            "detail": [f"The report failed: {exc}"]}]}  # fmt: skip
             with lock:
                 done = ref / "compare.json"
                 doc = json.loads(done.read_text()) if done.is_file() else {}
@@ -76,6 +121,16 @@ def install(app: FastAPI, store: Any) -> None:
                 tmp = ref / "compare.tmp"
                 tmp.write_text(json.dumps(doc, indent=1))
                 tmp.replace(done)  # never half written
+                hist = ref / "history"
+                hist.mkdir(exist_ok=True)
+                rep = res["report"]
+                entry = {"kind": kind, "file": source["name"], "by": by, "time": res["time"],
+                         "verdict": rep.get("verdict"), "headline": rep.get("headline"),
+                         "report": rep}  # fmt: skip
+                stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(res["time"]))
+                tmp = hist / f"{stamp}-{kind}.tmp"
+                tmp.write_text(json.dumps(entry, indent=1))
+                tmp.replace(hist / f"{stamp}-{kind}.json")
                 learning.mkdir(parents=True, exist_ok=True)
                 with (learning / "references.jsonl").open("a") as fh:
                     fh.write(json.dumps({"model": model_id, **res}) + "\n")
@@ -110,8 +165,8 @@ def install(app: FastAPI, store: Any) -> None:
             old.unlink()
         path = ref / f"{kind}{suffix}"
         path.write_bytes(data)
-        (ref / f"{kind}.source.json").write_text(json.dumps(
-            {"name": name, "by": user.username, "time": time.time()}))  # fmt: skip
+        source = {"name": name, "by": user.username, "time": time.time(), "bytes": len(data)}
+        (ref / f"{kind}.source.json").write_text(json.dumps(source))
         (ref / "running").write_text(kind)
         threading.Thread(target=compare, args=(model_id, kind, path, user.username),
                          daemon=True).start()  # fmt: skip

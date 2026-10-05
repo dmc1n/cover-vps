@@ -162,9 +162,13 @@ def ask_parts(
         raise CoverError(f"the AI did not answer: {exc}") from None
     text = reply["choices"][0]["message"]["content"]
     try:
-        doc: dict[str, Any] = json.loads(text)
+        doc = json.loads(text)
     except json.JSONDecodeError:
         raise CoverError("the AI's answer was not readable (no JSON)") from None
+    if isinstance(doc, list) and len(doc) == 1 and isinstance(doc[0], dict):
+        doc = doc[0]  # some models wrap the one answer in a list
+    if not isinstance(doc, dict):
+        raise CoverError("the AI's answer was not one JSON object")
     doc["_usage"] = reply.get("usage", {})
     return doc
 

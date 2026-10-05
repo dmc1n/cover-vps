@@ -1,9 +1,32 @@
 // The workshop's own reference for this model (ADR-070): upload a 3D model of the cover or a PDF
 // (the drawing or pattern), and see how the program's cover compares: the deviation in mm with a
 // coloured 3D view, the PDF's sizes found or not, the AI's differences, and lessons to accept.
+// On top, per upload, what the program did with it in plain words (ADR-074): received, read,
+// compared, double checked by two AIs, what changed; one verdict; earlier uploads below.
 import { useCallback, useEffect, useState } from "react";
 import { Scene } from "./shop/Scene";
 
+interface Step {
+  title: string;
+  status: "ok" | "warn" | "bad" | "info";
+  detail: string[];
+}
+interface Report {
+  verdict: "agrees" | "differs" | "look";
+  headline: string;
+  steps: Step[];
+  time?: number;
+  file?: string;
+}
+interface Past {
+  kind: string;
+  file: string;
+  by: string;
+  time: number;
+  verdict: Report["verdict"];
+  headline: string;
+  report: Report;
+}
 interface Surface {
   mean_mm: number;
   p95_mm: number;
@@ -14,6 +37,8 @@ interface Surface {
   size_mm: { ours: number[]; theirs: number[] };
   reference: string;
   error?: string;
+  report?: Report;
+  time?: number;
 }
 interface Drawing {
   reference: string;
@@ -32,12 +57,58 @@ interface Drawing {
   };
   ai_error?: string;
   error?: string;
+  report?: Report;
+  time?: number;
 }
 interface State {
   files: string[];
   compare: { surface?: Surface; drawing?: Drawing };
   running: boolean;
   has_view: boolean;
+  history?: Past[];
+}
+
+const MARK = { ok: "✓", warn: "!", bad: "✗", info: "·" } as const;
+const TONE = {
+  agrees: "#4f7a4a",
+  differs: "#a0522d",
+  look: "#9a7a1c",
+} as const;
+const KIND = { surface: "3D model", drawing: "PDF" } as Record<string, string>;
+
+function when(t?: number): string {
+  return t ? new Date(t * 1000).toLocaleString() : "";
+}
+
+function ReportCard({ title, report }: { title: string; report: Report }) {
+  return (
+    <section className="card">
+      <h3>What the program did with your {title}</h3>
+      <p
+        style={{
+          borderLeft: `4px solid ${TONE[report.verdict]}`,
+          paddingLeft: 10,
+          fontWeight: 600,
+        }}
+      >
+        {report.headline}
+      </p>
+      <ol style={{ paddingLeft: 20 }}>
+        {report.steps.map((s, i) => (
+          <li key={i} style={{ marginBottom: 8 }}>
+            <b>
+              {MARK[s.status] ?? "·"} {s.title}
+            </b>
+            {s.detail.map((d, j) => (
+              <div key={j} className={j ? "muted" : undefined}>
+                {d}
+              </div>
+            ))}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
 }
 
 export function Reference({ id, canEdit }: { id: string; canEdit: boolean }) {
@@ -99,8 +170,26 @@ export function Reference({ id, canEdit }: { id: string; canEdit: boolean }) {
   if (!s) return <p className="muted">{msg || "Loading…"}</p>;
   const sf = s.compare.surface;
   const dr = s.compare.drawing;
+  const current = [
+    sf?.report && {
+      title: `3D model (${sf.reference})`,
+      r: sf.report,
+      t: sf.time ?? 0,
+    },
+    dr?.report && {
+      title: `PDF (${dr.reference})`,
+      r: dr.report,
+      t: dr.time ?? 0,
+    },
+  ]
+    .filter((x): x is { title: string; r: Report; t: number } => !!x)
+    .sort((a, b) => b.t - a.t);
+  const past = s.history ?? [];
   return (
     <div className="reference">
+      {current.map((c) => (
+        <ReportCard key={c.title} title={c.title} report={c.r} />
+      ))}
       <section className="card">
         <h3>Your reference</h3>
         <p className="muted">
@@ -141,6 +230,48 @@ export function Reference({ id, canEdit }: { id: string; canEdit: boolean }) {
           </p>
         )}
       </section>
+
+      {past.length > 0 && (
+        <section className="card">
+          <h3>Earlier uploads</h3>
+          <table className="list">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>File</th>
+                <th>By</th>
+                <th>Verdict</th>
+              </tr>
+            </thead>
+            <tbody>
+              {past.map((p) => (
+                <tr key={`${p.time}-${p.kind}`}>
+                  <td>{when(p.time)}</td>
+                  <td>
+                    {p.file}{" "}
+                    <span className="muted">({KIND[p.kind] ?? p.kind})</span>
+                  </td>
+                  <td>{p.by}</td>
+                  <td>
+                    <details>
+                      <summary style={{ color: TONE[p.verdict] }}>
+                        {p.headline}
+                      </summary>
+                      <ol style={{ paddingLeft: 20 }}>
+                        {p.report.steps.map((st, i) => (
+                          <li key={i}>
+                            <b>{st.title}:</b> {st.detail.join(" ")}
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {sf && (
         <section className="card">

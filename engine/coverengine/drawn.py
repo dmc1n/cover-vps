@@ -11,7 +11,10 @@ the back, y towards the front.
 - L shape: the sloped box along two arms, which meet at the corner: the strips split from their
   inside corner to the outside corner, the slopes along the line where they meet (10 pieces);
 - round: a cylinder, the top split into strips across the roll, the band into at least two
-  pieces (a closed band needs a seam to lie flat).
+  pieces (a closed band needs a seam to lie flat);
+- outline: any closed plan shape (a kidney, a lens, a blob) straight up to one height: the top
+  is the outline itself, the band runs round it (ADR-072). The outline is read exactly from the
+  drawing's own lines (coverengine/drawing_vectors.py), not guessed.
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ from coverengine.errors import CoverError
 
 MM = 10.0  # param-ok: cm to mm
 Face = list[tuple[float, float, float]]
-SHAPES = ("box", "sloped box", "L shape", "round", "swept")
+SHAPES = ("box", "sloped box", "L shape", "round", "swept", "outline")
 ROUND_SEGMENTS = 96  # param-ok: the circle as this many straight bits
 
 
@@ -341,6 +344,103 @@ def round_cover(p: dict[str, Any], roll_mm: float) -> list[Piece]:
     return pieces
 
 
+def _ring(outline_cm: Sequence[Sequence[float]]) -> np.ndarray:
+    """The plan outline in mm: centred, counter-clockwise, no repeated closing point, starting
+    at its leftmost point (where the drawings put the band's seam)."""
+    ring = np.asarray(outline_cm, dtype=np.float64) * MM
+    if len(ring) > 1 and np.linalg.norm(ring[0] - ring[-1]) < 1e-6:
+        ring = ring[:-1]
+    if len(ring) < 3:  # param-ok: a polygon
+        raise CoverError("the outline needs at least three points")
+    x, y = ring[:, 0], ring[:, 1]
+    if np.dot(x, np.roll(y, -1)) - np.dot(np.roll(x, -1), y) < 0:
+        ring = ring[::-1]
+    lo, hi = ring.min(axis=0), ring.max(axis=0)
+    ring = ring - (lo + hi) / 2
+    return np.roll(ring, -int(np.argmin(ring[:, 0])), axis=0)
+
+
+def outline_cover(p: dict[str, Any], roll_mm: float) -> list[Piece]:
+    """A closed plan shape straight up to one height. The top is split into strips across the
+    roll only when it is wider than the roll in every direction; the strip seams' end points
+    are points of the band too. The band is cut at the given places along the outline (cm from
+    the leftmost point, counter-clockwise; default there and halfway: a closed band needs a
+    seam, and two pieces lie flat without a ring)."""
+    import shapely
+
+    h = _cm(p, "height_cm")
+    ring = _ring(p["outline_cm"])
+    poly = shapely.Polygon(ring)
+    if not poly.is_valid:
+        raise CoverError("the outline crosses itself")
+    # turn the shape so its narrowest direction runs across the roll
+    rect = np.asarray(poly.minimum_rotated_rectangle.exterior.coords)[:4]
+    e1, e2 = rect[1] - rect[0], rect[2] - rect[1]
+    across = e1 if np.linalg.norm(e1) < np.linalg.norm(e2) else e2
+    width = float(np.linalg.norm(across))
+    strips = max(1, math.ceil(width / roll_mm))
+    pts = [tuple(q) for q in ring]
+    if strips > 1:
+        u = across / width
+        t = ring @ u
+        cuts = np.linspace(t.min(), t.max(), strips + 1)[1:-1]
+        out = []
+        n = len(ring)
+        for i in range(n):
+            a, b = ring[i], ring[(i + 1) % n]
+            out.append(tuple(a))
+            ta, tb = float(a @ u), float(b @ u)
+            hits = [c for c in cuts if min(ta, tb) < c < max(ta, tb)]
+            for c in sorted(hits, key=lambda c: (c - ta) / (tb - ta)):
+                q = a + (b - a) * (c - ta) / (tb - ta)
+                out.append(tuple(q))
+        pts = out
+    ring = np.array(pts)
+    pieces = []
+    if strips == 1:
+        pieces.append(Piece("top", [[(float(x), float(y), h) for x, y in ring]]))
+    else:
+        u = across / width
+        t = ring @ u
+        edges = np.linspace(t.min(), t.max(), strips + 1)
+        for i in range(strips):
+            lo, hi = edges[i] - 1e-6, edges[i + 1] + 1e-6  # param-ok: rounding margin
+            part = poly.intersection(shapely.Polygon(_slab(u, lo, hi)))
+            for k, g in enumerate(getattr(part, "geoms", [part])):
+                if g.is_empty or g.area < 1:
+                    continue
+                cs = np.asarray(g.exterior.coords)[:-1]
+                # snap to the ring's own points so the band and the top share their corners
+                snap = [tuple(ring[int(np.argmin(np.linalg.norm(ring - c, axis=1)))]) for c in cs]
+                face = _dedupe([(float(x), float(y), h) for x, y in snap])
+                pieces.append(Piece(f"top-{i + 1}" + (f"{chr(97 + k)}" if k else ""), [face]))
+    n = len(ring)
+    seg = np.linalg.norm(np.roll(ring, -1, axis=0) - ring, axis=1)
+    along = np.concatenate([[0.0], np.cumsum(seg)[:-1]])
+    total = float(seg.sum())
+    seams = p.get("band_seams_cm")
+    at = sorted({float(x) * MM % total for x in seams}) if seams else [0.0, total / 2]
+    if len(at) < 2:  # param-ok: one seam closes a ring that cannot lie flat
+        at = [at[0], (at[0] + total / 2) % total]
+        at.sort()
+    starts = sorted({int(np.argmin(np.abs(along - a))) for a in at})
+    for b, s0 in enumerate(starts):
+        s1 = starts[(b + 1) % len(starts)]
+        idx = list(range(s0, s1 if s1 > s0 else s1 + n))
+        faces = []
+        for i in idx:
+            (x0, y0), (x1, y1) = ring[i % n], ring[(i + 1) % n]
+            faces.append([(x0, y0, 0), (x1, y1, 0), (x1, y1, h), (x0, y0, h)])
+        pieces.append(Piece(f"band-{b + 1}", faces))
+    return pieces
+
+
+def _slab(u: np.ndarray, lo: float, hi: float) -> list[tuple[float, float]]:
+    """The strip lo <= p·u <= hi as a large rectangle."""
+    v = np.array([-u[1], u[0]]) * 1e6  # param-ok: far beyond any cover
+    return [tuple(lo * u - v), tuple(hi * u - v), tuple(hi * u + v), tuple(lo * u + v)]
+
+
 def build(shape: str, params: dict[str, Any], roll_mm: float) -> list[Piece]:
     if shape == "box":
         return box(params, roll_mm)
@@ -350,6 +450,8 @@ def build(shape: str, params: dict[str, Any], roll_mm: float) -> list[Piece]:
         return conform(l_shape(params, roll_mm))
     if shape == "round":
         return round_cover(params, roll_mm)
+    if shape == "outline":
+        return outline_cover(params, roll_mm)
     if shape == "swept":  # free form: a cross-section along a path (ADR-068)
         from coverengine import swept
 

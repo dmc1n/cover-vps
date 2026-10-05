@@ -222,3 +222,9 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     for …", or show only the sizes?
     **Answered (owner, 5 Oct 2026): the SUNS names may be shown on the website.**
 
+64. **S45, which size is right?** The drawing writes "[152.4] Length 141.1in circumference".
+    141.1 in is 358.4 cm round the top; with the drawn kidney shape that makes it 125.8 cm
+    long, not 152.4. The 3D view on the same drawing agrees with 358.4 (the program fitted the
+    view: a match at exactly the isometric angle). The cover now follows 358.4 cm round,
+    125.8 cm long, 45 cm high, 4 vents. Is that right, or is it 152.4 cm long (then 434 cm
+    round)?

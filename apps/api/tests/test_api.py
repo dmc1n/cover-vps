@@ -58,6 +58,11 @@ def test_model_summary_and_files(chair: dict[str, Any]) -> None:
     assert r.status_code == 200 and b"LWPOLYLINE" in r.content
     assert c.get(f"/api/models/{chair['id']}/files/sizes.pdf").content.startswith(b"%PDF")
     assert c.get(f"/api/models/{chair['id']}/files/secret.txt").status_code == 404
+    # the air vents in 3D for the viewer's "Show air vents" (ADR-073)
+    assert "vents.json" in m["files"]
+    vents = c.get(f"/api/models/{chair['id']}/files/vents.json").json()["vents"]
+    hoods = next(p for p in m["finished"]["pieces"] if p["name"] == "vent-hood")
+    assert len(vents) == hoods["quantity"] and len(vents[0]["corners_mm"]) == 4
     assert c.get("/api/models/../etc/files/model.json").status_code == 404
 
 

@@ -36,6 +36,9 @@ cutting list and a size drawing. It runs at **covers.suns.nu**.
   checks disagree, a person looks.
 - **Rain simulation** in the 3D view (the *Rain* button): where water would stand or run,
   shown on the cover.
+- **Show air vents** in the 3D view (a tick box, remembered in your browser): every air vent
+  where it is cut in the cover, the opening dark with a red frame, its hood above it. They are
+  the same vents as on the cutting list (after each export).
 - **Approval.** Only users with approval rights can approve the definitive drawing. The approved
   PDFs are stamped. Any change after approval cancels it, so production always cuts what was
   approved.

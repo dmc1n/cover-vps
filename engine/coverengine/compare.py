@@ -46,21 +46,23 @@ def surface(model_dir: Path, ref: Path, params: EffectiveParams) -> dict[str, An
     for m in (ours, theirs):
         if m.is_empty:
             raise CoverError("a surface without triangles")
-    theirs = _same_frame(ours, theirs)
+    theirs, read_as = _same_frame(ours, theirs)
     # placed alike (both on the ground, centred in the top view), then fitted
     for m in (ours, theirs):
         if m.is_empty:
             raise CoverError("a surface without triangles")
     shift = _centre(ours) - _centre(theirs)
     theirs.apply_translation(shift)
-    _turn(ours, theirs)
-    _fit(ours, theirs)
+    read_as["turned_deg"] = _turn(ours, theirs)
+    read_as["fit_moved_mm"] = _fit(ours, theirs)
     signed = _signed(ours.vertices, theirs)  # + : ours outside the reference (roomier)
     back = np.abs(_signed(theirs.vertices, ours))
     a = np.abs(signed)
     res = {
         "kind": "surface",
         "reference": ref.name,
+        "read_as": read_as,
+        "triangles": int(len(theirs.faces)),
         "mean_mm": round(float(a.mean()), 1),
         "p95_mm": round(float(np.percentile(a, 95)), 1),  # param-ok
         "max_mm": round(float(a.max()), 1),
@@ -97,10 +99,17 @@ def _load_raw(ref: Path, params: EffectiveParams) -> trimesh.Trimesh:
     return load_mesh(ref)
 
 
-def _same_frame(ours: trimesh.Trimesh, theirs: trimesh.Trimesh) -> trimesh.Trimesh:
+UNIT_NAMES = {1.0: "mm", 10.0: "cm", 25.4: "inch", 1000.0: "m", 0.001: "µm"}  # param-ok: units
+
+
+def _same_frame(
+    ours: trimesh.Trimesh, theirs: trimesh.Trimesh
+) -> tuple[trimesh.Trimesh, dict[str, Any]]:
     """The reference in the program's units and up axis: of the usual units (mm, cm, inch, m)
-    and the two usual up axes (Z, Y), the one whose size best matches the program's cover."""
+    and the two usual up axes (Z, Y), the one whose size best matches the program's cover.
+    Also says which it chose (for the report to the workshop)."""
     best, best_err = theirs, math.inf
+    info: dict[str, Any] = {"unit": "mm", "up": "Z"}
     turn = trimesh.transformations.rotation_matrix(math.pi / 2, [1, 0, 0])  # Y up -> Z up
     for up in (None, turn):
         for k in SCALES:
@@ -113,9 +122,10 @@ def _same_frame(ours: trimesh.Trimesh, theirs: trimesh.Trimesh) -> trimesh.Trime
             )
             if err < best_err:
                 best, best_err = m, err
+                info = {"unit": UNIT_NAMES.get(k, f"x{k:g}"), "up": "Y" if up is not None else "Z"}
     lo = best.bounds[0]
     best.apply_translation([0, 0, -lo[2]])  # on the ground
-    return best
+    return best, info
 
 
 def _signed(points: np.ndarray, mesh: trimesh.Trimesh) -> np.ndarray:
@@ -128,7 +138,7 @@ def _signed(points: np.ndarray, mesh: trimesh.Trimesh) -> np.ndarray:
     return np.sqrt(sq) * np.where(side >= 0, 1.0, -1.0)
 
 
-def _turn(ours: trimesh.Trimesh, theirs: trimesh.Trimesh) -> None:
+def _turn(ours: trimesh.Trimesh, theirs: trimesh.Trimesh) -> int:
     """Of the turns about the vertical (every 15°, and mirrored never), the one that lays the
     reference best over the program's cover; ICP then finishes the fit."""
     import igl
@@ -138,7 +148,7 @@ def _turn(ours: trimesh.Trimesh, theirs: trimesh.Trimesh) -> None:
         rng.choice(len(ours.vertices), min(SAMPLES // 3, len(ours.vertices)), False)
     ]  # param-ok
     c = _centre(theirs)
-    best, best_err = np.eye(4), math.inf
+    best, best_err, best_deg = np.eye(4), math.inf, 0
     for deg in range(0, 360, 15):  # param-ok: 15° steps
         rot = trimesh.transformations.rotation_matrix(math.radians(deg), [0, 0, 1], c)
         v = trimesh.transform_points(theirs.vertices, rot)
@@ -146,12 +156,13 @@ def _turn(ours: trimesh.Trimesh, theirs: trimesh.Trimesh) -> None:
         sq, _, _ = igl.point_mesh_squared_distance(pts, v, np.asarray(theirs.faces, dtype=np.int64))
         if float(sq.mean()) < best_err:
             best_err = float(sq.mean())
-            best = rot
+            best, best_deg = rot, deg
     theirs.apply_transform(best)
     theirs.apply_translation(_centre(ours) - _centre(theirs))
+    return best_deg
 
 
-def _fit(ours: trimesh.Trimesh, theirs: trimesh.Trimesh, rounds: int = 25) -> None:
+def _fit(ours: trimesh.Trimesh, theirs: trimesh.Trimesh, rounds: int = 25) -> float:
     """ICP: the reference moved and turned (no scaling, no mirroring) onto the program's cover;
     only a small correction is kept (the placement on the ground is right already)."""
     import igl
@@ -177,6 +188,8 @@ def _fit(ours: trimesh.Trimesh, theirs: trimesh.Trimesh, rounds: int = 25) -> No
     moved = float(np.linalg.norm(total[:3, 3]))
     if moved < 0.15 * float(np.linalg.norm(ours.extents)):  # param-ok: only a small correction
         theirs.apply_transform(total)
+        return round(moved, 1)
+    return 0.0
 
 
 def _centre(m: trimesh.Trimesh) -> np.ndarray:
@@ -246,8 +259,11 @@ def drawing(
             matched.append({"written_mm": w, "ours": name, "ours_mm": round(v, 1)})
         else:
             missing.append(w)
+    import pymupdf
+
     res: dict[str, Any] = {"kind": "drawing", "reference": pdf.name, "written_mm": written,
-                           "matched": matched, "missing_mm": missing}  # fmt: skip
+                           "matched": matched, "missing_mm": missing,
+                           "pages": pymupdf.open(pdf).page_count}  # fmt: skip
     if use_ai:
         try:
             res["ai"] = _ai_compare(model_dir, pdf, params, missing)
@@ -302,3 +318,175 @@ def _ai_compare(model_dir: Path, pdf: Path, params: EffectiveParams,
     ans = ask_parts(vision, AI_SYSTEM, parts)
     ans.pop("_usage", None)
     return ans
+
+
+# ---- what the program did with the upload (ADR-074) ---------------------------------------------
+AGREE_PCT = 90.0  # param-ok: a 3D reference agrees when this share of the cover is within ±5 mm
+VERDICTS = {
+    "agrees": "Your reference agrees with the program's cover.",
+    "differs": "Your reference differs from the program's cover: see below.",
+    "look": "A person must look: the checks do not agree, or one could not be done.",
+}
+SURFACE_JUDGE = """You check a cover workshop's work. The workshop uploaded its own 3D model of a
+cover (right by definition); the program laid it over its own cover and measured the distance
+point by point. You get those numbers. Fit tolerance: ±5 mm. Say in plain words, for a sewer,
+what they mean: does the program's cover agree, where is it roomier or tighter and by how much,
+and does it matter. Answer JSON only:
+{"verdict": "agrees" | "differs" | "look", "summary": "two or three plain sentences"}"""
+
+
+def double_check(kind: str, res: dict[str, Any], ref: Path, model_dir: Path) -> dict[str, Any]:
+    """The two AIs' check of a comparison: advice, never a stop. A PDF: Gemini looks, DeepSeek
+    reads the numbers, they check each other (coverengine/crosscheck.py). A 3D model: DeepSeek
+    says in plain words what the measured deviation means."""
+    try:
+        if kind == "drawing":
+            if not all((model_dir / f).is_file() for f in ("cover.png", "finished.json")):
+                return {"error": "the program's cover has no picture or finished pieces yet"}
+            from coverengine import crosscheck
+
+            return crosscheck.run(ref, model_dir)
+        from coverengine.ai import ask_parts
+        from coverengine.params import Registry
+
+        numbers = {k: res.get(k) for k in ("mean_mm", "p95_mm", "max_mm", "within_fit_pct",
+                                           "roomier_pct", "tighter_pct", "size_mm", "area_m2",
+                                           "reference_covered_p95_mm", "read_as")}  # fmt: skip
+        ans = ask_parts(Registry.load(None).resolve(), SURFACE_JUDGE, json.dumps(numbers))
+        ans.pop("_usage", None)
+        return {"deepseek": ans}
+    except Exception as exc:  # noqa: BLE001 - shown in the report, never a crash
+        return {"error": str(exc)}
+
+
+def _cm(mm: float) -> str:
+    return f"{mm / TO_MM['cm']:g} cm"
+
+
+def _verdict(kind: str, res: dict[str, Any], dc: dict[str, Any]) -> str:
+    if res.get("error"):
+        return "look"
+    if kind == "surface":
+        ours = "agrees" if float(res["within_fit_pct"]) >= AGREE_PCT else "differs"
+        ai = (dc.get("deepseek") or {}).get("verdict")
+        return ours if ai in (None, ours) else "look"
+    sizes_ok = bool(res.get("written_mm")) and not res.get("missing_mm")
+    outcome = dc.get("outcome")
+    if outcome == "agreed: different":
+        return "differs"
+    if outcome == "agreed: same":
+        return "agrees" if sizes_ok else "look"
+    return "look" if sizes_ok or not res.get("written_mm") else "differs"
+
+
+def _ai_line(who: str, a: dict[str, Any]) -> str:
+    if "same" in a:
+        same = "the same cover" if a.get("same") else "not the same cover"
+    else:
+        same = {"agrees": "it agrees", "differs": "it differs", "look": "a person must look"}.get(
+            str(a.get("verdict")), "no verdict"
+        )
+    score = f" (score {a['score']})" if a.get("score") is not None else ""
+    return f"{who}: {same}{score}. {a.get('summary', '')}".strip()
+
+
+def report(
+    kind: str, res: dict[str, Any], source: dict[str, Any], dc: dict[str, Any]
+) -> dict[str, Any]:
+    """The upload in plain words, step by step: received, read, compared, double checked by
+    two AIs, and what changed in the program (the last step is filled in when shown, see
+    `changes_step`, because lessons are accepted later)."""
+    import time
+
+    steps: list[dict[str, Any]] = []
+    when = time.strftime("%d %b %Y %H:%M", time.localtime(float(source.get("time") or 0)))
+    size = source.get("bytes")
+    steps.append({"title": "Received", "status": "ok", "detail": [
+        f"{source.get('name') or res.get('reference')}"
+        + (f" ({size / 1e6:.1f} MB)" if size else "")
+        + f", uploaded by {source.get('by') or '?'} on {when}."]})  # fmt: skip
+    if res.get("error"):
+        why = f"The program could not read or compare it: {res['error']}"
+        steps.append({"title": "Read", "status": "bad", "detail": [why]})
+    elif kind == "surface":
+        ra = res.get("read_as") or {}
+        steps.append({"title": "Read", "status": "ok", "detail": [
+            f"A 3D surface of {res.get('triangles', '?')} triangles, read in {ra.get('unit', '?')}"
+            f" with {ra.get('up', '?')} up (the unit and axis whose size matches the program's "
+            "cover best).",
+            f"Turned {ra.get('turned_deg', 0)}° about the vertical to lie over the program's "
+            f"cover, then fitted (moved {ra.get('fit_moved_mm', 0)} mm); never scaled or "
+            "mirrored."]})  # fmt: skip
+        ok = float(res["within_fit_pct"]) >= AGREE_PCT
+        sz = res.get("size_mm") or {}
+        steps.append({"title": "Compared with the program's cover",
+                      "status": "ok" if ok else "warn", "detail": [
+            f"{res['within_fit_pct']} % of the program's cover lies within ±{FIT_MM:g} mm of "
+            f"yours (agreement from {AGREE_PCT:g} %).",
+            f"Deviation: mean {res['mean_mm']} mm, 95 % within {res['p95_mm']} mm, largest "
+            f"{res['max_mm']} mm.",
+            f"Ours roomier on {res['roomier_pct']} %, tighter on {res['tighter_pct']} % of the "
+            "cover.",
+            f"Size (mm): ours {' × '.join(map(str, sz.get('ours', [])))}, yours "
+            f"{' × '.join(map(str, sz.get('theirs', [])))}.",
+            "The 3D view below colours the program's cover by the deviation."]})  # fmt: skip
+    else:
+        written = res.get("written_mm") or []
+        steps.append({"title": "Read", "status": "ok" if written else "warn", "detail": [
+            f"{res.get('pages', '?')} page(s); {len(written)} sizes found as text"
+            + (f": {', '.join(_cm(w) for w in written)}." if written else
+               " (a scanned drawing has none; the AIs below still look at it).")]})  # fmt: skip
+        missing = res.get("missing_mm") or []
+        found = [f"{_cm(m['written_mm'])} = {m['ours']}" for m in res.get("matched") or []]
+        diffs = (res.get("ai") or {}).get("differences") or []
+        steps.append({"title": "Compared with the program's pattern",
+                      "status": "ok" if written and not missing else "warn", "detail": [
+            f"{len(found)} of {len(written)} sizes found in the program's pattern"
+            + (f"; not found: {', '.join(_cm(m) for m in missing)}." if missing else "."),
+            *found,
+            *([f"The AI listed {len(diffs)} difference(s) between your PDF and the pattern "
+               "(table below)."] if diffs else []),
+            *([f"The AI comparison failed: {res['ai_error']}"] if res.get("ai_error") else []),
+        ]})  # fmt: skip
+    if dc.get("error"):
+        steps.append({"title": "Double check by two AIs", "status": "warn",
+                      "detail": [f"Not done: {dc['error']}"]})  # fmt: skip
+    elif kind == "drawing":
+        lines = []
+        if dc.get("gemini"):
+            lines.append(_ai_line("Gemini (looks at the pictures)", dc["gemini"]))
+        if dc.get("deepseek"):
+            lines.append(_ai_line("DeepSeek (reads the words and numbers)", dc["deepseek"]))
+        if dc.get("gemini_second"):
+            lines.append(_ai_line("Gemini, after reading DeepSeek's points", dc["gemini_second"]))
+        lines.append(f"Outcome: {dc.get('outcome', '?')}.")
+        for who in ("gemini_second", "deepseek"):
+            lines += [f"- {d}" for d in (dc.get(who) or {}).get("differences") or []]
+        steps.append({"title": "Double check by two AIs",
+                      "status": "ok" if dc.get("outcome") == "agreed: same" else "warn",
+                      "detail": lines})  # fmt: skip
+    else:
+        line = _ai_line("DeepSeek (reads the numbers)", dc.get("deepseek") or {})
+        steps.append({"title": "Double check by an AI", "status": "info", "detail": [line]})
+    verdict = _verdict(kind, res, dc)
+    return {"verdict": verdict, "headline": VERDICTS[verdict], "steps": steps,
+            "double_check": dc, "time": source.get("time"), "file": source.get("name")}  # fmt: skip
+
+
+def changes_step(res: dict[str, Any], accepted: list[dict[str, Any]]) -> dict[str, Any]:
+    """What changed in the program because of the upload: nothing by itself. Lessons the AI
+    proposed wait for a person; the accepted ones (for this model) with who and when."""
+    import time
+
+    proposed = (res.get("ai") or {}).get("lessons") or []
+    lines = ["Nothing in the program or this cover changed automatically."]
+    if proposed:
+        lines.append(f"The AI proposed {len(proposed)} lesson(s) for all covers; each waits for "
+                     "a person to accept it (below).")  # fmt: skip
+    for a in accepted:
+        when = time.strftime("%d %b %Y %H:%M", time.localtime(float(a.get("time") or 0)))
+        lines.append(f"Accepted by {a.get('accepted_by', '?')} on {when}: {a.get('rule')} "
+                     "(now in every AI prompt).")  # fmt: skip
+    lines.append("The comparison is logged in learning/references.jsonl, the material the "
+                 "program's shapes and seams are tuned with.")  # fmt: skip
+    return {"title": "What changed in the program", "status": "info", "detail": lines}

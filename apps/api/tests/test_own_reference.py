@@ -14,7 +14,13 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture()
-def app(tmp_path: Path) -> Any:
+def app(tmp_path: Path, monkeypatch: Any) -> Any:
+    from coverengine import compare
+
+    # the AI double check (ADR-074) answers from here, never from the network
+    monkeypatch.setattr(compare, "double_check", lambda kind, res, ref, model: {
+        "deepseek": {"verdict": "agrees", "same": True, "summary": "fine"},
+        "gemini": {"same": True, "score": 95}, "outcome": "agreed: same"})  # fmt: skip
     a = create_app(tmp_path / "data", login_required=False)
     d = a.state.store.models / "box-1"
     d.mkdir(parents=True)
@@ -48,6 +54,13 @@ def test_a_3d_reference_in_metres_is_laid_over_the_cover(app: Any, tmp_path: Pat
     assert "error" not in sf, sf
     assert sf["size_mm"]["theirs"] == [1200, 800, 710]  # found as metres
     assert sf["within_fit_pct"] > 80  # the top lies 1 cm off, the rest on it
+    rep = sf["report"]
+    assert rep["verdict"] in ("agrees", "differs", "look") and rep["headline"]
+    titles = [s["title"] for s in rep["steps"]]
+    assert titles[:2] == ["Received", "Read"] and titles[-1] == "What changed in the program"
+    assert "read in m with Z up" in " ".join(rep["steps"][1]["detail"])
+    st = _wait(c)
+    assert st["history"][0]["file"] == "mine.stl" and st["history"][0]["verdict"] == rep["verdict"]
     assert c.get("/api/models/box-1/reference/compare.glb").status_code == 200
 
 
@@ -65,8 +78,13 @@ def test_a_pdf_reference_has_its_sizes_found(app: Any, tmp_path: Path, monkeypat
     c.post("/api/models/box-1/reference", files={"file": ("mine.pdf", pdf.read_bytes())})
     dr = _wait(c)["compare"]["drawing"]
     assert len(dr["matched"]) == 2 and dr["missing_mm"] == [990.0]
+    assert dr["report"]["verdict"] == "look"  # the AIs agree, but 99 cm is not in the pattern
     r = c.post("/api/models/box-1/reference/lessons/0")
     assert r.status_code == 200 and r.json()["lessons"] == 1
+    st = _wait(c)
+    last = st["compare"]["drawing"]["report"]["steps"][-1]
+    assert any("Accepted by" in d and "keep the top in one piece" in d for d in last["detail"])
+    assert st["accepted"][0]["rule"] == "keep the top in one piece"
     kept = json.loads((app.state.store.root / "learning" / "lessons.json").read_text())
     assert kept[0]["rule"] == "keep the top in one piece"
     assert (app.state.store.root / "learning" / "references.jsonl").is_file()

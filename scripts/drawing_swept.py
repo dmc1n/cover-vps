@@ -264,7 +264,11 @@ def main() -> int:
             if pdf is not None:
                 res = read(code, pdf, params, a.rounds)
                 res["status"] = "read" if not res["missing"] else "read, sizes missing"
-                if not a.no_build and not res.get("error"):
+                if (res.get("shape") or {}).get("why_not"):
+                    # the reader says this drawing is not a swept shape: never build a stand-in
+                    # (S45, a kidney, came out as a box; ADR-072). drawing_outline.py may fit it.
+                    res["status"] = "not a swept shape"
+                elif not a.no_build and not res.get("error"):
                     res.update(calculate(code, res["shape"], a.timeout))
                     if res["status"] == "calculated":
                         res["status"] = "built" if not res["missing"] else "built, check sizes"
