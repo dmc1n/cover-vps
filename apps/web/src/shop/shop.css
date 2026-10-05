@@ -844,6 +844,35 @@ select.s-lang option {
     rgba(60, 68, 60, 0) 50%
   );
 }
+/* a fine film grain over the rendered frames: the pictures read as photographed, not drawn */
+.st-pinned.frames .st-scene::after {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: st-grain 0.9s steps(4) infinite;
+}
+@keyframes st-grain {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-3%, 2%);
+  }
+  50% {
+    transform: translate(2%, -3%);
+  }
+  75% {
+    transform: translate(-2%, -1%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-pinned.frames .st-scene::after {
+    animation: none;
+  }
+}
 .st-pinned.frames .st-captions,
 .st-pinned.frames .st-bar {
   z-index: 2;

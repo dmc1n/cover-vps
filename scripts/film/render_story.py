@@ -405,12 +405,12 @@ def build(a: argparse.Namespace) -> None:
     keys(
         kb["apart"],
         "value",
-        [(2 * c + 1, 0.0), (2 * c + 30, 1.0), (3 * c + 1, 1.0), (3 * c + 30, 0.0)],
+        [(2 * c + 1, 0.0), (2 * c + 30, 1.0), (3 * c + 1, 1.0), (3 * c + 14, 0.0)],
     )
     keys(
         kb["flat"],
         "value",
-        [(3 * c + 1, 0.0), (3 * c + 30, 1.0), (4 * c + 1, 1.0), (4 * c + 14, 0.0)],
+        [(3 * c + 1, 0.0), (3 * c + 14, 1.0), (4 * c + 1, 1.0), (4 * c + 14, 0.0)],
     )
     keys(kb["lifted"], "value", [(4 * c + 1, 0.0), (4 * c + 14, 1.0), (4 * c + 28, 0.0)])
     keys(kb["drape"], "value", [(4 * c + 14, 0.0), (4 * c + 28, 1.0)])
@@ -426,7 +426,7 @@ def build(a: argparse.Namespace) -> None:
     keys(nt.nodes["unify"].outputs[0], "", [(4 * c + 14, 0.0), (4 * c + 30, 1.0)])
     keys(nt.nodes["wet"].outputs[0], "", [(5 * c + 1, 0.0), (5 * c + 34, 1.0)])
     # the sofa steps aside while the pieces lie on the table
-    for f, v in ((3 * c + 1, 1.0), (3 * c + 22, 0.0), (4 * c + 8, 0.0), (4 * c + 24, 1.0)):
+    for f, v in ((3 * c + 1, 1.0), (3 * c + 6, 0.0), (4 * c + 12, 0.0), (4 * c + 18, 1.0)):
         for m_ in (up, plinth):
             keys(m_.node_tree.nodes["alpha"].outputs[0], "", [(f, v)])
     # the cutting table, with the unrolled fabric under the pieces
@@ -455,7 +455,7 @@ def build(a: argparse.Namespace) -> None:
         o.hide_render = True
         keys(o, "hide_render", [(1, True), (3 * c + 1, False), (4 * c + 24, True)], "CONSTANT")
     for m_ in (tmat, smat):
-        fade = [(3 * c + 1, 0.0), (3 * c + 18, 1.0), (4 * c + 8, 1.0), (4 * c + 22, 0.0)]
+        fade = [(3 * c + 1, 0.0), (3 * c + 4, 1.0), (4 * c + 14, 1.0), (4 * c + 20, 0.0)]
         keys(m_.node_tree.nodes["alpha"].outputs[0], "", fade)
     # the rain
     bpy.ops.mesh.primitive_uv_sphere_add(
@@ -515,11 +515,22 @@ def build(a: argparse.Namespace) -> None:
         (1, (3.4, -4.0, 1.6), (0, 0, 0.45)), (c, (3.1, -3.6, 1.5), (0, 0, 0.45)),
         (2 * c, (2.8, -3.3, 1.7), (0, 0, 0.5)), (3 * c - 6, (3.6, -4.2, 2.2), (0, 0, 0.5)),
         # along the cutting table, close: every piece large and crisp
-        (3 * c + 22, (lo[0] + 0.6, mid[1] - 2.9, TABLE_Z + 2.3), (lo[0] + 1.5, mid[1], TABLE_Z)),
-        (4 * c + 6, (hi[0] - 2.4, mid[1] - 2.9, TABLE_Z + 2.3), (hi[0] - 1.5, mid[1], TABLE_Z)),
+        # facing the roll from the front, 45° down: the whole nested pattern, then closer
+        (3 * c + 14, (mid[0], mid[1] - 4.7, TABLE_Z + 4.7), (mid[0], mid[1] - 0.5, TABLE_Z)),
+        (4 * c + 8, (mid[0] + 1.4, mid[1] - 3.3, TABLE_Z + 3.3),
+         (mid[0] + 1.4, mid[1] - 0.4, TABLE_Z)),
         (4 * c + 30, (-3.2, -3.8, 1.6), (0, 0, 0.45)), (5 * c + 4, (-4.0, -4.9, 1.9), (0, 0, 0.5)),
         (LAST, (4.0, -4.9, 1.7), (0, 0, 0.5)),
     ]  # fmt: skip
+    # a wider lens over the roll, so all its pieces are in the picture
+    keys(
+        cam.data,
+        "lens",
+        [(3 * c - 6, 38.0), (3 * c + 14, 24.0), (4 * c + 8, 28.0), (4 * c + 30, 38.0)],
+    )
+    # over the roll the picture is centred (the pattern is too long to sit beside the captions)
+    shift = [(3 * c - 6, -0.19), (3 * c + 14, 0.0), (4 * c + 8, 0.0), (4 * c + 30, -0.19)]
+    keys(cam.data, "shift_x", shift)
     for f, pos, look in shots:
         keys(cam, "location", [(f, pos)])
         keys(aim, "location", [(f, look)])

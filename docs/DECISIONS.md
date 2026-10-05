@@ -1542,7 +1542,9 @@ animation; the hero film is still a green cover".
   - the cover in sand canvas: a fine weave, soft wrinkles, a little variation in the coating's
     sheen, a twisted cord piping on every seam;
   - the pieces stepping apart;
-  - every piece flat on the cutting table, the camera travelling close along it;
+  - the whole nested pattern flat on the 152 cm roll on the cutting table, seen from the front
+    (lens shift off for this chapter), then a slow push in; the pieces fly there quickly and
+    the table appears opaque, so no picture catches them half transparent;
   - the cover hanging over the sofa as Style3D drapes it;
   - rain on a backdrop that turns house green: clear drops drawn as streaks by the camera's
     shutter (motion blur in that chapter only), the canvas darkening in patches and runoff
@@ -1561,10 +1563,11 @@ animation; the hero film is still a green cover".
   - The pinned section draws the picture that matches the scroll, filling the canvas; on a
     narrow screen the crop follows the cover.
   - Every 8th picture loads first, so the whole story scrubs at once; the rest fill in.
-  - A soft scrim behind the captions turns green in the rain chapter.
+  - A soft scrim behind the captions turns green in the rain chapter; a fine animated film
+    grain (CSS) lies over the pictures.
   - Without the pictures, the live 3D scene is shown as before.
-- **Where:** the studio's `media/` folder serves them as `/media/story3-001.webp` …
-  `story3-360.webp`. Each render gets a new name, because the edge keeps `/media` for a day;
+- **Where:** the studio's `media/` folder serves them as `/media/story4-001.webp` …
+  `story4-360.webp`. Each render gets a new name, because the edge keeps `/media` for a day;
   `media.frames` in the shop settings picks the set.
 - **The hero film** is a Veo 3.1 take animated from a still that Gemini 3 Pro Image made:
   - a sand canvas cover on a sofa on a wet terrace in light rain;

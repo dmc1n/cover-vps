@@ -192,7 +192,7 @@ export function Story({
         >
           {frames ? (
             <StoryFrames
-              base={media.frames || "/media/story3-"}
+              base={media.frames || "/media/story4-"}
               progress={progress}
               onMissing={noFrames}
             />
