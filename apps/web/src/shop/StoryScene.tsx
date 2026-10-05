@@ -15,17 +15,17 @@ interface Meta {
 }
 
 const CHAPTERS = 6;
-// the house greens for the pieces, and the one green of the finished cover
+// sand tones for the pieces, and the sand of the finished cover (the workshop's standard)
 const PIECE = [
-  "#3c443c",
-  "#6e776b",
-  "#778074",
-  "#56604f",
-  "#8b9488",
-  "#4a5348",
-  "#9aa196",
+  "#cbb999",
+  "#bfab88",
+  "#d6c7aa",
+  "#b39f7d",
+  "#c6b392",
+  "#ddd0b6",
+  "#a99474",
 ];
-const FINISHED = new THREE.Color("#5a6457");
+const FINISHED = new THREE.Color("#c4b08e"); // the sand cover (the owner, 5 Oct)
 const BG = "#f1f2f2";
 
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
