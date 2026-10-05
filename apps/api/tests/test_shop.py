@@ -251,3 +251,15 @@ def test_the_fit_question_after_delivery(app: Any, monkeypatch: pytest.MonkeyPat
     assert photo.status_code == 200
     fb = admin.get("/api/admin/feedback").json()["feedback"][0]
     assert fb["score"] == 4 and fb["photo"] == f"order-{oid}.png"
+
+
+def test_the_film_is_served_with_byte_ranges(app: Any) -> None:
+    """ADR-065: the welcome film from data/media, in parts (Safari asks for ranges)."""
+    media = app.state.store.root / "media"
+    media.mkdir(parents=True, exist_ok=True)
+    (media / "welcome.mp4").write_bytes(bytes(range(256)) * 40)
+    c = TestClient(app)
+    r = c.get("/media/welcome.mp4", headers={"Range": "bytes=0-99"})
+    assert r.status_code == 206 and len(r.content) == 100
+    assert c.get("/media/../app.db").status_code == 404
+    assert c.get("/media/other.exe").status_code == 404

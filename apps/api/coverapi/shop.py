@@ -71,6 +71,7 @@ SHOP_DEFAULTS: dict[str, Any] = {
     },  # fmt: skip
     "colours": "",
     "film_url": "",
+    "film_poster": "",
     "notify_email": "",
     "languages": "nl,en,de,fr",
     "matching": {
@@ -657,6 +658,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             or [{"country": x["country"], "name": x["name"], "eur": 0} for x in s["shipping"]],
             "payment": bool(s["payment"].get("mollie_key")),
             "film_url": s["film_url"],
+            "film_poster": s["film_poster"],
             "colours": q.colours(p),
             "products": s["products"],
             "indicative": bool(p["quote.prices_are_placeholders"]),
@@ -1349,6 +1351,20 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
             ("order/", "match/", "fit/")
         )
         return render(request, page if known else "home", prefix)
+
+    media = Path(app.state.store.root) / "media"
+
+    @app.get("/media/{name}", include_in_schema=False)
+    def media_file(name: str) -> Response:
+        """The shop's films and pictures (data/media; ADR-065), with byte ranges for video."""
+        from fastapi.responses import FileResponse
+
+        if not re.fullmatch(r"[a-z0-9_-]{1,80}\.(mp4|webm|jpg|png|webp)", name):
+            raise HTTPException(404, "no such file")
+        path = media / name
+        if not path.is_file():
+            raise HTTPException(404, "no such file")
+        return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
     @app.get("/api/shop/demo.glb", include_in_schema=False)
     def demo_scene() -> Response:

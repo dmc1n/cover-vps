@@ -40,6 +40,7 @@ interface Info {
     shipping: { country: string; name: string; eur: number }[];
     payment: boolean;
     film_url: string;
+    film_poster: string;
     colours: string[];
     indicative: boolean;
     languages: string[];
@@ -215,21 +216,30 @@ function Header({ info, tx, page }: { info: Info; tx: Tx; page: string }) {
 function Home({ info, tx }: { info: Info; tx: Tx }) {
   const c = info.content;
   const { t, w } = tx;
+  // visitors who asked their device for less motion get the still picture
+  const calm = useMemo(
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
   return (
     <>
       <section className="s-hero">
-        {info.settings.film_url ? (
+        {info.settings.film_url && !calm ? (
           <video
             className="s-film"
             src={info.settings.film_url}
+            poster={info.settings.film_poster || undefined}
             autoPlay
             muted
             loop
             playsInline
+            preload="auto"
           />
+        ) : info.settings.film_poster ? (
+          <img className="s-film" src={info.settings.film_poster} alt="" />
         ) : (
           <div className="s-film">
-            <Scene url="/api/shop/demo.glb" spin dark />
+            <Scene url="/api/shop/demo.glb" spin={!calm} dark />
           </div>
         )}
         <div className="s-hero-text">

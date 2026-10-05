@@ -1310,3 +1310,40 @@ languages, driven by DeepSeek. The site moves to Cloudflare later (step 2).
   - From these the threshold and the bands are set.
 - **Fixed in passing:** the admin tabs Orders, Shop settings, Website (AI) and Requests had
   never been in the tab bar of v1.7.0, so they could not be reached. They are now.
+
+## ADR-065 — The welcome film: path-traced from our own simulation
+
+The owner (5 October 2026): the animation on the home page must be of lifelike quality.
+
+- **What it shows** (`scripts/film/render_film.py`), 13.75 s at 24 fps:
+  - a real SUNS sofa (the Kota 2-seater) on a hardwood terrace as a storm comes in;
+  - the Coverlast cover is laid over it;
+  - it falls exactly as the Style3D simulation computed (`drape.bin`, played in real time),
+    with its sewn seams as soft ribs (the seam edges of `panels.npz`, which move with the cloth);
+  - then the rain: the fabric and the deck get wet, the water beads on the coated fabric and the
+    drops are stopped by the cover.
+- **How it is made.**
+  - Blender 4.2 LTS Cycles: path tracing, motion blur, depth of field, the AgX view, and
+    OpenImageDenoise.
+  - The light and background are Poly Haven's "Approaching Storm" HDRI by Greg Zaal (CC0).
+  - Everything else is procedural: the weave and the beads, the boards, the rain (seeded,
+    baked).
+  - The render is deterministic and resumable: frames that exist are skipped.
+- **Where it runs.** Blender runs in the Playwright image, which has its X libraries, so the
+  server needs no system packages. It is limited to 6 cores, so the site and the drape queue
+  keep 2.
+  - 1920×1080 at 48 samples takes about 105 s per frame: 330 frames in roughly 10 hours.
+- **Into the shop.**
+  - `scripts/film/encode.py` makes `welcome.mp4` (1920), `welcome-1280.mp4` and a poster JPEG,
+    using Blender's own ffmpeg.
+  - The files go into `data/media/`; the shop serves them at `/media/<file>` with byte ranges,
+    which Safari needs.
+  - Shop settings `film_url` and `film_poster` point at them.
+  - Visitors who asked their device for less motion get the poster.
+- **What it cannot do yet** (where help from outside raises it further):
+  - **People:** a real workshop, hands laying the cover over the furniture.
+  - **The real fabric:** a scan or a set of close photos of Coverlast (colour, weave, sheen),
+    which would replace the procedural weave.
+  - **Real footage:** filmed footage of rain on a real cover, sound, and a brand edit.
+  - Generative video (Veo, Sora, Runway) could add people, but it does not show our own cover
+    and fit. The film stays the honest part: our simulation, rendered.
