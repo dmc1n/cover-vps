@@ -211,8 +211,8 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
     def _change_allowed(user: User, path: str) -> bool:
         if path.startswith("/api/auth/"):
             return True
-        if path.startswith("/api/admin/cms"):
-            return user.may("edit")  # colleagues change the website text (ADR-062)
+        if path.startswith(("/api/admin/cms", "/api/admin/matches")):
+            return user.may("edit")  # colleagues edit the site, answer matches (ADR-062, 064)
         if path.startswith("/api/admin/"):
             return user.may("admin")
         if path.endswith("/approve") or path.endswith("/approval-request"):

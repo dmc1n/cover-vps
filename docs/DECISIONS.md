@@ -1239,3 +1239,74 @@ The owner (4 Oct): the drape "makes assumptions that are not realistic". Two of 
   rest shape.
 - **The Lucia's sag (42.9 cm) is the design, not the simulation:** a flat top at the arm's
   height (87.5 cm) spans the lower back and seat, and the fabric sinks into that space.
+## ADR-064 — Several languages, and the customer's sizes matched to our range with a learning mode
+
+The owner (5 October 2026): "step 1"
+(docs/plans/hosting-scale-and-matching.md). People give their own sizes, and we show which
+existing cover fits ("90 %"); below 90 % it is made to measure. The website is in several
+languages, driven by DeepSeek. The site moves to Cloudflare later (step 2).
+
+### Languages
+
+- **Setting.** Shop settings: `languages` (default "nl,en,de,fr"). The first language lives at
+  `/shop/`, the others at `/shop/<lang>/`.
+- **Search engines.** The server puts the text in the right language into the HTML, with
+  `hreflang` alternates, a canonical address per language and the sitemap per language.
+- **Every word is content.** The buttons, labels and messages are no longer in the code: they
+  are in `config/shop_ui.json`, part of the site's content (`ui`). The AI CMS edits and
+  translates them like the rest.
+- **Translation.** **Translate missing languages** (Website tab) or `cover-site --translate`:
+  - DeepSeek fills every missing language in the draft, in batches of 40;
+  - it works from the Dutch and English texts and keeps the `{placeholders}`;
+  - a fixed glossary keeps one word per thing: Schutzhülle, housse, funda;
+  - German uses "du", French "vous".
+  - An instruction in the CMS keeps all languages in step, and anything left out is translated
+    afterwards.
+  - Translations go to the draft only: preview, then publish.
+- **First run.** On a copy of the live site: 230 texts into German and French in 48 s, and
+  they read naturally.
+
+### Matching (`engine/coverengine/match.py`)
+
+- **Size card.** Every SUNS cover has one: kind, the furniture's length ≥ width and height,
+  the side of an L, chairs or not, how its drape went.
+- **Kind.** It comes from the category and the name: round tables, L parts and chaises, and
+  corner modules (counted as an item).
+- **Score per size.** The difference is catalogue − customer.
+  - Within −`match.tight_cm` (1.25) and +`match.loose_cm` (4.5): 100 %.
+  - Smaller than that falls to 0 over `match.tight_falloff_cm` (3.5): a cover that is too
+    small does not go on.
+  - Larger falls to 0 over `match.loose_falloff_cm` (27.5): it hangs looser.
+- **Total.** The weighted geometric mean (`match.weights` 1, 1, 0.6). Any size at 0 makes the
+  total 0. A different kind of furniture, or the other hand of an L, is never a match.
+- **What the customer is offered.**
+  - From `match.threshold_pct` (90): the existing cover.
+  - From `match.choice_pct` (80): a choice between the existing cover and a custom one.
+  - Below: custom.
+  - All the bands are to confirm (Q57).
+- **Ordering an existing cover.** The quote takes `stock_model`. It is priced on that cover's
+  own sizes, less `matching.stock_discount_pct` when set (Q58). Into production means it is
+  cut from that model's own, tested pattern; no new model is made.
+- **Note.** In the catalogue, L sofas are mostly separate modules, so a whole L rarely matches
+  one cover and goes custom. Matching a set of modules is a later step.
+
+### The learning mode
+
+- **Shadow (`match.mode`, the default).**
+  - The customer leaves an e-mail address and sees nothing yet.
+  - The admin tab **Matches** shows the request with the best eight covers.
+  - A colleague takes the proposal, chooses another cover or chooses custom, with an optional
+    note. The customer is mailed a link in their own language.
+  - Every change of the proposal is stored. Editors may answer.
+- **Auto.** The customer sees the match at once, and every request is still kept.
+- **After delivery.** With `fit_mail` on and the domain set, a shipped order gets one question
+  after `fit_mail.days` (14): how does it fit (1–5), a comment and an optional photo
+  (JPEG/PNG/WebP up to 6 MB).
+  - **Returned** is a new order status.
+- **What we learn** (tab **Matches**). Per match band (95–100, 90–95, 85–90, 80–85, below 80):
+  - the requests, those answered by a colleague, and how many of those were changed;
+  - how often custom was chosen;
+  - the orders, the average fit answer, and the returns.
+  - From these the threshold and the bands are set.
+- **Fixed in passing:** the admin tabs Orders, Shop settings, Website (AI) and Requests had
+  never been in the tab bar of v1.7.0, so they could not be reached. They are now.

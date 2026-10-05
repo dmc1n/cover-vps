@@ -135,3 +135,29 @@ Three tabs on the admin page belong to it.
   - A paid order goes into production by itself: its pattern, then the drape. **Into
     production** does it by hand (for a payment by bank transfer).
   - Changing the status mails the customer.
+
+## Matches: which existing cover fits (learning mode)
+
+- **The customer enters their sizes in the configurator.**
+  - **Learning mode** (Shop settings, matching, mode `shadow`; the default): the customer leaves
+    an e-mail address. You get a mail, and the request appears in the admin tab **Matches**
+    with the best covers, their percentage and the difference per size in cm (+ is roomier).
+  - Press **Take N %** for the proposal, **Custom**, or type another cover (`suns-…`) and press
+    **Choose**. A note for the customer is optional.
+  - The customer gets a link to the proposal, in their own language, and can order the existing
+    cover or a custom one.
+- **Every change you make is a lesson.** The table **What we learn** shows, per match band,
+  how often the proposal was changed, the fit answers of customers (1–5) and the returns.
+  When a band fits well, set the threshold (Shop settings, matching, `threshold_pct`) and,
+  when you trust it, mode `auto`: customers then see the match at once.
+- **The fit question:** Shop settings, `fit_mail`. Switch it on and set the days. It needs the
+  domain and the mail server. A shipped order then gets one question by mail; the answers
+  appear under Matches.
+
+## Languages
+
+- Shop settings, `languages`: for example `nl,en,de,fr`. The first is the main language.
+- Website (AI), **Translate missing languages**: DeepSeek fills them into the draft. Check the
+  preview (switch the language at the top right), then **Publish**.
+- Every text, buttons included, can be changed by an instruction in the command line, in all
+  languages at once.

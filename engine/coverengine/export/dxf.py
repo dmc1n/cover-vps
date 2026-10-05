@@ -153,7 +153,7 @@ def rect_points(x: float, y: float, w: float, h: float) -> list[BulgePoint]:
 
 
 def rounded_rect_points(x: float, y: float, w: float, h: float, r: float) -> list[BulgePoint]:
-    b = math.tan(math.radians(90.0) / 4)  # quarter-circle corner
+    b = math.tan(math.radians(90.0) / 4)  # param-ok: a quarter-circle corner
     return [
         (x + r, y, 0.0),
         (x + w - r, y, b),

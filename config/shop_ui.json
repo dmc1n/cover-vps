@@ -1,0 +1,375 @@
+{
+ "_about": "The shop's own words (buttons, labels, messages), per language. The AI CMS edits and translates them like the rest of the content (ADR-062, ADR-064). {name} style placeholders are filled in by the page.",
+ "words": {
+  "how": {
+   "nl": "Zo werkt het",
+   "en": "How it works"
+  },
+  "configure": {
+   "nl": "Ontwerp je hoes",
+   "en": "Design your cover"
+  },
+  "what": {
+   "nl": "Wat wil je afdekken?",
+   "en": "What do you want to cover?"
+  },
+  "colour": {
+   "nl": "Kleur",
+   "en": "Colour"
+  },
+  "vents": {
+   "nl": "Ventilatie (aanbevolen: tegen vocht)",
+   "en": "Air vents (recommended: against damp)"
+  },
+  "rain": {
+   "nl": "Regentest",
+   "en": "Rain test"
+  },
+  "none": {
+   "nl": "Zonder steun",
+   "en": "No support"
+  },
+  "balloons": {
+   "nl": "Met ballonnen",
+   "en": "With balloons"
+  },
+  "frame": {
+   "nl": "Met frame",
+   "en": "With a frame"
+  },
+  "dry": {
+   "nl": "Water loopt af",
+   "en": "Water runs off"
+  },
+  "wet": {
+   "nl": "Water blijft staan",
+   "en": "Water stays"
+  },
+  "total": {
+   "nl": "Totaal incl. btw",
+   "en": "Total incl. VAT"
+  },
+  "indicative": {
+   "nl": "Indicatieve prijs",
+   "en": "Indicative price"
+  },
+  "order": {
+   "nl": "Bestellen",
+   "en": "Order"
+  },
+  "pay": {
+   "nl": "Naar betalen",
+   "en": "Go to payment"
+  },
+  "place": {
+   "nl": "Bestelling plaatsen",
+   "en": "Place the order"
+  },
+  "name": {
+   "nl": "Naam",
+   "en": "Name"
+  },
+  "email": {
+   "nl": "E-mail",
+   "en": "E-mail"
+  },
+  "phone": {
+   "nl": "Telefoon (optioneel)",
+   "en": "Phone (optional)"
+  },
+  "street": {
+   "nl": "Straat en huisnummer",
+   "en": "Street and number"
+  },
+  "postcode": {
+   "nl": "Postcode",
+   "en": "Postcode"
+  },
+  "city": {
+   "nl": "Plaats",
+   "en": "City"
+  },
+  "country": {
+   "nl": "Land",
+   "en": "Country"
+  },
+  "terms": {
+   "nl": "Ik ga akkoord met de voorwaarden (maatwerk: geen herroepingsrecht)",
+   "en": "I accept the terms (made to measure: no right of withdrawal)"
+  },
+  "status": {
+   "nl": "Je bestelling",
+   "en": "Your order"
+  },
+  "faq": {
+   "nl": "Veelgestelde vragen",
+   "en": "Questions"
+  },
+  "terms_page": {
+   "nl": "Voorwaarden",
+   "en": "Terms"
+  },
+  "privacy": {
+   "nl": "Privacy",
+   "en": "Privacy"
+  },
+  "warranty": {
+   "nl": "Garantie",
+   "en": "Warranty"
+  },
+  "shipping": {
+   "nl": "Verzending",
+   "en": "Delivery"
+  },
+  "pieces": {
+   "nl": "stukken",
+   "en": "pieces"
+  },
+  "empty": {
+   "nl": "Deze tekst volgt nog.",
+   "en": "This text follows."
+  },
+  "show_water": {
+   "nl": "Toon het water",
+   "en": "Show the water"
+  },
+  "thanks": {
+   "nl": "Dank je wel!",
+   "en": "Thank you!"
+  },
+  "thanks_text": {
+   "nl": "Je bestelling is ontvangen. Je krijgt een bevestiging per e-mail; de betaalgegevens volgen.",
+   "en": "We have your order. You get a confirmation by e-mail; the payment details follow."
+  },
+  "preview": {
+   "nl": "PREVIEW: nog niet live",
+   "en": "PREVIEW: not live yet"
+  },
+  "advice_flat": {
+   "nl": "Zonder steun is {m2} m² van het dak vlak: daar blijft water staan.",
+   "en": "Without support {m2} m² of the top is flat: water stays there."
+  },
+  "advice_balloons": {
+   "nl": "Met {n} ballon(nen) onder de hoes loopt het af.",
+   "en": "With {n} balloon(s) under the cover it runs off."
+  },
+  "advice_frame": {
+   "nl": "Met een frame krijgt het dak een vaste helling en loopt het af.",
+   "en": "With a frame the top gets a fixed slope and the water runs off."
+  },
+  "language": {
+   "nl": "Taal",
+   "en": "Language"
+  },
+  "match_title": {
+   "nl": "Hebben we al een hoes die past?",
+   "en": "Do we already make a cover that fits?"
+  },
+  "match_fits": {
+   "nl": "{name} past je voor {pct} %",
+   "en": "{name} fits you for {pct} %"
+  },
+  "match_existing": {
+   "nl": "Een bestaande hoes uit onze collectie: beproefd, en sneller geleverd.",
+   "en": "An existing cover from our range: proven, and delivered sooner."
+  },
+  "match_choice": {
+   "nl": "Deze bestaande hoes past redelijk. Kies hem, of laat er een op maat maken.",
+   "en": "This existing cover fits reasonably. Choose it, or have one made to measure."
+  },
+  "match_custom": {
+   "nl": "Geen bestaande hoes past goed genoeg: we maken hem precies op maat.",
+   "en": "No existing cover fits well enough: we make yours exactly to measure."
+  },
+  "match_pick": {
+   "nl": "Kies deze hoes",
+   "en": "Choose this cover"
+  },
+  "match_custom_cta": {
+   "nl": "Op maat laten maken",
+   "en": "Have it made to measure"
+  },
+  "match_chosen": {
+   "nl": "Gekozen: bestaande hoes {name}",
+   "en": "Chosen: the existing cover {name}"
+  },
+  "match_roomier": {
+   "nl": "{cm} cm ruimer",
+   "en": "{cm} cm roomier"
+  },
+  "match_tighter": {
+   "nl": "{cm} cm krapper",
+   "en": "{cm} cm tighter"
+  },
+  "match_exact": {
+   "nl": "precies",
+   "en": "exact"
+  },
+  "size_length": {
+   "nl": "lengte",
+   "en": "length"
+  },
+  "size_width": {
+   "nl": "breedte",
+   "en": "width"
+  },
+  "size_height": {
+   "nl": "hoogte",
+   "en": "height"
+  },
+  "match_ask": {
+   "nl": "Vraag een match aan",
+   "en": "Ask for a match"
+  },
+  "match_ask_text": {
+   "nl": "Een collega vergelijkt je maten met onze hoezen en mailt je binnen één werkdag welke past.",
+   "en": "A colleague compares your sizes with our covers and e-mails you within one working day which one fits."
+  },
+  "match_sent": {
+   "nl": "Dank je! We mailen je binnen één werkdag.",
+   "en": "Thank you! We will e-mail you within one working day."
+  },
+  "proposal": {
+   "nl": "Ons voorstel voor je hoes",
+   "en": "Our proposal for your cover"
+  },
+  "proposal_wait": {
+   "nl": "We kijken nog naar je maten; je krijgt bericht per e-mail.",
+   "en": "We are still looking at your sizes; you will hear from us by e-mail."
+  },
+  "fit_title": {
+   "nl": "Hoe past je hoes?",
+   "en": "How does your cover fit?"
+  },
+  "fit_comment": {
+   "nl": "Opmerking (optioneel)",
+   "en": "Comment (optional)"
+  },
+  "fit_photo": {
+   "nl": "Foto (optioneel)",
+   "en": "Photo (optional)"
+  },
+  "fit_send": {
+   "nl": "Versturen",
+   "en": "Send"
+  },
+  "fit_thanks": {
+   "nl": "Dank je voor je reactie! Daar leren we van.",
+   "en": "Thank you for your answer! We learn from it."
+  }
+ },
+ "status": {
+  "awaiting_payment": {
+   "nl": "Wacht op betaling",
+   "en": "Awaiting payment"
+  },
+  "paid": {
+   "nl": "Betaald",
+   "en": "Paid"
+  },
+  "in_production": {
+   "nl": "Wordt gemaakt",
+   "en": "Being made"
+  },
+  "sewn": {
+   "nl": "Genaaid",
+   "en": "Sewn"
+  },
+  "shipped": {
+   "nl": "Verzonden",
+   "en": "Shipped"
+  },
+  "cancelled": {
+   "nl": "Geannuleerd",
+   "en": "Cancelled"
+  },
+  "failed": {
+   "nl": "Betaling mislukt",
+   "en": "Payment failed"
+  },
+  "returned": {
+   "nl": "Geretourneerd",
+   "en": "Returned"
+  }
+ },
+ "field": {
+  "table_length_cm": {
+   "nl": "Lengte tafel",
+   "en": "Table length"
+  },
+  "table_width_cm": {
+   "nl": "Breedte tafel",
+   "en": "Table width"
+  },
+  "table_height_cm": {
+   "nl": "Hoogte tafel",
+   "en": "Table height"
+  },
+  "table_diameter_cm": {
+   "nl": "Doorsnede tafel",
+   "en": "Table diameter"
+  },
+  "chairs": {
+   "nl": "Stoelen meenemen",
+   "en": "Cover the chairs too"
+  },
+  "length_cm": {
+   "nl": "Lengte",
+   "en": "Length"
+  },
+  "depth_cm": {
+   "nl": "Diepte",
+   "en": "Depth"
+  },
+  "width_cm": {
+   "nl": "Breedte",
+   "en": "Width"
+  },
+  "height_cm": {
+   "nl": "Hoogte",
+   "en": "Height"
+  },
+  "back_height_cm": {
+   "nl": "Hoogte rugleuning",
+   "en": "Back height"
+  },
+  "front_height_cm": {
+   "nl": "Hoogte voorkant/armleuning",
+   "en": "Front/arm height"
+  },
+  "long_side_cm": {
+   "nl": "Lange zijde",
+   "en": "Long side"
+  },
+  "short_side_cm": {
+   "nl": "Korte zijde",
+   "en": "Short side"
+  }
+ },
+ "product": {
+  "dining_set": {
+   "nl": "Eettafel met stoelen",
+   "en": "Dining set"
+  },
+  "round_set": {
+   "nl": "Ronde tafel",
+   "en": "Round dining set"
+  },
+  "sofa": {
+   "nl": "Bank",
+   "en": "Sofa"
+  },
+  "corner_sofa": {
+   "nl": "Hoekbank",
+   "en": "Corner sofa"
+  },
+  "lounger": {
+   "nl": "Ligbed",
+   "en": "Sun lounger"
+  },
+  "item": {
+   "nl": "Stoel, bijzettafel, hocker",
+   "en": "Chair, side table, hocker"
+  }
+ }
+}

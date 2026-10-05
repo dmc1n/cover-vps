@@ -366,7 +366,7 @@ def _dim(ax: Axes, a: Array, b: Array, offset: float, text: str, size: float = F
         },
     )
     angle = math.degrees(math.atan2(d[1], d[0]))
-    if angle > 90 or angle <= -90:
+    if angle > 90 or angle <= -90:  # param-ok: degrees
         angle -= 180
     mid = (a2 + b2) / 2
     ax.text(

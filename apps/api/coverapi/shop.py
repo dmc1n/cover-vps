@@ -1,6 +1,9 @@
 """The cover webshop's back end (ADR-062, docs/plans/cover-webshop.md): its settings, the
 site's content with the AI CMS (draft, preview, live, history), the configurator's proposals
-with the rain check, orders with Mollie payments, and an order's way into production.
+with the rain check, orders with Mollie payments, and an order's way into production. Also
+(ADR-064): the site in several languages (DeepSeek translates), and the customer's sizes matched
+against the covers we already make, with a learning mode (a colleague confirms first) and the
+fit question after delivery.
 
 Everything the owner has not given yet is a setting on the admin page (Shop settings). Empty
 settings show as placeholders in the shop, and payments work as soon as a Mollie key is set.
@@ -69,7 +72,19 @@ SHOP_DEFAULTS: dict[str, Any] = {
     "colours": "",
     "film_url": "",
     "notify_email": "",
+    "languages": "nl,en,de,fr",
+    "matching": {
+        "mode": "shadow",
+        "threshold_pct": None,
+        "choice_pct": None,
+        "stock_discount_pct": None,
+    },  # fmt: skip
+    "fit_mail": {"enabled": False, "days": 14},
 }
+UI_JSON = Path(__file__).resolve().parents[3] / "config" / "shop_ui.json"
+LANG_NAMES = {"nl": "Dutch", "en": "English", "de": "German (informal du)",
+              "fr": "French (vous)", "es": "Spanish", "it": "Italian", "da": "Danish",
+              "sv": "Swedish", "no": "Norwegian", "pl": "Polish", "pt": "Portuguese"}  # fmt: skip
 
 # The site's text, NL and EN; the AI CMS edits this (draft), a person publishes it (live).
 CONTENT_DEFAULTS: dict[str, Any] = {
@@ -191,14 +206,34 @@ CONTENT_DEFAULTS: dict[str, Any] = {
         "warranty": {"nl": "", "en": ""},
     },
 }
+CONTENT_DEFAULTS["ui"] = {
+    k: v for k, v in json.loads(UI_JSON.read_text(encoding="utf-8")).items() if k[0] != "_"
+}
+
+
+def tr(t: Any, lang: str) -> str:
+    """A text in the asked language, else English, else Dutch."""
+    if not isinstance(t, dict):
+        return str(t or "")
+    return str(t.get(lang) or t.get("en") or t.get("nl") or "")
+
+
+def site_languages(auth: Any) -> list[str]:
+    s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
+    langs = [x.strip().lower() for x in str(s["languages"]).split(",")]
+    out = [x for x in langs if re.fullmatch(r"[a-z]{2}", x)]
+    return out or ["nl", "en"]
+
 
 CMS_SYSTEM = """You edit the content of a webshop for made-to-measure outdoor furniture covers.
-You get the current content (JSON, with Dutch "nl" and English "en" texts) and a colleague's
-instruction. Change only what the instruction asks; keep both languages in step (translate);
+You get the current content (JSON; every text has one entry per language code: LANGS) and a
+colleague's instruction. Change only what the instruction asks; keep every language in step
+(translate the change into each of them; a new text gets all of them);
 keep the tone: clear, warm, short sentences, no hype. Never invent facts (prices, guarantees,
 certificates, numbers) that are not in the content or the instruction. Answer with JSON only:
 {"changes": [{"path": "hero.title.nl", "value": "..."}, ...], "summary": "one sentence"}
-Paths use dots and list indexes (faq.0.q.en). To add a list item give the next index; to remove
+Paths use dots and list indexes (faq.0.q.en); "ui" holds the buttons and labels, whose
+{placeholders} stay as they are. To add a list item give the next index; to remove
 one give the value null. Search engines and AI assistants read this site: keep facts precise and
 answers self-contained."""
 
@@ -213,6 +248,26 @@ class ShopQuote(BaseModel):
     colour: str | None = Field(default=None, max_length=40)
     vents: bool = True
     support: str = Field(default="none", pattern=r"^(none|balloons|frame)$")
+    stock_model: str | None = Field(default=None, pattern=r"^suns-[a-z0-9-]{1,120}$")
+    match_token: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{10,40}$")
+
+
+class MatchIn(BaseModel):
+    product: str = Field(max_length=40)
+    sizes: dict[str, Any] = Field(default_factory=dict)
+    email: str | None = Field(default=None, max_length=254)
+    name: str | None = Field(default=None, max_length=120)
+    lang: str = Field(default="nl", pattern=r"^[a-z]{2}$")
+
+
+class MatchAnswer(BaseModel):
+    chosen: str = Field(pattern=r"^(custom|suns-[a-z0-9-]{1,120})$")
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class FitIn(BaseModel):
+    score: int = Field(ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=2000)
 
 
 class OrderIn(BaseModel):
@@ -226,6 +281,7 @@ class OrderIn(BaseModel):
     country: str = Field(min_length=2, max_length=2)
     note: str | None = Field(default=None, max_length=2000)
     terms: bool
+    lang: str = Field(default="nl", pattern=r"^[a-z]{2}$")
 
 
 ORDERS_TABLE = """
@@ -241,7 +297,42 @@ CREATE TABLE IF NOT EXISTS orders (
   model_id TEXT,
   updated REAL
 )"""
-STATUSES = ("awaiting_payment", "paid", "in_production", "sewn", "shipped", "cancelled", "failed")
+STATUSES = ("awaiting_payment", "paid", "in_production", "sewn", "shipped", "cancelled", "failed",
+            "returned")  # fmt: skip
+MATCH_TABLE = """
+CREATE TABLE IF NOT EXISTS match_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created REAL NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  email TEXT,
+  name TEXT,
+  lang TEXT,
+  product TEXT NOT NULL,
+  given TEXT NOT NULL,
+  result TEXT NOT NULL,
+  best_model TEXT,
+  best_pct REAL,
+  decision TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  status TEXT NOT NULL,
+  chosen TEXT,
+  chosen_by TEXT,
+  changed INTEGER,
+  note TEXT,
+  answered REAL
+)"""
+FEEDBACK_TABLE = """
+CREATE TABLE IF NOT EXISTS fit_feedback (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created REAL NOT NULL,
+  order_id INTEGER NOT NULL,
+  score INTEGER NOT NULL,
+  comment TEXT,
+  photo TEXT
+)"""
+BANDS = ((95, 101), (90, 95), (85, 90), (80, 85), (0, 80))
+DAY_S = 86400.0
+PHOTO_MAX = 6_000_000
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[a-z]{2,24}$", re.I)
 
 
@@ -328,14 +419,16 @@ class Site:
             self._write("draft", doc["content"])
 
 
-def cms_apply(site: Site, params: Any, text: str) -> dict[str, Any]:
+def cms_apply(site: Site, params: Any, text: str, langs: list[str] | None = None) -> dict[str, Any]:
     """The AI turns a colleague's instruction into changes of the draft (used by the admin
-    page and by the command line `cover-site`)."""
+    page and by the command line `cover-site`); any language it left out is then translated."""
     from coverengine.ai import ask
 
+    langs = langs or ["nl", "en"]
     draft = site.read("draft")
-    ans = ask(params, CMS_SYSTEM, json.dumps({"content": draft, "instruction": text},
-                                             ensure_ascii=False))  # fmt: skip
+    system = CMS_SYSTEM.replace("LANGS", ", ".join(langs))
+    ans = ask(params, system, json.dumps({"content": draft, "instruction": text},
+                                         ensure_ascii=False))  # fmt: skip
     changes = [c for c in ans.get("changes", []) if isinstance(c, dict) and "path" in c]
     if not changes:
         return {"summary": ans.get("summary") or "nothing to change", "changes": []}
@@ -343,7 +436,70 @@ def cms_apply(site: Site, params: Any, text: str) -> dict[str, Any]:
         if str(c["path"]).split(".")[0] not in CONTENT_DEFAULTS:
             raise ValueError(f"the AI wanted to change {c['path']}, which is not part of the site")
     site.change(changes)
+    if len(langs) > 2:  # noqa: PLR2004 - beyond Dutch and English
+        translate(site, params, langs)
     return {"summary": ans.get("summary", ""), "changes": changes}
+
+
+TRANSLATE_SYSTEM = """You translate the texts of a webshop for made-to-measure outdoor furniture
+covers (Sunbrella Coverlast fabric, cut by our own software, sewn in our workshop). You get JSON
+{"languages": {"de": "German (informal du)", ...}, "texts": {"<path>": {"nl": "...", "en": "..."}}}.
+Translate every text into every asked language, from the Dutch and English given (they say the
+same). Natural, short and warm, as a native copywriter would write it, not word for word. Keep
+{placeholders}, product names, units, numbers and punctuation like "→" unchanged. A legal text
+stays precise. One word for one thing, in every text (they are sent in batches): the cover
+(hoes) is "Schutzhülle" in German, "housse" in French, "funda" in Spanish, "telo di copertura" in
+Italian; the frame "Gestell"/"armature", the balloon "Ballon"/"ballon".
+Answer with JSON only: {"texts": {"<path>": {"de": "...", ...}, ...}}"""
+TRANSLATE_BATCH = 40
+
+
+def _texts(doc: Any, path: str = "") -> list[tuple[str, dict[str, Any]]]:
+    """Every translatable text in the content: a dict of language codes to strings."""
+    if isinstance(doc, dict):
+        if (
+            doc
+            and all(re.fullmatch(r"[a-z]{2}", str(k)) for k in doc)
+            and ("nl" in doc or "en" in doc)
+        ):
+            return [(path, doc)]
+        return [x for k, v in doc.items() for x in _texts(v, f"{path}.{k}" if path else k)]
+    if isinstance(doc, list):
+        return [x for i, v in enumerate(doc) for x in _texts(v, f"{path}.{i}")]
+    return []
+
+
+def translate(site: Site, params: Any, langs: list[str], only: str | None = None) -> dict[str, Any]:
+    """Fill in the languages the draft is missing (DeepSeek), in batches; `only` limits it to
+    paths starting with that prefix. The draft only: a person publishes."""
+    from coverengine.ai import ask
+
+    todo = []
+    for path, t in _texts(site.read("draft")):
+        if only and not path.startswith(only):
+            continue
+        source = {k: t[k] for k in ("nl", "en") if t.get(k)}
+        missing = [x for x in langs if not t.get(x) and x not in source]
+        if source and missing:
+            todo.append((path, source, missing))
+    done = 0
+    for i in range(0, len(todo), TRANSLATE_BATCH):
+        batch = todo[i : i + TRANSLATE_BATCH]
+        want = sorted({x for _, _, m in batch for x in m})
+        ans = ask(params, TRANSLATE_SYSTEM, json.dumps({
+            "languages": {x: LANG_NAMES.get(x, x) for x in want},
+            "texts": {path: src for path, src, _ in batch}}, ensure_ascii=False))  # fmt: skip
+        got = ans.get("texts") or {}
+        changes = []
+        for path, _, missing in batch:
+            out = got.get(path) or {}
+            for x in missing:
+                if isinstance(out.get(x), str) and out[x].strip():
+                    changes.append({"path": f"{path}.{x}", "value": out[x].strip()})
+        if changes:
+            site.change(changes)
+            done += len(changes)
+    return {"translated": done, "texts": len(todo), "languages": langs}
 
 
 def shop_params(auth: Any) -> Any:
@@ -359,6 +515,12 @@ def shop_params(auth: Any) -> Any:
         trial["quote.prices_are_placeholders"] = False
     if s.get("colours"):
         trial["quote.colours"] = s["colours"]
+    m = s["matching"]
+    if m.get("mode") in ("shadow", "auto"):
+        trial["match.mode"] = m["mode"]
+    for k in ("threshold_pct", "choice_pct"):
+        if m.get(k) not in (None, ""):
+            trial[f"match.{k}"] = float(m[k])
     return Registry.load(None).resolve(trial=trial)
 
 
@@ -372,8 +534,16 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     site = Site(data / "site")
     quotes = data / "shop_quotes"
     quotes.mkdir(parents=True, exist_ok=True)
+    photos = data / "fit_photos"
+    photos.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(auth.path) as db:
         db.execute(ORDERS_TABLE)
+        db.execute(MATCH_TABLE)
+        db.execute(FEEDBACK_TABLE)
+        have = {r[1] for r in db.execute("PRAGMA table_info(orders)")}
+        for col in ("feedback_token TEXT", "feedback_sent REAL"):
+            if col.split()[0] not in have:
+                db.execute(f"ALTER TABLE orders ADD COLUMN {col}")
     app.state.site = site
     recent: dict[str, list[float]] = {}
 
@@ -438,7 +608,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     def cms_command(req: CmsCommand, request: Request) -> dict[str, Any]:
         user = require(request, "edit")
         try:
-            out = cms_apply(site, shop_params(auth), req.text)
+            out = cms_apply(site, shop_params(auth), req.text, site_languages(auth))
         except (ValueError, CoverError) as exc:
             raise HTTPException(400, str(exc)) from None
         auth.log(user, "site draft", {"instruction": req.text, "summary": out["summary"]})
@@ -450,6 +620,17 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         stamp = site.publish(user.username)
         auth.log(user, "site published", {"previous": stamp})
         return {"published": True, "previous_version": stamp}
+
+    @app.post("/api/admin/cms/translate")
+    def cms_translate(request: Request) -> dict[str, Any]:
+        """Every language of the shop filled in (the draft; check the preview, then publish)."""
+        user = require(request, "edit")
+        try:
+            out = translate(site, shop_params(auth), site_languages(auth))
+        except CoverError as exc:
+            raise HTTPException(400, str(exc)) from None
+        auth.log(user, "site translated", out)
+        return out
 
     @app.post("/api/admin/cms/discard")
     def cms_discard(request: Request) -> dict[str, Any]:
@@ -479,6 +660,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             "colours": q.colours(p),
             "products": s["products"],
             "indicative": bool(p["quote.prices_are_placeholders"]),
+            "languages": site_languages(auth),
+            "matching": str(p["match.mode"]),
         }
 
     @app.get("/api/shop/info")
@@ -488,15 +671,32 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         return {"content": site.read("draft" if draft else "live"), "preview": bool(draft),
                 "settings": public_settings(), "options": q.options(shop_params(auth))}  # fmt: skip
 
+    def _stock(model_id: str, product: str) -> dict[str, Any]:
+        from coverengine import match as mt
+
+        c = mt.card(store.models / model_id)
+        if c is None or c["kind"] != product:
+            raise HTTPException(400, "this cover is not in our range for this furniture")
+        return c
+
     def _quote(req: ShopQuote) -> dict[str, Any]:
+        from coverengine import match as mt
+
         p = shop_params(auth)
-        given = {**req.sizes, "vents": req.vents, "colour": req.colour}
+        stock = _stock(req.stock_model, req.product) if req.stock_model else None
+        sizes = (
+            {**req.sizes, **mt.fields_for(req.product, stock["size_cm"])} if stock else req.sizes
+        )
+        given = {**sizes, "vents": req.vents, "colour": req.colour}
         try:
             full = q.proposal(req.product, given, p)
             rain = q.rain_check(req.product, given, p)
             glb = q.scene_glb(req.product, given, p, req.support)
         except CoverError as exc:
             raise HTTPException(400, str(exc)) from None
+        if stock:  # an existing cover: its own sizes, and the stock discount (when set)
+            off = settings()["matching"].get("stock_discount_pct") or 0
+            full["price"]["sale_eur"] = round(full["price"]["sale_eur"] * (1 - float(off) / 100), 2)  # noqa: PLR2004 - percent
         extra = 0.0
         markup = 1 + float(p["quote.markup_pct"]) / 100  # noqa: PLR2004 - percent
         vat = 1 + float(p["quote.vat_pct"]) / 100  # noqa: PLR2004 - percent
@@ -511,7 +711,10 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             if water:
                 (quotes / f"{qid}-{support}.glb").write_bytes(water)
         record = {"time": time.time(), "input": req.model_dump(), "quote": full, "rain": rain,
-                  "support_eur": round(extra, 2)}  # fmt: skip
+                  "support_eur": round(extra, 2),
+                  "stock": ({"model_id": stock["model_id"], "name": stock["name"]}
+                            if stock else None),
+                  "match_token": req.match_token}  # fmt: skip
         (quotes / f"{qid}.json").write_text(json.dumps(record), encoding="utf-8")
         (quotes / f"{qid}.glb").write_bytes(glb)
         return {
@@ -523,7 +726,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                       "total_eur": round(full["price"]["sale_eur"] + extra, 2),
                       "indicative": full["price"]["placeholder_prices"]},
             "rain": rain, "near": q.nearest(req.product, given, store.models)[:1],
-            "scene": f"/api/shop/scene/{qid}.glb",
+            "scene": f"/api/shop/scene/{qid}.glb", "stock": record["stock"],
         }  # fmt: skip
 
     @app.post("/api/shop/quote")
@@ -576,7 +779,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         shipping = float(ship.get("eur") or 0)
         total = round(record["quote"]["price"]["sale_eur"] + record["support_eur"] + shipping, 2)
         token = secrets.token_urlsafe(18)
-        data = {"customer": req.model_dump(), "quote": record, "shipping_eur": shipping}
+        data = {"customer": req.model_dump(), "quote": record, "shipping_eur": shipping,
+                "lang": req.lang}  # fmt: skip
         with sqlite3.connect(auth.path) as db:
             cur = db.execute(
                 "INSERT INTO orders (created, token, status, email, data, total_eur, updated) "
@@ -635,6 +839,260 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                 produce(int(row[0]))
         return {"ok": True}
 
+    # ---- the customer's sizes against our range, and the learning mode (ADR-064) -------------
+    def _match_row(token: str) -> dict[str, Any] | None:
+        with sqlite3.connect(auth.path) as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute("SELECT * FROM match_requests WHERE token=?", (token,)).fetchone()
+        return dict(row) if row else None
+
+    def _lang_prefix(lang: str) -> str:
+        langs = site_languages(auth)
+        return "" if not langs or lang == langs[0] else f"{lang}/"
+
+    @app.post("/api/shop/match")
+    def shop_match(req: MatchIn, request: Request) -> dict[str, Any]:
+        """Which existing cover fits these sizes. Learning mode (shadow): the customer leaves an
+        e-mail address and a colleague confirms the proposal first; auto: the answer at once."""
+        from coverengine import match as mt
+
+        limit(request)
+        p = shop_params(auth)
+        mode = str(p["match.mode"])
+        email = (req.email or "").strip()
+        if mode == "shadow" and not EMAIL.match(email):
+            raise HTTPException(400, "please give your e-mail address: we answer within a day")
+        try:
+            r = mt.match(req.product, req.sizes, store.models, p, top=8)  # param-ok: candidates
+        except (ValueError, CoverError) as exc:
+            raise HTTPException(400, str(exc)) from None
+        best = r["matches"][0] if r["matches"] else None
+        token = secrets.token_urlsafe(18)
+        auto = mode == "auto"
+        chosen = (
+            (best["model_id"] if best and r["decision"] != "custom" else "custom") if auto else None
+        )
+        with sqlite3.connect(auth.path) as db:
+            cur = db.execute(
+                "INSERT INTO match_requests (created, token, email, name, lang, product, given, "
+                "result, best_model, best_pct, decision, mode, status, chosen, chosen_by, "
+                "answered) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (time.time(), token, email or None, req.name, req.lang, req.product,
+                 json.dumps(req.sizes), json.dumps(r), best["model_id"] if best else None,
+                 best["score_pct"] if best else 0.0, r["decision"], mode,
+                 "answered" if auto else "open", chosen, "auto" if auto else None,
+                 time.time() if auto else None),
+            )  # fmt: skip
+            mid = cur.lastrowid
+        if auto:
+            return {"mode": mode, "token": token, "decision": r["decision"],
+                    "match": best, "threshold_pct": r["threshold_pct"]}  # fmt: skip
+        pct = f"{best['score_pct']} % {best['model_id']}" if best else "no cover of this kind"
+        notify(f"Match request {mid}: {req.product}, best {pct}",
+               f"{req.name or ''} <{email}> asks which cover fits:\n{json.dumps(req.sizes)}\n"
+               f"Best: {pct}. Confirm or change it on the admin page, Matches.")  # fmt: skip
+        return {"mode": mode, "token": token, "status": "open"}
+
+    @app.get("/api/shop/match/{token}")
+    def shop_match_answer(token: str) -> dict[str, Any]:
+        row = _match_row(token)
+        if row is None:
+            raise HTTPException(404, "no such request")
+        if row["status"] != "answered":
+            return {"status": "open"}
+        r = json.loads(row["result"])
+        chosen = row["chosen"]
+        match = None
+        if chosen and chosen != "custom":
+            match = next((m for m in r["matches"] if m["model_id"] == chosen), None) or r.get(
+                "chosen_entry"
+            )
+        return {"status": "answered", "product": row["product"], "sizes": json.loads(row["given"]),
+                "decision": "custom" if chosen == "custom" else r["decision"] if match is None
+                else ("existing" if match["score_pct"] >= r["threshold_pct"] else "choice"),
+                "match": match, "note": row["note"]}  # fmt: skip
+
+    @app.get("/api/admin/matches")
+    def matches(request: Request) -> dict[str, Any]:
+        require(request, "edit")
+        with sqlite3.connect(auth.path) as db:
+            db.row_factory = sqlite3.Row
+            rows = [dict(x) for x in db.execute(
+                "SELECT * FROM match_requests ORDER BY id DESC LIMIT 300")]  # fmt: skip
+        for x in rows:
+            x["result"], x["given"] = json.loads(x["result"]), json.loads(x["given"])
+        return {"requests": rows, "mode": str(shop_params(auth)["match.mode"])}
+
+    @app.put("/api/admin/matches/{mid}")
+    def answer_match(mid: int, req: MatchAnswer, request: Request) -> dict[str, Any]:
+        """A colleague's answer: the proposed cover, another one, or custom. Every change of the
+        proposal is stored: that is what the learning page counts."""
+        from coverengine import match as mt
+
+        user = require(request, "edit")
+        with sqlite3.connect(auth.path) as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute("SELECT * FROM match_requests WHERE id=?", (mid,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "no such request")
+        r = json.loads(row["result"])
+        proposed = (
+            row["best_model"] if row["decision"] != "custom" and row["best_model"] else "custom"
+        )
+        if req.chosen != "custom" and not any(m["model_id"] == req.chosen for m in r["matches"]):
+            e = mt.entry(store.models, req.chosen, row["product"], json.loads(row["given"]),
+                         shop_params(auth))  # fmt: skip
+            if e is None:
+                raise HTTPException(400, f"no cover {req.chosen}")
+            r["chosen_entry"] = e
+        with sqlite3.connect(auth.path) as db:
+            db.execute("UPDATE match_requests SET status='answered', chosen=?, chosen_by=?, "
+                       "changed=?, note=?, answered=?, result=? WHERE id=?",
+                       (req.chosen, user.username, int(req.chosen != proposed), req.note,
+                        time.time(), json.dumps(r), mid))  # fmt: skip
+        auth.log(user, "match answered", {"request": mid, "chosen": req.chosen,
+                                          "changed": req.chosen != proposed})  # fmt: skip
+        if row["email"]:
+            c = site.read("live")["ui"]["words"]
+            lang = row["lang"] or "nl"
+            link = f"{base_url(request)}/shop/{_lang_prefix(lang)}match/{row['token']}"
+            notify(tr(c["proposal"], lang), f"{tr(c['proposal'], lang)}:\n{link}\n",
+                   to=row["email"])  # fmt: skip
+        return {"ok": True, "changed": req.chosen != proposed}
+
+    @app.get("/api/admin/learning")
+    def learning(request: Request) -> dict[str, Any]:
+        """Per match band: how many requests, how often a colleague changed the proposal, and
+        how the delivered covers fit (the customers' answers, returns)."""
+        require(request, "edit")
+        with sqlite3.connect(auth.path) as db:
+            db.row_factory = sqlite3.Row
+            reqs = [dict(x) for x in db.execute("SELECT * FROM match_requests")]
+            orders_ = [dict(x) for x in db.execute("SELECT id, status, data FROM orders")]
+            fb = {x["order_id"]: x["score"] for x in db.execute("SELECT * FROM fit_feedback")}
+        pct_of = {x["token"]: float(x["best_pct"] or 0) for x in reqs}
+        out = []
+        for lo, hi in BANDS:
+            rs = [x for x in reqs if lo <= float(x["best_pct"] or 0) < hi]
+            staff = [x for x in rs if x["chosen_by"] not in (None, "auto")]
+            os_ = []
+            for o in orders_:
+                tok = json.loads(o["data"]).get("quote", {}).get("match_token")
+                if tok in pct_of and lo <= pct_of[tok] < hi:
+                    os_.append(o)
+            scores = [fb[o["id"]] for o in os_ if o["id"] in fb]
+            out.append({
+                "band": f"{lo}–{min(hi, 100)} %", "requests": len(rs),
+                "answered_by_staff": len(staff),
+                "changed": sum(1 for x in staff if x["changed"]),
+                "custom_chosen": sum(1 for x in rs if x["chosen"] == "custom"),
+                "orders": len(os_), "fit_answers": len(scores),
+                "fit_avg": round(sum(scores) / len(scores), 2) if scores else None,
+                "returns": sum(1 for o in os_ if o["status"] == "returned"),
+            })  # fmt: skip
+        p = shop_params(auth)
+        return {"bands": out, "threshold_pct": float(p["match.threshold_pct"]),
+                "choice_pct": float(p["match.choice_pct"]),
+                "mode": str(p["match.mode"])}  # fmt: skip
+
+    # ---- the fit question after delivery -----------------------------------------------------
+    def fit_mails() -> int:
+        """Shipped orders older than fit_mail.days get one question: how does it fit?"""
+        s = settings()
+        if not s["fit_mail"].get("enabled") or not s["domain"] or not mailer.configured(auth):
+            return 0
+        days = float(s["fit_mail"].get("days") or 14)  # noqa: PLR2004 - two weeks
+        base = "https://" + str(s["domain"]).removeprefix("https://").rstrip("/")
+        sent = 0
+        with sqlite3.connect(auth.path) as db:
+            rows = db.execute(
+                "SELECT id, email, data FROM orders WHERE status='shipped' AND feedback_sent IS "
+                "NULL AND updated < ?", (time.time() - days * DAY_S,)).fetchall()  # fmt: skip
+        words = site.read("live")["ui"]["words"]
+        for oid, email, d in rows:
+            lang = json.loads(d).get("lang") or "nl"
+            token = secrets.token_urlsafe(18)
+            link = f"{base}/shop/{_lang_prefix(lang)}fit/{token}"
+            notify(tr(words["fit_title"], lang), f"{tr(words['fit_title'], lang)}\n{link}\n",
+                   to=email)  # fmt: skip
+            with sqlite3.connect(auth.path) as db:
+                db.execute("UPDATE orders SET feedback_token=?, feedback_sent=? WHERE id=?",
+                           (token, time.time(), oid))  # fmt: skip
+            sent += 1
+        return sent
+
+    def fit_loop() -> None:
+        while True:
+            try:
+                fit_mails()
+            except Exception:  # noqa: BLE001 - try again in an hour
+                pass
+            time.sleep(3600)  # noqa: PLR2004 - hourly
+
+    threading.Thread(target=fit_loop, daemon=True, name="fit-mails").start()
+    app.state.fit_mails = fit_mails
+
+    def _order_by_fit(token: str) -> tuple[int, str]:
+        with sqlite3.connect(auth.path) as db:
+            row = db.execute("SELECT id, data FROM orders WHERE feedback_token=?",
+                             (token,)).fetchone()  # fmt: skip
+        if row is None or not re.fullmatch(r"[A-Za-z0-9_-]{10,40}", token):
+            raise HTTPException(404, "no such order")
+        return int(row[0]), str(json.loads(row[1])["quote"]["quote"]["product"])
+
+    @app.get("/api/shop/fit/{token}")
+    def fit_get(token: str) -> dict[str, Any]:
+        oid, product = _order_by_fit(token)
+        with sqlite3.connect(auth.path) as db:
+            done = db.execute("SELECT 1 FROM fit_feedback WHERE order_id=?", (oid,)).fetchone()
+        return {"order": oid, "product": product, "answered": bool(done)}
+
+    @app.post("/api/shop/fit/{token}")
+    def fit_post(token: str, req: FitIn, request: Request) -> dict[str, Any]:
+        limit(request, per_minute=10)
+        oid, _ = _order_by_fit(token)
+        with sqlite3.connect(auth.path) as db:
+            db.execute("DELETE FROM fit_feedback WHERE order_id=?", (oid,))
+            db.execute("INSERT INTO fit_feedback (created, order_id, score, comment) "
+                       "VALUES (?, ?, ?, ?)",
+                       (time.time(), oid, req.score, req.comment))  # fmt: skip
+        notify(f"Fit answer, order {oid}: {req.score}/5", req.comment or "")
+        return {"ok": True}
+
+    @app.post("/api/shop/fit/{token}/photo")
+    async def fit_photo(token: str, request: Request) -> dict[str, Any]:
+        limit(request, per_minute=10)
+        oid, _ = _order_by_fit(token)
+        body = await request.body()
+        kind = {b"\xff\xd8\xff": "jpg", b"\x89PNG": "png", b"RIFF": "webp"}
+        ext = next((v for k, v in kind.items() if body.startswith(k)), None)
+        if ext is None or len(body) > PHOTO_MAX:
+            raise HTTPException(400, "a JPEG, PNG or WebP photo up to 6 MB")
+        name = f"order-{oid}.{ext}"
+        (photos / name).write_bytes(body)
+        with sqlite3.connect(auth.path) as db:
+            db.execute("UPDATE fit_feedback SET photo=? WHERE order_id=?", (name, oid))
+        return {"ok": True}
+
+    @app.get("/api/admin/feedback")
+    def feedback(request: Request) -> dict[str, Any]:
+        require(request, "edit")
+        with sqlite3.connect(auth.path) as db:
+            db.row_factory = sqlite3.Row
+            rows = [dict(x) for x in db.execute("SELECT * FROM fit_feedback ORDER BY id DESC")]
+        return {"feedback": rows}
+
+    @app.get("/api/admin/feedback/photo/{name}")
+    def feedback_photo(name: str, request: Request) -> Response:
+        require(request, "edit")
+        if not re.fullmatch(r"order-\d+\.(jpg|png|webp)", name) or not (photos / name).is_file():
+            raise HTTPException(404, "no such photo")
+        media = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}[
+            name.rsplit(".", 1)[1]
+        ]
+        return Response((photos / name).read_bytes(), media_type=media)
+
     # ---- orders (admin) and the way into production ------------------------------------------
     def produce(oid: int) -> str:
         """The paid order as a cover model, calculated to the end (then the drape follows)."""
@@ -652,6 +1110,15 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         if row[1]:
             return str(row[1])
         d = json.loads(row[0])
+        if d["quote"].get("stock"):  # an existing cover: cut from its own, tested pattern
+            model_id = str(d["quote"]["stock"]["model_id"])
+            with sqlite3.connect(auth.path) as db:
+                db.execute("UPDATE orders SET model_id=?, status='in_production', updated=? "
+                           "WHERE id=?", (model_id, time.time(), oid))  # fmt: skip
+            notify(f"Order {oid}: cut the existing cover {model_id}",
+                   f"Order {oid} is an existing cover from the range: {model_id} "
+                   f"(cut.dxf of that model).")  # fmt: skip
+            return model_id
         qd = d["quote"]["quote"]
         p = shop_params(auth)
         roll = float(p["roll.usable_width_mm"]) - 2 * float(p["stitching.allowance_mm"])
@@ -740,9 +1207,12 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         s: Site = app.state.site
         return s
 
-    def lang_of(request: Request) -> str:
-        want = request.query_params.get("lang") or request.headers.get("accept-language", "")
-        return "nl" if want.lower().startswith("nl") else "en"
+    def lang_of(request: Request, prefix: str | None) -> str:
+        langs = site_languages(auth)
+        if prefix in langs:
+            return str(prefix)
+        want = request.query_params.get("lang", "")
+        return want if want in langs else langs[0]
 
     def base(request: Request) -> str:
         s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
@@ -752,7 +1222,7 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         scheme = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
         return f"{scheme}://{host}"
 
-    def render(request: Request, page: str) -> HTMLResponse:
+    def render(request: Request, page: str, prefix: str | None = None) -> HTMLResponse:
         if not template.is_file():
             raise HTTPException(404, "the shop is not built")
         token = request.query_params.get("preview")
@@ -760,16 +1230,24 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
             token or "", auth.setting(PREVIEW_SETTING, "") or "x"
         )
         c = site().read("draft" if draft else "live")
-        lang = lang_of(request)
+        langs = site_languages(auth)
+        lang = lang_of(request, prefix)
         s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
         company = s["company"]
-        url = base(request) + "/shop/" + ("" if page == "home" else page)
-        title = c["meta"]["title"][lang]
+        tail = "" if page == "home" else page
+
+        def url_in(x: str) -> str:
+            return base(request) + "/shop/" + ("" if x == langs[0] else f"{x}/") + tail
+
+        url = url_in(lang)
+        w = c["ui"]["words"]
+        title = tr(c["meta"]["title"], lang)
         if page in ("terms", "privacy", "warranty"):
-            title = f"{page.capitalize()} · {title}"
+            name = tr(w["terms_page" if page == "terms" else page], lang)
+            title = f"{name} · {title}"
         elif page == "configure":
-            title = f"{c['hero']['cta'][lang]} · {title}"
-        desc = c["meta"]["description"][lang]
+            title = f"{tr(c['hero']['cta'], lang)} · {title}"
+        desc = tr(c["meta"]["description"], lang)
         ld: list[dict[str, Any]] = [
             {"@context": "https://schema.org", "@type": "Organization",
              "name": company["name"] or "Covers", "url": base(request) + "/shop/",
@@ -779,25 +1257,34 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
                          "addressLocality": company["city"] or None,
                          "addressCountry": company["country"] or None}},
             {"@context": "https://schema.org", "@type": "Product",
-             "name": c["hero"]["title"][lang], "description": desc,
+             "name": tr(c["hero"]["title"], lang), "description": desc,
              "brand": company["name"] or "Covers",
              "material": "Sunbrella Coverlast: polyester with an acrylic coating",
              "offers": {"@type": "AggregateOffer", "priceCurrency": "EUR",
                         "availability": "https://schema.org/MadeToOrder"}},
-            {"@context": "https://schema.org", "@type": "HowTo", "name": c["hero"]["cta"][lang],
-             "step": [{"@type": "HowToStep", "position": i + 1, "name": st["title"][lang],
-                       "text": st["text"][lang]} for i, st in enumerate(c["steps"])]},
-            {"@context": "https://schema.org", "@type": "FAQPage",
-             "mainEntity": [{"@type": "Question", "name": f["q"][lang],
-                             "acceptedAnswer": {"@type": "Answer", "text": f["a"][lang]}}
+            {"@context": "https://schema.org", "@type": "HowTo",
+             "name": tr(c["hero"]["cta"], lang), "inLanguage": lang,
+             "step": [{"@type": "HowToStep", "position": i + 1, "name": tr(st["title"], lang),
+                       "text": tr(st["text"], lang)} for i, st in enumerate(c["steps"])]},
+            {"@context": "https://schema.org", "@type": "FAQPage", "inLanguage": lang,
+             "mainEntity": [{"@type": "Question", "name": tr(f["q"], lang),
+                             "acceptedAnswer": {"@type": "Answer", "text": tr(f["a"], lang)}}
                             for f in c["faq"]]},
         ]  # fmt: skip
+        alternates = (
+            "".join(
+                f'<link rel="alternate" hreflang="{x}" href="{_esc(url_in(x))}" />\n' for x in langs
+            )
+            + f'<link rel="alternate" hreflang="x-default" href="{_esc(url_in(langs[0]))}" />\n'
+        )
         head = (
             f"<title>{_esc(title)}</title>\n"
             f'<meta name="description" content="{_esc(desc)}" />\n'
             f'<link rel="canonical" href="{_esc(url)}" />\n'
-            f'<meta property="og:title" content="{_esc(title)}" />\n'
+            + alternates
+            + f'<meta property="og:title" content="{_esc(title)}" />\n'
             f'<meta property="og:description" content="{_esc(desc)}" />\n'
+            f'<meta property="og:locale" content="{_esc(lang)}" />\n'
             f'<meta property="og:type" content="website" />\n'
             + ('<meta name="robots" content="noindex" />\n' if draft else "")
             + "".join(
@@ -808,26 +1295,34 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
             )
         )
         if page in ("terms", "privacy", "warranty"):
-            body_html = f"<h1>{_esc(page.capitalize())}</h1>" + "".join(
-                f"<p>{_esc(p)}</p>" for p in str(c["legal"][page][lang]).split("\n\n") if p
+            body_html = f"<h1>{_esc(title.split(' · ')[0])}</h1>" + "".join(
+                f"<p>{_esc(x)}</p>" for x in tr(c["legal"][page], lang).split("\n\n") if x
             )
         else:
             body_html = (
-                f"<h1>{_esc(c['hero']['title'][lang])}</h1><p>{_esc(c['hero']['subtitle'][lang])}</p>"
-                + "<h2>How it works</h2><ol>"
+                f"<h1>{_esc(tr(c['hero']['title'], lang))}</h1>"
+                f"<p>{_esc(tr(c['hero']['subtitle'], lang))}</p>"
+                f"<h2>{_esc(tr(w['how'], lang))}</h2><ol>"
                 + "".join(
-                    f"<li><h3>{_esc(st['title'][lang])}</h3><p>{_esc(st['text'][lang])}</p></li>"
+                    f"<li><h3>{_esc(tr(st['title'], lang))}</h3>"
+                    f"<p>{_esc(tr(st['text'], lang))}</p></li>"
                     for st in c["steps"]
-                )  # fmt: skip
-                + f"</ol><h2>{_esc(c['green']['title'][lang])}</h2><ul>"
-                + "".join(f"<li>{_esc(p[lang])}</li>" for p in c["green"]["points"])
-                + "</ul><h2>FAQ</h2>"
-                + "".join(
-                    f"<h3>{_esc(f['q'][lang])}</h3><p>{_esc(f['a'][lang])}</p>" for f in c["faq"]
                 )
-                + '<p><a href="/shop/configure">'
-                + _esc(c["hero"]["cta"][lang])
+                + f"</ol><h2>{_esc(tr(c['green']['title'], lang))}</h2><ul>"
+                + "".join(f"<li>{_esc(tr(x, lang))}</li>" for x in c["green"]["points"])
+                + f"</ul><h2>{_esc(tr(w['faq'], lang))}</h2>"
+                + "".join(
+                    f"<h3>{_esc(tr(f['q'], lang))}</h3><p>{_esc(tr(f['a'], lang))}</p>"
+                    for f in c["faq"]
+                )
+                + f'<p><a href="{_esc(url_in(lang).removesuffix(tail))}configure">'
+                + _esc(tr(c["hero"]["cta"], lang))
                 + "</a></p>"
+                + "<nav>"
+                + "".join(
+                    f'<a href="{_esc(url_in(x))}" hreflang="{x}">{x.upper()}</a> ' for x in langs
+                )  # fmt: skip
+                + "</nav>"
             )
         html = template.read_text(encoding="utf-8")
         html = (
@@ -844,9 +1339,16 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
 
     @app.get("/shop/{page:path}", include_in_schema=False)
     def shop_page(page: str, request: Request) -> HTMLResponse:
+        parts = page.strip("/").split("/", 1)
+        prefix = None
+        if parts[0] in site_languages(auth):
+            prefix = parts[0]
+            page = parts[1] if len(parts) > 1 else ""
         page = page.strip("/")
-        known = page in ("configure", "terms", "privacy", "warranty") or page.startswith("order/")
-        return render(request, page if known else "home")
+        known = page in ("configure", "terms", "privacy", "warranty") or page.startswith(
+            ("order/", "match/", "fit/")
+        )
+        return render(request, page if known else "home", prefix)
 
     @app.get("/api/shop/demo.glb", include_in_schema=False)
     def demo_scene() -> Response:
@@ -869,8 +1371,12 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
     @app.get("/sitemap.xml", include_in_schema=False)
     def sitemap(request: Request) -> Response:
         b = base(request)
-        urls = "".join(f"<url><loc>{b}/shop/{p}</loc></url>"
-                       for p in ("", "configure", "terms", "privacy", "warranty"))  # fmt: skip
+        langs = site_languages(auth)
+        urls = "".join(
+            f"<url><loc>{b}/shop/{'' if x == langs[0] else x + '/'}{p}</loc></url>"
+            for x in langs
+            for p in ("", "configure", "terms", "privacy", "warranty")
+        )
         xml = ('<?xml version="1.0" encoding="UTF-8"?>'
                f'<urlset xmlns="{SITEMAP_NS}">{urls}</urlset>')  # fmt: skip
         return Response(xml, media_type="application/xml")
@@ -882,12 +1388,16 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
         b = base(request)
         lines = [f"# {s['company']['name'] or 'Covers'}", "",
-                 f"> {c['meta']['description']['en']}", "",
+                 f"> {tr(c['meta']['description'], 'en')}", "",
                  "## How it works"]  # fmt: skip
-        lines += [f"- {st['title']['en']}: {st['text']['en']}" for st in c["steps"]]
-        lines += ["", "## Sustainability"] + [f"- {p['en']}" for p in c["green"]["points"]]
-        lines += ["", "## Questions"] + [f"- {f['q']['en']} {f['a']['en']}" for f in c["faq"]]
+        lines += [f"- {tr(st['title'], 'en')}: {tr(st['text'], 'en')}" for st in c["steps"]]
+        lines += ["", "## Sustainability"] + [f"- {tr(p, 'en')}" for p in c["green"]["points"]]
+        lines += ["", "## Questions"] + [
+            f"- {tr(f['q'], 'en')} {tr(f['a'], 'en')}" for f in c["faq"]
+        ]
         lines += ["", "## Pages", f"- [Design your cover]({b}/shop/configure)",
                   f"- [Terms]({b}/shop/terms)", f"- [Privacy]({b}/shop/privacy)",
-                  f"- [Warranty]({b}/shop/warranty)"]  # fmt: skip
+                  f"- [Warranty]({b}/shop/warranty)", "",
+                  "## Languages",
+                  "The shop is in " + ", ".join(site_languages(auth)) + "."]  # fmt: skip
         return PlainTextResponse("\n".join(lines) + "\n")

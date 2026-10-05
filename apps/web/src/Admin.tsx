@@ -3,7 +3,9 @@ import {
   admin,
   CustomerRequest,
   Invite,
+  LearningBand,
   MailSettings,
+  MatchRequest,
   shopAdmin,
   ShopOrder,
   User,
@@ -13,6 +15,7 @@ import {
 type Tab =
   | "users"
   | "orders"
+  | "matches"
   | "shop"
   | "website"
   | "webshop"
@@ -36,29 +39,41 @@ export function Admin() {
         </p>
       </section>
       <nav className="tabs">
-        {(["users", "mail", "sessions", "audit", "system"] as Tab[]).map(
-          (t) => (
-            <button
-              key={t}
-              className={tab === t ? "active" : ""}
-              onClick={() => setTab(t)}
-            >
+        {(
+          [
+            "users",
+            "orders",
+            "matches",
+            "shop",
+            "website",
+            "webshop",
+            "mail",
+            "sessions",
+            "audit",
+            "system",
+          ] as Tab[]
+        ).map((t) => (
+          <button
+            key={t}
+            className={tab === t ? "active" : ""}
+            onClick={() => setTab(t)}
+          >
+            {
               {
-                {
-                  users: "Users",
-                  orders: "Orders",
-                  shop: "Shop settings",
-                  website: "Website (AI)",
-                  webshop: "Requests",
-                  mail: "Mail and address",
-                  sessions: "Logged in",
-                  audit: "Audit log",
-                  system: "System",
-                }[t]
-              }
-            </button>
-          ),
-        )}
+                users: "Users",
+                orders: "Orders",
+                matches: "Matches",
+                shop: "Shop settings",
+                website: "Website (AI)",
+                webshop: "Requests",
+                mail: "Mail and address",
+                sessions: "Logged in",
+                audit: "Audit log",
+                system: "System",
+              }[t]
+            }
+          </button>
+        ))}
       </nav>
       <section className="tab">
         {tab === "users" && <Users />}
@@ -68,6 +83,7 @@ export function Admin() {
         {tab === "system" && <System />}
         {tab === "webshop" && <Webshop />}
         {tab === "orders" && <Orders />}
+        {tab === "matches" && <Matches />}
         {tab === "shop" && <ShopSettings />}
         {tab === "website" && <Website />}
       </section>
@@ -1092,7 +1108,12 @@ function ShopSettings() {
           {v.map((x, i) => field([...path, String(i)], x))}
         </fieldset>
       );
-    const numeric = path[0] === "prices" || path[path.length - 1] === "eur";
+    const last = path[path.length - 1];
+    const numeric =
+      path[0] === "prices" ||
+      last === "eur" ||
+      last === "days" ||
+      last.endsWith("_pct");
     return (
       <label key={key} className="setting">
         {path[path.length - 1]}
@@ -1270,6 +1291,27 @@ export function Website({ canPublish = true }: { canPublish?: boolean }) {
             >
               Discard the draft
             </button>
+            <button
+              disabled={busy}
+              title="DeepSeek fills in every language the shop is set to (Shop settings, languages)"
+              onClick={async () => {
+                setBusy(true);
+                setMsg("Translating…");
+                try {
+                  const r = await shopAdmin.translate();
+                  setMsg(
+                    `${r.translated} texts translated into ${r.languages.join(", ")}: check the preview, then publish.`,
+                  );
+                  load();
+                } catch (e) {
+                  setMsg(String(e));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Translate missing languages
+            </button>
           </div>
           {state.history.length > 0 && (
             <p className="muted">
@@ -1292,6 +1334,224 @@ export function Website({ canPublish = true }: { canPublish?: boolean }) {
               ))}
             </p>
           )}
+        </section>
+      )}
+    </>
+  );
+}
+
+// ADR-064: which existing cover fits a customer's sizes. In learning mode (shadow) a colleague
+// answers every request: the proposal, another cover, or custom; every change is counted below.
+function Matches() {
+  const [data, setData] = useState<{
+    requests: MatchRequest[];
+    mode: string;
+  } | null>(null);
+  const [bands, setBands] = useState<LearningBand[]>([]);
+  const [limits, setLimits] = useState("");
+  const [fits, setFits] = useState<
+    {
+      order_id: number;
+      score: number;
+      comment: string | null;
+      photo: string | null;
+    }[]
+  >([]);
+  const [msg, setMsg] = useState("");
+  const [other, setOther] = useState<Record<number, string>>({});
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  const load = useCallback(() => {
+    shopAdmin
+      .matches()
+      .then(setData)
+      .catch((e) => setMsg(String(e)));
+    shopAdmin
+      .learning()
+      .then((r) => {
+        setBands(r.bands);
+        setLimits(
+          `Existing cover from ${r.threshold_pct} %, a choice from ${r.choice_pct} %; mode: ${r.mode}.`,
+        );
+      })
+      .catch(() => undefined);
+    shopAdmin
+      .feedback()
+      .then((r) => setFits(r.feedback))
+      .catch(() => undefined);
+  }, []);
+  useEffect(load, [load]);
+  if (!data) return <p className="muted">{msg || "Loading…"}</p>;
+  const answer = async (r: MatchRequest, chosen: string) => {
+    try {
+      const a = await shopAdmin.answerMatch(r.id, chosen, notes[r.id] ?? "");
+      setMsg(
+        `Request ${r.id} answered${a.changed ? " (changed: stored as a lesson)" : ""}; the customer has been mailed.`,
+      );
+      load();
+    } catch (e) {
+      setMsg(String(e));
+    }
+  };
+  return (
+    <>
+      <section className="card">
+        <h3>Requests</h3>
+        <p className="muted">
+          {data.mode === "shadow"
+            ? "Learning mode: customers see nothing until you answer. Take the proposal, choose another cover, or custom."
+            : "Automatic: customers see the match at once; the requests are kept for learning."}{" "}
+          {limits}
+        </p>
+        {msg && <p>{msg}</p>}
+        <table className="list">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>When</th>
+              <th>Customer</th>
+              <th>Furniture (cm)</th>
+              <th>Best matches</th>
+              <th>Answer</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.requests.map((r) => (
+              <tr key={r.id}>
+                <td>{r.id}</td>
+                <td>{when(r.created)}</td>
+                <td>
+                  {r.name} {r.email && <code>{r.email}</code>} {r.lang}
+                </td>
+                <td>
+                  {r.product}: {r.result.customer_cm.join(" × ")}
+                </td>
+                <td>
+                  {r.result.matches.slice(0, 4).map((m) => (
+                    <div key={m.model_id}>
+                      <a href={`#/model/${m.model_id}`}>{m.name}</a>{" "}
+                      <b>{Math.round(m.score_pct)} %</b>{" "}
+                      <span className="muted">
+                        (
+                        {m.sizes
+                          .map(
+                            (x) =>
+                              `${x.difference_cm > 0 ? "+" : ""}${x.difference_cm}`,
+                          )
+                          .join(" / ")}
+                        )
+                      </span>
+                    </div>
+                  ))}
+                  {!r.result.matches.length && (
+                    <span className="muted">no cover of this kind</span>
+                  )}
+                </td>
+                <td>
+                  {r.status === "answered" ? (
+                    <span>
+                      {r.chosen} <span className="muted">by {r.chosen_by}</span>
+                      {r.changed ? " · changed" : ""}
+                    </span>
+                  ) : (
+                    <div className="row">
+                      {r.best_model && r.decision !== "custom" && (
+                        <button
+                          className="primary"
+                          onClick={() => answer(r, r.best_model!)}
+                        >
+                          Take {Math.round(r.best_pct ?? 0)} %
+                        </button>
+                      )}
+                      <button onClick={() => answer(r, "custom")}>
+                        Custom
+                      </button>
+                      <input
+                        placeholder="other: suns-…"
+                        value={other[r.id] ?? ""}
+                        onChange={(e) =>
+                          setOther({ ...other, [r.id]: e.target.value })
+                        }
+                      />
+                      <button
+                        disabled={!other[r.id]}
+                        onClick={() => answer(r, other[r.id])}
+                      >
+                        Choose
+                      </button>
+                      <input
+                        placeholder="note for the customer (optional)"
+                        value={notes[r.id] ?? ""}
+                        onChange={(e) =>
+                          setNotes({ ...notes, [r.id]: e.target.value })
+                        }
+                      />
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+      <section className="card">
+        <h3>What we learn</h3>
+        <p className="muted">
+          Per match band: how often a colleague changed the proposal, and how
+          the delivered covers fit (the customers' answers, 1–5) and came back.
+          When a band fits well with few changes, the threshold can move (Shop
+          settings, matching).
+        </p>
+        <table className="list">
+          <thead>
+            <tr>
+              <th>Match</th>
+              <th>Requests</th>
+              <th>Answered</th>
+              <th>Changed</th>
+              <th>Custom</th>
+              <th>Orders</th>
+              <th>Fit (1–5)</th>
+              <th>Returns</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bands.map((b) => (
+              <tr key={b.band}>
+                <td>{b.band}</td>
+                <td>{b.requests}</td>
+                <td>{b.answered_by_staff}</td>
+                <td>{b.changed}</td>
+                <td>{b.custom_chosen}</td>
+                <td>{b.orders}</td>
+                <td>
+                  {b.fit_avg ?? "—"}{" "}
+                  <span className="muted">({b.fit_answers})</span>
+                </td>
+                <td>{b.returns}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+      {fits.length > 0 && (
+        <section className="card">
+          <h3>How the covers fit (customers' answers)</h3>
+          <ul>
+            {fits.map((f) => (
+              <li key={f.order_id}>
+                Order {f.order_id}: {"★".repeat(f.score)} {f.comment}{" "}
+                {f.photo && (
+                  <a
+                    href={`/api/admin/feedback/photo/${f.photo}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    photo
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </>

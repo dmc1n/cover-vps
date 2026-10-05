@@ -279,3 +279,12 @@ ai:                              # AI advice on cover layouts (the key: DEEPSEEK
   base_url: https://api.deepseek.com
   timeout_s: 120                 # how long to wait for an answer
 
+match:                           # the customer's sizes against the covers we already make (ADR-064)
+  tight_cm: 1.25                 # to confirm (Q57): an existing cover may be this much smaller and still count as exact
+  loose_cm: 4.5                  # to confirm (Q57): and this much larger
+  tight_falloff_cm: 3.5          # smaller than that: the fit falls to 0 % over this many cm (a tight cover does not go on)
+  loose_falloff_cm: 27.5         # larger than that: falls to 0 % over this many cm (loose: more folds)
+  weights: "1.0,1.0,0.6"         # weight of length, width, height in the total
+  threshold_pct: 90              # from this match on we offer the existing cover (the owner, 2026-10-05)
+  choice_pct: 80                 # from this on the customer chooses: existing or custom; below: custom
+  mode: shadow                   # shadow: a colleague confirms every proposal first; auto: above the threshold directly

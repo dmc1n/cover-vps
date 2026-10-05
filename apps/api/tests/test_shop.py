@@ -116,3 +116,138 @@ def test_the_settings_keep_the_payment_key_secret(app: Any) -> None:
     assert again.json()["settings"]["payment"]["mollie_key"] == s["payment"]["mollie_key"]
     info = TestClient(app).get("/api/shop/info").json()
     assert info["settings"]["payment"] is True and "mollie_key" not in str(info["settings"])
+
+
+def _catalogue(app: Any) -> None:
+    import json
+
+    models = app.state.store.models if hasattr(app.state, "store") else None
+    assert models is not None
+    for mid, cat, size in (("suns-dining-table-a-240", "Tafels", (2400, 1000, 760)),
+                           ("suns-dining-table-b-200", "Tafels", (2000, 900, 750))):  # fmt: skip
+        d = models / mid
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "cover.json").write_text(json.dumps({"category": f"Shop › {cat}"}))
+        (d / "model.json").write_text(json.dumps({"size_mm": list(size)}))
+
+
+def _login(app: Any) -> TestClient:
+    admin = TestClient(app)
+    admin.post("/api/auth/login", json={"username": "rick", "password": "a-long-admin-password"})
+    return admin
+
+
+def test_the_learning_mode_a_colleague_confirms_the_match_first(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-064: in shadow mode the customer leaves an address; a colleague confirms or changes
+    the proposal; the customer then sees it; the learning page counts the change."""
+    from coverapi import mailer
+
+    sent: list[tuple[str, str]] = []
+    admin = _login(app)  # before the mail is on (it would ask for a mailed code)
+    monkeypatch.setattr(mailer, "configured", lambda auth: True)
+    monkeypatch.setattr(mailer, "send", lambda auth, to, subject, text, html=None:
+                        sent.append((to, text)))  # fmt: skip
+    _catalogue(app)
+    c = TestClient(app)
+    sizes = {"table_length_cm": 238, "table_width_cm": 100, "table_height_cm": 76}
+    assert (
+        c.post("/api/shop/match", json={"product": "dining_set", "sizes": sizes}).status_code == 400
+    )
+    r = c.post("/api/shop/match", json={"product": "dining_set", "sizes": sizes,
+                                        "email": "anna@example.com", "lang": "de"})  # fmt: skip
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "open" and "match" not in r.json()  # nothing before a person
+    token = r.json()["token"]
+    assert c.get(f"/api/shop/match/{token}").json() == {"status": "open"}
+    req = admin.get("/api/admin/matches").json()["requests"][0]
+    assert req["best_model"] == "suns-dining-table-a-240" and req["best_pct"] == 100.0
+    a = admin.put(f"/api/admin/matches/{req['id']}", json={"chosen": "suns-dining-table-b-200"})
+    assert a.json()["changed"] is True  # the colleague chose another cover: a lesson
+    assert any(to == "anna@example.com" and f"/shop/de/match/{token}" in t for to, t in sent)
+    seen = c.get(f"/api/shop/match/{token}").json()
+    assert seen["match"]["model_id"] == "suns-dining-table-b-200"
+    band = admin.get("/api/admin/learning").json()["bands"][0]
+    assert band["requests"] == 1 and band["changed"] == 1
+
+
+def test_auto_mode_answers_at_once_and_an_existing_cover_is_ordered(app: Any) -> None:
+    _catalogue(app)
+    admin = _login(app)
+    admin.put("/api/admin/shop/settings", json={"matching": {"mode": "auto"}})
+    c = TestClient(app)
+    sizes = {"table_length_cm": 239, "table_width_cm": 99, "table_height_cm": 76}
+    r = c.post("/api/shop/match", json={"product": "dining_set", "sizes": sizes}).json()
+    assert r["decision"] == "existing" and r["match"]["model_id"] == "suns-dining-table-a-240"
+    q = c.post("/api/shop/quote", json={"product": "dining_set", "sizes": sizes,
+                                        "stock_model": "suns-dining-table-a-240",
+                                        "match_token": r["token"]}).json()  # fmt: skip
+    assert q["stock"]["model_id"] == "suns-dining-table-a-240"
+    own = c.post("/api/shop/quote", json={"product": "dining_set", "sizes": {
+        "table_length_cm": 240, "table_width_cm": 100, "table_height_cm": 76}}).json()  # fmt: skip
+    assert q["sizes_cm"] == own["sizes_cm"]  # priced on the existing cover's own sizes
+    order = {"quote_id": q["id"], "name": "Anna", "email": "anna@example.com",
+             "street": "Dorpsstraat 1", "postcode": "1234 AB", "city": "Utrecht",
+             "country": "NL", "terms": True}  # fmt: skip
+    oid = c.post("/api/shop/order", json=order).json()["order"]
+    assert admin.post(f"/api/admin/orders/{oid}/produce").json()["model_id"] == (
+        "suns-dining-table-a-240"  # cut from its own pattern, no new model
+    )
+
+
+def test_the_shop_speaks_every_language_and_the_ai_fills_them_in(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import coverengine.ai as ai
+
+    def fake(params: Any, system: str, user: str) -> dict[str, Any]:
+        import json
+
+        texts = json.loads(user)["texts"]
+        return {"texts": {k: {x: f"[{x}] {v.get('en', '')}" for x in ("de", "fr")}
+                          for k, v in texts.items()}}  # fmt: skip
+
+    monkeypatch.setattr(ai, "ask", fake)
+    admin = _login(app)
+    out = admin.post("/api/admin/cms/translate").json()
+    assert out["translated"] > 50  # the texts and the buttons, in German and French
+    admin.post("/api/admin/cms/publish")
+    c = TestClient(app)
+    html = c.get("/shop/de/").text
+    assert '<html lang="de">' in html and "[de] Your cover." in html
+    assert 'hreflang="fr"' in html and 'hreflang="x-default"' in html
+    assert "/shop/de/configure" in c.get("/sitemap.xml").text
+    words = c.get("/api/shop/info").json()["content"]["ui"]["words"]
+    assert words["match_title"]["fr"].startswith("[fr]")
+
+
+def test_the_fit_question_after_delivery(app: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    import sqlite3
+    import time
+
+    from coverapi import mailer
+
+    sent: list[str] = []
+    admin = _login(app)
+    monkeypatch.setattr(mailer, "configured", lambda auth: True)
+    monkeypatch.setattr(mailer, "send", lambda auth, to, subject, text, html=None:
+                        sent.append(text))  # fmt: skip
+    settings = {"domain": "shop.example.com", "fit_mail": {"enabled": True, "days": 14}}
+    admin.put("/api/admin/shop/settings", json=settings)
+    c = TestClient(app)
+    q = c.post("/api/shop/quote", json={"product": "item", "sizes": {}}).json()
+    order = {"quote_id": q["id"], "name": "Anna", "email": "anna@example.com",
+             "street": "Dorpsstraat 1", "postcode": "1234 AB", "city": "Utrecht",
+             "country": "NL", "terms": True}  # fmt: skip
+    oid = c.post("/api/shop/order", json=order).json()["order"]
+    with sqlite3.connect(app.state.auth.path) as db:  # shipped three weeks ago
+        db.execute("UPDATE orders SET status='shipped', updated=? WHERE id=?",
+                   (time.time() - 21 * 86400, oid))  # fmt: skip
+    assert app.state.fit_mails() == 1 and app.state.fit_mails() == 0  # once only
+    token = next(t for t in sent if "/fit/" in t).split("/fit/")[1].split()[0]
+    assert c.post(f"/api/shop/fit/{token}", json={"score": 4, "comment": "past goed"}).json()["ok"]
+    photo = c.post(f"/api/shop/fit/{token}/photo", content=b"\x89PNG\r\n\x1a\n" + b"0" * 100)
+    assert photo.status_code == 200
+    fb = admin.get("/api/admin/feedback").json()["feedback"][0]
+    assert fb["score"] == 4 and fb["photo"] == f"order-{oid}.png"

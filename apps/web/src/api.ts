@@ -495,7 +495,84 @@ export const shopAdmin = {
     send("POST", `/api/admin/orders/${id}/produce`).then((r) =>
       json<{ model_id: string }>(r),
     ),
+  translate: () =>
+    send("POST", "/api/admin/cms/translate").then((r) =>
+      json<{ translated: number; texts: number; languages: string[] }>(r),
+    ),
+  matches: () =>
+    fetch("/api/admin/matches").then((r) =>
+      json<{ requests: MatchRequest[]; mode: string }>(r),
+    ),
+  answerMatch: (id: number, chosen: string, note: string) =>
+    send("PUT", `/api/admin/matches/${id}`, { chosen, note }).then((r) =>
+      json<{ changed: boolean }>(r),
+    ),
+  learning: () =>
+    fetch("/api/admin/learning").then((r) =>
+      json<{
+        bands: LearningBand[];
+        threshold_pct: number;
+        choice_pct: number;
+        mode: string;
+      }>(r),
+    ),
+  feedback: () =>
+    fetch("/api/admin/feedback").then((r) =>
+      json<{ feedback: FitFeedback[] }>(r),
+    ),
 };
+
+// ADR-064: a customer's sizes against our range, a colleague's answer, and what we learn.
+export interface MatchCandidate {
+  model_id: string;
+  name: string;
+  size_cm: number[];
+  score_pct: number;
+  sizes: { size: string; difference_cm: number; verdict: string }[];
+}
+export interface MatchRequest {
+  id: number;
+  created: number;
+  email: string | null;
+  name: string | null;
+  lang: string | null;
+  product: string;
+  given: Record<string, number | boolean>;
+  result: {
+    customer_cm: number[];
+    matches: MatchCandidate[];
+    decision: string;
+    chosen_entry?: MatchCandidate;
+  };
+  best_model: string | null;
+  best_pct: number | null;
+  decision: string;
+  mode: string;
+  status: string;
+  chosen: string | null;
+  chosen_by: string | null;
+  changed: number | null;
+  note: string | null;
+}
+export interface LearningBand {
+  band: string;
+  requests: number;
+  answered_by_staff: number;
+  changed: number;
+  custom_chosen: number;
+  orders: number;
+  fit_answers: number;
+  fit_avg: number | null;
+  returns: number;
+}
+export interface FitFeedback {
+  id: number;
+  created: number;
+  order_id: number;
+  score: number;
+  comment: string | null;
+  photo: string | null;
+}
 
 export interface ShopOrder {
   id: number;
