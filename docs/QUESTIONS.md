@@ -220,4 +220,5 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
 63. **SUNS names on the other website:** the match shows covers from the SUNS range by name
     ("SUNS 2 Seater Evora alu fits you for 100 %"). Keep the names, show them as "our model
     for …", or show only the sizes?
+    **Answered (owner, 5 Oct 2026): the SUNS names may be shown on the website.**
 
