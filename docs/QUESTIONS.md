@@ -206,5 +206,11 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
 58. **Off-the-shelf covers:** which of the 302 are sold as they are, at what price, and with
     what delivery time against custom?
 59. **The shop's domain on Cloudflare** (DNS) and an API token for Pages, Workers, KV and R2.
+    Found on 5 Oct: suns.nu's DNS is at Bunny (coco/kiki.bunny.net), registered at my.host;
+    only covers.suns.nu is visible (no website or mail on suns.nu itself). Choose:
+    (a) move suns.nu's name servers to Cloudflare (first export every record from Bunny DNS);
+    (b) a separate shop domain, fully on Cloudflare;
+    (c) stay on Bunny (Bunny also has a CDN and edge scripts).
+    The shop's name and domain (question 53) decide which.
 60. **GPU on demand:** Modal or RunPod, and a monthly cap (e.g. €50)?
 61. **The fit question** by mail two weeks after delivery, with an optional photo: OK?
