@@ -495,6 +495,10 @@ export const shopAdmin = {
     send("POST", `/api/admin/orders/${id}/produce`).then((r) =>
       json<{ model_id: string }>(r),
     ),
+  linkKey: () =>
+    send("POST", "/api/admin/shop/link-key").then((r) =>
+      json<{ key: string; note: string }>(r),
+    ),
   translate: () =>
     send("POST", "/api/admin/cms/translate").then((r) =>
       json<{ translated: number; texts: number; languages: string[] }>(r),

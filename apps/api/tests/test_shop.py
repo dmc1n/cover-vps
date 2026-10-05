@@ -263,3 +263,25 @@ def test_the_film_is_served_with_byte_ranges(app: Any) -> None:
     assert r.status_code == 206 and len(r.content) == 100
     assert c.get("/media/../app.db").status_code == 404
     assert c.get("/media/other.exe").status_code == 404
+
+
+def test_the_website_reaches_the_studio_with_its_key_and_the_public_does_not(app: Any) -> None:
+    """ADR-066: the website (its own domain, a Cloudflare Worker) uses the studio's shop with a
+    key; with the link closed, the public is sent to the website and the API refuses them."""
+    admin = _login(app)
+    key = admin.post("/api/admin/shop/link-key").json()["key"]
+    admin.put("/api/admin/shop/settings",
+              json={"domain": "hoezen.example", "website_link": {"closed": True}})  # fmt: skip
+    public = TestClient(app)
+    r = public.get("/shop/de/configure", follow_redirects=False)
+    assert r.status_code == 301 and r.headers["location"] == "https://hoezen.example/de/configure"
+    assert public.post("/api/shop/quote", json={"product": "item"}).status_code == 403
+    assert "Disallow: /" in public.get("/robots.txt").text
+    site = TestClient(app, headers={"x-link-key": key, "x-client-ip": "203.0.113.9"})
+    html = site.get("/shop/de/").text
+    assert 'rel="canonical" href="https://hoezen.example/de/"' in html
+    assert site.post("/api/shop/quote", json={"product": "item"}).status_code == 200
+    assert "https://hoezen.example/configure" in site.get("/sitemap.xml").text
+    wrong = TestClient(app, headers={"x-link-key": "not-the-key"})
+    assert wrong.post("/api/shop/quote", json={"product": "item"}).status_code == 403
+    assert admin.get("/shop/?preview=x").status_code == 200  # colleagues still see the preview

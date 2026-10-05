@@ -214,3 +214,10 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     The shop's name and domain (question 53) decide which.
 60. **GPU on demand:** Modal or RunPod, and a monthly cap (e.g. €50)?
 61. **The fit question** by mail two weeks after delivery, with an optional photo: OK?
+62. **The website's brand name and domain** (ADR-066): the website is another brand on its own
+    domain, on Cloudflare. Which name and domain, and is there a Cloudflare account? I need an
+    API token with Workers (edit) for that account, and the domain added as a zone.
+63. **SUNS names on the other website:** the match shows covers from the SUNS range by name
+    ("SUNS 2 Seater Evora alu fits you for 100 %"). Keep the names, show them as "our model
+    for …", or show only the sizes?
+

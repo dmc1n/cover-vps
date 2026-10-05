@@ -41,6 +41,7 @@ interface Info {
     payment: boolean;
     film_url: string;
     film_poster: string;
+    logo_url: string;
     colours: string[];
     indicative: boolean;
     languages: string[];
@@ -108,6 +109,9 @@ const SWATCH: Record<string, string> = {
   black: "#1f1f1f",
   sand: "#c8b593",
 };
+// On the website (its own domain, ADR-066) the shop is the whole site; on the studio it lives
+// under /shop/ (the colleagues' preview).
+const ROOT = window.location.pathname.startsWith("/shop") ? "/shop/" : "/";
 const euro = (n: number, lang: string) =>
   new Intl.NumberFormat(lang, { style: "currency", currency: "EUR" }).format(n);
 
@@ -136,7 +140,7 @@ function makeTx(info: Info, lang: string): Tx {
     status: (key) => t(ui.status[key]) || key,
     field: (key) => t(ui.field[key]) || key,
     product: (key) => t(ui.product[key]) || key,
-    href: (page) => `/shop/${lang === first ? "" : `${lang}/`}${page}`,
+    href: (page) => `${ROOT}${lang === first ? "" : `${lang}/`}${page}`,
   };
 }
 
@@ -176,7 +180,7 @@ function Header({ info, tx, page }: { info: Info; tx: Tx; page: string }) {
   return (
     <header className="s-head">
       <a href={tx.href("")} className="s-logo">
-        <img src="/brand/s2dio-mark.svg" alt="" />{" "}
+        {info.settings.logo_url && <img src={info.settings.logo_url} alt="" />}{" "}
         {info.settings.company.name || "Covers"}
       </a>
       <nav>
@@ -198,7 +202,7 @@ function Header({ info, tx, page }: { info: Info; tx: Tx; page: string }) {
                 /* no storage */
               }
               const first = langs[0];
-              window.location.href = `/shop/${l === first ? "" : `${l}/`}${page}${window.location.search}`;
+              window.location.href = `${ROOT}${l === first ? "" : `${l}/`}${page}${window.location.search}`;
             }}
           >
             {langs.map((l) => (
@@ -985,7 +989,7 @@ function App() {
   const langs = useMemo(() => info?.settings.languages ?? ["nl"], [info]);
   const parts = window.location.pathname
     .replace(/\/+$/, "")
-    .replace(/^\/shop\/?/, "")
+    .replace(ROOT === "/shop/" ? /^\/shop\/?/ : /^\//, "")
     .split("/");
   const prefixed = langs.includes(parts[0]) && parts[0] !== langs[0];
   const lang = prefixed ? parts[0] : langs[0];
@@ -1002,7 +1006,7 @@ function App() {
     want = want || navigator.language.slice(0, 2).toLowerCase();
     if (want !== langs[0] && langs.includes(want))
       window.location.replace(
-        `/shop/${want}/${page}${window.location.search}${window.location.hash}`,
+        `${ROOT}${want}/${page}${window.location.search}${window.location.hash}`,
       );
   }, [info, prefixed, langs, page]);
   const tx = useMemo(() => (info ? makeTx(info, lang) : null), [info, lang]);

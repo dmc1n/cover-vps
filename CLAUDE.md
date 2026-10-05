@@ -100,6 +100,7 @@ engine/schemas/           JSON schemas: CoverDefinition, PatternSet, FabricProfi
 config/defaults.yaml      every default parameter, commented; the only place numbers are set
 apps/api/                 FastAPI app, SQLite migrations, job runner, Dockerfile
 apps/web/                 React app
+apps/site/                the website on its own domain: a Cloudflare Worker in front of the studio (ADR-066)
 deploy/                   docker-compose.yml, reverse proxy config, cloudflared, backup scripts
 testdata/                 models/ (owner samples, git-ignored) fabrics/ golden/ generated/ machine/,
                           shapes.yaml, generate.py
@@ -220,6 +221,7 @@ scripts/release.sh v1.2.3 "what is new"     test, tag, build ~/releases/v1.2.3 a
 scripts/rollback.sh [v1.2.3 | --list]       back to the release before (or a chosen one) in seconds
 sudo systemctl restart cover-web            the app as a service (runs ~/releases/current); Caddy serves https://covers.suns.nu
 make backup     push the data directory to R2 with rclone
+cd apps/site && npm run dev | npm run deploy   the website's Worker, locally or to Cloudflare (ADR-066)
 ```
 
 ## How to work in this repo (instructions for Claude Code)

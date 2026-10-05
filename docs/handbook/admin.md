@@ -161,3 +161,20 @@ Three tabs on the admin page belong to it.
   preview (switch the language at the top right), then **Publish**.
 - Every text, buttons included, can be changed by an instruction in the command line, in all
   languages at once.
+
+## The website on its own domain (Cloudflare)
+
+The website is a different brand on its own domain. It shows the shop, and everything about
+covers comes from this studio (ADR-066).
+
+1. **Shop settings:** set `domain` to the website's domain (for example `example.com`) and,
+   optionally, `logo_url`.
+2. **Admin, Shop settings:** make the website key (*New website key*, or
+   `POST /api/admin/shop/link-key`). It is shown once.
+3. **On the server, in `apps/site/`:**
+   - `npx wrangler login` (or set `CLOUDFLARE_API_TOKEN`);
+   - `npx wrangler secret put LINK_KEY` and paste the key;
+   - in `wrangler.toml`, the `routes` line with the domain;
+   - then `npm run deploy` (after `make web-build`).
+4. **Check the website.** Then set `website_link.closed` on: the studio's `/shop/` is then
+   only a preview for colleagues, and visitors go to the website.

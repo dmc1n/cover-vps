@@ -72,6 +72,7 @@ SHOP_DEFAULTS: dict[str, Any] = {
     "colours": "",
     "film_url": "",
     "film_poster": "",
+    "logo_url": "",
     "notify_email": "",
     "languages": "nl,en,de,fr",
     "matching": {
@@ -81,7 +82,12 @@ SHOP_DEFAULTS: dict[str, Any] = {
         "stock_discount_pct": None,
     },  # fmt: skip
     "fit_mail": {"enabled": False, "days": 14},
+    # ADR-066: the website runs elsewhere (its own domain, on Cloudflare) and reaches this
+    # server through a key; closed: the shop here answers only the website and colleagues
+    "website_link": {"closed": False},
 }
+LINK_SETTING = "shop_link_key"  # the website's key, hashed
+LINK_HEADER = "x-link-key"
 UI_JSON = Path(__file__).resolve().parents[3] / "config" / "shop_ui.json"
 LANG_NAMES = {"nl": "Dutch", "en": "English", "de": "German (informal du)",
               "fr": "French (vous)", "es": "Spanish", "it": "Italian", "da": "Danish",
@@ -217,6 +223,28 @@ def tr(t: Any, lang: str) -> str:
     if not isinstance(t, dict):
         return str(t or "")
     return str(t.get(lang) or t.get("en") or t.get("nl") or "")
+
+
+def link_ok(auth: Any, request: Request) -> bool:
+    """The request came through the website's own server (the Cloudflare Worker) with its key."""
+    import hashlib
+
+    key = request.headers.get(LINK_HEADER, "")
+    stored = auth.setting(LINK_SETTING, "") or ""
+    return bool(key and stored) and secrets.compare_digest(
+        hashlib.sha256(key.encode()).hexdigest(), str(stored)
+    )
+
+
+def shop_root(auth: Any, request: Request) -> str:
+    """Where customers find the shop: the website's own domain ("https://example.com/") once
+    it is set, otherwise this server's /shop/."""
+    s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
+    if s["domain"]:
+        return "https://" + str(s["domain"]).removeprefix("https://").strip("/") + "/"
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    scheme = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
+    return f"{scheme}://{host}/shop/"
 
 
 def site_languages(auth: Any) -> list[str]:
@@ -550,6 +578,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
 
     def limit(request: Request, per_minute: int = 40) -> None:
         a, now = _address(request), time.time()
+        if link_ok(auth, request):  # through the website: its visitor's own address
+            a = request.headers.get("x-client-ip") or a
         times = [t for t in recent.get(a, []) if now - t < 60]  # noqa: PLR2004 - a minute
         if len(times) >= per_minute:
             raise HTTPException(429, "too many requests; try again in a minute")
@@ -567,6 +597,43 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             except Exception:  # noqa: BLE001 - a mail must never stop an order
                 pass
 
+    # ---- the website's link (ADR-066) --------------------------------------------------------
+    from coverapi.security import SESSION_COOKIE
+
+    def staff(request: Request) -> bool:
+        return auth.session_user(request.cookies.get(SESSION_COOKIE)) is not None
+
+    @app.middleware("http")
+    async def website_gate(request: Request, call_next: Any) -> Any:
+        """With the link closed, the shop on this server answers only the website (its key)
+        and logged-in colleagues (the preview); visitors are sent to the website."""
+        from fastapi.responses import JSONResponse, RedirectResponse
+
+        path = request.url.path
+        shop_path = path.startswith(("/api/shop/", "/media/", "/shop")) or path in (
+            "/sitemap.xml", "/llms.txt")  # fmt: skip
+        if shop_path and settings()["website_link"].get("closed"):
+            if not link_ok(auth, request) and not staff(request):
+                root = shop_root(auth, request)
+                on_website = root.startswith("https://") and "/shop/" not in root
+                if path.startswith("/shop") and on_website:
+                    rest = path.removeprefix("/shop").lstrip("/")
+                    q = f"?{request.url.query}" if request.url.query else ""
+                    return RedirectResponse(root + rest + q, status_code=301)
+                return JSONResponse({"detail": f"the shop is at {root}"}, status_code=403)
+        return await call_next(request)
+
+    @app.post("/api/admin/shop/link-key")
+    def new_link_key(request: Request) -> dict[str, Any]:
+        """A new key for the website's Worker (shown once; the old one stops working)."""
+        import hashlib
+
+        admin = require(request, "admin")
+        key = secrets.token_urlsafe(32)
+        auth.set_setting(LINK_SETTING, hashlib.sha256(key.encode()).hexdigest())
+        auth.log(admin, "website link key", {"new": True})
+        return {"key": key, "note": "set it in the Worker: wrangler secret put LINK_KEY"}
+
     # ---- settings (admin) -------------------------------------------------------------------
     @app.get("/api/admin/shop/settings")
     def get_settings(request: Request) -> dict[str, Any]:
@@ -577,7 +644,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         missing = [k for k, v in s["company"].items() if not v] + [
             k for k, v in s["prices"].items() if v in (None, "")
         ]  # fmt: skip
-        return {"settings": s, "missing": missing, "defaults": SHOP_DEFAULTS}
+        return {"settings": s, "missing": missing, "defaults": SHOP_DEFAULTS,
+                "link_key_set": bool(auth.setting(LINK_SETTING, ""))}  # fmt: skip
 
     @app.put("/api/admin/shop/settings")
     async def put_settings(request: Request) -> dict[str, Any]:
@@ -659,6 +727,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             "payment": bool(s["payment"].get("mollie_key")),
             "film_url": s["film_url"],
             "film_poster": s["film_poster"],
+            "logo_url": s["logo_url"],
             "colours": q.colours(p),
             "products": s["products"],
             "indicative": bool(p["quote.prices_are_placeholders"]),
@@ -754,14 +823,6 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             doc: dict[str, Any] = json.loads(r.read())
             return doc
 
-    def base_url(request: Request) -> str:
-        s = settings()
-        if s["domain"]:
-            return "https://" + s["domain"].removeprefix("https://").rstrip("/")
-        host = request.headers.get("x-forwarded-host") or request.headers.get("host")
-        scheme = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
-        return f"{scheme}://{host}"
-
     @app.post("/api/shop/order")
     def shop_order(req: OrderIn, request: Request) -> dict[str, Any]:
         limit(request, per_minute=10)
@@ -790,7 +851,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                 (time.time(), token, req.email.strip(), json.dumps(data), total, time.time()),
             )
             oid = cur.lastrowid
-        status_url = f"{base_url(request)}/shop/order/{token}"
+        status_url = f"{shop_root(auth, request)}order/{token}"
+        hook = shop_root(auth, request).removesuffix("shop/") + "api/shop/mollie"
         checkout = None
         if settings()["payment"].get("mollie_key"):
             try:
@@ -798,7 +860,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                     "amount": {"currency": "EUR", "value": f"{total:.2f}"},
                     "description": f"Cover order {oid}",
                     "redirectUrl": status_url,
-                    "webhookUrl": f"{base_url(request)}/api/shop/mollie",
+                    "webhookUrl": hook,
                     "metadata": {"order": oid},
                 })  # fmt: skip
                 checkout = pay["_links"]["checkout"]["href"]
@@ -958,7 +1020,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         if row["email"]:
             c = site.read("live")["ui"]["words"]
             lang = row["lang"] or "nl"
-            link = f"{base_url(request)}/shop/{_lang_prefix(lang)}match/{row['token']}"
+            link = f"{shop_root(auth, request)}{_lang_prefix(lang)}match/{row['token']}"
             notify(tr(c["proposal"], lang), f"{tr(c['proposal'], lang)}:\n{link}\n",
                    to=row["email"])  # fmt: skip
         return {"ok": True, "changed": req.chosen != proposed}
@@ -1005,7 +1067,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         if not s["fit_mail"].get("enabled") or not s["domain"] or not mailer.configured(auth):
             return 0
         days = float(s["fit_mail"].get("days") or 14)  # noqa: PLR2004 - two weeks
-        base = "https://" + str(s["domain"]).removeprefix("https://").rstrip("/")
+        base = "https://" + str(s["domain"]).removeprefix("https://").strip("/")
         sent = 0
         with sqlite3.connect(auth.path) as db:
             rows = db.execute(
@@ -1015,7 +1077,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         for oid, email, d in rows:
             lang = json.loads(d).get("lang") or "nl"
             token = secrets.token_urlsafe(18)
-            link = f"{base}/shop/{_lang_prefix(lang)}fit/{token}"
+            link = f"{base}/{_lang_prefix(lang)}fit/{token}"
             notify(tr(words["fit_title"], lang), f"{tr(words['fit_title'], lang)}\n{link}\n",
                    to=email)  # fmt: skip
             with sqlite3.connect(auth.path) as db:
@@ -1178,7 +1240,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                      "cancelled": "is geannuleerd / is cancelled"}  # fmt: skip
             if status in words:
                 notify(f"Je hoes {words[status]}", f"Bestelling / order {oid}: {words[status]}.\n"
-                       f"{base_url(request)}/shop/order/{row[1]}\n", to=row[0])  # fmt: skip
+                       f"{shop_root(auth, request)}order/{row[1]}\n", to=row[0])  # fmt: skip
         return {"ok": True}
 
     @app.post("/api/admin/orders/{oid}/produce")
@@ -1239,7 +1301,7 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         tail = "" if page == "home" else page
 
         def url_in(x: str) -> str:
-            return base(request) + "/shop/" + ("" if x == langs[0] else f"{x}/") + tail
+            return shop_root(auth, request) + ("" if x == langs[0] else f"{x}/") + tail
 
         url = url_in(lang)
         w = c["ui"]["words"]
@@ -1252,7 +1314,7 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         desc = tr(c["meta"]["description"], lang)
         ld: list[dict[str, Any]] = [
             {"@context": "https://schema.org", "@type": "Organization",
-             "name": company["name"] or "Covers", "url": base(request) + "/shop/",
+             "name": company["name"] or "Covers", "url": shop_root(auth, request),
              "email": company["email"] or None, "telephone": company["phone"] or None,
              "address": {"@type": "PostalAddress", "streetAddress": company["street"] or None,
                          "postalCode": company["postcode"] or None,
@@ -1379,6 +1441,14 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
 
     @app.get("/robots.txt", include_in_schema=False)
     def robots(request: Request) -> PlainTextResponse:
+        s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
+        if s["website_link"].get("closed") and not link_ok(auth, request):
+            return PlainTextResponse("User-agent: *\nDisallow: /\n")  # the studio itself
+        if link_ok(auth, request):  # the website: the shop is the whole site
+            return PlainTextResponse(
+                "User-agent: *\nAllow: /\nDisallow: /api/\n"
+                f"Sitemap: {shop_root(auth, request)}sitemap.xml\n"
+            )
         return PlainTextResponse(
             "User-agent: *\nAllow: /shop/\nDisallow: /api/\nDisallow: /#/\n"
             f"Sitemap: {base(request)}/sitemap.xml\n"
@@ -1386,10 +1456,10 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
 
     @app.get("/sitemap.xml", include_in_schema=False)
     def sitemap(request: Request) -> Response:
-        b = base(request)
+        root = shop_root(auth, request)
         langs = site_languages(auth)
         urls = "".join(
-            f"<url><loc>{b}/shop/{'' if x == langs[0] else x + '/'}{p}</loc></url>"
+            f"<url><loc>{root}{'' if x == langs[0] else x + '/'}{p}</loc></url>"
             for x in langs
             for p in ("", "configure", "terms", "privacy", "warranty")
         )
@@ -1402,7 +1472,7 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         """For AI assistants: what this shop is, in plain words, from the live content."""
         c = site().read("live")
         s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
-        b = base(request)
+        b = shop_root(auth, request)
         lines = [f"# {s['company']['name'] or 'Covers'}", "",
                  f"> {tr(c['meta']['description'], 'en')}", "",
                  "## How it works"]  # fmt: skip
@@ -1411,9 +1481,9 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         lines += ["", "## Questions"] + [
             f"- {tr(f['q'], 'en')} {tr(f['a'], 'en')}" for f in c["faq"]
         ]
-        lines += ["", "## Pages", f"- [Design your cover]({b}/shop/configure)",
-                  f"- [Terms]({b}/shop/terms)", f"- [Privacy]({b}/shop/privacy)",
-                  f"- [Warranty]({b}/shop/warranty)", "",
+        lines += ["", "## Pages", f"- [Design your cover]({b}configure)",
+                  f"- [Terms]({b}terms)", f"- [Privacy]({b}privacy)",
+                  f"- [Warranty]({b}warranty)", "",
                   "## Languages",
                   "The shop is in " + ", ".join(site_languages(auth)) + "."]  # fmt: skip
         return PlainTextResponse("\n".join(lines) + "\n")

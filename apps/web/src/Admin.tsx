@@ -1060,6 +1060,7 @@ function Orders() {
 // Every setting the shop needs; what is empty is listed at the top, to fill in later.
 function ShopSettings() {
   const [s, setS] = useState<Record<string, unknown> | null>(null);
+  const [linkKey, setLinkKey] = useState("");
   const [missing, setMissing] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
   useEffect(() => {
@@ -1161,6 +1162,31 @@ function ShopSettings() {
         )}
         {msg && <p className="muted">{msg}</p>}
         <button className="primary">Save</button>
+      </section>
+      <section className="card">
+        <h3>The website's key</h3>
+        <p className="muted">
+          The website on its own domain (Cloudflare) reaches this studio with a
+          key (ADR-066). A new key is shown once and stops the old one: put it
+          in the Worker with <code>npx wrangler secret put LINK_KEY</code>.
+        </p>
+        {linkKey && (
+          <p>
+            <code>{linkKey}</code>
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              setLinkKey((await shopAdmin.linkKey()).key);
+            } catch (err) {
+              setMsg(String(err));
+            }
+          }}
+        >
+          New website key
+        </button>
       </section>
       {Object.entries(s).map(([k, v]) => field([k], v))}
       <button className="primary">Save</button>

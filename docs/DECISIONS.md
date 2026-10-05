@@ -1347,3 +1347,46 @@ The owner (5 October 2026): the animation on the home page must be of lifelike q
   - **Real footage:** filmed footage of rain on a real cover, sound, and a brand edit.
   - Generative video (Veo, Sora, Runway) could add people, but it does not show our own cover
     and fit. The film stays the honest part: our simulation, rendered.
+
+## ADR-066 — Two lines: the studio stays covers.suns.nu, the website is its own brand on Cloudflare
+
+The owner (5 October 2026): "covers.suns.nu stays for the covers of SUNS; the website becomes
+a completely different story with another domain, but linked to the database of covers.suns.nu
+to check whether it fits, and so on". suns.nu itself stays at Bunny DNS.
+
+- **The studio** (covers.suns.nu, this server) stays the one place for the covers. It holds:
+  - the catalogue and the match;
+  - the prices and the rain check;
+  - the 3D scenes;
+  - orders, Mollie and production;
+  - the AI CMS and the content in every language.
+- **The website** (`apps/site/`) is a Cloudflare Worker on its own domain.
+  - It serves the shop's own build files (`/assets/`, `/brand/`). The studio app is never part
+    of it.
+  - Every page and every API call goes to the studio with the website's key (`x-link-key`),
+    plus the visitor's address (`x-client-ip`) for the rate limits.
+  - Pages, the feeds, the demo 3D and the film are cached at the edge (60 s; the media a day).
+    Quotes, matches and orders always go through to the studio.
+  - The studio's session cookies never pass in either direction.
+- **On the studio.**
+  - `domain` (Shop settings) is now the website's domain, and the shop is its whole site
+    (`https://<domain>/`, `/de/` and so on). Canonical links, hreflang, the sitemap, llms.txt,
+    the links in mails and Mollie's addresses all point there.
+  - **Website link** (Shop settings, `website_link.closed`). When closed, the shop on the studio
+    answers only the website (its key) and logged-in colleagues (the preview). Visitors of
+    `/shop/…` are sent with a 301 to the website; the API refuses them (403); `robots.txt`
+    disallows the studio.
+  - The key is made on the admin page (`POST /api/admin/shop/link-key`) and is shown once. Only
+    its hash is stored. A new key stops the old one.
+  - The logo is a setting (`logo_url`), since the website is another brand.
+- **Why a Worker in front, and not a copy of the shop on Cloudflare:** one source of truth.
+  - The engine (Python, compiled geometry) cannot run at the edge.
+  - The studio already renders the pages with their content for search engines.
+  - The edge cache takes the load of a busy day.
+  - D1/KV copies of the content or orders would have to be kept in step. That is needed only
+    if the studio is ever down for long, and it can follow then.
+- **Tested end to end on this machine** (`wrangler dev --local` against a studio copy on port
+  8091):
+  - the website's pages in four languages, with the right canonical and hreflang;
+  - the API through the key, and the match in the German configurator;
+  - the studio's `/shop/` redirected, its API refused, the studio app not reachable.
