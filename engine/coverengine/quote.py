@@ -385,6 +385,8 @@ __all__ = ["PRODUCTS", "options", "proposal", "preview_glb", "nearest", "new_id"
 # ---- the rain check and the upsell (ADR-062) ----------------------------------------------------
 
 SUPPORTS = ("none", "balloons", "frame")
+BALLOON_RGBA = (236, 238, 240, 255)  # param-ok: display colour of the balloons
+SHOP_SUPPORTS = ("none", "balloons")  # what the shop offers now (the frame is off for now)
 
 
 def full_sizes(product: str, given: dict[str, Any]) -> dict[str, Any]:
@@ -488,18 +490,60 @@ def _roof(L: float, W: float, H: float, rise: float, reach: float, hip: bool) ->
     return _join([top, walls])
 
 
+def under_cover(product: str, given: dict[str, Any], params: EffectiveParams) -> trimesh.Trimesh:
+    """The customer's furniture as it stands under the cover: a table set's chairs pushed in,
+    inside the cover that was made wider for them (the owner, 5 Oct 2026)."""
+    from coverengine import furniture
+
+    full = full_sizes(product, given)
+    if product in ("dining_set", "round_set") and full.get("chairs"):
+        shape, sizes, _ = _sizes(product, given, params)
+        room = _p(params, "hull.chair_room_mm") / MM_PER_CM + _p(params, "quote.ease_cm")
+        return furniture.build(product, full, room_cm=room, top_cm=float(sizes["height_cm"]))
+    return furniture.build(product, full)
+
+
+def balloons_mesh(product: str, given: dict[str, Any], params: EffectiveParams
+                  ) -> trimesh.Trimesh | None:  # fmt: skip
+    """The balloons under the cover, where `cover_mesh` lifts it: resting on the table top and
+    touching the top of the roof (a table set only)."""
+    shape, sizes, facts = _sizes(product, given, params)
+    full = full_sizes(product, given)
+    if "table_height_cm" not in full or shape not in ("box", "round"):
+        return None
+    table = float(full["table_height_cm"]) * MM_PER_CM
+    rise = _p(params, "quote.balloon_rise_cm") * MM_PER_CM
+    top = float(sizes["height_cm"]) * MM_PER_CM + rise
+    r = max((top - table) / 2, 1.0)
+    if shape == "round":
+        xs = [0.0]
+    else:
+        L = float(sizes["length_cm"]) * MM_PER_CM
+        n_roof = max(2, int(facts.get("balloons") or 1))
+        reach = (L / 2) * (1 - 1 / n_roof)
+        n = max(1, int(facts.get("balloons") or 1))
+        xs = [0.0] if n == 1 else [float(x) for x in np.linspace(-reach, reach, n)]
+    balls = []
+    for x in xs:
+        b = trimesh.creation.icosphere(subdivisions=3, radius=r)
+        b.apply_translation((x, 0.0, table + r))
+        balls.append(b)
+    return _join(balls)
+
+
 def rain_check(product: str, given: dict[str, Any], params: EffectiveParams) -> dict[str, Any]:
     """Where rain stays on the proposed cover without support, with balloons and with a frame,
     and what the shop advises (the upsell). Box covers only; the other shapes are checked
     as they are."""
     import tempfile
 
-    from coverengine import furniture, rain
+    from coverengine import rain
     from coverengine.io.model_io import glb_bytes
 
     shape, sizes, facts = _sizes(product, given, params)
-    under = furniture.build(product, full_sizes(product, given))
-    options = SUPPORTS if shape in ("box", "round") else ("none",)
+    under = under_cover(product, given, params)
+    # the frame is off the shop for now (the owner, 5 Oct 2026): no balloons or nothing
+    options = SHOP_SUPPORTS if shape in ("box", "round") else ("none",)
     out: dict[str, Any] = {}
     for support in options:
         cover = cover_mesh(product, given, params, support)
@@ -534,7 +578,7 @@ def rain_check(product: str, given: dict[str, Any], params: EffectiveParams) -> 
                       "why": f"without support {out['none']['flat_m2']} m2 of the top is flat: "
                              "water stays. "
                              f"With {n} balloon(s) under the cover it runs off."}  # fmt: skip
-        elif out["frame"]["dry"]:
+        elif "frame" in out and out["frame"]["dry"]:
             advice = {"support": "frame", "count": 1,
                       "price_eur": round(_p(params, "quote.frame_eur")
                                          * (1 + _p(params, "quote.markup_pct") / PERCENT)
@@ -546,14 +590,18 @@ def rain_check(product: str, given: dict[str, Any], params: EffectiveParams) -> 
 def scene_glb(product: str, given: dict[str, Any], params: EffectiveParams, support: str = "none",
               colour_rgb: tuple[int, int, int] | None = None) -> bytes:  # fmt: skip
     """The furniture and the cover over it, for the shop's configurator."""
-    from coverengine import furniture
     from coverengine.hull.build import _coloured
     from coverengine.io.model_io import glb_bytes
 
     cover = cover_mesh(product, given, params, support)
-    under = furniture.build(product, full_sizes(product, given))
+    under = under_cover(product, given, params)
     rgb = colour_rgb or (80, 84, 74)  # param-ok: charcoal-ish
-    return glb_bytes([
+    parts = [
         ("furniture", _coloured(under, (182, 160, 128, 255))),  # param-ok: wood display colour
         ("cover", _coloured(cover, (*rgb, 255))),
-    ])  # fmt: skip
+    ]  # fmt: skip
+    if support == "balloons":
+        balls = balloons_mesh(product, given, params)
+        if balls is not None:
+            parts.insert(1, ("balloons", _coloured(balls, BALLOON_RGBA)))
+    return glb_bytes(parts)

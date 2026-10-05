@@ -5,6 +5,7 @@ out (Z up, on the ground, centred on x and y like the cover from `drawn.scene`).
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import trimesh
@@ -30,6 +31,8 @@ LOUNGER_BACK_CM = 52.0  # param-ok: display: the raised back of a lounger
 HALF = 0.5  # param-ok: the middle of a place
 CHAIR_BACK_THICK_CM = 4.5  # param-ok: display
 CHAIR_GAP_CM = 4.5  # param-ok: display
+CHAIR_SPACE_CM = 14.0  # param-ok: display: room between two chairs
+CHAIR_MARGIN_CM = 3.0  # param-ok: display: a pushed-in chair stays this far inside the cover
 
 
 def _box(x0: float, y0: float, z0: float, x1: float, y1: float, z1: float) -> trimesh.Trimesh:
@@ -38,8 +41,51 @@ def _box(x0: float, y0: float, z0: float, x1: float, y1: float, z1: float) -> tr
     return b
 
 
-def build(product: str, v: dict[str, Any]) -> trimesh.Trimesh:
-    """The furniture as one mesh (mm), centred on the origin in plan."""
+def _chair(back_y: float, back_h: float) -> list[trimesh.Trimesh]:
+    """One dining chair pushed in, in cm: its back's outer face at y = back_y (> 0), the seat
+    reaching in towards -y (under the table), centred on x = 0."""
+    seat = _box(-SEAT_W_CM / 2, back_y - SEAT_D_CM, 0, SEAT_W_CM / 2, back_y, SEAT_H_CM)
+    back = _box(-SEAT_W_CM / 2, back_y - CHAIR_BACK_THICK_CM, SEAT_H_CM, SEAT_W_CM / 2, back_y,
+                back_h)  # fmt: skip
+    return [seat, back]
+
+
+def _chairs_under(product: str, lx: float, wy: float, room_cm: float, top_cm: float
+                  ) -> list[trimesh.Trimesh]:  # fmt: skip
+    """The chairs pushed in under the table, all inside the cover: the cover reaches `room_cm`
+    beyond the table top and is `top_cm` high (the owner: the cover is made wider so the
+    chairs fit underneath)."""
+    back_y = room_cm - CHAIR_MARGIN_CM  # the back's outer face, from the table's edge
+    back_h = min(CHAIR_BACK_CM, top_cm - CHAIR_MARGIN_CM)
+    out: list[trimesh.Trimesh] = []
+    if product == "round_set":  # round the table, facing its centre
+        n = max(2, int(2 * math.pi * lx // (SEAT_W_CM + CHAIR_SPACE_CM)))
+        # the back's outer corners, not only its middle, stay inside the round cover
+        reach = math.sqrt(max((lx + back_y) ** 2 - (SEAT_W_CM / 2) ** 2, 0.0))
+        for i in range(n):
+            a = 2 * math.pi * i / n
+            for m in _chair(reach, back_h):
+                m.apply_transform(trimesh.transformations.rotation_matrix(a - math.pi / 2,
+                                                                          (0, 0, 1)))  # fmt: skip
+                out.append(m)
+        return out
+    n = max(1, int(2 * lx // (SEAT_W_CM + CHAIR_SPACE_CM)))
+    xs = [-lx + (i + HALF) * 2 * lx / n for i in range(n)]
+    for sy in (-1, 1):
+        for x in xs:
+            for m in _chair(wy + back_y, back_h):
+                if sy < 0:
+                    m.apply_transform(trimesh.transformations.rotation_matrix(math.pi, (0, 0, 1)))
+                m.apply_translation((x, 0, 0))
+                out.append(m)
+    return out
+
+
+def build(product: str, v: dict[str, Any], room_cm: float | None = None,
+          top_cm: float | None = None) -> trimesh.Trimesh:  # fmt: skip
+    """The furniture as one mesh (mm), centred on the origin in plan. For a table set with
+    chairs, `room_cm` and `top_cm` (the cover's reach beyond the table and its height) place
+    the chairs pushed in under the cover; without them they stand just pulled up."""
     cm = MM_PER_CM
     parts: list[trimesh.Trimesh] = []
     if product in ("dining_set", "round_set"):
@@ -67,8 +113,10 @@ def build(product: str, v: dict[str, Any]) -> trimesh.Trimesh:
                             h - TOP_CM,
                         ).apply_scale(cm)  # fmt: skip
                     )
-        if v.get("chairs", True):
-            n = max(1, int(2 * lx // (SEAT_W_CM + 14)))  # param-ok: chairs per long side
+        if v.get("chairs", True) and room_cm is not None and top_cm is not None:
+            parts += [m.apply_scale(cm) for m in _chairs_under(product, lx, wy, room_cm, top_cm)]
+        elif v.get("chairs", True):
+            n = max(1, int(2 * lx // (SEAT_W_CM + CHAIR_SPACE_CM)))
             xs = [-lx + (i + HALF) * 2 * lx / n for i in range(n)]
             for sy in (-1, 1):
                 for x in xs:

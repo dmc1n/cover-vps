@@ -62,6 +62,13 @@ export function Scene({
     const loader = new GLTFLoader();
     loader.load(url, (gltf) => {
       if (!alive) return;
+      const named = (o: THREE.Object3D, n: string) =>
+        o.name.includes(n) || !!o.parent?.name.includes(n);
+      // balloons under the cover: show the cover see-through so they can be seen
+      let balloons = false;
+      gltf.scene.traverse((o) => {
+        if (named(o, "balloon")) balloons = true;
+      });
       gltf.scene.traverse((o) => {
         const m = o as THREE.Mesh;
         if (!m.isMesh) return;
@@ -69,10 +76,15 @@ export function Scene({
         m.receiveShadow = true;
         const mat = m.material as THREE.MeshStandardMaterial;
         mat.side = THREE.DoubleSide;
-        if (m.name.includes("cover") || m.parent?.name.includes("cover")) {
+        if (named(m, "cover")) {
           mat.roughness = 0.9;
           mat.transparent = true;
-          mat.opacity = 0.93;
+          mat.opacity = balloons ? 0.55 : 0.93;
+          mat.depthWrite = !balloons;
+          m.renderOrder = 1;
+        } else if (named(m, "balloon")) {
+          mat.roughness = 0.35;
+          mat.metalness = 0;
         }
       });
       scene.add(gltf.scene);

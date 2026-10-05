@@ -509,7 +509,6 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [showWater, setShowWater] = useState(true);
   const [step, setStep] = useState<"design" | "checkout">("design");
   const [form, setForm] = useState({
     name: "",
@@ -576,18 +575,19 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   }, [product, sizes, colour, vents, support, stock, matchToken]);
 
   const rain = quote?.rain;
-  const water =
-    rain && showWater ? (rain.options[support]?.water ?? null) : null;
-  const overlay = useMemo(() => (water ? [water] : []), [water]);
+  // the shop offers no support or balloons; the frame is off for now (the owner, 5 Oct 2026)
+  const supports = Object.entries(rain?.options ?? {}).filter(
+    ([k]) => k !== "frame",
+  );
   return (
     <section className="s-config">
       <div className="s-config-view">
-        <Scene url={quote?.scene ?? null} overlays={overlay} />
+        <Scene url={quote?.scene ?? null} />
         {busy && <span className="s-busy">…</span>}
         {rain && (
           <div className="s-rain">
             <strong>{w("rain")}</strong>
-            {Object.entries(rain.options).map(([k, v]) => (
+            {supports.map(([k, v]) => (
               <button
                 key={k}
                 className={`s-chip ${support === k ? "on" : ""} ${v.dry ? "dry" : "wet"}`}
@@ -597,12 +597,10 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
                 {!v.dry && v.flat_m2 > 0 ? ` (${v.flat_m2} m²)` : ""}
               </button>
             ))}
-            {rain.advice && support === "none" && (
+            {rain.advice?.support === "balloons" && support === "none" && (
               <p className="s-advice">
                 💧 {w("advice_flat", { m2: rain.options.none.flat_m2 })}{" "}
-                {rain.advice.support === "balloons"
-                  ? w("advice_balloons", { n: rain.advice.count })
-                  : w("advice_frame")}{" "}
+                {w("advice_balloons", { n: rain.advice.count })}{" "}
                 <button
                   className="s-btn small"
                   onClick={() => setSupport(rain.advice!.support)}
@@ -612,14 +610,6 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
                 </button>
               </p>
             )}
-            <label className="s-check">
-              <input
-                type="checkbox"
-                checked={showWater}
-                onChange={(e) => setShowWater(e.target.checked)}
-              />{" "}
-              {w("show_water")}
-            </label>
           </div>
         )}
       </div>

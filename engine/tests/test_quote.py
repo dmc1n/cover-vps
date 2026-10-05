@@ -37,3 +37,38 @@ def test_sizes_outside_the_range_are_refused() -> None:
 
 def test_the_preview_is_a_glb() -> None:
     assert quote.preview_glb("corner_sofa", {}, PARAMS)[:4] == b"glTF"
+
+
+@pytest.mark.parametrize("product", ["dining_set", "round_set"])
+def test_pushed_in_chairs_stand_inside_the_widened_cover(product: str) -> None:
+    """The owner, 5 Oct 2026: the cover is made wider so the chairs fit underneath it."""
+    import numpy as np
+
+    given = {"chairs": True}
+    cover = quote.cover_mesh(product, given, PARAMS)
+    under = quote.under_cover(product, given, PARAMS)
+    lo, hi = cover.bounds
+    assert under.vertices[:, 2].max() < hi[2]  # the chair backs below the top
+    if product == "round_set":
+        assert np.hypot(under.vertices[:, 0], under.vertices[:, 1]).max() < hi[0]
+    else:
+        assert (under.vertices[:, :2] > lo[:2]).all() and (under.vertices[:, :2] < hi[:2]).all()
+
+
+def test_balloons_show_in_the_scene_and_touch_the_roof() -> None:
+    import trimesh
+
+    given = {"table_length_cm": 220, "chairs": True}
+    with_b = trimesh.load(
+        trimesh.util.wrap_as_stream(quote.scene_glb("dining_set", given, PARAMS, "balloons")),
+        file_type="glb",
+    )
+    without = trimesh.load(
+        trimesh.util.wrap_as_stream(quote.scene_glb("dining_set", given, PARAMS, "none")),
+        file_type="glb",
+    )
+    assert any("balloon" in n for n in with_b.geometry)
+    assert not any("balloon" in n for n in without.geometry)
+    balls = quote.balloons_mesh("dining_set", given, PARAMS)
+    roof = quote.cover_mesh("dining_set", given, PARAMS, "balloons")
+    assert balls is not None and abs(balls.bounds[1][2] - roof.bounds[1][2]) < 1.0
