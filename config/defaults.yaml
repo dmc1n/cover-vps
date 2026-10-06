@@ -259,6 +259,15 @@ drawn:
                                  # joined (owner, 5 Oct 2026, S43: "far too many panels"); a crease stays a seam
   merge_max_stretch_pct: 1.0     # ... when the joined piece still lies flat within this stretch
 
+
+spend:                           # what the AI costs, kept and guarded (owner, 6 Oct 2026; ADR-078)
+  budget_eur_month: 50           # to confirm: the month's AI budget; at 100 % paid calls stop
+  warn_pct: "50,80"              # the watchdog mails at these shares of the budget
+  hourly_spike_eur: 2.5          # ... and when one hour costs more than this
+  hard_stop: true                # refuse paid calls once the budget is used up
+  prices: "gemini-3.8-flash=0.30/2.50, gemini-3.7-flash=0.30/2.50, gemini-3.1-pro-preview=2.00/12.00, deepseek-flash=0.25/1.00, deepseek-v4-pro=0.50/2.00"
+                                 # to confirm against the bills: € per million tokens in/out
+
 pen:
   label_height_mm: 15
   tick_length_mm: 10
@@ -290,8 +299,11 @@ ai:                              # AI advice on cover layouts (the key: DEEPSEEK
   base_url: https://api.deepseek.com
   timeout_s: 120                 # how long to wait for an answer
   vision_provider: gemini        # who reads the drawings (pictures): gemini | deepseek (ADR-068)
-  vision_model: gemini-3.1-pro-preview
+  vision_model: gemini-3.8-flash # reading drawings, comparing references: the cheap Flash model
+                                 # (owner, 6 Oct 2026; was gemini-3.1-pro-preview; ADR-077)
   vision_base_url: https://generativelanguage.googleapis.com/v1beta/openai
+  check_model: gemini-3.8-flash  # the picture check of a built cover (ADR-072): same verdicts as
+                                 # the Pro model on S47/S44, about 10x cheaper and faster (owner, 6 Oct 2026)
 
 match:                           # the customer's sizes against the covers we already make (ADR-064)
   tight_cm: 1.25                 # to confirm (Q57): an existing cover may be this much smaller and still count as exact

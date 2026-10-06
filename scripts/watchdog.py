@@ -51,6 +51,33 @@ def _active(unit: str) -> bool:
     return r.stdout.strip() == "active"
 
 
+def ai_costs() -> dict[str, str]:
+    """The AI's spend this month (ADR-078): mail at 50 % and 80 % of the budget, at a spike in
+    one hour, and when paid calls have stopped because the budget is used up."""
+    try:
+        from coverengine import spend
+        from coverengine.params import Registry
+
+        s = spend.status(Registry.load(None).resolve())
+    except Exception as exc:  # noqa: BLE001 - a broken ledger is a problem to report too
+        return {"ai_costs": f"the AI cost ledger cannot be read: {exc}"}
+    out: dict[str, str] = {}
+    top = ", ".join(f"{k} €{v}" for k, v in list(s["by_model"].items())[:3])
+    if s["stopped"]:
+        out["ai_budget_stop"] = (
+            f"AI calls STOPPED: €{s['month_eur']} of the €{s['budget_eur']} "
+            f"month budget used ({top}); raise spend.budget_eur_month"
+        )
+    elif s["passed_pct"]:
+        out[f"ai_budget_{int(s['passed_pct'])}"] = (
+            f"AI costs this month €{s['month_eur']}: {s['pct']} % of the €{s['budget_eur']} "
+            f"budget ({top})"
+        )
+    if s["spike"]:
+        out["ai_spike"] = f"AI costs €{s['hour_eur']} in the last hour ({top})"
+    return out
+
+
 def checks() -> dict[str, str]:
     """Problem name -> description, for every problem found now."""
     bad: dict[str, str] = {}
@@ -95,6 +122,7 @@ def checks() -> dict[str, str]:
     reboot = Path("/var/run/reboot-required")
     if reboot.is_file() and (time.time() - reboot.stat().st_mtime) / 86400 > REBOOT_DAYS_MAX:
         bad["reboot"] = "a reboot for security updates has been waiting for more than a week"
+    bad.update(ai_costs())
     return bad
 
 

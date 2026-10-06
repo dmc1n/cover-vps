@@ -34,13 +34,16 @@ def app(tmp_path: Path, monkeypatch: Any) -> Any:
     return a
 
 
-def _wait(c: TestClient) -> dict[str, Any]:
+def _wait(c: TestClient, kind: str | None = None) -> dict[str, Any]:
+    """Until the comparison is done (and, with `kind`, its result is there: under a full test
+    run the state was once read in between)."""
+    s: dict[str, Any] = {}
     for _ in range(600):
         s = c.get("/api/models/box-1/reference").json()
-        if not s["running"]:
+        if not s["running"] and (kind is None or kind in s["compare"]):
             return s
         time.sleep(0.2)
-    raise AssertionError("the comparison did not finish")
+    raise AssertionError(f"the comparison did not finish: {s}")
 
 
 def test_a_3d_reference_in_metres_is_laid_over_the_cover(app: Any, tmp_path: Path) -> None:
@@ -50,7 +53,7 @@ def test_a_3d_reference_in_metres_is_laid_over_the_cover(app: Any, tmp_path: Pat
     c = TestClient(app)
     r = c.post("/api/models/box-1/reference", files={"file": ("mine.stl", path.read_bytes())})
     assert r.status_code == 200, r.text
-    sf = _wait(c)["compare"]["surface"]
+    sf = _wait(c, "surface")["compare"]["surface"]
     assert "error" not in sf, sf
     assert sf["size_mm"]["theirs"] == [1200, 800, 710]  # found as metres
     assert sf["within_fit_pct"] > 80  # the top lies 1 cm off, the rest on it
@@ -75,8 +78,9 @@ def test_a_pdf_reference_has_its_sizes_found(app: Any, tmp_path: Path, monkeypat
     pdf = tmp_path / "mine.pdf"
     doc.save(pdf)
     c = TestClient(app)
-    c.post("/api/models/box-1/reference", files={"file": ("mine.pdf", pdf.read_bytes())})
-    dr = _wait(c)["compare"]["drawing"]
+    r = c.post("/api/models/box-1/reference", files={"file": ("mine.pdf", pdf.read_bytes())})
+    assert r.status_code == 200, r.text
+    dr = _wait(c, "drawing")["compare"]["drawing"]
     assert len(dr["matched"]) == 2 and dr["missing_mm"] == [990.0]
     assert dr["report"]["verdict"] == "look"  # the AIs agree, but 99 cm is not in the pattern
     r = c.post("/api/models/box-1/reference/lessons/0")

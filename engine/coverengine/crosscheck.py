@@ -1,6 +1,7 @@
 """Two AIs check the program's cover against the drawing, and each other (ADR-072).
 
-The program decides the shape itself; the AIs only check. Gemini (ai.vision_*) looks: the
+The program decides the shape itself; the AIs only check. Gemini (ai.check_model, a Flash model:
+a check needs eyes, not long reasoning, and costs a tenth of the Pro model) looks: the
 drawing's pages next to the program's picture of the cover. DeepSeek (ai.*) reads: every word
 and number on the drawing against the cover's measured sizes, and Gemini's verdict. When the
 two disagree, Gemini gets DeepSeek's points once to confirm or correct its view. The outcome is
@@ -75,7 +76,7 @@ def measured(model: Path) -> dict[str, Any]:
 def vision_params() -> EffectiveParams:
     base = Registry.load(None).resolve()
     return Registry.load(None).resolve(trial={
-        "ai.provider": str(base["ai.vision_provider"]), "ai.model": str(base["ai.vision_model"]),
+        "ai.provider": str(base["ai.vision_provider"]), "ai.model": str(base["ai.check_model"]),
         "ai.base_url": str(base["ai.vision_base_url"]), "ai.timeout_s": 600})  # fmt: skip
 
 
@@ -96,22 +97,34 @@ def run(pdf: Path, model: Path, facts: dict[str, Any] | None = None) -> dict[str
     vision = vision_params()
     out: dict[str, Any] = {}
     look = ask_parts(vision, LOOK, look_parts)
-    look.pop("_usage", None)
+    usage: dict[str, dict[str, int]] = {"gemini": _tokens(look.pop("_usage", None))}
     out["gemini"] = look
     reading = {"drawing_text": text, "program_read": facts or {},
                "program_cover": measured(model), "colleague_verdict": look}  # fmt: skip
     read = ask_parts(Registry.load(None).resolve(), READ, json.dumps(reading, default=str))
-    read.pop("_usage", None)
+    usage["deepseek"] = _tokens(read.pop("_usage", None))
     out["deepseek"] = read
     if bool(look.get("same")) != bool(read.get("same")):
         second = SECOND + "\n" + json.dumps(read)
         again = ask_parts(vision, LOOK, [*look_parts, {"type": "text", "text": json.dumps(look)},
                                          {"type": "text", "text": second}])  # fmt: skip
-        again.pop("_usage", None)
+        more = _tokens(again.pop("_usage", None))
+        usage["gemini"] = {k: usage["gemini"][k] + more[k] for k in more}
         out["gemini_second"] = again
         look = again
     if bool(look.get("same")) == bool(read.get("same")):
         out["outcome"] = "agreed: same" if look.get("same") else "agreed: different"
     else:
         out["outcome"] = "person to check"
+    out["tokens"] = usage  # what the check cost, per AI (the owner, 6 Oct 2026)
     return out
+
+
+def _tokens(u: Any) -> dict[str, int]:
+    """Tokens in and out of one answer (reasoning counted as out, as it is billed)."""
+    u = u if isinstance(u, dict) else {}
+    out = int(u.get("completion_tokens") or 0)
+    details = u.get("completion_tokens_details") or {}
+    if isinstance(details, dict):
+        out = max(out, out + int(details.get("reasoning_tokens") or 0))
+    return {"in": int(u.get("prompt_tokens") or 0), "out": out}

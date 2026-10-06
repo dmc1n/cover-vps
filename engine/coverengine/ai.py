@@ -55,6 +55,9 @@ ACTIONS: dict[str, str] = {
 }
 
 
+LEDGER_NOTE = 40  # param-ok: characters of the prompt kept in the cost ledger
+
+
 def _key(provider: str) -> str:
     name = KEY_ENV.get(provider)
     if name is None:
@@ -144,6 +147,9 @@ def ask_parts(
     provider = str(params["ai.provider"])
     if provider == "none":
         raise CoverError("AI advice is off (ai.provider = none)")
+    from coverengine import spend
+
+    spend.guard(params)  # the month's budget (ADR-078)
     body = {
         "model": str(params["ai.model"]),
         "response_format": {"type": "json_object"},
@@ -170,6 +176,7 @@ def ask_parts(
     if not isinstance(doc, dict):
         raise CoverError("the AI's answer was not one JSON object")
     doc["_usage"] = reply.get("usage", {})
+    spend.record(params, str(params["ai.model"]), doc["_usage"], system[:LEDGER_NOTE])
     return doc
 
 

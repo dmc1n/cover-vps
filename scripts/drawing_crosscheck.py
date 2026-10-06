@@ -53,12 +53,20 @@ def main() -> int:
         rows = list(pool.map(one, jobs))
     with (a.out / "crosscheck.csv").open("w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["code", "outcome", "gemini", "deepseek", "differences"])
+        w.writerow(["code", "outcome", "gemini", "deepseek", "tokens_in", "tokens_out",
+                    "differences"])  # fmt: skip
         for r in rows:
             g = r.get("gemini_second") or r.get("gemini") or {}
             d = r.get("deepseek") or {}
             diff = (g.get("differences") or []) + (d.get("differences") or [])
-            w.writerow([r["code"], r["outcome"], g.get("score"), d.get("score"), " | ".join(diff)])
+            t = r.get("tokens") or {}
+            t_in = sum(x.get("in", 0) for x in t.values())
+            t_out = sum(x.get("out", 0) for x in t.values())
+            w.writerow([r["code"], r["outcome"], g.get("score"), d.get("score"), t_in, t_out,
+                        " | ".join(diff)])  # fmt: skip
+    t_in = sum(x.get("in", 0) for r in rows for x in (r.get("tokens") or {}).values())
+    t_out = sum(x.get("out", 0) for r in rows for x in (r.get("tokens") or {}).values())
+    print(f"{len(rows)} covers checked; tokens in {t_in}, out {t_out}", flush=True)
     return 0
 
 

@@ -1826,3 +1826,45 @@ be much simpler."
   C28 still fails at the cut, as before; it was restored as it was.
 - **Better later:** S43 still has a few small pieces where the back strip meets the round end.
   Joining across a crease with a fold line (as for box tops, ADR-055) would remove them.
+
+## ADR-077 — The cheap Gemini model for checks and readings
+
+On 6 October Gemini's monthly spending cap was reached. Most of the money went to two things:
+- **The Pro model's long reasoning:** a picture check of S44 took 146 s, and the hidden
+  reasoning tokens are billed as output.
+- **Veo videos for the website:** several euros per take.
+
+The owner asked whether DeepSeek alone would do. It cannot: DeepSeek reads no pictures, and
+whether a cover is a kidney or a box is only seen by looking.
+
+The Flash model gave the same verdicts as Pro:
+- S47: both 100, "same".
+- S44: Pro 75, Flash 35, both "different" (Flash is stricter, and rightly so).
+
+Flash took 7–21 s instead of 13–146 s, at about a tenth of the cost.
+
+- **Settings:** `ai.check_model` and `ai.vision_model` are now `gemini-3.8-flash` (the owner:
+  "fine, then we go to a cheaper model").
+- **Veo:** only on the owner's explicit request.
+
+## ADR-078 — The AI's costs kept, with triggers that warn and stop
+
+The owner (6 October), after Gemini's monthly cap stopped every call: "build a trigger yourself
+for when the costs go up."
+
+- **Kept** (`coverengine/spend.py`):
+  - every paid AI answer (`ai.ask_parts`) is written to <data>/usage/ai-YYYY-MM.jsonl with
+    its tokens and the estimated cost in euros;
+  - reasoning tokens count as output, because they are billed so;
+  - prices per million tokens are in `spend.prices`, to confirm against the bills;
+  - an unknown model is priced as the dearest one we know, so a new model warns too early,
+    never too late.
+- **Warned** (the watchdog, every 10 minutes, mails rick@s2dio.industries once per trigger,
+  again after `REMIND_HOURS`):
+  - at 50 % and 80 % of `spend.budget_eur_month` (€50, to confirm);
+  - when one hour costs more than `spend.hourly_spike_eur` (€2.50);
+  - the mail names the dearest models.
+- **Stopped:** at 100 % of the month's budget every paid call is refused with a clear message
+  until the budget is raised (`spend.hard_stop: true`).
+- **Not covered:** Veo videos for the website go through their own calls outside the engine.
+  They are made only on the owner's explicit request (ADR-077).
