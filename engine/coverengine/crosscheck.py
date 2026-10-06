@@ -101,7 +101,11 @@ def run(pdf: Path, model: Path, facts: dict[str, Any] | None = None) -> dict[str
     out["gemini"] = look
     reading = {"drawing_text": text, "program_read": facts or {},
                "program_cover": measured(model), "colleague_verdict": look}  # fmt: skip
-    read = ask_parts(Registry.load(None).resolve(), READ, json.dumps(reading, default=str))
+    base = Registry.load(None).resolve()
+    reader = Registry.load(None).resolve(
+        trial={"ai.reasoning_effort": str(base["ai.check_reasoning"])}
+    )
+    read = ask_parts(reader, READ, json.dumps(reading, default=str))
     usage["deepseek"] = _tokens(read.pop("_usage", None))
     out["deepseek"] = read
     if bool(look.get("same")) != bool(read.get("same")):

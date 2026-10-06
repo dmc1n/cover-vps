@@ -309,6 +309,9 @@ ai:                              # AI advice on cover layouts (the key: DEEPSEEK
   vision_model: gemini-3.8-flash # reading drawings, comparing references: the cheap Flash model
                                  # (owner, 6 Oct 2026; was gemini-3.1-pro-preview; ADR-077)
   vision_base_url: https://generativelanguage.googleapis.com/v1beta/openai
+  reasoning_effort: ""           # low | medium | high, or "" for the model's own choice
+  check_reasoning: low           # the cross check's reading AI (DeepSeek): it thought 40-70k tokens
+                                 # per cover (85 % of the cost); low keeps it right at a fraction (ADR-078)
   check_model: gemini-3.8-flash  # the picture check of a built cover (ADR-072): same verdicts as
                                  # the Pro model on S47/S44, about 10x cheaper and faster (owner, 6 Oct 2026)
 

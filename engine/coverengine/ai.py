@@ -155,6 +155,9 @@ def ask_parts(
         "response_format": {"type": "json_object"},
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
     }
+    effort = str(params["ai.reasoning_effort"] or "")
+    if effort:  # how long a reasoning model thinks (it is billed as output; ADR-078)
+        body["reasoning_effort"] = effort
     req = urllib.request.Request(
         str(params["ai.base_url"]).rstrip("/") + "/chat/completions",
         data=json.dumps(body).encode("utf-8"),

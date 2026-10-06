@@ -1868,6 +1868,12 @@ for when the costs go up."
   until the budget is raised (`spend.hard_stop: true`).
 - **Not covered:** Veo videos for the website go through their own calls outside the engine.
   They are made only on the owner's explicit request (ADR-077).
+- **The ledger's first finding:** Gemini Flash costs about €0.01 per check, but DeepSeek
+  reasoned 40,000–70,000 tokens per cover, 85 % of the cost.
+  - With thinking off, DeepSeek answered wrongly: it took 141.1 in for not 3584 mm.
+  - `ai.check_reasoning: low` keeps it right at about 40 % less (€0.03–0.05 per cover).
+  - A full round of 115 covers costs about €5.
+  - DeepSeek stays, because two vendors checking each other catch more.
 
 ## ADR-079 — The Desk: people approve the drawing covers, the AI only sorts
 
