@@ -39,6 +39,7 @@ INPUTS = {
         "hull_parts.npy",
         "seams.json",
         "proposals.json",
+        "part_edits.json",  # the Desk's seam corrections (ADR-082)
         "cover.json",
     ),
     "flatten": ("panels.npz", "panels.json", "cover.json"),

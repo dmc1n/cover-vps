@@ -122,3 +122,14 @@ def test_no_drape_is_queued_after_a_calculation_by_default() -> None:
     assert (
         api_main._auto_drape() is False or __import__("os").environ.get("COVER_AUTO_DRAPE") == "on"
     )
+
+
+def test_a_seam_correction_from_the_desk_reruns_the_cut(
+    box: Path, tmp_path: Path, capsys: Any
+) -> None:
+    """ADR-082 meets ADR-080: part_edits.json is an input of the cut, so a correction made at
+    the Desk is never skipped as "unchanged"."""
+    d = tmp_path / "box"
+    shutil.copytree(box, d)
+    (d / "part_edits.json").write_text(json.dumps({"edits": []}))
+    assert _run(d, capsys)[0] == "cut"

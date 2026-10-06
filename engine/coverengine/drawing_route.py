@@ -44,6 +44,11 @@ JOINABLE = ("swept", "outline", "views")  # the program made these seams
 SCALE_DIGITS = 5  # param-ok: decimals of the scale kept in drawing_read.json
 
 
+CM_TO_MM = 10.0  # param-ok: unit
+CORRECTION_CM = 1.0  # param-ok: a corrected size names a read size within 1 cm ...
+CORRECTION_SHARE = 0.01  # param-ok: ... or 1 %
+
+
 def roll_mm(params: EffectiveParams) -> float:
     """The width a piece may have before allowances: the roll minus a stitch allowance each side."""
     return float(params["roll.usable_width_mm"]) - 2 * float(params["stitching.allowance_mm"])  # type: ignore[arg-type]
@@ -94,7 +99,61 @@ def _views_info(read: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def read(pdf: Path, params: EffectiveParams) -> dict[str, Any]:
+def _fixes(corrections: list[dict[str, Any]] | None) -> list[tuple[float, float]]:
+    """(read cm, right cm) from the Desk's size corrections (ADR-082)."""
+    out = []
+    for c in corrections or []:
+        try:
+            r, ok = float(c.get("read_cm") or 0), float(c.get("correct_cm") or 0)
+        except (TypeError, ValueError):
+            continue
+        if r > 0 and ok > 0:
+            out.append((r, ok))
+    return out
+
+
+def _same(a: float, b: float) -> bool:
+    return abs(a - b) <= max(CORRECTION_CM, CORRECTION_SHARE * max(a, b))
+
+
+def _correct_outline(outline: dict[str, Any], fixes: list[tuple[float, float]]) -> list[str]:
+    """A person said a read size is wrong: the plan (circumference, longest) is scaled, the
+    height replaced. Returns what was applied."""
+    done = []
+    shape, plan = outline["shape"], outline["plan_cm"]
+    for r, ok in fixes:
+        if _same(r, float(plan["circumference"])) or _same(r, float(plan["longest"])):
+            k = ok / r
+            shape["outline_cm"] = [[x * k, y * k] for x, y in shape["outline_cm"]]
+            plan["circumference"] = round(float(plan["circumference"]) * k, 1)
+            plan["longest"] = round(float(plan["longest"]) * k, 1)
+            done.append(f"plan scaled by {k:.3f} ({r:g} -> {ok:g} cm)")
+        elif _same(r, float(shape["height_cm"])):
+            shape["height_cm"] = ok
+            done.append(f"height {r:g} -> {ok:g} cm")
+    return done
+
+
+def _correct_solid(mesh: trimesh.Trimesh, fixes: list[tuple[float, float]]) -> list[str]:
+    """A person said a read size is wrong: the solid is stretched along the axis whose extent
+    it is (x, y or z)."""
+    done = []
+    for r, ok in fixes:
+        ext = mesh.extents / CM_TO_MM
+        for axis, name in enumerate("xyz"):
+            if _same(r, float(ext[axis])):
+                v = mesh.vertices.copy()
+                lo = v[:, axis].min()
+                v[:, axis] = lo + (v[:, axis] - lo) * ok / r
+                mesh.vertices = v
+                done.append(f"{name} {r:g} -> {ok:g} cm")
+                break
+    return done
+
+
+def read(
+    pdf: Path, params: EffectiveParams, corrections: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     """The reader chain. {"status": "built" | NEEDS_PERSON, "reader", "shape", "pieces", "info",
     "reasons"}; `pieces` only when built."""
     from coverengine import drawing_solid, drawing_vectors, drawn
@@ -115,8 +174,11 @@ def read(pdf: Path, params: EffectiveParams) -> dict[str, Any]:
         reasons.append(f"the views could not be read: {exc}")
 
     # a. a closed free outline (a kidney, a lens) straight up
+    fixes = _fixes(corrections)
     outline = drawing_vectors.outline_shape(pdf)
     if outline and "shape" in outline:
+        if fixes:
+            info["corrections_applied"] = _correct_outline(outline, fixes)
         pieces = drawn.build("outline", outline["shape"], roll)
         fit = None
         if iso is not None:
@@ -145,6 +207,8 @@ def read(pdf: Path, params: EffectiveParams) -> dict[str, Any]:
             best = {"best": None}
             reasons.append(f"no shape could be built from the views: {exc}")
         b = best["best"]
+        if b is not None and fixes:
+            info["corrections_applied"] = _correct_solid(b["solid"], fixes)
         if b is not None:
             info["solid"] = {"how": b["how"], "fits_3d_view": round(float(b["iou"]), 3),
                              "candidates": len(best["candidates"])}  # fmt: skip
@@ -187,7 +251,9 @@ def build(
     code = code or model_dir.name.removeprefix("drawing-").upper()
     feats = features(ref)
     _write(model_dir / "drawing_features.json", feats)
-    res = read(ref, params)
+    fixes = model_dir / "drawing_corrections.json"
+    corrections = json.loads(fixes.read_text()).get("sizes") if fixes.is_file() else None
+    res = read(ref, params, corrections)
     doc: dict[str, Any] = {
         "code": code, "time": time.time(), "status": res["status"], "reader": res["reader"],
         "reasons": res["reasons"], "features": feats, **res["info"],

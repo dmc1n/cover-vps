@@ -56,3 +56,21 @@ def test_a_drawing_it_cannot_read_builds_nothing_and_says_why(tmp_path: Path) ->
     assert not (model / "model.glb").exists()  # nothing guessed
     check = json.loads((model / "check.json").read_text())
     assert check["outcome"] == "person to check"  # the Desk puts it first
+
+
+def test_a_size_corrected_at_the_desk_is_used_when_the_drawing_is_read_again() -> None:
+    """ADR-082 meets ADR-081 (S45): a person says the read circumference is wrong and gives the
+    right one; reading the drawing again scales the plan by it."""
+    import tempfile
+
+    from coverengine.drawing_route import read
+
+    with tempfile.TemporaryDirectory() as tmp:
+        pdf = _kidney_pdf(Path(tmp) / "k.pdf")
+        p = Registry.load(None).resolve()
+        plain = read(pdf, p)["info"]["outline"]["plan_cm"]
+        fixed = read(pdf, p, [{"read_cm": plain["circumference"], "correct_cm": 434.0}])
+    plan = fixed["info"]["outline"]["plan_cm"]
+    assert plan["circumference"] == 434.0
+    assert plan["longest"] > plain["longest"]
+    assert fixed["info"]["corrections_applied"]
