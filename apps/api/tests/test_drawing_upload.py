@@ -49,3 +49,26 @@ def test_only_pdfs_are_drawings(app: Any) -> None:
     assert r.status_code == 400
     r = c.post("/api/models/drawing", files={"file": ("fake.pdf", b"not a pdf")})
     assert r.status_code == 400
+
+
+def test_the_ai_button_queues_the_ai_reading(app: Any, tmp_path: Path, monkeypatch: Any) -> None:
+    """ADR-083: "let the AI read it" queues `cover drawing-ai` (the job is caught here, so no
+    paid call is made in a test)."""
+    pdf = _kidney_pdf(tmp_path / "cover 996 - S96.pdf")
+    c = TestClient(app)
+    queued: list[Any] = []
+    real = app.state.jobs.submit
+    out = c.post("/api/models/drawing",
+                 files={"file": ("cover 996 - S96.pdf", pdf.read_bytes())}).json()  # fmt: skip
+    app.state.jobs.wait(out["job"]["id"], 600)
+
+    def catch(spec: Any) -> dict[str, str]:
+        queued.append(spec)
+        return {"id": "x", "status": "queued"}
+
+    monkeypatch.setattr(app.state.jobs, "submit", catch)
+    r = c.post(f"/api/models/{out['model_id']}/drawing/ai")
+    assert r.status_code == 200, r.text
+    assert queued and queued[0].steps == ["drawing-ai"]
+    assert c.post("/api/models/nothing/drawing/ai").status_code == 400  # no drawing to read
+    assert real is not None

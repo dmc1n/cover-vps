@@ -25,7 +25,7 @@ LOG_TAIL = 4000  # characters of each step's output kept in the job file
 # cover improve: the program adds seams; cover ai: AI advice; cover rain: the rain simulation;
 # cover drape: the sewn cover falling over the furniture
 # cover drawing-build: route A, a drawing read and built as a cover (ADR-081)
-EXTRA_STEPS = ["improve", "ai", "rain", "drape", "drawing-build"]
+EXTRA_STEPS = ["improve", "ai", "rain", "drape", "drawing-build", "drawing-ai"]
 LONG_STEPS = {"drape"}  # a job of only these runs in the second queue
 DRAPE_WORKERS = 4  # drapes side by side (one core each; the server has 8)
 

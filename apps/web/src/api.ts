@@ -339,6 +339,10 @@ export const api = {
     fetch(`/api/models/${id}/drawing`, { method: "POST" }).then((r) =>
       json<{ model_id: string; job: Job }>(r),
     ),
+  aiReadDrawing: (id: string) =>
+    fetch(`/api/models/${id}/drawing/ai`, { method: "POST" }).then((r) =>
+      json<{ model_id: string; job: Job }>(r),
+    ),
   drawingRead: (id: string) =>
     fetch(`/api/models/${id}/drawing`).then((r) => json<DrawingRead>(r)),
   upload: (file: File, units: string, up: string) => {

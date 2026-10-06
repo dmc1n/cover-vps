@@ -2071,3 +2071,26 @@ really learn?" It did not.
     little. The pattern check's wiggle warning shows it.
   - Size corrections do not yet re-read the drawing: the reader of route A (two-routes plan,
     step 3) should apply `drawing_corrections.json`.
+
+## ADR-083 — "Let the AI read it": a button for drawings that need a person; the 85 % threshold kept
+
+The owner (6 October): keep `drawing.min_iou` at 85 %; the AI button may come.
+
+- **Where.** For a drawing that route A could not read surely ("needs a person": C27, S44, T5
+  in the first runs), a person may press "Let the AI read it". The button is on the drawing
+  upload's outcome and on the Desk card.
+- **What it does.**
+  - The AI reader of ADR-068 reads the drawing into the swept shape. It moved from
+    scripts/drawing_swept.py into `coverengine/drawing_ai.py`, and the script imports it.
+  - It uses `ai.vision_model` (Gemini Flash) and is guarded by the month's budget (ADR-078).
+  - Every written size is checked against the shape's lengths, with `drawing.ai_rounds` (2)
+    rounds of feedback.
+- **Advice, never a decision.** When the AI says the shape does not fit (`why_not`), or the
+  shape cannot be built, nothing is built. Otherwise the cover:
+  - is built through the same route as the program's own reading;
+  - is tagged `ai-read`;
+  - gets a check that says "person to check", with the written sizes that were not found;
+  - waits at the top of the Desk for approval.
+- **Commands and endpoint:** `cover drawing-ai <model>` (a job step) and
+  `POST /api/models/{id}/drawing/ai`.
+- **Tests** fake the AI: no paid call in a test.

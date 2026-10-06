@@ -25,6 +25,7 @@ and how it was found, the sizes, the written sizes that contradict each other (S
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import time
 from collections.abc import Callable
@@ -223,6 +224,35 @@ def read(
             "reasons": reasons or ["nothing on the drawing could be read"]}  # fmt: skip
 
 
+def ai_read(pdf: Path, params: EffectiveParams, code: str) -> dict[str, Any]:
+    """The AI reads the drawing (advice, ADR-083): Gemini Flash into the swept shape, every
+    written size checked against the shape's lengths. When the AI says the shape does not fit,
+    or the shape cannot be built, nothing is built."""
+    from coverengine import drawing_ai, swept
+    from coverengine.params import Registry
+
+    vision = Registry.load(None).resolve(trial={
+        "ai.provider": str(params["ai.vision_provider"]),
+        "ai.model": str(params["ai.vision_model"]),
+        "ai.base_url": str(params["ai.vision_base_url"]), "ai.timeout_s": 600})  # fmt: skip
+    res = drawing_ai.read(code, pdf, vision, int(params["drawing.ai_rounds"]))  # type: ignore[arg-type]
+    shape = res.get("shape") or {}
+    info = {"ai": {"matched": res.get("matched"), "written": res.get("written"),
+                   "missing": res.get("missing"), "notes": shape.get("notes"),
+                   "why_not": shape.get("why_not"), "error": res.get("error")}}  # fmt: skip
+    reasons = []
+    if shape.get("why_not"):
+        reasons.append(f"the AI says the shape does not fit: {shape['why_not']}")
+    if res.get("error"):
+        reasons.append(f"the AI's shape could not be built: {res['error']}")
+    if reasons:
+        return {"status": NEEDS_PERSON, "reader": "ai", "shape": None, "pieces": None,
+                "info": info, "reasons": reasons}  # fmt: skip
+    pieces = swept.build(shape, roll_mm(params), float(shape.get("max_piece_mm") or math.inf))
+    return {"status": "built", "reader": "ai", "shape": "swept", "pieces": pieces, "info": info,
+            "reasons": []}  # fmt: skip
+
+
 def _write(path: Path, doc: Any) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(doc, indent=1, default=str) + "\n", encoding="utf-8")
@@ -235,6 +265,7 @@ def build(
     params: EffectiveParams,
     code: str | None = None,
     log: Callable[[str], None] = print,
+    ai: bool = False,
 ) -> dict[str, Any]:
     """Read the drawing and, when sure, build and calculate its cover in `model_dir` (a new
     model, or a new revision of an existing drawing cover). Never deletes the model's
@@ -253,7 +284,7 @@ def build(
     _write(model_dir / "drawing_features.json", feats)
     fixes = model_dir / "drawing_corrections.json"
     corrections = json.loads(fixes.read_text()).get("sizes") if fixes.is_file() else None
-    res = read(ref, params, corrections)
+    res = ai_read(ref, params, code) if ai else read(ref, params, corrections)
     doc: dict[str, Any] = {
         "code": code, "time": time.time(), "status": res["status"], "reader": res["reader"],
         "reasons": res["reasons"], "features": feats, **res["info"],
@@ -285,11 +316,18 @@ def build(
         mine.get("features", {}).pop("vents_total", None)
     cj.write_text(json.dumps(cover_doc, indent=2) + "\n", encoding="utf-8")
     how = res["info"].get("solid", {}).get("how") or ["the drawn outline straight up"]
-    set_info(model_dir, {
-        "tags": sorted(set(cover_doc.get("tags") or []) | {"drawing", "reference"}),
-        "notes": f"Drawing {code}: read by the program itself (ADR-081): {res['reader']}, "
-                 f"{', '.join(how)}.",
-    })  # fmt: skip
+    tags = set(cover_doc.get("tags") or []) | {"drawing", "reference"}
+    if ai:  # advice: a person approves it at the Desk (ADR-083)
+        tags.add("ai-read")
+        note = (
+            f"Drawing {code}: read by the AI as advice (ADR-083), "
+            f"{res['info']['ai'].get('matched')} written sizes found; approve at the Desk."
+        )
+    else:
+        tags.discard("ai-read")
+        note = (f"Drawing {code}: read by the program itself (ADR-081): {res['reader']}, "
+                f"{', '.join(how)}.")  # fmt: skip
+    set_info(model_dir, {"tags": sorted(tags), "notes": note})
     for step in STEPS:
         log(f"{code}: {step}")
         if cover([step, str(model_dir)]):
@@ -301,5 +339,12 @@ def build(
     stale = model_dir / "check.json"  # an old verdict was about the cover before this one
     if stale.is_file() and json.loads(stale.read_text()).get("source") == "drawing route":
         stale.unlink()
+    if ai:  # the Desk puts it at the top: a person decides
+        missing = res["info"]["ai"].get("missing") or []
+        verdict = {"summary": "Read by the AI (advice): check the shape against the drawing "
+                              "before approving.",
+                   "differences": [f"written size not found: {m} cm" for m in missing]}  # fmt: skip
+        _write(stale, {"code": code, "outcome": "person to check", "source": "drawing route",
+                       "gemini": verdict})  # fmt: skip
     log(f"{code}: built ({res['reader']}), {doc['pieces']} pieces, {doc['vents']} vents")
     return doc

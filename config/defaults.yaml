@@ -259,6 +259,8 @@ drawing:
                                  # it matches the workshop drawing of the model
   min_iou: 0.85                  # route A (ADR-081): a shape read from a drawing is only taken when it
                                  # covers the drawing's 3D view this well; less: "needs a person"
+  ai_rounds: 2                   # the "let the AI read it" button: rounds of size feedback to the AI
+                                 # (owner, 6 Oct 2026: the button, as advice; ADR-083)
 
 
 drawn:

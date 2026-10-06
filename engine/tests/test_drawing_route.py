@@ -3,6 +3,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pymupdf
@@ -74,3 +75,38 @@ def test_a_size_corrected_at_the_desk_is_used_when_the_drawing_is_read_again() -
     assert plan["circumference"] == 434.0
     assert plan["longest"] > plain["longest"]
     assert fixed["info"]["corrections_applied"]
+
+
+def test_the_ai_reading_is_built_as_advice_and_waits_for_a_person(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """ADR-083: "let the AI read it" — the AI's shape is built, tagged ai-read, and the Desk is
+    told a person must look (the AI is faked: no paid call in a test)."""
+    from coverengine import drawing_ai
+
+    shape = {"path": [{"line": 200}], "profile": [[0, 80], [30, 80], [100, 45]],
+             "start_end": "square", "end_end": "square", "why_not": ""}  # fmt: skip
+    monkeypatch.setattr(drawing_ai, "read", lambda *a, **k: {
+        "shape": shape, "matched": 2, "written": [200.0, 80.0], "missing": []})  # fmt: skip
+    pdf = _kidney_pdf(tmp_path / "cover 998 - S98.pdf")
+    model = tmp_path / "models" / "drawing-s98"
+    doc = build(pdf, model, Registry.load(None).resolve(), code="S98", log=lambda s: None,
+                ai=True)  # fmt: skip
+    assert doc["status"] == "built" and doc["reader"] == "ai"
+    cover = json.loads((model / "cover.json").read_text())
+    assert "ai-read" in cover["tags"]
+    assert json.loads((model / "check.json").read_text())["outcome"] == "person to check"
+
+
+def test_when_the_ai_says_the_shape_does_not_fit_nothing_is_built(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from coverengine import drawing_ai
+
+    said = {"shape": {"why_not": "a kidney is no swept shape"}, "matched": 0, "missing": [45.0]}
+    monkeypatch.setattr(drawing_ai, "read", lambda *a, **k: said)
+    pdf = _kidney_pdf(tmp_path / "cover 997 - S97.pdf")
+    model = tmp_path / "models" / "drawing-s97"
+    doc = build(pdf, model, Registry.load(None).resolve(), code="S97", log=lambda s: None,
+                ai=True)  # fmt: skip
+    assert doc["status"] == NEEDS_PERSON and not (model / "cut.dxf").exists()

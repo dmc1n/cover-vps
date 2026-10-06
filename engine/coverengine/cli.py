@@ -615,7 +615,7 @@ def _cmd_drawing_build(args: argparse.Namespace) -> int:
     if not pdf.is_file():
         raise CoverError(f"no drawing: {pdf} (give --pdf FILE)")
     params = resolve_params(args, None)
-    doc = build(pdf, args.model, params, code=args.code)
+    doc = build(pdf, args.model, params, code=args.code, ai=bool(getattr(args, "ai", False)))
     if doc["status"] == NEEDS_PERSON:
         print(f"{NEEDS_PERSON}: " + "; ".join(doc["reasons"]))
     return 0
@@ -899,6 +899,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--code", help="the drawing's code, e.g. S45 (default: from the folder name)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_drawing_build)
+
+    p = sub.add_parser(
+        "drawing-ai", help="route A by the AI (advice, ADR-083): for a drawing that needs a person"
+    )
+    p.add_argument("model", type=Path, help="model directory with its reference.pdf")
+    p.add_argument("--pdf", type=Path, help="the drawing (default: reference.pdf in the model)")
+    p.add_argument("--code", help="the drawing's code, e.g. S45 (default: from the folder name)")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_drawing_build, ai=True)
 
     p = sub.add_parser("run", help="import, cover, seams and patterns in one go")
     p.add_argument("file", type=Path, help="3D file (STEP, IGES, STL, ...)")

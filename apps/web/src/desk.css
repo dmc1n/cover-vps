@@ -1019,3 +1019,18 @@ main:has(.desk) {
 .dc-pending td {
   opacity: 0.55;
 }
+
+/* "let the AI read it": advice for a drawing the program could not read (ADR-083) */
+.d-ai {
+  border: 1px solid var(--d-line);
+  background: var(--d-card);
+  color: inherit;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.d-ai:hover {
+  border-color: #6e776b;
+}

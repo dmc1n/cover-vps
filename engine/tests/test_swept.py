@@ -1,16 +1,12 @@
 """ADR-068: free-form covers from the drawings, a cross-section swept along a path."""
 
 import math
-import sys
-from pathlib import Path
 
 import numpy as np
 import pytest
+from coverengine import drawing_ai as ds
 from coverengine import drawn, swept
 from coverengine.errors import CoverError
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
-import drawing_swept as ds  # noqa: E402
 
 QUARTER = {
     "path": [{"arc": 176.57, "angle": 90}],

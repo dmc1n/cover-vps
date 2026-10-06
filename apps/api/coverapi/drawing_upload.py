@@ -93,6 +93,21 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
                    if (d / "desk.json").is_file() else model_id, user.username)  # fmt: skip
         return {"model_id": model_id, "job": jobs.submit(JobSpec(model_id, [STEP], {}))}
 
+    @app.post("/api/models/{model_id}/drawing/ai")
+    def ai_read_drawing(model_id: str, request: Request) -> dict[str, Any]:
+        """The AI reads a drawing the program could not (ADR-083): advice, to approve at the
+        Desk. Paid (Gemini Flash, guarded by the month's budget)."""
+        user = require(request, "edit")
+        try:
+            d = store.model_dir(model_id)
+        except KeyError:
+            raise HTTPException(404, f"no model {model_id!r}") from None
+        if not (d / "reference.pdf").is_file():
+            raise HTTPException(400, "this model has no drawing: upload one")
+        _desk_note(d, json.loads((d / "desk.json").read_text()).get("code")
+                   if (d / "desk.json").is_file() else model_id, user.username)  # fmt: skip
+        return {"model_id": model_id, "job": jobs.submit(JobSpec(model_id, ["drawing-ai"], {}))}
+
     @app.get("/api/models/{model_id}/drawing")
     def drawing_read(model_id: str) -> dict[str, Any]:
         try:

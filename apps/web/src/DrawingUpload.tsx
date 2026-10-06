@@ -108,6 +108,25 @@ export function DrawingUpload() {
             ))}
           </ul>
           <a href={`#/desk/${model}`}>It waits at the top of the Desk.</a>
+          <p className="muted">
+            Or let the AI read it: a proposal (about 1–5 cents), marked
+            "read by the AI", that a person approves at the Desk.
+          </p>
+          <button
+            disabled={running || !model}
+            onClick={async () => {
+              if (!model) return;
+              setError("");
+              setRead(null);
+              try {
+                setJob((await api.aiReadDrawing(model)).job);
+              } catch (e) {
+                setError(String(e));
+              }
+            }}
+          >
+            Let the AI read it
+          </button>
         </div>
       )}
     </section>

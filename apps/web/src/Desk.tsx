@@ -535,6 +535,25 @@ function CardView({
           <Score label="G" v={card.scores.gemini} />
           <Score label="D" v={card.scores.deepseek} />
           <Pill status={st.status} />
+          {canAct && ck.outcome === "person to check" && (
+            <button
+              className="d-ai"
+              title="The AI reads the drawing: a proposal (about 1–5 cents), marked 'read by the AI', to approve here"
+              onClick={async () => {
+                setMsg("");
+                try {
+                  await api.aiReadDrawing(card.id);
+                  setMsg(
+                    "The AI is reading the drawing; the proposal appears here in about a minute.",
+                  );
+                } catch (e) {
+                  setMsg(String((e as Error).message ?? e));
+                }
+              }}
+            >
+              Let the AI read it
+            </button>
+          )}
           <a className="d-open" href={`#/model/${card.id}`}>
             Open model ↗
           </a>
