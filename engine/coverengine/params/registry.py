@@ -332,4 +332,10 @@ def resolve_model(
         raise ParamError(f"{model_dir / 'cover.json'}: 'parameters' must be an object")
     if preset is None:
         preset = family_preset(cover.get("family"))
+        # rules learned at the Desk for the cover's group, on top of the preset (ADR-082)
+        from coverengine import learned
+
+        preset = learned.merge(
+            dict(preset) if preset else None, learned.rules(learned.group_of(model_dir, cover))
+        )
     return reg.resolve(preset=preset, model=layer, trial=trial)

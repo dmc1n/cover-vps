@@ -468,6 +468,15 @@ def _box_cut(
             bool(params["seams.fold_merge"]),
         )
         label = np.unique(label, return_inverse=True)[1].astype(np.int64)
+    # the people's corrections at the Desk: join pieces, split a piece (ADR-082)
+    from coverengine import learned
+
+    edit_notes: list[str] = []
+    edits = learned.read_edits(model_dir)
+    if edits:
+        label, edit_notes = learned.apply_edits(
+            np.asarray(hull.triangles_center), np.asarray(hull.face_adjacency), label, edits
+        )
     # a region's direction is its area-weighted normal (thin slivers have noisy normals)
     weighted = np.zeros((label.max() + 1, 3))
     np.add.at(weighted, label, hull.face_normals * hull.area_faces[:, None])
@@ -500,6 +509,7 @@ def _box_cut(
     result.report["box"] = True
     result.report["joined"] = joined  # slivers and (on request) top faces joined, with folds
     result.report["folds_mm"] = folds  # the 3D ends of every fold, drawn in pen (ADR-055)
+    result.report["part_edits"] = edit_notes  # what the Desk's piece edits did (ADR-082)
     return result
 
 

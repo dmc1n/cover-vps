@@ -1,0 +1,8 @@
+{
+ "about": "The Desk: 'add a seam' across the top at half its length: one piece more (ADR-082)",
+ "shape": "box",
+ "sizes": {"length_cm": 120, "depth_cm": 80, "height_cm": 60},
+ "edits": [{"op": "split", "piece_region": "top", "axis": "x", "fraction": 0.5}],
+ "params": {},
+ "expect": {"pieces_delta": 1}
+}

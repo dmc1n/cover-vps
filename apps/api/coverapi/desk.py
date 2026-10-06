@@ -12,8 +12,13 @@ Per model `desk.json` (written atomically) keeps the pipeline and its history:
 plus the fit after sewing, a preferred revision, the drawing's code and PDF. `check.json` holds
 the latest Gemini + DeepSeek check (scripts/drawing_crosscheck.py writes it; desk_import.py
 copied the earlier ones). Approval sets the catalogue status too: approved -> "checked",
-produced -> "production", rejected -> "draft". A reject with words becomes a lesson for the AI
-(learning/lessons.json, ADR-070) and every action is logged in learning/desk.jsonl.
+produced -> "production", rejected -> "draft". Every action is logged in learning/desk.jsonl.
+
+Corrections (ADR-082) change the cover itself, not an AI prompt: a seam removed or added (piece
+edits the cut reads), a vent count or height, a skirt seam height (parameter overrides in the
+cover's own settings), a size read wrong, a shape that is missing. Each is kept as a test case,
+and the same parameter correction on `desk.learn_after` covers of a group is proposed as the
+group's rule (coverengine/learned.py). A reject's words are no longer an AI lesson.
 """
 
 from __future__ import annotations
@@ -271,8 +276,6 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
         _write(d / "desk.json", st)
         if a.action in ("approve", "reject", "produced"):
             _catalogue(d, st["status"], set_info)
-        if a.action == "reject" and a.text.strip():
-            _lesson(learning, d, a, who, now)
         _log(learning, d, entry)
     return state(d)
 
@@ -292,17 +295,177 @@ def _log(learning: Path, d: Path, entry: dict[str, Any]) -> None:
         fh.write(json.dumps(row) + "\n")
 
 
-def _lesson(learning: Path, d: Path, a: Action, who: str, now: float) -> None:
-    """A reject in words is a lesson for every later AI prompt (ADR-055, ADR-070)."""
-    path = learning / "lessons.json"
-    kept = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else []
-    lesson = {"rule": a.text.strip(), "check": ", ".join(a.reasons) or "desk",
-              "applies_to": "drawing covers", "model_id": d.name, "from": "desk",
-              "accepted_by": who, "time": now}  # fmt: skip
-    if not any(k.get("rule") == lesson["rule"] for k in kept):
-        kept.append(lesson)
-        learning.mkdir(parents=True, exist_ok=True)
+# ---- corrections that change the cover (ADR-082) --------------------------------------------
+
+SHAPES = ("round front", "back profile missing", "taper missing", "wrong height", "mirrored",
+          "other")  # fmt: skip
+CM_TO_MM = 10.0  # param-ok: cm to mm
+
+
+class Feedback(BaseModel):
+    kind: str  # seam | size | vents | shape
+    op: str = ""  # seam: remove | add | skirt
+    seam: str = ""  # seam remove: its id in panels.json ("top-1/top-2")
+    piece: str = ""  # seam add: the piece to split
+    axis: str = "z"  # seam add: z (a height) | x (along the width) | y (front to back)
+    at_cm: float | None = None  # seam add: where; skirt: the height above the hem
+    what: str = ""  # size: which size
+    read_cm: float | None = None
+    correct_cm: float | None = None
+    count: int | None = None  # vents
+    above_hem_cm: float | None = None  # vents
+    chips: list[str] = []
+    text: str = ""
+
+
+class RuleRequest(BaseModel):
+    group: str
+    key: str
+    value: Any
+
+
+def first_steps(key: str) -> list[str]:
+    """The steps a changed parameter needs (the server decides, not the browser)."""
+    group = key.split(".", 1)[0]
+    if group == "hull":
+        return ["hull", "cut", "flatten", "export"]
+    if group in ("seams", "roll"):
+        return ["cut", "flatten", "export"]
+    if group in ("flatten", "fabric"):
+        return ["flatten", "export"]
+    return ["export"]
+
+
+def _set_params(d: Path, params: dict[str, Any]) -> None:
+    from coverengine import learned
+
+    doc = _read(d / "cover.json")
+    tree = doc.setdefault("parameters", {})
+    for key, value in params.items():
+        learned.set_dotted(tree, key, value)
+    _write(d / "cover.json", doc)
+
+
+def seams_of(d: Path) -> list[dict[str, Any]]:
+    from coverengine import learned
+
+    return learned.seam_points(d)
+
+
+def pieces_of(d: Path) -> list[dict[str, Any]]:
+    from coverengine import learned
+
+    return learned.piece_points(d)
+
+
+def _drawn(d: Path) -> bool:
+    from coverengine import learned
+
+    return learned.editable(d)
+
+
+def correct(d: Path, fb: Feedback, user: Any, base: Path) -> dict[str, Any]:
+    """One correction: what it changes, the test case it leaves, the steps to recalculate."""
+    from coverengine import learned
+    from coverengine.params import resolve_model
+
+    who = user.name or user.username
+    now = time.time()
+    params: dict[str, Any] = {}
+    edit: dict[str, Any] | None = None
+    expect: dict[str, Any] = {}
+    steps: list[str] = []
+    _, before_pieces, _ = _pieces(d)
+    if fb.kind == "seam":
+        if fb.op in ("remove", "add") and not _drawn(d):
+            raise HTTPException(400, "this cover's seams follow the furniture: move its skirt "
+                                "seam here, or place seams in the seam editor")  # fmt: skip
+        if fb.op == "remove":
+            hit = next((x for x in seams_of(d) if x["id"] == fb.seam), None)
+            if hit is None or hit["at"] is None:
+                raise HTTPException(404, f"no seam {fb.seam!r} on this cover")
+            edit = {"op": "join", "at": hit["at"], "seam": fb.seam}
+            expect = {"pieces_at_most": max(before_pieces - 1, 1), "no_seam_near": hit["at"]}
+        elif fb.op == "add":
+            pieces = pieces_of(d)
+            piece = next((x for x in pieces if x["name"] == fb.piece), None)
+            if piece is None or fb.at_cm is None or fb.axis not in ("x", "y", "z"):
+                raise HTTPException(400, "give the piece, the direction (x, y, z) and where (cm)")
+            i = "xyz".index(fb.axis)
+            # z: a height above the hem (the cover's lowest point); x, y: from the piece's start
+            lo = min(p["min"][2] for p in pieces) if fb.axis == "z" else piece["min"][i]
+            edit = {"op": "split", "at": piece["at"], "axis": fb.axis,
+                    "value_mm": round(lo + fb.at_cm * CM_TO_MM, 1), "piece": fb.piece}  # fmt: skip
+            expect = {"pieces_at_least": before_pieces + 1}
+        elif fb.op == "skirt":
+            if fb.at_cm is None:
+                raise HTTPException(400, "give the skirt seam's height above the hem (cm)")
+            params["seams.skirt_height_mm"] = round(fb.at_cm * CM_TO_MM, 1)
+        else:
+            raise HTTPException(400, "seam: remove, add or skirt")
+        steps = ["cut", "flatten", "export"]
+    elif fb.kind == "vents":
+        if fb.count is not None:
+            params["features.vents_total"] = int(fb.count)
+            expect["vents"] = int(fb.count)
+        if fb.above_hem_cm is not None:
+            params["features.vent_above_hem_mm"] = round(fb.above_hem_cm * CM_TO_MM, 1)
+        if not params:
+            raise HTTPException(400, "give the vent count or their height above the hem")
+    elif fb.kind == "size":
+        if fb.correct_cm is None:
+            raise HTTPException(400, "give the right size (cm)")
+        doc = _read(d / "drawing_corrections.json")
+        doc.setdefault("sizes", []).append({"what": fb.what, "read_cm": fb.read_cm,
+                                            "correct_cm": fb.correct_cm, "by": who,
+                                            "time": now})  # fmt: skip
+        _write(d / "drawing_corrections.json", doc)
+    elif fb.kind == "shape":
+        bad = [c for c in fb.chips if c not in SHAPES]
+        if bad or not (fb.chips or fb.text.strip()):
+            raise HTTPException(400, f"choose what is wrong ({', '.join(SHAPES)}) or a few words")
+    else:
+        raise HTTPException(400, "kind: seam, size, vents or shape")
+    for key in params:
+        if len(first_steps(key)) > len(steps):
+            steps = first_steps(key)
+    old_cover = _read(d / "cover.json")
+    if params:
+        _set_params(d, params)
+        expect["params"] = params
+        try:
+            resolve_model(d)  # the settings must still resolve before a job is queued
+        except Exception as exc:  # noqa: BLE001
+            _write(d / "cover.json", old_cover)
+            raise HTTPException(400, f"the correction makes the settings invalid: {exc}") from None
+    if edit is not None:
+        learned.add_edit(d, {**edit, "by": who, "time": now})
+    entry = {"kind": fb.kind, "op": fb.op, "seam": fb.seam, "piece": fb.piece,
+             "axis": fb.axis if fb.op == "add" else None, "at_cm": fb.at_cm, "what": fb.what,
+             "read_cm": fb.read_cm, "correct_cm": fb.correct_cm, "count": fb.count,
+             "above_hem_cm": fb.above_hem_cm, "chips": fb.chips, "text": fb.text,
+             "params": params, "edit": edit, "by": who, "time": now}  # fmt: skip
+    entry = {k: v for k, v in entry.items() if v not in (None, "", [], {})}
+    with _lock:
+        path = d / "feedback.json"
+        kept = json.loads(path.read_text("utf-8")) if path.is_file() else []
+        kept.append(entry)
         _write(path, kept)
+        case = learned.write_case(d, {"feedback": entry, "expect": expect,
+                                      "check": "auto" if expect else "manual"}, base)  # fmt: skip
+        st = state(d)
+        hist = {"action": f"correct {fb.kind}", "by": who, "time": now,
+                "before": {k: v for k, v in st.items() if k != "history"},
+                "detail": {k: v for k, v in entry.items() if k not in ("by", "time")}}  # fmt: skip
+        if st["status"] in ("approved", "produced") and (params or edit):
+            # the cover changes: the approval was for the one before
+            st["status"] = "ai-checked"
+            st.pop("approved", None)
+            st.pop("produced", None)
+        st["history"].append(hist)
+        _write(d / "desk.json", st)
+        _log(base / "learning", d, hist)
+    return {"steps": steps, "case": case.name, "expect": expect, "entry": entry}
 
 
 # ---- the routes -----------------------------------------------------------------------------
@@ -384,6 +547,122 @@ def install(app: FastAPI, store: Any) -> None:
         return FileResponse(
             drawing_page(folder(model_id), store.root, page), media_type="image/png"
         )
+
+    def submit(model_id: str, steps: list[str]) -> dict[str, Any] | None:
+        jobs = getattr(app.state, "jobs", None)
+        if jobs is None or not steps:
+            return None
+        from coverapi.jobs import JobSpec
+
+        job: dict[str, Any] = jobs.submit(JobSpec(model_id, steps, {}))
+        return job
+
+    @app.get("/api/desk/{model_id}/correct")
+    def correct_view(model_id: str, request: Request) -> dict[str, Any]:
+        """What can be corrected: seams, pieces, the sizes read, the vents, the history."""
+        from coverengine.params import resolve_model
+
+        current_user(request)
+        d = folder(model_id)
+        try:
+            p = resolve_model(d)
+            now = {k: p[k] for k in ("features.vents_total", "features.vent_above_hem_mm",
+                                     "seams.skirt_height_mm")}  # fmt: skip
+        except Exception:  # noqa: BLE001
+            now = {}
+        sizes: list[float] = []
+        pdf = drawing_pdf(d, store.root)
+        if pdf is not None:
+            try:
+                from coverengine.drawing_views import written_cm
+
+                sizes = written_cm(pdf)
+            except Exception:  # noqa: BLE001 - the list is a help, never a stop
+                sizes = []
+        _, count, vents = _pieces(d)
+        fb = d / "feedback.json"
+        return {
+            "seams": seams_of(d),
+            "pieces": pieces_of(d),
+            "drawn": _drawn(d),
+            "sizes_cm": sizes,
+            "read": _read(d / "drawing_features.json"),
+            "settings": now,
+            "piece_count": count,
+            "vents": vents,
+            "shapes": list(SHAPES),
+            "feedback": json.loads(fb.read_text("utf-8")) if fb.is_file() else [],
+            "edits": _read(d / "part_edits.json").get("edits", []),
+        }
+
+    @app.post("/api/desk/{model_id}/correct")
+    def correct_action(model_id: str, fb: Feedback, request: Request) -> dict[str, Any]:
+        user = current_user(request)
+        if not approver(user, Registry.load(None).resolve()):
+            raise HTTPException(403, "only Rens, Rick, Wouter (desk.approvers) or an admin")
+        out = correct(folder(model_id), fb, user, store.root)
+        out["job"] = submit(model_id, out["steps"])
+        return out
+
+    @app.get("/api/desk-rules")
+    def rules_view(request: Request) -> dict[str, Any]:
+        """The groups' learned rules, and corrections made often enough to become one."""
+        from coverengine import learned
+
+        current_user(request)
+        params = Registry.load(None).resolve()
+        rdir = learned.rules_dir(store.root)
+        groups = sorted(p.stem for p in rdir.glob("*.yaml")) if rdir and rdir.is_dir() else []
+        shapes: dict[str, dict[str, int]] = {}
+        models = Path(store.models)
+        for d in sorted(p for p in models.iterdir() if (p / "feedback.json").is_file()):
+            g = learned.group_of(d) or "other"
+            for f in json.loads((d / "feedback.json").read_text("utf-8")):
+                for c in f.get("chips") or []:
+                    shapes.setdefault(g, {})[c] = shapes.setdefault(g, {}).get(c, 0) + 1
+        after = int(params["desk.learn_after"])  # type: ignore[arg-type]
+        return {
+            "rules": {g: learned.rules(g, store.root) for g in groups},
+            "proposals": learned.proposals(models, store.root, after),
+            "shape_problems": shapes,
+            "learn_after": after,
+        }
+
+    @app.post("/api/desk-rules")
+    def accept_rule(req: RuleRequest, request: Request) -> dict[str, Any]:
+        """A person makes a repeated correction the rule for a group; its covers recalculate."""
+        from coverengine import learned
+        from coverengine.params import resolve_model
+
+        user = current_user(request)
+        params = Registry.load(None).resolve()
+        if not approver(user, params):
+            raise HTTPException(403, "only Rens, Rick, Wouter (desk.approvers) or an admin")
+        if req.key not in params.keys():
+            raise HTTPException(400, f"no setting {req.key!r}")
+        who = user.name or user.username
+        row = learned.write_rule(req.group, req.key, req.value, who,
+                                 "made the rule at the Desk", store.root)  # fmt: skip
+        models = Path(store.models)
+        covers = [d for d in sorted(models.iterdir()) if (d / "cover.json").is_file()]
+        members = [d for d in covers if learned.group_of(d) == req.group]
+        jobs: list[Any] = []
+        for d in members:
+            try:
+                resolve_model(d)
+            except Exception:  # noqa: BLE001 - a cover that does not resolve is not run
+                continue
+            learned.write_case(d, {"feedback": {"kind": "rule", "group": req.group,
+                                                "key": req.key, "value": req.value},
+                                   "expect": {"params": {req.key: req.value}},
+                                   "check": "auto"}, store.root)  # fmt: skip
+            job = submit(d.name, first_steps(req.key))
+            if job:
+                jobs.append(job.get("id"))
+        learning.mkdir(parents=True, exist_ok=True)
+        with (learning / "desk.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"action": "rule", **row}) + "\n")
+        return {"rule": row, "covers": [d.name for d in members], "jobs": jobs}
 
     @app.post("/api/desk/{model_id}")
     def act(model_id: str, a: Action, request: Request) -> dict[str, Any]:

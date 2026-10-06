@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type ModelDetail } from "./api";
 import { Viewer } from "./Viewer";
+import { Corrections, RulesBar } from "./DeskCorrect";
 import "./desk.css";
 
 type Scores = {
@@ -236,6 +237,7 @@ export function Desk({ selected }: { selected: string | null }) {
             />
           )}
         </div>
+        <RulesBar canAct={q.can_approve} onChanged={load} />
         <div className="d-pipe" aria-label="pipeline">
           {seg.map(([k, n]) =>
             n ? (
@@ -702,6 +704,14 @@ function CardView({
             <p className="d-muted">No revisions kept.</p>
           )}
         </section>
+        <Corrections
+          id={card.id}
+          canAct={canAct}
+          onChanged={() => {
+            load();
+            onChanged();
+          }}
+        />
         <section className="d-panel d-wide">
           <h3>History</h3>
           <ol className="d-timeline">
@@ -828,7 +838,7 @@ function CardView({
             </div>
             <textarea
               ref={textRef}
-              placeholder="What is wrong? (this becomes a lesson for the AI)"
+              placeholder="What is wrong? (kept in the history; to change the cover itself, use “Correct this cover”)"
               value={text}
               onChange={(e) => setText(e.target.value)}
             />

@@ -860,3 +860,157 @@ main:has(.desk) {
     color: #f1f2f2;
   }
 }
+
+/* ---- corrections that change the cover (ADR-082) ------------------------------------------ */
+.dc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 18px;
+}
+.dc-note {
+  margin: 0;
+  flex: 1 1 320px;
+  color: var(--d-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.dc-tabs {
+  margin: 12px 0 10px;
+}
+.dc-body {
+  display: grid;
+  gap: 10px;
+}
+.dc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.dc-row input,
+.dc-row select {
+  font: inherit;
+  padding: 6px 10px;
+  border: 1px solid var(--d-line);
+  border-radius: 8px;
+  background: var(--d-soft);
+  color: var(--d-ink);
+  min-width: 0;
+}
+.dc-row input:focus,
+.dc-row select:focus {
+  outline: 2px solid var(--d-sage);
+  outline-offset: 1px;
+}
+.dc-num {
+  width: 72px;
+  font-variant-numeric: tabular-nums;
+}
+.dc-wide {
+  flex: 1 1 260px;
+}
+.dc-seams td {
+  vertical-align: middle;
+}
+.dc-kind {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--d-soft);
+  color: var(--d-muted);
+}
+.dc-kind.k-top {
+  background: var(--d-mid-bg);
+  color: var(--d-mid-c);
+}
+.dc-kind.k-corner {
+  background: var(--d-good-bg);
+  color: var(--d-good);
+}
+.dc-sizes button {
+  font-variant-numeric: tabular-nums;
+}
+.dc-done {
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px dashed var(--d-line);
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--d-muted);
+}
+.dc-done strong {
+  color: var(--d-ink);
+  text-transform: capitalize;
+}
+.dc-msg {
+  margin: 10px 0 0;
+}
+
+/* the rules bar on top of the Desk */
+.dc-rules {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+.dc-prop,
+.dc-learnt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--d-card);
+  box-shadow: var(--d-shadow);
+  font-size: 13px;
+}
+.dc-prop {
+  border-left: 3px solid var(--d-sand);
+}
+.dc-prop > span:nth-child(2) {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.dc-badge {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--d-green);
+  color: var(--d-bg);
+}
+.dc-badge.quiet {
+  background: var(--d-soft);
+  color: var(--d-muted);
+}
+.dc-badge.warn {
+  background: var(--d-mid-bg);
+  color: var(--d-mid-c);
+}
+.dc-rule {
+  padding: 2px 10px;
+  border-radius: 8px;
+  background: var(--d-soft);
+  color: var(--d-ink);
+  font-size: 12.5px;
+}
+.dc .dc-tabs {
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+}
+.dc .dc-tabs button {
+  flex: 0 0 auto;
+  padding-inline: 14px;
+}
+.dc-pending td {
+  opacity: 0.55;
+}
