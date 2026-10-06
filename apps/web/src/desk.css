@@ -1034,3 +1034,35 @@ main:has(.desk) {
 .d-ai:hover {
   border-color: #6e776b;
 }
+.d-ai.busy {
+  opacity: 0.8;
+  cursor: progress;
+}
+.d-ai.busy::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: d-spin 0.8s linear infinite;
+}
+@keyframes d-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.d-ai-note {
+  margin: 0 18px 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #778074 14%, transparent);
+  border: 1px solid var(--d-line);
+  font-size: 13px;
+}
+.d-ai-note.busy {
+  font-style: italic;
+}

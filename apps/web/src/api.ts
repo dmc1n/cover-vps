@@ -162,7 +162,7 @@ export interface Job {
 export interface DrawingRead {
   code: string;
   status: "built" | "needs a person";
-  reader: "outline" | "views" | null;
+  reader: "outline" | "views" | "ai" | null;
   reasons: string[];
   pieces?: number;
   vents?: number;

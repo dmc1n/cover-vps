@@ -419,6 +419,9 @@ function CardView({
   const [msg, setMsg] = useState("");
   const [allDiffs, setAllDiffs] = useState(false);
   const [allRevs, setAllRevs] = useState(false);
+  // "let the AI read it": its job followed here, the outcome shown beside the button
+  const [aiJob, setAiJob] = useState<string | null>(null);
+  const [aiNote, setAiNote] = useState("");
   const textRef = useRef<HTMLTextAreaElement>(null);
   const load = useCallback(() => {
     getJSON<Card>(`/api/desk/${id}`)
@@ -432,6 +435,40 @@ function CardView({
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    setAiJob(null);
+    setAiNote("");
+  }, [id]);
+  useEffect(() => {
+    if (!aiJob) return;
+    const t = setInterval(async () => {
+      try {
+        const j = await api.job(aiJob);
+        if (j.status === "queued" || j.status === "running") return;
+        clearInterval(t);
+        setAiJob(null);
+        if (j.status === "failed") {
+          setAiNote(`Failed: ${j.error ?? "see the model's log"}`);
+        } else {
+          const r = await api.drawingRead(id).catch(() => null);
+          setAiNote(
+            !r
+              ? "Done."
+              : r.status === "built"
+                ? `Built by the AI: ${r.pieces ?? "?"} pieces, ${r.vents ?? "?"} vents. Check it against the drawing, then approve or reject.`
+                : `Nothing built: ${r.reasons.join("; ")}`,
+          );
+        }
+        load();
+        onChanged();
+      } catch (e) {
+        clearInterval(t);
+        setAiJob(null);
+        setAiNote(String((e as Error).message ?? e));
+      }
+    }, 2000);
+    return () => clearInterval(t);
+  }, [aiJob, id, load, onChanged]);
 
   const act = useCallback(
     async (body: Record<string, unknown>, done: string, next = false) => {
@@ -540,21 +577,20 @@ function CardView({
             st.status !== "approved" &&
             st.status !== "produced" && (
             <button
-              className="d-ai"
+              className={`d-ai ${aiJob ? "busy" : ""}`}
+              disabled={!!aiJob}
               title="The AI reads the drawing: a proposal (about 1–5 cents), marked 'read by the AI', to approve here"
               onClick={async () => {
-                setMsg("");
+                setAiNote("");
                 try {
-                  await api.aiReadDrawing(card.id);
-                  setMsg(
-                    "The AI is reading the drawing; the proposal appears here in about a minute.",
-                  );
+                  const r = await api.aiReadDrawing(card.id);
+                  setAiJob(r.job.id);
                 } catch (e) {
-                  setMsg(String((e as Error).message ?? e));
+                  setAiNote(String((e as Error).message ?? e));
                 }
               }}
             >
-              Let the AI read it
+              {aiJob ? "AI is reading… (about a minute)" : "Let the AI read it"}
             </button>
           )}
           <a className="d-open" href={`#/model/${card.id}`}>
@@ -563,6 +599,13 @@ function CardView({
         </div>
       </div>
 
+      {(aiJob || aiNote) && (
+        <p className={`d-ai-note ${aiJob ? "busy" : ""}`} role="status">
+          {aiJob
+            ? "The AI is reading the drawing and the program builds its proposal. This card updates by itself."
+            : aiNote}
+        </p>
+      )}
       <div className="d-split">
         <figure className="d-drawing">
           <figcaption>
