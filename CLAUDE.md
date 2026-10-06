@@ -194,12 +194,13 @@ cover import <file> --out models/<id>/      STEP/IGES/STL/OBJ/PLY/GLB → model.
                                              kind.json (furniture or cover surface, ADR-039)
 cover hull models/<id>/ [--clearance N ...]  drape hull → hull.glb, hull.json, preview.glb
 cover cut models/<id>/ [--seams FILE]        seams and panels → panels.glb, panels.json
-cover flatten models/<id>/                   flat patterns → pattern.dxf, pattern.svg, pattern.json, sizes.pdf
+cover flatten models/<id>/                   flat patterns → pattern.dxf, pattern.svg, pattern.json (sizes.pdf on request)
 cover drawing models/<id>/                   size drawing of cover and panels → sizes.pdf
 cover drawing-build models/<id>/ [--pdf FILE] route A: a drawing read by the program and built as a cover,
                                              or "needs a person" (drawing_read.json, ADR-081)
-cover export models/<id>/                    finished pieces → cut.dxf, cut.svg, cutting-list.pdf, finished.json
-                                             (and a revision in revisions/<n>/)
+cover export models/<id>/ [--save-version]   finished pieces → cut.dxf, cut.svg, cutting-list.pdf, finished.json
+                                             (a revision in revisions/<n>/ when cut.dxf changed)
+cover hull|cut|flatten|export ... [--force]  a step skips itself when nothing it depends on changed (ADR-080)
 cover model models/<id>/ [--family F --status S --tags a,b --notes ...]   catalogue info, revisions
 cover batch [--family F | --ids a,b] [--steps hull,cut,flatten,export] [--set ...]  many models, what changed
 cover improve models/<id>/ [--rounds 4]      take seam proposals while they lower the worst stretch

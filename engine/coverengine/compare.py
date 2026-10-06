@@ -309,6 +309,9 @@ def _ai_compare(model_dir: Path, pdf: Path, params: EffectiveParams,
         {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{i}"}}
         for i in pages(pdf)
     ]
+    from coverengine.export.drawing import ensure_sizes
+
+    ensure_sizes(model_dir)
     if (model_dir / "sizes.pdf").is_file():
         parts += [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{i}"}}
                   for i in pages(model_dir / "sizes.pdf", 3)]  # fmt: skip

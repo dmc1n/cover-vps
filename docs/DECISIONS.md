@@ -1909,6 +1909,62 @@ The owner (6 October): a hyper-modern dashboard to keep track of everything, wit
 - **Better later:** a revision keeps only its cut files, not its 3D. "Cut this" therefore marks
   the revision whose DXF the workshop cuts; it does not bring back the old 3D.
 
+## ADR-080 — A lean pipeline: only what changed is calculated, the expensive extras on request
+
+The team (6 October): "every improvement recalculates so much, which costs time and tokens".
+Steps 1 and 2 of docs/plans/two-routes.md.
+
+**Off by default (still available as a button or flag):**
+- **The drape after every saved calculation** (ADR-059): `drape.auto: false`. It was a Style3D
+  fall on a Modal GPU, a rain simulation and two AI verdicts after every save, every shop order
+  and every reference upload. The "Drape" button runs it. `COVER_AUTO_DRAPE=on|off` still
+  overrides it.
+- **The AI choosing a box cover's pieces and a table's balloons:** `hull.box_ai` and
+  `hull.balloon_ai`, both false. The rule decides:
+  - box covers: the fewest top pieces, then the fewest pieces, within
+    `hull.box_volume_slack_pct` of the tightest box, never a sliver. This is what the AI was
+    asked to weigh (the owner, 2 Oct);
+  - tables: the fewest balloons with which all water runs off, about one per
+    `hull.balloon_spacing_mm`.
+
+  Every table recalculation made a paid call before.
+- **The size drawing** is no longer written by every flatten (`flatten.size_drawing: false`).
+  It is made when it is opened, approved or compared (`export.drawing.ensure_sizes`), and again
+  when it is older than pattern.json.
+- **The vents in 3D (vents.json)** are made when the viewer's tick box asks for them
+  (`finish.vents3d.ensure_vents`). Export no longer flattens every skirt piece a second time.
+- **cover.png** is rendered only when the cover's shape changed, never for a trial run.
+- **A revision** is kept only when cut.dxf changed from the latest revision, or on request
+  (`cover export --save-version`).
+
+**The step cache** (`coverengine/stepcache.py`):
+- **The stamp.** Each step (hull, cut, flatten, export) leaves <model>/steps/<step>.json with
+  three things:
+  - the parameters it read while it ran (measured through EffectiveParams, not a hand-written
+    list), with their values;
+  - the hashes of the files it reads from the step before. cover.json counts without its
+    catalogue notes and its parameters; the parameters are compared value by value;
+  - the hash of the engine's code.
+- **The skip.** A step whose stamp matches and whose outputs are there skips itself ("unchanged,
+  skipped"). `--force` always calculates; a step written to another folder (`--out`) never
+  skips.
+- **The server decides.** The web app no longer works out which step a setting starts from: it
+  sends hull→export, and the unchanged steps skip themselves. `POST /run` takes `force`.
+- **pattern.json** keeps the parameter record of the run that made its geometry. Copying the
+  full set into the file does not count as reading.
+
+**Measured on the procedural chair:**
+
+| | Before | After |
+|---|---|---|
+| Full first run | 16.5 s | 13.5 s |
+| Flatten | 6.6 s | 2.9 s (no size drawing) |
+| "Run again" with nothing changed | 21.3 s | 0.9 s |
+| A vent setting changed | export only, or the full 21.3 s via "Run again" | export only, 2.6 s |
+| The clearance changed | | hull onward |
+
+`cover batch` over the catalogue benefits in the same way.
+
 ## ADR-081 — Route A: a drawing (PDF) → a cover, one reader, nothing guessed
 
 The team (6 October 2026) asked for two routes only (docs/plans/two-routes.md). This is route A

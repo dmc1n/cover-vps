@@ -1011,3 +1011,22 @@ def write_drawing(model_dir: Path, doc: dict[str, Any], params: EffectiveParams,
     from coverengine.export.brand import brand
 
     return brand(out)
+
+
+def ensure_sizes(model_dir: Path, params: EffectiveParams | None = None) -> Path | None:
+    """The size drawing, made when it is asked for (ADR-080): flatten no longer writes it every
+    time. Made again when it is older than the pattern it shows. None without a pattern."""
+    import json
+
+    pattern = model_dir / "pattern.json"
+    out = model_dir / SIZES_PDF
+    if not pattern.is_file():
+        return None
+    if out.is_file() and out.stat().st_mtime >= pattern.stat().st_mtime:
+        return out
+    if params is None:
+        from coverengine.params.registry import Registry, resolve_model
+
+        params = resolve_model(model_dir, {}, Registry.load(None), None)
+    doc = json.loads(pattern.read_text(encoding="utf-8"))
+    return write_drawing(model_dir, doc, params, out)

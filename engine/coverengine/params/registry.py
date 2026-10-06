@@ -222,6 +222,9 @@ class Registry:
 class EffectiveParams:
     """The resolved parameter set for one run."""
 
+    # while a step runs, the keys it reads (coverengine.stepcache, ADR-080); None: not noted
+    track: set[str] | None = None
+
     def __init__(
         self, registry: Registry, values: Mapping[str, Scalar], sources: Mapping[str, str]
     ) -> None:
@@ -230,9 +233,16 @@ class EffectiveParams:
         self._sources = dict(sources)
 
     def __getitem__(self, key: str) -> Scalar:
-        return self._values[key]
+        value = self._values[key]
+        if EffectiveParams.track is not None:
+            EffectiveParams.track.add(key)
+        return value
 
     def get(self, key: str) -> Scalar:
+        return self[key]
+
+    def peek(self, key: str) -> Scalar:
+        """The value without noting it as read (for the step cache's own comparisons)."""
         return self._values[key]
 
     def source(self, key: str) -> str:

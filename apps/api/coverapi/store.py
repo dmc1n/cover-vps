@@ -144,6 +144,11 @@ class Store:
         if not d.is_dir():
             raise KeyError(model_id)
         files = sorted(f for f in ALLOWED if (d / f).is_file())
+        # made when they are opened (ADR-080)
+        if "pattern.json" in files and "sizes.pdf" not in files:
+            files = sorted([*files, "sizes.pdf"])
+        if "finished.json" in files and "vents.json" not in files:
+            files = sorted([*files, "vents.json"])
         done = [s for s in STEPS if all((d / f).is_file() for f in STEP_FILES[s][:1])]
         out: dict[str, Any] = {"id": model_id, "steps_done": done, "files": files}
         out.update(info(d))

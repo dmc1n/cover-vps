@@ -45,6 +45,9 @@ def state(model_dir: Path) -> dict[str, Any] | None:
 
 
 def approve(model_dir: Path, username: str, name: str, note: str = "") -> dict[str, Any]:
+    from coverengine.export.drawing import ensure_sizes
+
+    ensure_sizes(model_dir)  # the size drawing is made when it is needed (ADR-080)
     missing = [
         f for f in ("cut.dxf", "cutting-list.pdf", "sizes.pdf") if not (model_dir / f).is_file()
     ]

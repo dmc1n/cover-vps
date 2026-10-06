@@ -32,8 +32,11 @@ class ApproveRequest(BaseModel):
 
 
 class RunRequest(BaseModel):
-    steps: list[str] | None = None  # default: everything after import
+    # default: everything after import; the steps whose inputs did not change skip themselves
+    # (the server decides, ADR-080), unless `force`
+    steps: list[str] | None = None
     trial: dict[str, Any] = {}
+    force: bool = False
 
 
 class ParametersRequest(BaseModel):
@@ -82,6 +85,15 @@ def _named(model_id: str, name: str, revision: int | None = None) -> tuple[str, 
     return file, kind
 
 
+def _auto_drape() -> bool:
+    env = os.environ.get("COVER_AUTO_DRAPE")
+    if env in ("on", "off"):
+        return env == "on"
+    from coverengine.params import Registry
+
+    return bool(Registry.load(None).resolve()["drape.auto"])
+
+
 def create_app(
     data_dir: Path, web_dir: Path | None = None, login_required: bool = False
 ) -> FastAPI:
@@ -91,10 +103,11 @@ def create_app(
 
     store = Store(data_dir)
     store.ensure()
-    # the drape after every full calculation (ADR-059); COVER_AUTO_DRAPE=off for tests
+    # the drape after every full calculation: off by default (drape.auto, ADR-080); the env
+    # COVER_AUTO_DRAPE=on|off overrides it
     jobs = Jobs(
         store,
-        drape_after_export=os.environ.get("COVER_AUTO_DRAPE", "on") != "off",
+        drape_after_export=_auto_drape(),
         drape_workers=int(os.environ.get("COVER_DRAPE_WORKERS", "4")),
     )
     app = FastAPI(
@@ -183,6 +196,14 @@ def create_app(
     @app.get("/api/models/{model_id}/files/{name}")
     def file(model_id: str, name: str, request: Request) -> FileResponse:
         d = model_or_404(model_id)
+        if name == "sizes.pdf":  # made when it is opened (ADR-080)
+            from coverengine.export.drawing import ensure_sizes
+
+            ensure_sizes(d)
+        elif name == "vents.json":
+            from coverengine.finish.vents3d import ensure_vents
+
+            ensure_vents(d)
         if name not in ALLOWED or not (d / name).is_file():
             raise HTTPException(404, f"no file {name!r}")
         if name == "cut.dxf":  # the cutting table's file: only an approved cover (ADR-079)
@@ -217,7 +238,7 @@ def create_app(
         steps = req.steps or STEPS[1:]
         try:
             store.parameters(model_id, trial=req.trial)  # check the values before queueing
-            return jobs.submit(JobSpec(model_id, steps, req.trial))
+            return jobs.submit(JobSpec(model_id, steps, req.trial, force=req.force))
         except (ParamError, ValueError) as exc:
             raise HTTPException(400, str(exc)) from None
 

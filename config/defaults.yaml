@@ -30,8 +30,9 @@ hull:                            # the cover surface (drape hull)
   min_slope_deg: 5               # to confirm; flatter patches of the top hold water
   flat_patch_mm: 100             # flat spots smaller than this across, or this close to the edge,
                                  # still shed water
-  box_pieces: 0                  # box cover: number of flat pieces; 0 = chosen by the AI (or, without
-                                 # AI, the fewest within box_volume_slack_pct of the tightest box)
+  box_pieces: 0                  # box cover: number of flat pieces; 0 = by the rule: the fewest top
+                                 # pieces, then the fewest pieces, within box_volume_slack_pct (ADR-080)
+  box_ai: false                  # true: the AI chooses the number of pieces instead (a paid call each time)
   box_max_pieces: 10             # box cover: options tried, up to this many pieces
   box_volume_slack_pct: 5        # box cover without AI: extra volume allowed over the tightest box
   support: none                  # none | balloons | balloon | frame   support under the cover
@@ -49,8 +50,9 @@ hull:                            # the cover surface (drape hull)
   dining_table_min_mm: 740       # a table this high up to dining_table_max_mm is a dining table
   dining_table_max_mm: 770
   balloon_model: table-baloon    # the balloon's model folder (owner, 1 Oct 2026: one size)
-  balloon_count: 0               # balloons under a table; 0 = chosen by the AI (or, without AI,
-                                 # the fewest with which all water runs off)
+  balloon_count: 0               # balloons under a table; 0 = by the rule: the fewest with which all
+                                 # water runs off, about one per balloon_spacing_mm (ADR-080)
+  balloon_ai: false              # true: the AI chooses the number of balloons instead (a paid call)
   balloon_max: 8                 # balloons: options tried, up to this many
   balloon_spacing_mm: 1100       # without AI about one balloon per this table length (owner,
                                  # 1 Oct 2026: a 340 cm table gets 3 to 4); always at least 1
@@ -163,6 +165,8 @@ rain:                            # cover rain: where rain goes on a cover (ADR-0
   seam_run_mm: 250               # water running along a seam further than this soaks in
 
 drape:                           # the drape simulation: the sewn cover falling over the furniture (ADR-056)
+  auto: false                    # after every saved calculation (ADR-059 had it on); off since the team's
+                                 # "two routes" (6 Oct 2026, ADR-080): the button "Drape check" runs it
   engine: style3d                # style3d (Newton's garment solver, lifelike, ~40 min a sofa; the owner,
                                  # 2026-10-04: time is fine if it is kept, ADR-059) | own (fast, ADR-056)
   gpu: modal                     # modal: the Style3D fall on an NVIDIA GPU by API (ADR-069, ~7 min a sofa
@@ -232,6 +236,7 @@ roll:
 
 flatten:
   solver: slim                   # slim | arap
+  size_drawing: false            # write sizes.pdf on every flatten; false: made when it is opened (ADR-080)
   iterations: 50                 # most SLIM iterations per panel
   slim_tolerance: 0.0000001      # stop when the energy improves by less than this fraction
   max_triangles: 50000           # denser panels are simplified first (outline kept exactly)
