@@ -193,7 +193,26 @@ def read(
     elif outline and "error" in outline:
         reasons.append(f"a closed outline is drawn, but: {outline['error']}")
 
-    # b. the views: the plan cut by the elevations, checked against the 3D view
+    # b. a C or U shaped sofa: the exact top view, the written back profile, the drawn seams
+    #    (ADR-084), trusted when the back edge's segments match the written lengths
+    try:
+        from coverengine import plan_profile
+
+        pp = plan_profile.read_drawing(pdf)
+    except Exception as exc:  # noqa: BLE001 - not this kind of drawing
+        pp = {"error": str(exc)}
+    if "shape" in pp:
+        lengths = plan_profile.check_lengths(pdf, pp["shape"])
+        info["plan_profile"] = {"profile": pp["profile"], "scale_fix": pp["scale_fix"],
+                                "seams": pp["seams"], "lengths": lengths}  # fmt: skip
+        if lengths["trusted"]:
+            pieces = plan_profile.build(pp["shape"])
+            return {"status": "built", "reader": "plan-profile", "shape": "plan-profile",
+                    "pieces": pieces, "info": info, "reasons": []}  # fmt: skip
+        reasons.append(f"a C or U shape: only {lengths['matched']} of {lengths['of']} lengths "
+                       "along the back match the drawing")  # fmt: skip
+
+    # c. the views: the plan cut by the elevations, checked against the 3D view
     if views is not None:
         kinds = [v.kind for v in views["views"]]
         if "plan" not in kinds:

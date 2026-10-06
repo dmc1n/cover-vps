@@ -176,3 +176,15 @@ def test_table_covers_get_a_middle_cord_line_and_every_hood_a_logo() -> None:
     assert level  # halfway up, level
     hood = next(p for p in pieces if p.name == "vent-hood")
     assert any(t == "LOGO" for t, _, _ in hood.pen_text)
+
+
+def test_a_vent_on_a_too_short_piece_moves_to_a_roomy_one() -> None:
+    """C27 (6 Oct 2026): a share of the drawing's vents fell on a 16 cm end piece and was lost;
+    it moves to the nearest piece of the same side with room, so the count is kept."""
+    from coverengine.finish.finish import HemRun, _roomy
+
+    runs = [HemRun("skirt-front-1", np.array([[0, 0], [160, 0]]), 160.0),
+            HemRun("skirt-front-2", np.array([[160, 0], [2160, 0]]), 2000.0)]  # fmt: skip
+    at = _roomy(runs, 80.0, 310.0)
+    assert 160.0 + 155.0 <= at <= 2160.0 - 155.0
+    assert _roomy(runs, 900.0, 310.0) == 900.0

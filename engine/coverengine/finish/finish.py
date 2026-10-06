@@ -162,6 +162,24 @@ def side_of(panel: str) -> str:
     return re.sub(r"-\d+$", "", panel)
 
 
+def _roomy(runs: list[HemRun], s_at: float, need: float) -> float:
+    """Where along a side a vent goes: `s_at`, unless the piece of hem there is too short for a
+    vent (a narrow end piece, C27); then the nearest point on a piece long enough (so the count
+    on the drawing is kept, owner 5 Oct 2026)."""
+    acc, spans = 0.0, []
+    for r in runs:
+        spans.append((acc, acc + r.length, r.length >= need))
+        acc += r.length
+    for lo, hi, ok in spans:
+        if lo <= s_at <= hi and ok:
+            return s_at
+    roomy = [(lo, hi) for lo, hi, ok in spans if ok]
+    if not roomy:
+        return s_at  # nowhere roomier: warned as before
+    lo, hi = min(roomy, key=lambda sp: min(abs(s_at - sp[0]), abs(s_at - sp[1])))
+    return float(np.clip(s_at, lo + need / 2, hi - need / 2))
+
+
 def per_side(lengths: dict[str, float], params: EffectiveParams) -> dict[str, int]:
     """Vents per side of the cover: one per full metre of that side, at least one (owner, 1 Oct
     2026: each side separately; 2.10 m: 2, 2.90 m: 2, 3.10 m: 3, 1.40 m: 1). A number written
@@ -278,6 +296,7 @@ def place_vents(
         for j in range(n):
             k += 1
             s_at = (j + 0.5) * side_total / n  # param-ok: the middle of each share
+            s_at = _roomy(side_runs, s_at, w + 2 * allowance)
             acc = 0.0
             for r in side_runs:
                 if s_at <= acc + r.length or r is side_runs[-1]:

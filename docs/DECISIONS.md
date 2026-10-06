@@ -2094,3 +2094,40 @@ The owner (6 October): keep `drawing.min_iou` at 85 %; the AI button may come.
 - **Commands and endpoint:** `cover drawing-ai <model>` (a job step) and
   `POST /api/models/{id}/drawing/ai`.
 - **Tests** fake the AI: no paid call in a test.
+
+## ADR-084 — C- and U-shaped sofas from the exact top view and the back profile
+
+The owner (6 October) on the AI's C27: "it looks nothing like it; a ridge runs over the cover
+that is far too pointed." Then: "option 2" (build it by hand from the drawing), "you have the
+whole night".
+
+- **Why the earlier ways failed.**
+  - The swept shape (ADR-068) follows one curve with a constant cross-section. C27's arms curl
+    in and end in round noses, so no path fits; the AI read only about a quarter circle.
+  - The views reader (ADR-075) has no side view to use for such a curve.
+- **The shape "plan + profile"** (`coverengine/plan_profile.py`).
+  - **The plan:** the drawing's own top view, exactly.
+  - **The top:** its height at every point is the written profile at that point's distance
+    from the back edge. For C27, the strip is 20.3 cm wide at 86.4 cm, then falls to 38.1 cm
+    at 99 cm.
+  - **The back edge:** the longest run of the outline along its convex hull, i.e. the
+    outside of the C or U.
+  - **The walls** stand on the outline up to the top.
+  - **The pieces:** the top is split at the profile's creases and across at the drawing's
+    seam lines; the walls are split at the same lines.
+- **Read by the program** (route A, before the views reader):
+  - **The profile:** from the written "Height", "Front Height" and "Depth", plus the bare
+    strip size.
+  - **The seams:** the drawn seam lines over the top view, followed from the outline over the
+    crease (choosing the straightest bit there) back to the outline.
+  - **The scale:** corrected by the written depth, because the seam lines span the depth. The
+    top view's own scale was 16.7 % off on C26 and 5 % on C27.
+  - **Trust:** the back edge's segments between the seams must match the written lengths
+    (75 %). On both drawings every segment matched within 1 cm.
+  - **A typo on the drawing is found, not followed.** C27 writes 235.1 cm beside 96.5 in
+    (= 245.1 cm); the measured segment is 245.0 cm.
+- **C26 and C27** are rebuilt this way and live (new revisions; backups in cover-data).
+  - C26 has 20 pieces and covers the drawing's 3D view 98 %.
+  - C27 has 25 pieces and 10 vents. A vent that fell on a 16 cm end piece now moves to the
+    nearest piece with room (`finish._roomy`), so the drawing's count is kept.
+  - Both wait at the top of the Desk for a person.
