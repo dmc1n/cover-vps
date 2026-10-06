@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -103,7 +104,13 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
         except KeyError:
             raise HTTPException(404, f"no model {model_id!r}") from None
         if not (d / "reference.pdf").is_file():
-            raise HTTPException(400, "this model has no drawing: upload one")
+            # older drawing covers: the Desk finds their PDF in the uploads; keep it with the model
+            from coverapi.desk import drawing_pdf
+
+            found = drawing_pdf(d, store.root) if d.is_dir() else None
+            if found is None:
+                raise HTTPException(400, "this model has no drawing: upload one")
+            shutil.copyfile(found, d / "reference.pdf")
         _desk_note(d, json.loads((d / "desk.json").read_text()).get("code")
                    if (d / "desk.json").is_file() else model_id, user.username)  # fmt: skip
         return {"model_id": model_id, "job": jobs.submit(JobSpec(model_id, ["drawing-ai"], {}))}

@@ -535,7 +535,10 @@ function CardView({
           <Score label="G" v={card.scores.gemini} />
           <Score label="D" v={card.scores.deepseek} />
           <Pill status={st.status} />
-          {canAct && ck.outcome === "person to check" && (
+          {canAct &&
+            ck.outcome !== "agreed: same" &&
+            st.status !== "approved" &&
+            st.status !== "produced" && (
             <button
               className="d-ai"
               title="The AI reads the drawing: a proposal (about 1–5 cents), marked 'read by the AI', to approve here"
