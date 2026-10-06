@@ -239,3 +239,12 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
 66. **Vent position on the drawings:** many drawings write "4 Air Pockets at Middle" or "at
     Top" (R1–R3). The rule from 1 October puts every vent 5 cm above the lower edge. Does the
     drawing's position win here too, as the number now does?
+67. **Learning, simplicity and two questions** (mailed to Wouter Bekkers on 6 Oct 2026, at the
+    owner's request; working on with the current system until the answers come):
+    - lessons today only steer the AI's advice, not the geometry;
+    - the proposal: two routes (2D drawing → cover; 3D cover surface → cover), the rest on
+      request only.
+    - Q1 (seams): a reference set of 10–20 good covers with their seams, the seam rules in
+      writing, and structured seam feedback at the Desk.
+    - Q2 (2D drawings): the STEP behind each drawing, or a fixed drawing standard; a test set of
+      20 drawings with the right answer; structured feedback.
