@@ -185,6 +185,11 @@
   .d-body {
     grid-template-columns: 1fr;
   }
+  /* one column: the queue scrolls in its own box above the card, never over it */
+  .d-queue {
+    position: static;
+    max-height: 46vh;
+  }
 }
 .d-queue {
   background: var(--d-card);
