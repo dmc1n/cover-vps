@@ -266,6 +266,8 @@ desk:                            # the drawing desk: people approve covers, AI o
   require_approval_for_dxf: true # the cutting table's DXF only once a cover is approved (owner)
   gate_scope: drawings           # drawings: only drawing-* covers need approval for the DXF; all: every
                                  # model (to confirm: the 314 SUNS models are all still "draft")
+  learn_after: 5                 # the same correction on this many covers of a group is proposed
+                                 # as the group's rule; a person accepts it (ADR-082)
 
 spend:                           # what the AI costs, kept and guarded (owner, 6 Oct 2026; ADR-078)
   budget_eur_month: 50           # to confirm: the month's AI budget; at 100 % paid calls stop

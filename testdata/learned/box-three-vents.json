@@ -1,0 +1,8 @@
+{
+ "about": "The Desk: 'this cover has 3 vents': the count is the cover's own setting (ADR-082)",
+ "shape": "box",
+ "sizes": {"length_cm": 120, "depth_cm": 80, "height_cm": 60},
+ "edits": [],
+ "params": {"features.vents_total": 3},
+ "expect": {"vents": 3, "params": {"features.vents_total": 3}}
+}

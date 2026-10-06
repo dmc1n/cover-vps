@@ -88,16 +88,16 @@ def test_only_approvers_decide_and_the_catalogue_follows(app: Any, tmp_path: Pat
     assert json.loads(cover.read_text())["status"] == "checked"
 
 
-def test_a_reject_needs_a_reason_and_becomes_a_lesson(app: Any, tmp_path: Path) -> None:
+def test_a_reject_needs_a_reason_and_is_logged_not_an_ai_lesson(app: Any, tmp_path: Path) -> None:
+    """ADR-082: a reject's words no longer go into AI prompts; corrections change the cover."""
     rick = login(app, "rick")
     assert rick.post("/api/desk/drawing-a", json={"action": "reject"}).status_code == 400
     r = rick.post("/api/desk/drawing-a", json={
         "action": "reject", "reasons": ["shape"], "text": "the front must be round"})  # fmt: skip
     assert r.json()["status"] == "rejected"
     learning = tmp_path / "data" / "learning"
-    lessons = json.loads((learning / "lessons.json").read_text())
-    assert lessons[-1]["rule"] == "the front must be round" and lessons[-1]["from"] == "desk"
-    assert "reject" in (learning / "desk.jsonl").read_text()
+    assert not (learning / "lessons.json").is_file()
+    assert "the front must be round" in (learning / "desk.jsonl").read_text()
     card = rick.get("/api/desk/drawing-a").json()
     assert (
         card["desk"]["rejected"]["reasons"] == ["shape"]

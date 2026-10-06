@@ -1908,3 +1908,57 @@ The owner (6 October): a hyper-modern dashboard to keep track of everything, wit
   dark, the keys j/k/a/r/p/u, and the existing 3D viewer.
 - **Better later:** a revision keeps only its cut files, not its 3D. "Cut this" therefore marks
   the revision whose DXF the workshop cuts; it does not bring back the old 3D.
+
+## ADR-082 — Learning that changes the cover itself: Desk corrections, group rules, test cases
+
+The team (6 October): "when we apply a learning, it does not show in a new version. Does it
+really learn?" It did not.
+- An accepted lesson was only text in the AI's prompts.
+- The geometry (seams, pieces, vents, the drawing reading) never read it.
+
+**Now** a correction at the Desk is something the program uses, deterministically:
+
+- **Per cover** (`apps/api/coverapi/desk.py` `correct`, `POST /api/desk/{id}/correct`):
+  - a vent count, a vent height or a skirt seam height becomes a parameter override in the
+    cover's own `cover.json`;
+  - "remove this seam" or "add a seam" becomes a piece edit in `part_edits.json`.
+
+    The cut reads the edits for covers drawn in parts and for box covers
+    (`seams/build.py`, `learned.apply_edits`). A join is located by a point on the seam, so
+    it survives the renaming of pieces: "join the two pieces whose seam passes here". A split
+    takes a plane: x, y or z at a value.
+  - a size read wrong goes to `drawing_corrections.json`, for the drawing reader;
+  - a missing shape is kept as structured feedback.
+  - The server decides which steps run (export, or cut → export) and queues them.
+  - A correction to an approved cover sets it back to "to approve": the approval was for the
+    cover before the change.
+- **Per group** (`coverengine/learned.py`):
+  - A group is the cover's family, or for a drawing cover its series (S45 → drawing-s).
+  - The same parameter correction on `desk.learn_after` covers of a group is proposed at the
+    top of the Desk.
+  - A person accepts it. It is then written to <data>/learning/rules/<group>.yaml and logged
+    in learning/rules.jsonl.
+  - `params.resolve_model` merges the group's rules on top of the family preset, below the
+    cover's own settings.
+  - Rules are read only when the app names the data folder (COVER_DATA_DIR), so a CLI run
+    by hand or a test stays deterministic (rule 10).
+- **As tests:**
+  - Every correction leaves a case in <data>/learning/cases/: what must hold afterwards
+    (pieces at most/least, no seam near the point, a vent count, a setting).
+  - `scripts/learned_check.py [--recalc]` checks them all. This is the groundwork for the
+    team's measuring rod (question 67).
+  - The synthetic cases in testdata/learned/ are replayed in CI on a box cover built from
+    scratch (`engine/tests/test_learned_cases.py`).
+- **The old path:**
+  - A reject's words no longer become an AI lesson; they stay in the history and in
+    learning/desk.jsonl.
+  - The lessons already accepted remain in the AI prompts for advice.
+- **`desk.learn_after` is 5:** the team suggested 3, but 3 (and 4, 6) collide with the
+  repository's rule that no default may repeat a number used in the engine code. It is one
+  setting to change.
+- **Not yet:**
+  - Moving a seam of a drawn cover is "remove + add" (two clicks), not one drag.
+  - A split follows the faces' centres, so on a coarse surface the new seam can step a
+    little. The pattern check's wiggle warning shows it.
+  - Size corrections do not yet re-read the drawing: the reader of route A (two-routes plan,
+    step 3) should apply `drawing_corrections.json`.

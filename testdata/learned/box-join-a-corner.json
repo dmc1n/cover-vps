@@ -1,0 +1,8 @@
+{
+ "about": "The Desk: 'remove this seam' on a box cover's corner: the two walls become one piece (ADR-082)",
+ "shape": "box",
+ "sizes": {"length_cm": 120, "depth_cm": 80, "height_cm": 60},
+ "edits": [{"op": "join", "seam_kind": "corner"}],
+ "params": {},
+ "expect": {"pieces_delta": -1, "no_seam_near": true}
+}
