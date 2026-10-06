@@ -186,7 +186,7 @@ def choose(
         if dry
         else "no option sheds all water: the one with the least flat area"
     )
-    if params["ai.provider"] != "none":
+    if bool(params["hull.balloon_ai"]) and params["ai.provider"] != "none":
         try:
             from coverengine.ai import ask, lessons_text
 
@@ -313,7 +313,7 @@ def box_points(
             "setting",
             (f"hull.balloon_count = {fixed}"),
         )
-    elif params["ai.provider"] != "none":
+    elif bool(params["hull.balloon_ai"]) and params["ai.provider"] != "none":
         try:
             from coverengine.ai import ask, lessons_text
 

@@ -73,12 +73,20 @@ def revisions(model_dir: Path) -> list[dict[str, Any]]:
     return data
 
 
-def save_revision(model_dir: Path, trial: dict[str, Any]) -> dict[str, Any]:
-    """Keep this export as the next revision."""
+def save_revision(
+    model_dir: Path, trial: dict[str, Any], only_if_changed: bool = False
+) -> dict[str, Any]:
+    """Keep this export as the next revision. `only_if_changed`: not when the cutting file is
+    the same as the latest revision's (ADR-080): then that revision is returned, marked
+    "unchanged"."""
     pattern = model_dir / "pattern.json"
     if not pattern.is_file():
         raise CoverError(f"no pattern.json in {model_dir}")
     listed = revisions(model_dir)
+    if only_if_changed and listed and (model_dir / "cut.dxf").is_file():
+        last = model_dir / REVISIONS / f"{listed[-1]['number']:03d}" / "cut.dxf"
+        if last.is_file() and last.read_bytes() == (model_dir / "cut.dxf").read_bytes():
+            return {**listed[-1], "unchanged": True}
     number = (listed[-1]["number"] + 1) if listed else 1
     folder = model_dir / REVISIONS / f"{number:03d}"
     folder.mkdir(parents=True, exist_ok=True)

@@ -302,8 +302,11 @@ def choose(
     least = _p(params, "seams.min_piece_width_mm")
     rows = [r for r in rows if r.get("narrowest_piece_mm", least) >= least] or rows  # no slivers
     tightest = min(r["extra_volume_pct"] for r in rows)
-    rule = next(r for r in rows if r["extra_volume_pct"] <= tightest + slack)
-    if params["ai.provider"] != "none":
+    near = [r for r in rows if r["extra_volume_pct"] <= tightest + slack]
+    # the owner (2 Oct 2026): a seam on top is a weak point for water, so the fewest top pieces
+    # first, then the fewest pieces; this is what the AI was asked to weigh (ADR-080)
+    rule = min(near, key=lambda r: (int(r.get("top_pieces", 0)), int(r["pieces"])))
+    if bool(params["hull.box_ai"]) and params["ai.provider"] != "none":
         try:
             from coverengine.ai import ask
 
@@ -321,7 +324,8 @@ def choose(
                 "rule",
                 f"the AI could not decide ({exc}); fewest pieces within the slack",
             )
-    return int(rule["pieces"]), "rule", f"fewest pieces within {slack:g} % of the tightest box"
+    why = f"fewest top pieces, then fewest pieces, within {slack:g} % of the tightest box"
+    return int(rule["pieces"]), "rule", why
 
 
 def mesh_of(box: Box, planes: list[Array]) -> trimesh.Trimesh:

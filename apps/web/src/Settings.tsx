@@ -24,17 +24,6 @@ const GROUP_LABEL: Record<string, string> = {
   units: "Units",
 };
 
-// the step a change in a group has to start from
-const FIRST_STEP: Record<string, Step> = {
-  import: "import",
-  hull: "hull",
-  seams: "cut",
-  roll: "cut",
-  flatten: "flatten",
-  fabric: "flatten",
-  drawing: "flatten",
-  pen: "flatten",
-};
 
 export function Settings({
   id,
@@ -68,15 +57,9 @@ export function Settings({
   if (!current) return <p className="muted">Loading settings…</p>;
   const changed = Object.keys(edits).length > 0;
 
-  const firstStep = (): Step[] => {
-    const order: Step[] = ["import", "hull", "cut", "flatten", "export"];
-    let start = 4;
-    for (const key of Object.keys(edits)) {
-      const step = FIRST_STEP[key.split(".")[0]] ?? "export";
-      start = Math.min(start, order.indexOf(step));
-    }
-    return order.slice(Math.max(start, 1));
-  };
+  // every step after import; the server skips the ones whose inputs did not change (ADR-080)
+  const firstStep = (): Step[] => ["hull", "cut", "flatten", "export"];
+
 
   const save = async () => {
     const own: Record<string, Scalar> = {};

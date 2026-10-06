@@ -228,19 +228,18 @@ def _cmd_export(args: argparse.Namespace) -> int:
     finished["sheet"] = write_export(out, pieces, finished, params)
     from coverengine.export.preview import PREVIEW_PNG, write_preview
 
-    write_preview(args.model, doc, params, out / PREVIEW_PNG)
+    # the picture only when the cover's shape changed, never for a trial run (ADR-080)
+    png = out / PREVIEW_PNG
+    if not png.is_file() or (not args.overrides and png.stat().st_mtime < pattern.stat().st_mtime):
+        write_preview(args.model, doc, params, png)
     (out / FINISHED_JSON).write_text(
         _json.dumps(finished, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    from coverengine.finish.vents3d import VENTS_JSON, vents_3d
+    from coverengine.finish.vents3d import VENTS_JSON
 
-    try:  # where the air vents sit on the cover, for the viewer (ADR-073)
-        vents = vents_3d(args.model, doc, params)
-    except (OSError, KeyError, ValueError) as exc:
-        vents = {"vents": [], "warnings": [f"vents not placed in 3D: {exc}"]}
-    (out / VENTS_JSON).write_text(_json.dumps(vents, indent=1) + "\n", encoding="utf-8")
-    print(f"export -> {out / 'cut.dxf'}, cut.svg, cutting-list.pdf, cover.png, {FINISHED_JSON}, "
-          f"{VENTS_JSON}")  # fmt: skip
+    # the vents in 3D are made when the viewer asks for them (ADR-080): a stale file goes
+    (out / VENTS_JSON).unlink(missing_ok=True)
+    print(f"export -> {out / 'cut.dxf'}, cut.svg, cutting-list.pdf, cover.png, {FINISHED_JSON}")
     for pc in finished["pieces"]:
         w, h = pc["size_mm"]
         print(f"  {pc['id']:<4} {pc['name']:<16} x{pc['quantity']}  {w:6.0f} x {h:6.0f} mm")
@@ -249,8 +248,13 @@ def _cmd_export(args: argparse.Namespace) -> int:
     if out.resolve() == args.model.resolve():
         from coverengine.catalogue import save_revision
 
-        rev = save_revision(args.model, parse_set(args.overrides))
-        print(f"revision {rev['number']}" + (" (trial settings)" if rev["trial"] else ""))
+        # a new revision only when the cutting file changed, or on request (ADR-080)
+        rev = save_revision(args.model, parse_set(args.overrides),
+                            only_if_changed=not args.save_version)  # fmt: skip
+        if rev.get("unchanged"):
+            print(f"revision {rev['number']} (cut.dxf unchanged)")
+        else:
+            print(f"revision {rev['number']}" + (" (trial settings)" if rev["trial"] else ""))
     for w in warnings:
         print(f"warning: {w}", file=sys.stderr)
     return 0
@@ -621,11 +625,12 @@ def _cmd_flatten(args: argparse.Namespace) -> int:
     )
     from coverengine.export.drawing import SIZES_PDF, write_drawing
 
-    write_drawing(args.model, doc, params, out / SIZES_PDF)
-    print(
-        f"patterns -> {out / 'pattern.dxf'}, pattern.svg, pattern-stretch.svg, pattern.json, "
-        f"{SIZES_PDF}"
-    )
+    # the size drawing is made when it is opened (ADR-080); a stale one goes
+    if bool(params["flatten.size_drawing"]):
+        write_drawing(args.model, doc, params, out / SIZES_PDF)
+    else:
+        (out / SIZES_PDF).unlink(missing_ok=True)
+    print(f"patterns -> {out / 'pattern.dxf'}, pattern.svg, pattern-stretch.svg, pattern.json")
     for p in doc["panels"]:
         fits = "fits the roll" if p["fits_roll"] else "TOO WIDE for the roll"
         print(
@@ -648,7 +653,7 @@ def _cmd_flatten(args: argparse.Namespace) -> int:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
-    """import -> hull -> cut -> flatten in one go."""
+    """import -> hull -> cut -> flatten -> export in one go (unchanged steps skip themselves)."""
     out = args.out or Path("models") / args.file.stem.lower().replace(" ", "-")
     steps = [
         ["import", str(args.file), "--out", str(out)]
@@ -751,6 +756,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resolution", type=float, help="grid size (mm); smaller is slower, finer")
     p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
     _add_param_args(p)
+    p.add_argument("--force", action="store_true",
+                   help="calculate even when nothing this step depends on changed")  # fmt: skip
     p.set_defaults(handler=_cmd_hull)
 
     p = sub.add_parser("cut", help="divide the cover surface into panels with seams")
@@ -758,18 +765,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seams", type=Path, help="seam file (default: seams.json in the model dir)")
     p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
     _add_param_args(p)
+    p.add_argument("--force", action="store_true",
+                   help="calculate even when nothing this step depends on changed")  # fmt: skip
     p.set_defaults(handler=_cmd_cut)
 
     p = sub.add_parser("flatten", help="flat patterns of every panel (DXF, SVG, pattern.json)")
     p.add_argument("model", type=Path, help="model directory with panels (cover cut)")
     p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
     _add_param_args(p)
+    p.add_argument("--force", action="store_true",
+                   help="calculate even when nothing this step depends on changed")  # fmt: skip
     p.set_defaults(handler=_cmd_flatten)
 
     p = sub.add_parser("export", help="finished pieces for the cutting table (cut.dxf, list)")
     p.add_argument("model", type=Path, help="model directory with patterns (cover flatten)")
     p.add_argument("--out", type=Path, help="output directory (default: the model directory)")
+    p.add_argument("--save-version", action="store_true",
+                   help="keep a revision even when cut.dxf did not change")  # fmt: skip
     _add_param_args(p)
+    p.add_argument("--force", action="store_true",
+                   help="calculate even when nothing this step depends on changed")  # fmt: skip
     p.set_defaults(handler=_cmd_export)
 
     p = sub.add_parser("model", help="a model's family, status, tags, notes and revisions")
@@ -887,11 +902,46 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+CACHED_STEPS = ("hull", "cut", "flatten", "export")
+
+
+def _cached(step: str, handler: Handler, args: argparse.Namespace) -> int:
+    """Run a step unless nothing it depends on changed (coverengine.stepcache, ADR-080)."""
+    from coverengine import stepcache
+
+    model = args.model
+    same_folder = getattr(args, "out", None) is None or (
+        Path(args.out).resolve() == Path(model).resolve()
+    )
+    # the hull's own shortcuts (--clearance ...) are trial values the stamp cannot see first
+    shortcuts = any(getattr(args, k, None) is not None
+                    for k in ("clearance", "bridge_gap", "hem_height", "resolution"))  # fmt: skip
+    if not (same_folder and Path(model).is_dir()):
+        return handler(args)
+    if shortcuts or args.overrides:
+        # a trial run (--set): always calculated; its result is no saved state, so the stamp
+        # goes and the next normal run calculates again
+        stepcache.forget(model, (step,))
+        return handler(args)
+    cover_json = model / "cover.json"
+    params = resolve_params(args, cover_json if cover_json.is_file() else None)
+    if not args.force and stepcache.unchanged(step, model, params):
+        print(f"{step}: unchanged, skipped (--force to calculate again)")
+        return 0
+    with stepcache.reading() as read:
+        code = handler(args)
+    if code == 0:
+        stepcache.write(step, model, params, read)
+    return code
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     handler: Handler = args.handler
     try:
+        if args.command in CACHED_STEPS and hasattr(args, "force"):
+            return _cached(args.command, handler, args)
         return handler(args)
     except CoverError as exc:
         print(f"error: {exc}", file=sys.stderr)

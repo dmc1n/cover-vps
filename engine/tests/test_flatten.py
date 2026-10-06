@@ -205,7 +205,13 @@ def test_cli_run_and_diff(
 ) -> None:
     src = covers["root"] / "generated" / "chair.stl"
     assert main(["run", str(src), "--out", str(tmp_path / "a")]) == 0
-    files = ("model.glb", "hull.glb", "pattern.json", "sizes.pdf", "cut.dxf", "cutting-list.pdf")
+    files = (
+        "model.glb",
+        "hull.glb",
+        "pattern.json",
+        "cut.dxf",
+        "cutting-list.pdf",
+    )  # sizes.pdf on request
     for f in files:
         assert (tmp_path / "a" / f).is_file(), f
     assert (
@@ -401,6 +407,10 @@ def test_export_places_the_air_vents_on_the_cover_in_3d(
     shutil.copytree(covers["root"] / "box_with_legs", d)
     assert main(["flatten", str(d)]) == 0
     assert main(["export", str(d)]) == 0
+    from coverengine.finish.vents3d import ensure_vents
+
+    assert not (d / "vents.json").exists()  # made when the viewer asks (ADR-080)
+    assert ensure_vents(d) == d / "vents.json"
     p = resolve_model(d)
     doc = json.loads((d / "vents.json").read_text())
     vents = doc["vents"]

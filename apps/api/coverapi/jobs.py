@@ -29,6 +29,9 @@ LONG_STEPS = {"drape"}  # a job of only these runs in the second queue
 DRAPE_WORKERS = 4  # drapes side by side (one core each; the server has 8)
 
 
+CACHED = ("hull", "cut", "flatten", "export")  # steps that skip themselves when unchanged
+
+
 @dataclass
 class JobSpec:
     model_id: str
@@ -37,6 +40,7 @@ class JobSpec:
     source: str | None = None  # the uploaded file (for the import step)
     units: str | None = None
     up: str | None = None
+    force: bool = False  # calculate even the steps whose inputs did not change (ADR-080)
 
 
 class Jobs:
@@ -133,6 +137,8 @@ class Jobs:
                 args += ["--up", spec.up] if spec.up else []
             else:
                 args = [name, str(model_dir), *sets]
+                if spec.force and name in CACHED:
+                    args.append("--force")
             step["status"], step["started"] = "running", time.time()
             self._write(doc)
             proc = subprocess.run(

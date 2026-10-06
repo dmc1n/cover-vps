@@ -62,6 +62,16 @@ pieces to 9). Covers whose seams follow the drawing keep them.
 A drawing cover is only replaced when the new one fits the 3D view better **and** both AIs
 find it better. It then becomes a new revision of the same cover, so nothing is lost.
 
+## Only what changed is calculated (ADR-080)
+
+When you save a setting or press "Run again", every step checks whether anything it depends on
+changed. A step with no changes skips itself, so a vent setting recalculates only the export, in
+seconds. The size drawing and the air vents in 3D are made when you open them.
+
+Since 6 October, two things are not run automatically and have their own button: the drape
+check (the cover falling over the furniture, with rain) and the AI's choice of pieces or
+balloons. The rule decides those by default.
+
 ## What you find where
 
 - **Models:** every model with its state. Open one for the 3D view, the pieces, the files and

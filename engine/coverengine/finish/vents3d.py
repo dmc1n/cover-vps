@@ -108,3 +108,28 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
                 }
             )
     return {"vents": out, "warnings": warnings}
+
+
+def ensure_vents(model_dir: Path) -> Path | None:
+    """vents.json, made when the viewer asks for it (ADR-080): export no longer flattens every
+    skirt piece a second time. Made again when it is older than finished.json. None when the
+    cover is not exported yet."""
+    import json
+
+    finished = model_dir / "finished.json"
+    pattern = model_dir / "pattern.json"
+    out = model_dir / VENTS_JSON
+    if not (finished.is_file() and pattern.is_file()):
+        return None
+    if out.is_file() and out.stat().st_mtime >= finished.stat().st_mtime:
+        return out
+    from coverengine.params.registry import Registry, resolve_model
+
+    params = resolve_model(model_dir, {}, Registry.load(None), None)
+    doc = json.loads(pattern.read_text(encoding="utf-8"))
+    try:
+        vents = vents_3d(model_dir, doc, params)
+    except (OSError, KeyError, ValueError) as exc:
+        vents = {"vents": [], "warnings": [f"vents not placed in 3D: {exc}"]}
+    out.write_text(json.dumps(vents, indent=1) + "\n", encoding="utf-8")
+    return out

@@ -139,14 +139,26 @@ def test_family_status_revisions_and_batch(chair: dict[str, Any]) -> None:
     assert listing[chair["id"]]["tags"] == ["test"]
     m = c.get(f"/api/models/{chair['id']}").json()
     assert m["revisions"], "every export keeps a revision"
-    n = m["revisions"][-1]["number"]
+
+    def export() -> None:
+        r = c.post("/api/batch", json={"model_ids": [chair["id"]], "steps": ["export"]})
+        assert r.status_code == 200, r.text
+        job = chair["app"].state.jobs.wait(r.json()["jobs"][0]["id"], RUN_TIMEOUT_S)
+        assert job["status"] == "done"
+
+    export()  # the saved state (an earlier test may have left a trial run's files)
+    n = c.get(f"/api/models/{chair['id']}").json()["revisions"][-1]["number"]
     assert c.get(f"/api/models/{chair['id']}/revisions/{n}/cut.dxf").status_code == 200
-    r = c.post("/api/batch", json={"model_ids": [chair["id"]], "steps": ["export"]})
-    assert r.status_code == 200, r.text
-    job = chair["app"].state.jobs.wait(r.json()["jobs"][0]["id"], RUN_TIMEOUT_S)
-    assert job["status"] == "done"
+    export()
     m2 = c.get(f"/api/models/{chair['id']}").json()
-    assert m2["revisions"][-1]["number"] == n + 1
+    # nothing changed: export skipped itself, no new revision (ADR-080)
+    assert m2["revisions"][-1]["number"] == n
+    r = c.post("/api/batch", json={"model_ids": [chair["id"]], "steps": ["export"],
+                                   "trial": {"features.vents_total": 3}})  # fmt: skip
+    assert r.status_code == 200, r.text
+    chair["app"].state.jobs.wait(r.json()["jobs"][0]["id"], RUN_TIMEOUT_S)
+    m3 = c.get(f"/api/models/{chair['id']}").json()
+    assert m3["revisions"][-1]["number"] == n + 1  # a changed cut.dxf: a new revision
     assert c.post("/api/batch", json={"family": "table"}).status_code == 400  # none of them
 
 
