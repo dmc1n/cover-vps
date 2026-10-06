@@ -124,6 +124,8 @@ export interface ModelBrief {
   roll_length_mm?: number | null;
   kind?: Kind | null;
   approval?: Approval | null;
+  dxf_ok?: boolean; // the cutting table's DXF: only for an approved cover (ADR-079)
+  desk_status?: string;
 }
 
 /** What an uploaded file is: the furniture, or only the cover surface (kind.json). */

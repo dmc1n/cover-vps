@@ -1,3 +1,4 @@
+import { Desk } from "./Desk";
 import { useCallback, useEffect, useState } from "react";
 import Configure from "./Configure";
 import Guide from "./Guide";
@@ -98,6 +99,9 @@ export function App() {
           <a href="#/" className="nav">
             Models
           </a>
+          <a href="#/desk" className="nav">
+            Desk
+          </a>
           <a href="#/catalogue" className="nav">
             Catalogue
           </a>
@@ -116,6 +120,10 @@ export function App() {
         <main>
           {m ? (
             <ModelPage id={m[1]} />
+          ) : hash.startsWith("#/desk") ? (
+            <Desk
+              selected={hash.match(/^#\/desk\/([a-z0-9-]+)/)?.[1] ?? null}
+            />
           ) : hash.startsWith("#/catalogue") ? (
             <Gallery />
           ) : hash.startsWith("#/learning") ? (
@@ -841,9 +849,19 @@ function CutPieces({ model, stamp }: { model: ModelDetail; stamp: number }) {
   return (
     <>
       <p>
-        <a href={fileUrl(model.id, "cut.dxf")} download>
-          Download the DXF for the cutting table
-        </a>{" "}
+        {model.dxf_ok === false ? (
+          <span
+            className="dxf-locked"
+            title="Approve the cover on the Desk first"
+          >
+            🔒 DXF for the cutting table: approve this cover on the{" "}
+            <a href={`#/desk/${model.id}`}>Desk</a> first
+          </span>
+        ) : (
+          <a href={fileUrl(model.id, "cut.dxf")} download>
+            Download the DXF for the cutting table
+          </a>
+        )}{" "}
         ·{" "}
         <a
           href={fileUrl(model.id, "cutting-list.pdf")}

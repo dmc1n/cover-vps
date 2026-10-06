@@ -1868,3 +1868,37 @@ for when the costs go up."
   until the budget is raised (`spend.hard_stop: true`).
 - **Not covered:** Veo videos for the website go through their own calls outside the engine.
   They are made only on the owner's explicit request (ADR-077).
+
+## ADR-079 — The Desk: people approve the drawing covers, the AI only sorts
+
+The owner (6 October): a hyper-modern dashboard to keep track of everything, with a checkbox for
+"actually produced"; the cutting-table DXF only after approval; Rens, Rick and Wouter approve.
+
+- **State per model** in `desk.json` (written atomically), with every action and the state
+  before it, so an undo steps back exactly:
+  - new → ai-checked → approved → produced, or rejected;
+  - the fit after sewing;
+  - a preferred revision;
+  - the drawing's code and PDF.
+
+  `check.json` holds the latest Gemini + DeepSeek check. `scripts/drawing_crosscheck.py` now
+  writes it into the model, and `scripts/desk_import.py` copied the earlier checks: 113 of 115
+  covers.
+- **The catalogue follows:** approved → checked, produced → production, rejected → draft.
+- **Learning:** a reject in words is stored as a lesson (learning/lessons.json, `from: desk`).
+  Every action is logged in learning/desk.jsonl.
+- **Who:** `desk.approvers` ("rens,rick,wouter", matched on user name or first name). Admins
+  may always.
+- **The DXF gate:** `desk.require_approval_for_dxf`, scope `desk.gate_scope: drawings`.
+  - Only drawing covers wait for approval, because the 314 SUNS models are all still "draft".
+    Setting `all` gates every model on catalogue status checked/production.
+  - An admin can override with `?override=1`, and the history keeps it.
+- **API:**
+  - `GET /api/desk` (queue, counts, average score, AI spend);
+  - `GET /api/desk/{id}` (card);
+  - `GET /api/desk/{id}/page/{n}` (a drawing page as PNG, cached in desk-cache/);
+  - `POST /api/desk/{id}` with approve | reject | produced | fit | prefer | undo.
+- **Web:** the Desk page (Desk.tsx, desk.css): the brand book's colours, Work Sans, light and
+  dark, the keys j/k/a/r/p/u, and the existing 3D viewer.
+- **Better later:** a revision keeps only its cut files, not its 3D. "Cut this" therefore marks
+  the revision whose DXF the workshop cuts; it does not bring back the old 3D.

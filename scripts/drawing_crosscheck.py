@@ -4,7 +4,8 @@
         [--only S44,S47] [--workers 3]
 
 For every models/drawing-<code>/ with a PDF: coverengine/crosscheck.run (ADR-072). Out:
-<out>/<code>.json and crosscheck.csv (code, outcome, both scores, the differences).
+<out>/<code>.json and crosscheck.csv (code, outcome, both scores, the differences), and the
+model's own check.json, which the drawing desk shows (ADR-079).
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import argparse
 import csv
 import json
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -46,6 +48,8 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 - one drawing must not stop the others
             res = {"code": code, "outcome": "check failed", "error": str(exc)}
         (a.out / f"{code}.json").write_text(json.dumps(res, indent=1))
+        if res.get("outcome") != "check failed":  # the desk reads it from the model (ADR-079)
+            (model / "check.json").write_text(json.dumps({**res, "time": time.time()}, indent=1))
         print(code, res["outcome"], flush=True)
         return res
 

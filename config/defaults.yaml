@@ -260,6 +260,13 @@ drawn:
   merge_max_stretch_pct: 1.0     # ... when the joined piece still lies flat within this stretch
 
 
+desk:                            # the drawing desk: people approve covers, AI only sorts (ADR-079)
+  approvers: "rens,rick,wouter"  # who may approve, reject and mark produced (owner, 6 Oct 2026);
+                                 # matched on user name or first name; admins always may
+  require_approval_for_dxf: true # the cutting table's DXF only once a cover is approved (owner)
+  gate_scope: drawings           # drawings: only drawing-* covers need approval for the DXF; all: every
+                                 # model (to confirm: the 314 SUNS models are all still "draft")
+
 spend:                           # what the AI costs, kept and guarded (owner, 6 Oct 2026; ADR-078)
   budget_eur_month: 50           # to confirm: the month's AI budget; at 100 % paid calls stop
   warn_pct: "50,80"              # the watchdog mails at these shares of the budget

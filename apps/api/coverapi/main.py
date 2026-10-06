@@ -109,6 +109,9 @@ def create_app(
     from coverapi import own_reference
 
     own_reference.install(app, store)  # the workshop's own reference per model (ADR-070)
+    from coverapi import desk
+
+    desk.install(app, store)  # the drawing desk: people approve, the AI sorts (ADR-079)
     from coverapi import shop
 
     shop.install(app, auth, store.root, jobs, store)
@@ -168,13 +171,19 @@ def create_app(
         out = store.summary(model_id)
         out["job"] = jobs.latest(model_id)
         out["approval"] = state(d)
+        from coverengine.params import Registry
+
+        out["dxf_ok"] = desk.dxf_allowed(d, Registry.load(None).resolve())  # ADR-079
+        out["desk_status"] = desk.state(d)["status"]
         return out
 
     @app.get("/api/models/{model_id}/files/{name}")
-    def file(model_id: str, name: str) -> FileResponse:
+    def file(model_id: str, name: str, request: Request) -> FileResponse:
         d = model_or_404(model_id)
         if name not in ALLOWED or not (d / name).is_file():
             raise HTTPException(404, f"no file {name!r}")
+        if name == "cut.dxf":  # the cutting table's file: only an approved cover (ADR-079)
+            desk.gate(d, model_id, request)
         suffix = Path(name).suffix
         file, kind = _named(model_id, name)
         return FileResponse(d / name, media_type=MEDIA.get(suffix, "application/octet-stream"),
@@ -352,10 +361,12 @@ def create_app(
         return out
 
     @app.get("/api/models/{model_id}/revisions/{number}/{name}")
-    def revision(model_id: str, number: int, name: str) -> FileResponse:
+    def revision(model_id: str, number: int, name: str, request: Request) -> FileResponse:
         d = model_or_404(model_id)
         if name not in KEPT:
             raise HTTPException(404, f"no file {name!r}")
+        if name == "cut.dxf":
+            desk.gate(d, model_id, request)
         path = revision_file(d, number, name)
         if not path.is_file():
             raise HTTPException(404, f"revision {number} has no {name}")

@@ -211,6 +211,7 @@ uv run python scripts/drawing_crosscheck.py OUT --pdfs DIR   Gemini and DeepSeek
 uv run python scripts/drawing_features.py --pdfs DIR   vent count and features from each drawing's text onto its cover (ADR-075)
 uv run python scripts/drawing_rebuild.py OUT --pdfs DIR [--dry-run]   drawing covers rebuilt from their own views; better ones replace (ADR-075)
 uv run python scripts/drawing_merge.py [--only ...] [--dry-run]   free-form drawing covers in fewer pieces (ADR-076)
+uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
 make e2e        the web app flow in a real browser (Playwright in Docker)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
