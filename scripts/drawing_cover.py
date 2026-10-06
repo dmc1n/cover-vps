@@ -13,10 +13,9 @@ import re
 import sys
 from pathlib import Path
 
-import trimesh
 from coverengine.catalogue import set_info
 from coverengine.cli import main as cover
-from coverengine.drawn import build, scene
+from coverengine.drawn import build
 from coverengine.io.kind import confirm
 from coverengine.params import Registry
 
@@ -24,8 +23,9 @@ STEPS = ("hull", "cut", "flatten", "export", "preview")
 
 
 def roll_mm() -> float:
-    params = Registry.load(None).resolve()
-    return float(params["roll.usable_width_mm"]) - 2 * float(params["stitching.allowance_mm"])
+    from coverengine.drawing_route import roll_mm as roll
+
+    return roll(Registry.load(None).resolve())
 
 
 def make(
@@ -45,18 +45,9 @@ def make(
     model = models / ("drawing-" + re.sub(r"[^a-z0-9]+", "-", code.lower()).strip("-"))
     src = models.parent / "out" / "drawn" / f"{model.name}.glb"
     src.parent.mkdir(parents=True, exist_ok=True)
-    sc = scene(pieces)
-    if shape in ("swept", "outline", "views"):  # the program made these seams: join where no crease
-        from coverengine.drawn_merge import merge
+    from coverengine.drawing_route import surface
 
-        params = Registry.load(None).resolve()
-        parts = [(str(n), sc.geometry[g].copy()) for n, g in
-                 ((n, sc.graph[n][1]) for n in sc.graph.nodes_geometry)]  # fmt: skip
-        joined = merge(parts, roll_mm(), float(params["drawn.merge_fold_deg"]),  # type: ignore[arg-type]
-                       float(params["drawn.merge_max_stretch_pct"]))  # type: ignore[arg-type]  # fmt: skip
-        sc = trimesh.Scene()
-        for name, m in joined:
-            sc.add_geometry(m, node_name=name, geom_name=name)
+    sc = surface(pieces, shape, Registry.load(None).resolve())  # joined where no crease (ADR-076)
     sc.export(src)
     if cover(["import", str(src), "--out", str(model), "--units", "mm", "--up", "z"]):
         raise SystemExit(f"{code}: import failed")

@@ -112,6 +112,9 @@ def create_app(
     from coverapi import desk
 
     desk.install(app, store)  # the drawing desk: people approve, the AI sorts (ADR-079)
+    from coverapi import drawing_upload
+
+    drawing_upload.install(app, store, jobs)  # route A: a drawing (PDF) -> a cover (ADR-081)
     from coverapi import shop
 
     shop.install(app, auth, store.root, jobs, store)

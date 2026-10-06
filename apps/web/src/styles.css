@@ -296,3 +296,11 @@ fieldset.card legend { font-weight: 600; text-transform: capitalize; padding: 0 
 .cms-line .prompt { color: var(--sand); font-family: monospace; font-size: 20px; }
 .cms-line input { flex: 1; background: transparent; border: 0; color: var(--cream); font-family: ui-monospace, Menlo, monospace; font-size: 15px; outline: none; }
 .cms-entry { border-left: 3px solid var(--sand); padding: 6px 12px; margin: 10px 0; }
+
+/* route A: a drawing the program could not read surely (ADR-081) */
+.upload .warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+  padding: 10px 14px;
+  border-radius: 8px;
+}

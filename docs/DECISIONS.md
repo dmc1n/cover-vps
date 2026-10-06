@@ -1908,3 +1908,56 @@ The owner (6 October): a hyper-modern dashboard to keep track of everything, wit
   dark, the keys j/k/a/r/p/u, and the existing 3D viewer.
 - **Better later:** a revision keeps only its cut files, not its 3D. "Cut this" therefore marks
   the revision whose DXF the workshop cuts; it does not bring back the old 3D.
+
+## ADR-081 — Route A: a drawing (PDF) → a cover, one reader, nothing guessed
+
+The team (6 October 2026) asked for two routes only (docs/plans/two-routes.md). This is route A
+as one step: `cover drawing-build <model dir> --pdf FILE` (`coverengine/drawing_route.py`), and in
+the web app "Upload drawing (PDF)" on the Models page (`POST /api/models/drawing`, a background
+job of the one step `drawing-build`).
+
+- **One AI-free reader chain.**
+  1. A closed free outline drawn as vector lines, scaled by its written circumference or
+     length (ADR-072): the plan straight up to the written height.
+  2. Otherwise the views: silhouettes, the scale from the size arrows, the plan cut by the
+     elevations (ADR-075).
+
+  A shape is only taken when it covers the drawing's 3D view at least `drawing.min_iou` (0.85).
+  The outline is checked against the 3D view too, when the drawing has one.
+- **Nothing is guessed.** When neither reader is sure, the cover is "needs a person", with the
+  reasons:
+  - no top view;
+  - no size arrows;
+  - the shape fits the 3D view only 78 %.
+
+  No surface is built, and an existing cover is left as it is. A check.json with outcome
+  "person to check" puts it at the top of the Desk (ADR-079).
+- **Then route B.**
+  - The vent count from the drawing (written, or counted from the arrows) goes into
+    `features.vents_total`.
+  - The program's own seams are joined where there is no crease (ADR-076). This lives in
+    `drawing_route.surface`; scripts/drawing_cover.py uses it too.
+  - The surface is written with one part per piece, imported as a cover surface, and runs
+    through hull, cut, flatten, export and preview.
+- **drawing_read.json** keeps what was read, for the Desk's card:
+  - the reader and the views;
+  - the scale and how it was found;
+  - the dimensions;
+  - the written sizes that contradict each other;
+  - the vents and where their number came from;
+  - the fit to the 3D view.
+- **On the owner's drawings** (scratch folder, not live), each built in about 10 s:
+
+  | Drawing | Read by | Result |
+  |---|---|---|
+  | S45 | outline | 3 pieces, 4 vents, the 152.4 vs 358.4 conflict noted, fit 1.00 |
+  | S47 | views | 3 pieces, 3 vents, fit 1.00 |
+  | S38 | views | 6 pieces, 4 vents, fit 0.98 |
+  | C27 (U shape) | — | needs a person (78 %) |
+  | S44 | — | needs a person (83 %) |
+  | T5 | — | needs a person (no top view, only the 3D view) |
+- **Rebuilding:** `POST /api/models/{id}/drawing` builds an existing drawing cover again from
+  its drawing as a new revision. It keeps reference/, desk.json and revisions/.
+- **Not built:** the explicit "Let the AI read it" button for a "needs a person" drawing (the
+  old Gemini reader, ADR-068). The scripts still offer it; a button is for later, if the team
+  wants it.

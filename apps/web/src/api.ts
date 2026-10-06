@@ -9,7 +9,8 @@ export type Step =
   | "improve"
   | "ai"
   | "rain"
-  | "drape";
+  | "drape"
+  | "drawing-build";
 export const STEPS: Step[] = ["import", "hull", "cut", "flatten", "export"];
 export const STEP_LABEL: Record<Step, string> = {
   import: "Import",
@@ -21,6 +22,7 @@ export const STEP_LABEL: Record<Step, string> = {
   ai: "AI advice",
   rain: "Rain simulation",
   drape: "Drape simulation",
+  "drawing-build": "Cover from the drawing",
 };
 
 /** The drape simulation (drape.json, ADR-056): the sewn cover falling over the furniture. */
@@ -154,6 +156,24 @@ export interface Job {
   error?: string;
   trial: Record<string, unknown>;
   created: number;
+}
+
+/** What the program read from a drawing (drawing_read.json, ADR-081). */
+export interface DrawingRead {
+  code: string;
+  status: "built" | "needs a person";
+  reader: "outline" | "views" | null;
+  reasons: string[];
+  pieces?: number;
+  vents?: number;
+  features?: { vents_total?: number | null; vents_from?: string | null };
+  views?: { scale_from: string; views: { kind: string; size_cm: number[] }[] };
+  solid?: { how: string[]; fits_3d_view: number };
+  outline?: {
+    fits_3d_view: number | null;
+    conflicts: { size: string; written_cm: number; outline_gives_cm: number }[];
+  };
+  job?: { id: string; status: string; error?: string } | null;
 }
 
 export interface PatternPanel {
@@ -307,6 +327,20 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind }),
     }).then((r) => json<{ kind: Kind; job: Job | null }>(r)),
+  /** Route A: a drawing (PDF) read by the program and built as a cover (ADR-081). */
+  uploadDrawing: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return fetch("/api/models/drawing", { method: "POST", body: form }).then((r) =>
+      json<{ model_id: string; code: string; job: Job }>(r),
+    );
+  },
+  rebuildDrawing: (id: string) =>
+    fetch(`/api/models/${id}/drawing`, { method: "POST" }).then((r) =>
+      json<{ model_id: string; job: Job }>(r),
+    ),
+  drawingRead: (id: string) =>
+    fetch(`/api/models/${id}/drawing`).then((r) => json<DrawingRead>(r)),
   upload: (file: File, units: string, up: string) => {
     const form = new FormData();
     form.append("file", file);

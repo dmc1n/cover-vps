@@ -96,3 +96,18 @@ Several values (seam allowance, hem, vent size) are best guesses until then. Cur
 U-shaped drawings are being added.
 
 *Questions: Rick, rick@s2dio.industries.*
+
+## A new cover from your drawing (route A, ADR-081)
+
+On the Models page, choose **Upload drawing (PDF)**. The program reads the drawing itself, without AI:
+- the views;
+- the sizes, by their arrows;
+- the number of air vents.
+
+Then it builds the cover, places the vents by your rule and splits the pieces to fit the roll. This takes
+about 10 seconds.
+
+When it is not sure, it builds nothing and says why: no top view, no size arrows, or the shape does not
+match the 3D view on the drawing. Such a drawing waits at the top of the **Desk** for a person. A drawing
+cover can be built again from its drawing with `cover drawing-build models/<id>` (or the API); that makes
+a new revision and keeps the history.

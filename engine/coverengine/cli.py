@@ -603,6 +603,20 @@ def _cmd_drawing(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_drawing_build(args: argparse.Namespace) -> int:
+    """Route A (ADR-081): the drawing in the model folder (or --pdf) read and built as a cover."""
+    from coverengine.drawing_route import NEEDS_PERSON, build
+
+    pdf = args.pdf or args.model / "reference.pdf"
+    if not pdf.is_file():
+        raise CoverError(f"no drawing: {pdf} (give --pdf FILE)")
+    params = resolve_params(args, None)
+    doc = build(pdf, args.model, params, code=args.code)
+    if doc["status"] == NEEDS_PERSON:
+        print(f"{NEEDS_PERSON}: " + "; ".join(doc["reasons"]))
+    return 0
+
+
 def _cmd_flatten(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -861,6 +875,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, help="PDF file (default: sizes.pdf in the model dir)")
     _add_param_args(p)
     p.set_defaults(handler=_cmd_drawing)
+
+    p = sub.add_parser(
+        "drawing-build", help="route A: a drawing (PDF) read by the program and built as a cover"
+    )
+    p.add_argument("model", type=Path, help="model directory (made when missing)")
+    p.add_argument("--pdf", type=Path, help="the drawing (default: reference.pdf in the model)")
+    p.add_argument("--code", help="the drawing's code, e.g. S45 (default: from the folder name)")
+    _add_param_args(p)
+    p.set_defaults(handler=_cmd_drawing_build)
 
     p = sub.add_parser("run", help="import, cover, seams and patterns in one go")
     p.add_argument("file", type=Path, help="3D file (STEP, IGES, STL, ...)")

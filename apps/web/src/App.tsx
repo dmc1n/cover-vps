@@ -1,4 +1,5 @@
 import { Desk } from "./Desk";
+import { DrawingUpload } from "./DrawingUpload";
 import { useCallback, useEffect, useState } from "react";
 import Configure from "./Configure";
 import Guide from "./Guide";
@@ -192,6 +193,7 @@ function ModelList() {
   return (
     <>
       <Upload />
+      <DrawingUpload />
       <h2>
         Models{" "}
         {models && (

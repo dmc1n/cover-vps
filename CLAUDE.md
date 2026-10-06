@@ -196,6 +196,8 @@ cover hull models/<id>/ [--clearance N ...]  drape hull → hull.glb, hull.json,
 cover cut models/<id>/ [--seams FILE]        seams and panels → panels.glb, panels.json
 cover flatten models/<id>/                   flat patterns → pattern.dxf, pattern.svg, pattern.json, sizes.pdf
 cover drawing models/<id>/                   size drawing of cover and panels → sizes.pdf
+cover drawing-build models/<id>/ [--pdf FILE] route A: a drawing read by the program and built as a cover,
+                                             or "needs a person" (drawing_read.json, ADR-081)
 cover export models/<id>/                    finished pieces → cut.dxf, cut.svg, cutting-list.pdf, finished.json
                                              (and a revision in revisions/<n>/)
 cover model models/<id>/ [--family F --status S --tags a,b --notes ...]   catalogue info, revisions
