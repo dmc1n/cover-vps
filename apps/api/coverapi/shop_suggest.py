@@ -275,7 +275,11 @@ def photo_png(data: bytes) -> bytes:
         im.load()
     except (UnidentifiedImageError, OSError):
         raise SuggestError("that file is not a photo (JPG, PNG, WebP or AVIF please)") from None
-    rgb = im.convert("RGB")
+    # a webshop's cut-out picture: its see-through background white, not black (which made the
+    # furniture hard to recognise and found nothing in the image search)
+    rgba = im.convert("RGBA")
+    rgb = Image.new("RGB", rgba.size, "white")
+    rgb.paste(rgba, mask=rgba.getchannel("A"))
     rgb.thumbnail((PHOTO_EDGE_PX, PHOTO_EDGE_PX))
     out = io.BytesIO()
     rgb.save(out, "PNG", optimize=True)

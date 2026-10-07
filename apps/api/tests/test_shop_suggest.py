@@ -26,7 +26,7 @@ def no_web_search(monkeypatch: pytest.MonkeyPatch) -> None:
         raise AssertionError("a test made a paid AI call")
 
     monkeypatch.setattr(sg, "gemini", paid)
-    monkeypatch.setattr(sg, "reverse_search", paid)  # off by default; a test switches it on
+    monkeypatch.setattr(sg, "reverse_search", lambda *a, **k: {"pages": [], "labels": []})
     monkeypatch.setattr(sg, "identify", lambda *a, **k: {})
     monkeypatch.setattr(sg, "search_comparable", lambda *a, **k: [])
     monkeypatch.setattr(sg, "compare", lambda *a, **k: {})
@@ -434,8 +434,8 @@ def test_the_search_by_image_when_switched_on_comes_first(monkeypatch: pytest.Mo
     monkeypatch.setattr(sg, "reverse_search", lambda *a, **k: {
         "labels": ["suns tosca sofa"],
         "pages": [_page("Tosca 3-zits bank", "SUNS", True)]})  # fmt: skip
-    off = Registry.load(None).resolve()
-    assert sg._reverse(off, _png()) == {"pages": [], "labels": []}  # the default: off
+    off = Registry.load(None).resolve(trial={"suggest.reverse_search": False})
+    assert sg._reverse(off, _png()) == {"pages": [], "labels": []}  # switched off
     on = Registry.load(None).resolve(trial={"suggest.reverse_search": True})
     out = sg.find_comparable(on, _png(), 5, 1000, 1000)
     assert seen["candidates"][0] == "Tosca 3-zits bank"
@@ -470,3 +470,19 @@ def test_the_search_by_image_reads_google_s_answer_and_records_its_fee(
     rows = [json.loads(x) for f in (tmp_path / "usage").glob("*.jsonl")
             for x in f.read_text().splitlines()]  # fmt: skip
     assert rows[0]["eur"] == pytest.approx(float(p["suggest.reverse_eur"]))
+
+
+def test_a_cut_out_picture_gets_a_white_background() -> None:
+    """A webshop's product picture with a see-through background: white, never black."""
+    import io
+
+    from coverapi.shop_suggest import photo_png
+    from PIL import Image
+
+    im = Image.new("RGBA", (40, 40), (0, 0, 0, 0))
+    im.paste((200, 30, 30, 255), (10, 10, 30, 30))
+    buf = io.BytesIO()
+    im.save(buf, "PNG")
+    out = Image.open(io.BytesIO(photo_png(buf.getvalue()))).convert("RGB")
+    assert out.getpixel((1, 1)) == (255, 255, 255)
+    assert out.getpixel((20, 20)) == (200, 30, 30)
