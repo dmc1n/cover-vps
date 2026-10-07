@@ -34,6 +34,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from coverapi.products_sheet import product_labels, products_card
+
 STATUSES = ("new", "ai-checked", "rejected", "approved", "produced")
 CATALOGUE = {"approved": "checked", "produced": "production", "rejected": "draft"}
 REASONS = ("shape", "size", "seams", "vents", "pieces", "other")
@@ -150,6 +152,7 @@ def brief(d: Path) -> dict[str, Any]:
         "catalogue": cover.get("status", "draft"),
         "pieces": count,
         "vents": vents,
+        "products": product_labels(d),  # the workshop's product list (ADR-091)
         "has_picture": (d / "cover.png").is_file(),
         "last": last and {k: last.get(k) for k in ("action", "by", "time")},
         # reopened after a fix, for a person to look again (owner, 7 Oct 2026)
@@ -549,6 +552,7 @@ def install(app: FastAPI, store: Any) -> None:
                 {k: p.get(k) for k in ("name", "quantity", "size_mm", "area_m2")} for p in pieces
             ],  # fmt: skip
             "revisions": revisions(d),
+            "product_list": products_card(d),
             "pages": pages,
             "dxf_ok": dxf_allowed(d, Registry.load(None).resolve()),
         }

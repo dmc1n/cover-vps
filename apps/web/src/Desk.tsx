@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type ModelDetail } from "./api";
 import { Viewer } from "./Viewer";
 import { Corrections, RulesBar } from "./DeskCorrect";
+import { ProductsPanel, ProductsUpload, type ProductList } from "./DeskProducts";
 import "./desk.css";
 
 type Scores = {
@@ -25,6 +26,7 @@ interface Item {
   catalogue: string;
   pieces: number;
   vents: number;
+  products?: string[];
   has_picture: boolean;
   last: { action: string; by: string; time: number } | null;
 }
@@ -91,6 +93,7 @@ interface Card extends Item {
     panels: number;
     roll_length_mm?: number;
   }[];
+  product_list?: ProductList;
   pages: number;
   dxf_ok: boolean;
 }
@@ -110,6 +113,41 @@ const OUTCOME_LABEL: Record<string, string> = {
 };
 // the drawings' series, and the SUNS catalogue (owner, 7 Oct 2026: every approval at the Desk)
 const SERIES = ["C", "S", "D", "L", "R", "T", "U", "SUNS"];
+// the list's order: what needs a person first (the server's), or by code, product, status, score
+const SORTS: Record<string, string> = {
+  need: "Needs a person first",
+  code: "Code",
+  product: "Product",
+  status: "Status",
+  score: "AI score (low first)",
+};
+const natural = (a: string, b: string) =>
+  a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+const STATUS_ORDER = ["new", "ai-checked", "rejected", "approved", "produced"];
+function sortItems(items: Item[], by: string): Item[] {
+  if (by === "need") return items;
+  const out = [...items];
+  const prod = (i: Item) => i.products?.[0] ?? "";
+  out.sort((a, b) => {
+    if (by === "product") {
+      // covers without a product last
+      if (!prod(a) !== !prod(b)) return prod(a) ? -1 : 1;
+      return natural(prod(a), prod(b)) || natural(a.code, b.code);
+    }
+    if (by === "status")
+      return (
+        STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) ||
+        natural(a.code, b.code)
+      );
+    if (by === "score")
+      return (
+        (a.scores.avg ?? Infinity) - (b.scores.avg ?? Infinity) ||
+        natural(a.code, b.code)
+      );
+    return natural(a.code, b.code);
+  });
+  return out;
+}
 const when = (t?: number) =>
   t
     ? new Date(t * 1000).toLocaleString(undefined, {
@@ -141,6 +179,7 @@ export function Desk({ selected }: { selected: string | null }) {
   const [status, setStatus] = useState<string>("open");
   const [series, setSeries] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("need");
   const load = useCallback(
     () =>
       getJSON<Queue>("/api/desk")
@@ -154,7 +193,7 @@ export function Desk({ selected }: { selected: string | null }) {
 
   const items = useMemo(() => {
     const all = q?.items ?? [];
-    return all.filter((i) => {
+    const shown = all.filter((i) => {
       if (status === "second" && !i.second_round) return false;
       if (status === "open" && ["approved", "produced"].includes(i.status))
         return false;
@@ -176,12 +215,13 @@ export function Desk({ selected }: { selected: string | null }) {
         return false;
       if (search) {
         const s = search.toLowerCase();
-        if (!`${i.code} ${i.id} ${i.tags.join(" ")}`.toLowerCase().includes(s))
-          return false;
+        const text = `${i.code} ${i.id} ${i.tags.join(" ")} ${(i.products ?? []).join(" ")}`;
+        if (!text.toLowerCase().includes(s)) return false;
       }
       return true;
     });
-  }, [q, status, series, search]);
+    return sortItems(shown, sort);
+  }, [q, status, series, search, sort]);
 
   const open = (id: string) => (window.location.hash = `#/desk/${id}`);
   const idx = items.findIndex((i) => i.id === selected);
@@ -254,6 +294,7 @@ export function Desk({ selected }: { selected: string | null }) {
           )}
         </div>
         <RulesBar canAct={q.can_approve} onChanged={load} />
+        <ProductsUpload onDone={load} />
         <div className="d-pipe" aria-label="pipeline">
           {seg.map(([k, n]) =>
             n ? (
@@ -275,7 +316,7 @@ export function Desk({ selected }: { selected: string | null }) {
           <div className="d-filters">
             <input
               className="d-search"
-              placeholder="Search code, model or tag…"
+              placeholder="Search code, product, model or tag…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -314,6 +355,16 @@ export function Desk({ selected }: { selected: string | null }) {
                 </button>
               ))}
             </div>
+            <label className="d-sort">
+              Sort
+              <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                {Object.entries(SORTS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           <ul className="d-list">
             {items.map((i) => (
@@ -352,6 +403,11 @@ export function Desk({ selected }: { selected: string | null }) {
                       </span>
                     )}
                   </div>
+                  {i.products && i.products.length > 0 && (
+                    <div className="d-row-prod" title={i.products.join("\n")}>
+                      {i.products.join(" · ")}
+                    </div>
+                  )}
                 </div>
               </li>
             ))}
@@ -688,6 +744,7 @@ function CardView({
       </div>
 
       <div className="d-grid">
+        {card.product_list && <ProductsPanel list={card.product_list} />}
         <section className="d-panel">
           <h3>What the program read</h3>
           <ul className="d-facts">

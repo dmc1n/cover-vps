@@ -57,3 +57,31 @@ recalculated.
 
 **Do the corrections still hold?** `scripts/learned_check.py` checks every correction against
 the covers as they are now; with `--recalc` it calculates them again first.
+
+## The product list (ADR-091)
+
+Link the workshop's product list to the drawing covers, so the Desk can show, search and sort
+by product.
+
+- **Upload:** "Upload product list (Excel)" at the top of the Desk. It takes an .xlsx, a .csv,
+  or a .zip with one or more of them. A zip with the list and no drawings may also go through
+  the studio's drawings-zip button; it ends up in the same place.
+  - An old **.xls** file is refused: open it in Excel, Save As "Excel Workbook" (.xlsx).
+  - Column names do not matter. The program finds the header row and the column that names
+    the drawings (D1, C 23, s40, Cover 105, …) by what is in it.
+- **The result** says how many rows were linked to how many drawings, and through which
+  column. If it picked the wrong column, choose another and press "Apply again". It also lists:
+  - rows it could not link (usually a drawing not uploaded yet);
+  - drawings without a product;
+  - codes that carry two different products;
+  - the PDFs in a zip and whether their drawings already exist. PDFs are not imported here.
+- **In the list** each cover shows its products under its name. The search finds them, and
+  "Sort" orders by code, product, status or AI score.
+- **On the card**, "Products" shows the rows of the list for this cover, and the SUNS models
+  it fits:
+  - a dark chip is a **link**: family and type agree (Portofino D-Bed → the Portofino daybed);
+  - a dashed chip with "?" is only a **suggestion**: the family agrees, but the description
+    names no type ("lounge set normal"). Check it by eye.
+
+  A SUNS model's card shows the drawings it is linked to.
+- Uploading again replaces the links; every upload is kept in `products/` in the data folder.

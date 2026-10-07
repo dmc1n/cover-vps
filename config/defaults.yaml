@@ -280,6 +280,10 @@ desk:                            # the drawing desk: people approve covers, AI o
   learn_after: 5                 # the same correction on this many covers of a group is proposed
                                  # as the group's rule; a person accepts it (ADR-082)
 
+products:                        # the workshop's product list linked to the drawing covers (ADR-091)
+  max_bytes: 52428800            # an uploaded list, or a zip unpacked, at most this large (50 MB)
+  max_files: 2000                # a zip with more entries than this is refused whole
+
 spend:                           # what the AI costs, kept and guarded (owner, 6 Oct 2026; ADR-078)
   budget_eur_month: 50           # to confirm: the month's AI budget; at 100 % paid calls stop
   warn_pct: "50,80"              # the watchdog mails at these shares of the budget
