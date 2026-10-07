@@ -1123,3 +1123,68 @@ select.s-lang option {
   width: 140px;
   accent-color: #6e776b;
 }
+
+/* start from a photo or a link (ADR-086) */
+.s-suggest-open {
+  width: 100%;
+  margin: 4px 0 14px;
+  padding: 12px 14px;
+  border: 1px dashed var(--s-line, #c9cbc3);
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.s-suggest-open:hover {
+  border-color: #6e776b;
+}
+.s-suggest {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 16px;
+  padding: 14px;
+  border-radius: 16px;
+  background: color-mix(in srgb, #778074 10%, transparent);
+}
+.s-suggest-title {
+  margin: 0;
+  font-weight: 600;
+}
+.s-suggest-photo {
+  display: block;
+  padding: 12px;
+  border: 1px dashed #778074;
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+}
+.s-suggest-photo input {
+  display: none;
+}
+.s-suggest-url {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--s-line, #c9cbc3);
+  border-radius: 10px;
+  font: inherit;
+}
+.s-suggest-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--s-bg, #f1f2f2);
+}
+.s-suggest-card p {
+  margin: 0;
+}
+.s-estimate span,
+.s-estimate {
+  color: #9a5b14;
+}
+.s-estimate input[type="range"] {
+  accent-color: #c47f2c;
+}

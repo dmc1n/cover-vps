@@ -6,6 +6,7 @@
 // other than the first lives under /shop/<lang>/. The server puts the same text in the HTML for
 // search engines; this replaces it once loaded.
 import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
+import { Suggest, type Suggestion } from "./Suggest";
 import { createRoot } from "react-dom/client";
 import "./shop.css";
 import { Scene } from "./Scene";
@@ -501,6 +502,15 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
     return p && products[p] ? p : "dining_set";
   });
   const [sizes, setSizes] = useState<Record<string, number | boolean>>({});
+  // started from a photo or a link (ADR-086): the sizes to apply once the product is set, the
+  // ones the customer must still check, and what goes with the order for the workshop
+  const pendingSizes = useRef<Record<string, number | boolean> | null>(null);
+  const [estimated, setEstimated] = useState<string[]>([]);
+  const [source, setSource] = useState<{
+    url: string | null;
+    summary: string;
+    photos: File[];
+  } | null>(null);
   const [stock, setStock] = useState<string | null>(start.get("stock"));
   const [matchToken, setMatchToken] = useState<string | null>(start.get("mt"));
   const [colour, setColour] = useState(info.settings.colours[0] ?? "");
@@ -539,6 +549,10 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
       }
     } else {
       setStock(null);
+    }
+    if (pendingSizes.current) {
+      Object.assign(d, pendingSizes.current);
+      pendingSizes.current = null;
     }
     setSizes(d);
     setSupport("none");
@@ -646,6 +660,20 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
         {step === "design" && (
           <>
             <h1>{w("configure")}</h1>
+            <Suggest
+              w={w}
+              lang={lang}
+              productName={tx.product}
+              onUse={(sg: Suggestion, photos: File[]) => {
+                pendingSizes.current = sg.sizes;
+                setEstimated(sg.check);
+                setSource({ url: sg.source.url, summary: sg.summary, photos });
+                if (sg.product === product) {
+                  setSizes({ ...sizes, ...sg.sizes });
+                  pendingSizes.current = null;
+                } else setProduct(sg.product);
+              }}
+            />
             <p className="s-muted">{w("what")}</p>
             <div className="s-products">
               {Object.keys(products).map((k) => (
@@ -676,18 +704,30 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
             ) : (
               products[product].fields.map((f) =>
                 f.min === null ? (
-                  <label key={f.key} className="s-check">
+                  <label
+                    key={f.key}
+                    className={`s-check ${estimated.includes(f.key) ? "s-estimate" : ""}`}
+                  >
                     <input
                       type="checkbox"
                       checked={!!sizes[f.key]}
-                      onChange={(e) =>
-                        setSizes({ ...sizes, [f.key]: e.target.checked })
-                      }
+                      onChange={(e) => {
+                        setSizes({ ...sizes, [f.key]: e.target.checked });
+                        setEstimated(estimated.filter((k) => k !== f.key));
+                      }}
                     />{" "}
                     {tx.field(f.key)}
                   </label>
                 ) : (
-                  <label key={f.key} className="s-range">
+                  <label
+                    key={f.key}
+                    className={`s-range ${estimated.includes(f.key) ? "s-estimate" : ""}`}
+                    title={
+                      estimated.includes(f.key)
+                        ? w("suggest_estimate")
+                        : undefined
+                    }
+                  >
                     <span>
                       {tx.field(f.key)}
                       <b>{Number(sizes[f.key] ?? f.default)} cm</b>
@@ -697,9 +737,10 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
                       min={f.min}
                       max={f.max ?? undefined}
                       value={Number(sizes[f.key] ?? f.default)}
-                      onChange={(e) =>
-                        setSizes({ ...sizes, [f.key]: Number(e.target.value) })
-                      }
+                      onChange={(e) => {
+                        setSizes({ ...sizes, [f.key]: Number(e.target.value) });
+                        setEstimated(estimated.filter((k) => k !== f.key));
+                      }}
                     />
                   </label>
                 ),
@@ -769,10 +810,28 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
               const r = await fetch("/api/shop/order", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ quote_id: quote.id, ...form, lang }),
+                body: JSON.stringify({
+                  quote_id: quote.id,
+                  ...form,
+                  lang,
+                  source_url: source?.url ?? null,
+                  source_summary: source?.summary || null,
+                }),
               });
               const data = await r.json();
               if (!r.ok) return setError(data.detail ?? "error");
+              if (source?.photos.length) {
+                // the photos the customer started from, kept with the order for the workshop
+                const token = String(data.status_url ?? "")
+                  .split("/")
+                  .pop();
+                const body = new FormData();
+                for (const ph of source.photos) body.append("photos", ph);
+                await fetch(`/api/shop/order/${token}/source`, {
+                  method: "POST",
+                  body,
+                }).catch(() => undefined);
+              }
               if (data.checkout_url) window.location.href = data.checkout_url;
               else setDone(data);
             }}
