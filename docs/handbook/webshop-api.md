@@ -60,3 +60,14 @@ The price comes from `quote.*` in `config/defaults.yaml`:
 
 Until the owner has set them, `quote.prices_are_placeholders` is true, and the price is shown
 as indicative.
+
+## Start from a photo or a link (ADR-086)
+
+In the configurator a customer can upload up to 3 photos of their furniture, or paste the link
+of the webshop page where they bought it. We suggest the product and its sizes:
+- sizes written on the page are taken as they are;
+- sizes judged from a photo are marked "please measure".
+
+The customer checks them, then goes on as usual. Nothing is kept unless they order; then the link
+and the photos come with the order, for the workshop. API: `POST /api/shop/suggest`
+(multipart: `photos`, `url`, `lang`).

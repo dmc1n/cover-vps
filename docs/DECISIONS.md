@@ -2176,3 +2176,49 @@ and lie flat, so we also see all dimensions and where the extra lengths of fabri
     of cut pieces (+21 %);
   - the export's layout uses 25.1 m of roll (37.6 m²). It leaves 15.1 m² between the pieces,
     which the machine's nesting reduces.
+
+
+## ADR-086 — Start from a photo or a link: the configurator's sizes suggested, the customer checks
+
+The owner (7 October): customers should be able to upload a photo of their furniture, or share
+a link to its page, and get a proposal from that.
+
+- **Where:** above the product choice in the configurator, the button "Have a photo or a link to
+  your furniture?". Behind it:
+  - **Photos:** up to 3. On a phone it opens the camera. JPG, PNG and WebP are accepted; an
+    iPhone's HEIC is refused with the setting that avoids it.
+  - **A link:** to the product page of a webshop.
+- **The link is fetched safely** (`apps/api/coverapi/shop_suggest.py`). Only http and https.
+  - **Public addresses only:** every host is resolved, and every address it has must be
+    public: never private, loopback, link-local or the cloud metadata address (SSRF).
+  - **Redirects:** at most 3, each one checked again.
+  - **No second lookup:** the connection goes to the address that was checked.
+  - **Limits:** `suggest.fetch_timeout_s` (8 s) and `suggest.fetch_max_bytes` (2 MB). A page
+    must be HTML and an image an image.
+- **What the page says** is read by the program itself: the title, the og/meta tags, a JSON-LD
+  Product (name, image, sizes) and the text around the words for sizes (afmetingen, dimensions,
+  Maße, cm …). The page's main image is fetched with the same rules.
+- **The AI only reads.** Gemini Flash (`ai.vision_*`) gets the photos and/or those facts and
+  says which configurator product it is, with its sizes in cm.
+  - **The source of each size:** every size says whether it was written on the page, or only
+    judged from a picture with a confidence.
+  - **Written beats estimated:** a size written on the page wins over a picture.
+  - **Cost:** about €0.001 per suggestion. It counts towards the month's budget (ADR-078), and
+    when the budget is used up the customer gets a friendly "please choose by hand".
+- **Checked by the program:**
+  - the product must be one of the configurator's;
+  - every size is held to its range in config/quote_products.json (clipped and flagged);
+  - estimates, clipped sizes and missing ones are marked "please measure" and highlighted in
+    the configurator until the customer touches them;
+  - an existing cover that fits these sizes is offered as well (ADR-064).
+- **Privacy:** nothing is stored. A photo lives only for the request, and at most
+  `suggest.per_hour` (10) suggestions are made per visitor per hour (the Worker's x-client-ip).
+  When the customer orders, the link and the summary go with the order (`source_url`,
+  `source_summary`). The photos are then sent to `/api/shop/order/{token}/source` and kept as
+  `order_sources/order-<id>-<n>.png` for the workshop.
+- **First real try** (SUNS Terme, hello-suns.com):
+  - **From the link:** "Breedte 197 cm, Diepte 77 cm, Hoogte 82.5 cm" was read off the page,
+    giving a sun lounger of 197 × 77 × 82 cm with nothing to check. The AI noted that the back
+    was raised, and that the flat seat is 39.5 cm high.
+  - **From the photo alone:** 195 × 65 × 80 cm, all marked as estimates.
+  - Each took about 9–11 s.

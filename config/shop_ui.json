@@ -262,6 +262,78 @@
    "en": "Cover see-through",
    "de": "Transparenz der Schutzhülle",
    "fr": "Transparence de la housse"
+  },
+  "suggest_open": {
+   "nl": "Heb je een foto of een link van je meubel?",
+   "en": "Have a photo or a link to your furniture?",
+   "de": "Haben Sie ein Foto oder einen Link zu Ihrem Möbel?",
+   "fr": "Vous avez une photo ou un lien de votre meuble ?"
+  },
+  "suggest_title": {
+   "nl": "Begin met een foto of een link",
+   "en": "Start from a photo or a link",
+   "de": "Mit einem Foto oder Link beginnen",
+   "fr": "Commencer par une photo ou un lien"
+  },
+  "suggest_help": {
+   "nl": "Maak een foto van je meubel of plak de link van de webshop waar je het kocht. Wij stellen de maten voor; jij controleert ze.",
+   "en": "Take a photo of your furniture or paste the link of the webshop where you bought it. We suggest the sizes; you check them.",
+   "de": "Fotografieren Sie Ihr Möbel oder fügen Sie den Link des Shops ein, in dem Sie es gekauft haben. Wir schlagen die Maße vor; Sie prüfen sie.",
+   "fr": "Prenez une photo de votre meuble ou collez le lien de la boutique où vous l'avez acheté. Nous proposons les dimensions ; vous les vérifiez."
+  },
+  "suggest_photo": {
+   "nl": "Foto kiezen of maken (max. 3)",
+   "en": "Choose or take a photo (max. 3)",
+   "de": "Foto wählen oder aufnehmen (max. 3)",
+   "fr": "Choisir ou prendre une photo (max. 3)"
+  },
+  "suggest_photos": {
+   "nl": "{n} foto('s) gekozen",
+   "en": "{n} photo(s) chosen",
+   "de": "{n} Foto(s) gewählt",
+   "fr": "{n} photo(s) choisie(s)"
+  },
+  "suggest_link": {
+   "nl": "of plak hier een link naar het product",
+   "en": "or paste a link to the product here",
+   "de": "oder hier einen Link zum Produkt einfügen",
+   "fr": "ou collez ici un lien vers le produit"
+  },
+  "suggest_go": {
+   "nl": "Maten voorstellen",
+   "en": "Suggest the sizes",
+   "de": "Maße vorschlagen",
+   "fr": "Proposer les dimensions"
+  },
+  "suggest_reading": {
+   "nl": "We lezen je meubel…",
+   "en": "Reading your furniture…",
+   "de": "Wir lesen Ihr Möbel…",
+   "fr": "Nous lisons votre meuble…"
+  },
+  "suggest_check": {
+   "nl": "De gemarkeerde maten zijn geschat: meet ze even na.",
+   "en": "The marked sizes are estimates: please measure them.",
+   "de": "Die markierten Maße sind geschätzt: bitte nachmessen.",
+   "fr": "Les dimensions marquées sont estimées : merci de les mesurer."
+  },
+  "suggest_match": {
+   "nl": "We maken al een hoes die hierbij past: {name}.",
+   "en": "We already make a cover that fits: {name}.",
+   "de": "Wir fertigen bereits eine passende Hülle: {name}.",
+   "fr": "Nous fabriquons déjà une housse qui convient : {name}."
+  },
+  "suggest_use": {
+   "nl": "Gebruik deze maten",
+   "en": "Use these sizes",
+   "de": "Diese Maße verwenden",
+   "fr": "Utiliser ces dimensions"
+  },
+  "suggest_estimate": {
+   "nl": "Geschat: meet dit na",
+   "en": "An estimate: please measure",
+   "de": "Geschätzt: bitte nachmessen",
+   "fr": "Estimé : à mesurer"
   }
  },
  "status": {

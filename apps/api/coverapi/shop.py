@@ -376,6 +376,9 @@ class OrderIn(BaseModel):
     note: str | None = Field(default=None, max_length=2000)
     terms: bool
     lang: str = Field(default="nl", pattern=r"^[a-z]{2}$")
+    # started from a photo or a link (ADR-086): kept with the order for the workshop
+    source_url: str | None = Field(default=None, max_length=2000)
+    source_summary: str | None = Field(default=None, max_length=600)
 
 
 ORDERS_TABLE = """
