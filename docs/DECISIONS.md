@@ -2551,3 +2551,63 @@ intermediate step where we can choose, so this doesn't go wrong automatically."
 Owner's answers (7 Oct 2026, QUESTIONS 69): the step where a longer top meets a shorter one is
 right (no blending); covering each piece as its plan rectangle is fine; an arrangement gets one
 cover over the whole, never covers zipped together (closes that question from ADR-089).
+
+## ADR-097 — C- and U-shaped drawing covers in the pieces the drawing draws; no slivers
+
+The owner (7 Oct 2026, twice): "some drawings like C27 still have too many panels"; "look very
+carefully at C27 again". Live C27 had 25 pieces (13 on top, 12 walls), and C26 20; both also
+broke the rules: C27 stretched 3.5 % and C26 5.4 % (limit `fabric.max_allowed_stretch_pct` 2 %),
+with up to 8.5 mm of ease on a seam.
+
+**Survey** (all 115 drawing covers against their drawings; staging out/drawings/fewer/): the box
+family and the views/isofit covers have the panels their drawings draw, or need a split only
+because two halves together are wider than the roll (D1, D2, D6: 2 x 971, 895, 858 mm). The
+extra pieces were on the plan-profile covers (C26, C27) and as slivers (S43, S44).
+
+What was wrong, and the fix (each general, not per model):
+- **A drawn seam cut the other arm** (`plan_profile._cuts`). A seam line square to the back
+  edge ran 4 m across the plan, so on a C it also cut the opposite arm: C27's extra seam across
+  the middle of the top. A seam now runs from the back edge to the first outline it meets.
+- **The noses could not lie flat** (`plan_profile.height_edge`, `zof`). The heights were the
+  profile at the distance from the back edge: where the back edge curls round a nose tighter
+  than the cover is deep, the slope got a ridge (the nearest back point jumps), and where the
+  cover is deeper than the drawn depth the slope ran out flat. Both join surfaces along a curve
+  no flat piece can follow. Now the heights are measured from the back edge without its tightly
+  curled ends (a cone past them), and past the last crease the slope is spread over what is left
+  to the front edge, so it reaches the front height on the whole front edge. C27 0.65 %, C26
+  0.62 %.
+- **The hidden back wall is one band** (`plan_profile.build(..., wall_max_mm)`). The outer wall
+  is behind the cover on every view; it was a piece per section. It is now joined into runs no
+  longer than `seams.max_skirt_panel_mm`, cut only at drawn seams so its seams meet the top's.
+  The inner walls keep a piece per section: the drawings draw those lines.
+- **Slivers** (`drawn_merge.absorb_slivers`). A piece narrower than `seams.min_piece_width_mm`
+  flattened goes into the neighbour it shares the longest edge with, when the two lie flat
+  within `drawn.merge_max_stretch_pct` and fit the roll, on every route-A cover, whoever made the
+  seams. The flattening for this measure now leaves out triangles without area and turns all
+  triangles one way: S43's half-millimetre strips made the solver blow up, so they were never
+  joined.
+- Kept as drawn: the back strip's crease (a strip joined to its slope does not lie flat: the
+  crease is curved and the two sides curve differently) and the drawn seams across the top.
+
+**Results**, each checked twice — `cover audit` and the engine's warnings, and a separate
+re-measure from the exported files (`scripts/fewer_check.py`: widths from cut.dxf, both sides
+of every seam and its 3D length, flat against 3D area, stretch flattened again with ARAP, the
+vents' count and that none is on an inner wall) — and by looking at the compare sheets
+(`scripts/fewer_compare.py`, out/drawings/fewer/compare/):
+
+| Cover | Pieces before | after | Worst stretch before → after | Largest seam ease |
+|---|---|---|---|---|
+| C27 | 25 | 20 | 3.54 → 0.65 % | 8.5 → 2.3 mm |
+| C26 | 20 | 16 | 5.37 → 0.62 % | 6.1 → 2.2 mm |
+| S43 | 9 | 5 | 0 → 0 % | — |
+| S44 | 10 | 9 | 0 → 0 % | — |
+
+The live covers of C26, C27 and S43 fail `cover audit` (pieces); the new ones pass. Vent counts
+kept (10, 8, 4, 4), none on an inner wall.
+
+- **Not fixed:** C28 (the mirror of C27) is not read by route A: its drawing has the heights
+  and depth without the words "Height", "Front Height", "Depth". drawing-cover-39-46-l1-l5-mirror
+  has 7,846 pieces from a broken AI shape (6 Oct) and route A cannot read its drawing (no top
+  view); it is the same drawing as drawing-l1 (10 pieces).
+- **For the owner** (open questions): is the flat back strip sewn as its own piece (as drawn) or
+  folded from the slope? Is the hidden back wall one band (as now) or a piece per section?

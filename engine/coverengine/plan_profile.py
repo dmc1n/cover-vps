@@ -26,6 +26,9 @@ from coverengine.errors import CoverError
 
 STEP_CM = 6.0  # param-ok: the top mesh, at most this coarse
 CUT_REACH_CM = 400.0  # param-ok: a seam line reaches this far across the cover
+OVERSHOOT_CM = 0.5  # param-ok: a seam line runs on this far past the outline, to cut it clean
+CURL_STEP_CM = 2.0  # param-ok: the back edge resampled this fine to measure its curl
+CURL_WINDOW = 10  # param-ok: the curl measured over this many steps each way (40 cm)
 
 
 def _height(profile: np.ndarray, d: np.ndarray) -> np.ndarray:
@@ -56,8 +59,12 @@ def _tri_region(region: Any, step: float) -> tuple[np.ndarray, np.ndarray]:
     return v3[:, :2], np.asarray(f)
 
 
-def _cuts(back: Any, at_cm: list[float]) -> list[Any]:
-    """Seam lines square to the back edge at the given distances along it."""
+def _cuts(back: Any, at_cm: list[float], plan: Any = None) -> list[Any]:
+    """Seam lines square to the back edge at the given distances along it.
+
+    With the plan given, a line runs from the back edge across the cover to the first outline
+    it meets, and no further: a drawn seam crosses its own section only. Reaching on, it cut
+    the opposite arm of a C or U (C27: an extra seam across the middle of the top, ADR-097)."""
     import shapely
 
     out = []
@@ -68,8 +75,64 @@ def _cuts(back: Any, at_cm: list[float]) -> list[Any]:
         t = q - r
         t /= max(np.linalg.norm(t), 1e-9)
         n = np.array([-t[1], t[0]])
-        out.append(shapely.LineString([p - n * CUT_REACH_CM, p + n * CUT_REACH_CM]))
+        line = shapely.LineString([p - n * CUT_REACH_CM, p + n * CUT_REACH_CM])
+        if plan is None:
+            out.append(line)
+            continue
+        if not plan.contains(shapely.Point(p + n)):
+            n = -n  # inward
+        ray = shapely.LineString([p - n * OVERSHOOT_CM, p + n * CUT_REACH_CM])
+        inside = plan.intersection(ray)
+        here = shapely.Point(p)
+        own = [
+            g
+            for g in getattr(inside, "geoms", [inside])
+            if g.geom_type == "LineString" and g.distance(here) < OVERSHOOT_CM
+        ]
+        if not own:
+            out.append(line)
+            continue
+        a, b = np.asarray(own[0].coords)[0], np.asarray(own[0].coords)[-1]
+        if np.linalg.norm(a - p) > np.linalg.norm(b - p):
+            a, b = b, a
+        out.append(shapely.LineString([a - n * OVERSHOOT_CM, b + n * OVERSHOOT_CM]))
     return out
+
+
+def height_edge(back: Any, depth_cm: float) -> Any:
+    """The back edge the heights are measured from: the drawn back edge without its ends where
+    it curls tighter than the cover is deep (a nose wrapping round). Measured from such a curl,
+    the slope gets a ridge where the nearest point on the back edge jumps (the medial axis), and
+    a piece over that ridge cannot lie flat: C27's arms stretched 3.8 %. Past the trimmed ends
+    the height is measured from the end point, a cone, which lies flat."""
+    import shapely
+
+    pts = np.asarray(shapely.segmentize(back, CURL_STEP_CM).coords)
+    if len(pts) < 3 * CURL_WINDOW + 1:
+        return back
+    seg = np.diff(pts, axis=0)
+    ang = np.unwrap(np.arctan2(seg[:, 1], seg[:, 0]))
+    run = np.linalg.norm(seg, axis=1)
+    n = len(seg)
+    tight = np.zeros(n, dtype=bool)
+    for i in range(n):
+        a, b = max(0, i - CURL_WINDOW), min(n - 1, i + CURL_WINDOW)
+        turn = abs(float(ang[b] - ang[a]))
+        length = float(run[a : b + 1].sum())
+        tight[i] = turn > 0 and length / turn < depth_cm
+    mid = n // 2
+    lo, hi = 0, n
+    for i in range(mid, -1, -1):
+        if tight[i]:
+            lo = i + 1
+            break
+    for i in range(mid, n):
+        if tight[i]:
+            hi = i
+            break
+    if hi - lo < 2 or (lo == 0 and hi == n):  # param-ok: a line needs points
+        return back
+    return shapely.LineString(pts[lo : hi + 1])
 
 
 def _split(region: Any, lines: list[Any]) -> list[Any]:
@@ -85,7 +148,10 @@ def _split(region: Any, lines: list[Any]) -> list[Any]:
     return parts
 
 
-def build(p: dict[str, Any], roll_mm: float = math.inf) -> list[Piece]:
+def build(p: dict[str, Any], roll_mm: float = math.inf, wall_max_mm: float = 0.0) -> list[Piece]:
+    """The pieces. `wall_max_mm` > 0: the back wall, hidden behind the cover on the drawing, is
+    one band cut only where it must be (at the drawn seams, into runs no longer than this:
+    seams.max_skirt_panel_mm), not a piece per section (ADR-097)."""
     import shapely
 
     plan = shapely.Polygon(np.asarray(p["plan_cm"], dtype=float)).buffer(0)
@@ -95,7 +161,28 @@ def build(p: dict[str, Any], roll_mm: float = math.inf) -> list[Piece]:
     profile = np.asarray(p["profile"], dtype=float)
     profile = profile[np.argsort(profile[:, 0])]
     creases = [float(d) for d in profile[1:-1, 0]]
-    cut_lines = _cuts(back, [float(s) for s in p.get("seams_at_cm") or []])
+    cut_lines = _cuts(back, [float(s) for s in p.get("seams_at_cm") or []], plan)
+    # the heights are measured from the back edge without its tightly curled ends (ADR-097)
+    seams_back = back
+    back = height_edge(back, float(profile[-1, 0]))
+    front = plan.exterior.difference(seams_back.buffer(HULL_NEAR_CM))
+    last = float(profile[-2, 0]) if len(profile) > 2 else 0.0  # param-ok: the last crease
+    depth = float(profile[-1, 0])
+
+    def zof(xy: np.ndarray) -> np.ndarray:
+        """The top's height: the profile by the distance from the back edge up to its last
+        crease; past it the slope is spread over what is left between the crease and the front
+        edge, so it reaches the front height on the front edge everywhere. Measured by the
+        distance alone, the slope ran out flat where the cover is deeper than the drawn depth
+        (the noses), a flat bit joined to a slope along a curve that no piece can lie flat
+        over: C26 stretched 4.4 % (ADR-097)."""
+        d = np.array([back.distance(shapely.Point(x, y)) for x, y in xy])
+        if front.is_empty:
+            return _height(profile, d)
+        f = np.array([front.distance(shapely.Point(x, y)) for x, y in xy])
+        past = np.maximum(d - last, 0.0)
+        eff = np.where(d > last, last + (depth - last) * past / np.maximum(past + f, 1e-9), d)
+        return _height(profile, eff)
 
     # the top: bands between the creases (distance from the back edge), cut across
     bands = []
@@ -115,8 +202,7 @@ def build(p: dict[str, Any], roll_mm: float = math.inf) -> list[Piece]:
     for a, band in bands:
         for part in _split(band, cut_lines):
             v, f = _tri_region(part, STEP_CM)
-            d = np.array([back.distance(shapely.Point(x, y)) for x, y in v])
-            z = _height(profile, d)
+            z = zof(v)
             k += 1
             kind = "top" if a == 0 else "slope"
             faces = [[(float(v[i, 0] * MM), float(v[i, 1] * MM), float(z[i] * MM)) for i in tri]
@@ -125,25 +211,54 @@ def build(p: dict[str, Any], roll_mm: float = math.inf) -> list[Piece]:
 
     # the walls on the outline: the back wall where the outline runs along the back edge
     ring = np.asarray(shapely.segmentize(plan.exterior, STEP_CM).coords)
-    near = np.array([back.distance(shapely.Point(x, y)) for x, y in ring]) < 1.0  # param-ok: cm
+    near = (
+        np.array([seams_back.distance(shapely.Point(x, y)) for x, y in ring]) < 1.0
+    )  # param-ok: cm
     cut_pts = [ln.intersection(plan.exterior) for ln in cut_lines]
     walls: dict[str, list[list[tuple[float, float, float]]]] = {}
     for i in range(len(ring) - 1):
         (x0, y0), (x1, y1) = ring[i], ring[i + 1]
-        z0 = float(_height(profile, np.array([back.distance(shapely.Point(x0, y0))]))[0])
-        z1 = float(_height(profile, np.array([back.distance(shapely.Point(x1, y1))]))[0])
+        z0, z1 = (float(z) for z in zof(np.array([[x0, y0], [x1, y1]])))
         side = "back" if near[i] and near[i + 1] else "front"
         mid = shapely.Point((x0 + x1) / 2, (y0 + y1) / 2)
         # which stretch between seam lines this wall bit is in
-        s = back.project(mid)
+        s = seams_back.project(mid)
         stretch = sum(1 for c in (p.get("seams_at_cm") or []) if s > float(c))
         name = f"{side}-{stretch + 1}"
         walls.setdefault(name, []).append([
             (x0 * MM, y0 * MM, 0.0), (x1 * MM, y1 * MM, 0.0),
             (x1 * MM, y1 * MM, z1 * MM), (x0 * MM, y0 * MM, z0 * MM)])  # fmt: skip
     del cut_pts
+    if wall_max_mm > 0:
+        walls = _band(walls, "back", wall_max_mm)
     pieces += [Piece(n, f) for n, f in sorted(walls.items())]
     return pieces
+
+
+def _band(
+    walls: dict[str, list[list[tuple[float, float, float]]]], side: str, longest_mm: float
+) -> dict[str, list[list[tuple[float, float, float]]]]:
+    """Neighbouring wall pieces of one side joined in order into runs no longer than
+    `longest_mm` along the floor (the fewest runs: each takes as many as fit)."""
+    mine = sorted(
+        (k for k in walls if k.startswith(side + "-")), key=lambda k: int(k.split("-")[1])
+    )
+    if len(mine) < 2:  # param-ok: nothing to join
+        return walls
+
+    def run(k: str) -> float:
+        return sum(math.dist(q[0][:2], q[1][:2]) for q in walls[k])
+
+    out = {k: v for k, v in walls.items() if k not in mine}
+    group: list[str] = []
+    for k in mine:
+        if group and (sum(run(g) for g in group) + run(k) > longest_mm
+                      or int(k.split("-")[1]) != int(group[-1].split("-")[1]) + 1):  # fmt: skip
+            out[group[0]] = [q for g in group for q in walls[g]]
+            group = []
+        group.append(k)
+    out[group[0]] = [q for g in group for q in walls[g]]
+    return out
 
 
 # --- reading such a cover from its drawing, by the program (ADR-084) -------------------------

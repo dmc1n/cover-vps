@@ -34,6 +34,7 @@ STRETCH_SHARE = 0.98  # param-ok: the stretch most of the piece (by area) stays 
 SUBDIVIDE_PARTS = 12.0  # param-ok: a piece is measured with triangles this fine (of its size)
 SUBDIVIDE_MIN_MM = 50.0  # param-ok: mm, the finest measuring triangles
 PERCENT = 100.0  # param-ok: a share as a percentage
+FLAT_TRIANGLE_MM = 0.01  # param-ok: a triangle lower than this has no area
 
 
 def _weld(m: trimesh.Trimesh) -> trimesh.Trimesh:
@@ -89,6 +90,21 @@ def _one_sheet(m: trimesh.Trimesh) -> bool:
 
 def flat_ok(m: trimesh.Trimesh, max_stretch_pct: float, roll_mm: float) -> tuple[bool, float]:
     """Does the piece lie flat (stretch within the limit) and fit the roll? (ok, stretch %)."""
+    stretch, narrow = flat_measure(m)
+    return bool(stretch <= max_stretch_pct and narrow <= roll_mm), stretch
+
+
+def flat_measure(m: trimesh.Trimesh) -> tuple[float, float]:
+    """The piece flattened: its stretch over most of its area (%) and its width in its
+    narrowest direction (mm). A piece that cannot be flattened: (inf, inf)."""
+    # triangles with no area (points on one line, as S43's strips have) make the solver blow
+    # up; they cover nothing, so they are left out of the measure
+    m = m.copy()
+    m.update_faces(m.nondegenerate_faces(height=FLAT_TRIANGLE_MM))
+    m.remove_unreferenced_vertices()
+    trimesh.repair.fix_winding(m)  # triangles turned either way fold the flat piece over
+    if len(m.faces) == 0:
+        return math.inf, math.inf
     # long thin triangles flatten badly: split them so the measure is fair
     edge = max(float(m.scale) / SUBDIVIDE_PARTS, SUBDIVIDE_MIN_MM)
     v, f = trimesh.remesh.subdivide_to_size(m.vertices, m.faces, max_edge=edge)
@@ -96,7 +112,7 @@ def flat_ok(m: trimesh.Trimesh, max_stretch_pct: float, roll_mm: float) -> tuple
     try:
         flat = flatten(sub, "slim", SLIM_ITERATIONS, SLIM_TOLERANCE)
     except Exception:  # noqa: BLE001 - a piece that cannot be flattened is not joined
-        return False, math.inf
+        return math.inf, math.inf
     s1, s2, area = singular_values(flat.vertices, flat.faces, flat.uv)
     worst = np.maximum(s1, 1.0 / np.maximum(s2, 1e-9)) - 1.0
     order = np.argsort(worst)
@@ -108,7 +124,61 @@ def flat_ok(m: trimesh.Trimesh, max_stretch_pct: float, roll_mm: float) -> tuple
     hull = shapely.MultiPoint(flat.uv).minimum_rotated_rectangle
     rect = np.asarray(hull.exterior.coords)[:4]
     narrow = min(np.linalg.norm(rect[1] - rect[0]), np.linalg.norm(rect[2] - rect[1]))
-    return bool(stretch <= max_stretch_pct and narrow <= roll_mm), stretch
+    return stretch, float(narrow)
+
+
+def absorb_slivers(
+    parts: list[tuple[str, trimesh.Trimesh]],
+    least_mm: float,
+    roll_mm: float,
+    max_stretch_pct: float,
+    log: Any = None,
+) -> list[tuple[str, trimesh.Trimesh]]:
+    """A piece narrower than `least_mm` (seams.min_piece_width_mm) flattened is no panel to
+    cut and sew: it goes into the neighbour it shares the longest edge with, when the two lie
+    flat together and fit the roll (ADR-097). C27's trimmed noses left strip ends of 4 x 6 cm;
+    S43 had four pieces of 0.01-0.05 m2. The neighbour keeps its name."""
+    meshes = {n: _weld(m) for n, m in parts}
+    order = [n for n, _ in parts]
+    tried: set[str] = set()
+    width: dict[str, float] = {}
+    while True:
+        thin = []
+        for n in order:
+            if n in tried:
+                continue
+            if n not in width:
+                width[n] = flat_measure(meshes[n])[1]
+            if width[n] < least_mm:
+                thin.append((width[n], n))
+        if not thin:
+            break
+        _, n = min(thin)
+        tried.add(n)
+        mates = []
+        for o in order:
+            if o == n:
+                continue
+            fold, shared = _fold(meshes[n], meshes[o])
+            if shared > 0:
+                mates.append((-shared, fold, o))
+        for _neg, fold, o in sorted(mates):
+            both = trimesh.util.concatenate([meshes[n], meshes[o]])
+            assert isinstance(both, trimesh.Trimesh)
+            m = _weld(both)
+            if not _one_sheet(m):
+                continue
+            ok, stretch = flat_ok(m, max_stretch_pct, roll_mm)
+            if not ok:
+                continue
+            if log:
+                log(f"sliver {n} joined to {o} (fold {fold:.1f}°, stretch {stretch:.2f} %)")
+            meshes[o] = m
+            width.pop(o, None)
+            meshes.pop(n)
+            order.remove(n)
+            break
+    return [(n, meshes[n]) for n in order]
 
 
 def merge(
