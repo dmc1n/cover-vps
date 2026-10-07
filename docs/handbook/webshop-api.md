@@ -68,6 +68,16 @@ of the webshop page where they bought it. We suggest the product and its sizes:
 - sizes written on the page are taken as they are;
 - sizes judged from a photo are marked "please measure".
 
+A photo alone is looked up on the web (ADR-087, ADR-092), which takes up to a minute:
+- when we find the very product (its picture matches the photo), the page shows
+  "Recognised: <brand and model>" with a link, and its written sizes are the start;
+- when we find only a product that looks much alike, its sizes are the start, shown as
+  "based on a comparable product";
+- otherwise nothing found is used: the photo's own estimates, to measure. Better than a product
+  that has nothing to do with it.
+Each photo costs about €0.03 to €0.07, depending on how Google bills its searches (the cost
+ledger, "suggest ..." rows).
+
 The customer checks them, then goes on as usual. Nothing is kept unless they order; then the link
 and the photos come with the order, for the workshop. API: `POST /api/shop/suggest`
 (multipart: `photos`, `url`, `lang`).

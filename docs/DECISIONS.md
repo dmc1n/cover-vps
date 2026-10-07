@@ -2374,3 +2374,60 @@ to upload it", "it has to be a zip".
   models linked, 27 more only suggested.
 - **Better later:** a person confirms or removes a suggested SUNS link on the card; SUNS
   names that differ in spelling ("Victoria" vs "vittoria") need an alias list.
+
+## ADR-092 — A photo alone: recognise the brand and model, compare pictures, drop what is unlike
+
+The owner (7 October) uploaded a photo on the preview configurator: what it recognised "made no
+sense", while Google Lens found far better matches. Then: recognising the brand and model "is
+really a good idea"; show it to the customer.
+
+- **The cause** (ADR-087's flow, reproduced on 12 SUNS photos and renders; the owner's photo
+  itself is not kept, by design):
+  - one Gemini call looked at the photo, guessed a famous design (Kettal Cala, Tribù, Talenti,
+    Vondom, Knoll) and searched for that name: a search by words, not by image;
+  - the program took the first page that had sizes, without checking it looked like the photo;
+  - the final AI then wrote "your Kettal CALA sofa". A round SUNS Marolo daybed became a
+    "round dining set" from a Talenti page; a Vivaro sofa an "Atmosphera Loto module".
+- **Now, for a photo alone** (`apps/api/coverapi/shop_suggest.py`, `find_comparable`):
+  1. **Identify** (vision, JSON): product type, brand and model with an honest confidence,
+     materials, colours, distinctive features, estimated sizes, and up to `suggest.queries`
+     search queries by look (no brand).
+  2. **Two searches side by side** (Gemini with Google Search): the recognised brand and model
+     (the manufacturer's page first), and the look alone, so a wrong brand guess cannot steer
+     everything. Results are taken in turns, at most `suggest.search_pages`.
+  3. **Each result made ready** in parallel: its page read by the safe fetcher (or the sizes the
+     search read, when a shop refuses robots) and its main picture, `suggest.compare_px` small.
+  4. **Compare** (one vision call): the customer's photo beside every picture; per candidate
+     "the same product and size variant?" and a similarity 0–1 for a cover's shape.
+  5. **The program decides:** the same product at `suggest.same_min` or more is **recognised**
+     (shown as "Herkend: <name>" with its link, its sizes the start, flagged to check); else
+     the most alike with sizes at `suggest.similar_min` or more is a **comparable** start (as
+     before); else **nothing is taken over** and the photo's own estimates are asked to measure.
+     A page without a picture counts only if it carries the brand and model recognised with
+     `suggest.brand_min` confidence.
+  6. The final AI is told whether the page is "the same product" or "a SIMILAR product" and may
+     never name a similar product's brand as the customer's.
+- **Measured** on 6 photos from hello-suns.com (before → after):
+  - Basta low bar table (SUNS logo visible): found → **recognised "SUNS Basta low bar tafel"**,
+    256.5 × 96 × 95 cm;
+  - Marolo daybed: "round dining set 180 cm from Talenti Slam" → a sofa from the photo's own
+    estimates (the Talenti pages judged unlike: 0.65);
+  - Vivaro sofa: "Atmosphera Loto module, 180 cm" → estimates (Talenti Moon judged 0.5);
+  - Venosa, Blocchi: "Vondom Suave", "Soho Noelle" → the photo's own estimates (the best
+    results judged 0.7 and 0.55 alike);
+  - Dolce chair: 502 (no answer) → estimates; Tosca render: "your Kettal CALA" → "4SO Calma"
+    as a comparable (0.8), 214 × 81 cm against the real 231 × 85.
+  - Each takes 30–60 s (was 17–78 s); the AI work now runs off the event loop, so the rest of
+    the app keeps answering meanwhile (before, one suggestion blocked the API for a minute).
+- **The limit:** a search by words rarely finds a brand like SUNS from the look alone. Google
+  Lens finds it because it searches by image. **Ready but off:** `suggest.reverse_search`
+  (Google Cloud Vision web detection, the engine behind Lens's visual matches): its pages that
+  show the very picture come first and its best-guess label becomes the first query. It needs an
+  API key for the Cloud Vision API (`GOOGLE_VISION_API_KEY` in deploy/.env); question 68.
+- **Cost** (ADR-078, every call in the ledger as "suggest identify / search / compare"): about
+  €0.035 per photo, measured (4 Flash calls ≈ €0.006, 1–2 searches with about 1.3 queries each at
+  `suggest.search_query_eur`, Google's fee per search query for Gemini 3, to confirm on the
+  bill). If Google bills per grounded request instead (€0.03 each), about €0.07.
+- **Tests** fake every paid call: an autouse fixture fails a test that would call Gemini, the
+  search or the image search for real; the decisions are tested on faked identify, searches,
+  pictures and comparison scores.

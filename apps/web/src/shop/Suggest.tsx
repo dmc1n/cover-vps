@@ -10,7 +10,15 @@ export interface Suggestion {
   check: string[];
   summary: string;
   source: { url: string | null; title: string | null; photos: number };
-  /** a photo alone: the comparable product the web search found, its sizes the basis */
+  /** a photo alone: the very product, recognised (brand and model) and confirmed by
+   * comparing its picture with the photo (ADR-092) */
+  recognised?: {
+    url: string;
+    title: string;
+    name: string;
+    brand: string;
+  } | null;
+  /** a photo alone: a similar product the web search found, its sizes the basis */
   comparable?: { url: string; title: string | null } | null;
   match: { model_id: string; name?: string; score_pct?: number } | null;
 }
@@ -104,6 +112,19 @@ export function Suggest({
             <b>{productName(got.product)}</b>
           </p>
           {got.summary && <p>{got.summary}</p>}
+          {got.recognised && (
+            <p className="s-muted">
+              {w("suggest_recognised")}{" "}
+              <a
+                href={got.recognised.url}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+              >
+                {got.recognised.name || got.recognised.title}
+              </a>
+              . {w("suggest_recognised_note")}
+            </p>
+          )}
           {got.comparable && (
             <p className="s-muted">
               {w("suggest_comparable")}{" "}

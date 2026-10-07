@@ -348,9 +348,23 @@ suggest:                         # "start from a photo or a link" in the configu
   search: true                   # a photo without a link: the AI looks up comparable products on the web
                                  # (Gemini with Google Search) and their pages' sizes become the basis
                                  # (owner, 7 Oct 2026: "via Google image search a comparison as the basis")
-  search_pages: 5                # at most this many product pages fetched to find written sizes
+  search_pages: 5                # at most this many product pages fetched and compared with the photo
   search_timeout_s: 90           # the search may take this long (it looks up several pages)
-  search_eur: 0.035              # to confirm: what one search costs (Google's grounding fee), for the budget
+  search_query_eur: 0.013        # to confirm on the bill: Google's grounding fee per search query the
+                                 # model runs (Gemini 3: $14 per 1000 queries), for the budget
+  thinking: low                  # how long Gemini thinks in the photo steps (low: about 3x faster)
+  queries: 5                     # the photo is first identified (brand, model, features); the search by its
+                                 # look gets this many queries, and a recognised brand a search of its own (ADR-092)
+  compare_px: 512                # each found product's picture is made this small to hold it against
+                                 # the customer's photo (fewer tokens)
+  same_min: 0.85                 # "recognised": the comparison says it is the same product, at least this alike
+  similar_min: 0.72              # else a similar product's sizes are a start only when at least this alike;
+                                 # below it nothing is taken over (the photo's own estimates)
+  brand_min: 0.85                # a found page without a picture counts as recognised only when its name
+                                 # carries the brand and model the photo was recognised as, this sure
+  reverse_search: false          # a real search by image (Google Cloud Vision web detection, as Google Lens):
+                                 # off until the owner gives a key, GOOGLE_VISION_API_KEY (docs/QUESTIONS.md 68)
+  reverse_eur: 0.0033            # to confirm: its fee per photo ($3.50 per 1000 after the first 1000 a month)
 
 match:                           # the customer's sizes against the covers we already make (ADR-064)
   tight_cm: 1.25                 # to confirm (Q57): an existing cover may be this much smaller and still count as exact

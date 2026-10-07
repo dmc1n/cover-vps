@@ -30,7 +30,11 @@ MM_PER_CM = 10.0  # param-ok: unit conversion
 # "A calmer cover surface": the owner's 5 mm more room, and gaps up to 15 cm bridged.
 SMOOTH_CLEARANCE_MM = 15.0  # param-ok: the action's value (owner, 1 Oct 2026)
 SMOOTH_BRIDGE_MM = 150.0  # param-ok: the action's value
-KEY_ENV = {"deepseek": "DEEPSEEK_API_KEY", "gemini": "GEMINI_API_KEY"}
+KEY_ENV = {
+    "deepseek": "DEEPSEEK_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "google_vision": "GOOGLE_VISION_API_KEY",  # reverse image search, off until a key (ADR-092)
+}
 
 # What the AI may suggest, and what each does (shown to the AI and in the web app).
 ACTIONS: dict[str, str] = {
