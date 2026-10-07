@@ -180,3 +180,19 @@ def test_the_month_s_budget_stops_it_kindly(app: Any, monkeypatch: pytest.Monkey
     r = TestClient(app).post("/api/shop/suggest",
                              files=[("photos", ("a.png", _png(), "image/png"))])  # fmt: skip
     assert r.status_code == 503 and "by hand" in r.json()["detail"]
+
+
+def test_a_flat_lounger_asks_nothing_about_a_headrest_a_raised_one_does() -> None:
+    """The lounger's headrest is an option (owner, 7 Oct 2026): its sizes are only checked when
+    the AI saw one."""
+    from coverapi.shop_suggest import proposal
+
+    page = {"source": "page", "confidence": 0.9}
+    flat = proposal({"product": "lounger", "fields": {
+        "length_cm": {"value": 198, **page}, "width_cm": {"value": 70, **page},
+        "height_cm": {"value": 35, **page}}})  # fmt: skip
+    assert flat["check"] == [] and flat["sizes"]["headrest"] is False
+    raised = proposal({"product": "lounger", "fields": {
+        "length_cm": {"value": 198, **page}, "width_cm": {"value": 70, **page},
+        "height_cm": {"value": 35, **page}, "headrest": {"value": True, **page}}})  # fmt: skip
+    assert set(raised["check"]) == {"headrest_height_cm", "headrest_length_cm"}

@@ -350,7 +350,9 @@ def proposal(ans: dict[str, Any]) -> dict[str, Any]:
         item = got.get(f) if isinstance(got, dict) else None
         if not isinstance(item, dict) or "value" not in item:
             sizes[f] = d
-            flags[f] = ["default"]
+            # a yes/no the AI did not mention keeps its default unflagged (a lounger without a
+            # word about a headrest is a flat one); every size it did not give must be checked
+            flags[f] = [] if lo is None else ["default"]
             continue
         src = str(item.get("source") or "photo")
         try:
@@ -373,6 +375,11 @@ def proposal(ans: dict[str, Any]) -> dict[str, Any]:
             v = min(max(v, lo), hi)
         sizes[f] = round(v)
         flags[f] = mark
+    # a size that belongs to an unticked yes/no (the headrest of a flat lounger) is not asked
+    requires = PRODUCTS[product].get("requires", {})
+    for f, need in requires.items():
+        if not sizes.get(need):
+            flags[f] = []
     check = [f for f, m in flags.items() if m]
     return {"product": product, "label": PRODUCTS[product]["label"], "sizes": sizes,
             "flags": flags, "check": check, "summary": str(ans.get("summary") or "")[:400],
