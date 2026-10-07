@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { UnfoldView, type FrameHook } from "./Unfold";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -223,6 +224,10 @@ export function Viewer({
   const [water, setWater] = useState(true); // the water heatmap over the draped cover
   const [showVents, setShowVents] = useState(ventsSaved);
   const [showDims, setShowDims] = useState(dimsSaved);
+  const [unfolding, setUnfolding] = useState(false);
+  const frameHooks = useRef<FrameHook[]>([]);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
   const drapeAnim = useRef<{
     mesh: THREE.Mesh;
     frames: Float32Array[];
@@ -279,6 +284,8 @@ export function Viewer({
     scene.add(grid);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    cameraRef.current = camera;
+    controlsRef.current = controls;
     const loader = new GLTFLoader();
     const box = new THREE.Box3();
     let framed = false;
@@ -366,6 +373,7 @@ export function Viewer({
           if (fall.wet) fall.wet.visible = wetShown;
         }
       }
+      for (const hook of frameHooks.current) hook();
       renderer.render(scene, camera);
     });
     return () => {
@@ -650,6 +658,17 @@ export function Viewer({
         <span className="muted">
           Drag to turn, scroll to zoom, right-drag to move.
         </span>
+        {files.includes("finished.json") && files.includes("panels.glb") && (
+          <span className="rain-buttons">
+            <button
+              className={unfolding ? "primary" : ""}
+              title="Every piece pulled apart and laid flat on a table: its net and cut size, the seam and hem allowances, and where the fabric goes"
+              onClick={() => setUnfolding(!unfolding)}
+            >
+              {unfolding ? "Back to the cover" : "Unfold"}
+            </button>
+          </span>
+        )}
         <span className="rain-buttons">
           {files.includes("rain.json") && (
             <button
@@ -713,6 +732,20 @@ export function Viewer({
         </span>
       </div>
       <div className="canvas" ref={host} />
+      {unfolding && (
+        <UnfoldView
+          id={id}
+          stamp={stamp}
+          scene={sceneRef.current}
+          frameHooks={frameHooks}
+          camera={cameraRef.current}
+          controls={controlsRef.current}
+          hideLayers={(hide) => {
+            for (const [file, obj] of Object.entries(groups.current))
+              obj.visible = hide ? false : !!shownRef.current[file];
+          }}
+        />
+      )}
       {raining && rain && <RainReport rain={rain} />}
       {draping && drape && <DrapeReport drape={drape} water={water} />}
     </div>

@@ -72,6 +72,17 @@ Since 6 October, two things are not run automatically and have their own button:
 check (the cover falling over the furniture, with rain) and the AI's choice of pieces or
 balloons. The rule decides those by default.
 
+## Unfold: the pieces flat, and where the fabric goes (ADR-085)
+
+In the 3D view, "Unfold" plays the cover coming apart and lying flat on a table. On the table,
+each piece shows:
+- its net outline (the sewn size) and its cut outline (dashed);
+- the seam allowance (orange), the hem (blue) and the vent openings;
+- its net and cut size in cm.
+
+Below the view, a table shows where the fabric goes: the surface, the seam allowances, the hem,
+the vent hoods, and what is left on the roll.
+
 ## What you find where
 
 - **Models:** every model with its state. Open one for the 3D view, the pieces, the files and

@@ -304,3 +304,14 @@ fieldset.card legend { font-weight: 600; text-transform: capitalize; padding: 0 
   padding: 10px 14px;
   border-radius: 8px;
 }
+
+/* Unfold (ADR-085): the pieces flat on the table, and where the fabric goes */
+.unfold { margin-top: 12px; }
+.unfold-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.unfold-bar input[type="range"] { flex: 1; min-width: 180px; accent-color: var(--olive); }
+.unfold-legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 10px 0; font-size: 13px; }
+.unfold-legend i { display: inline-block; width: 14px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+.unfold-legend i.dash { background: repeating-linear-gradient(90deg, #3c443c 0 4px, transparent 4px 7px); height: 3px; vertical-align: 2px; }
+.unfold-table td, .unfold-table th, .unfold-totals td { font-variant-numeric: tabular-nums; }
+.unfold-totals { margin-top: 10px; max-width: 640px; }
+.unfold-totals tr.sum td { font-weight: 600; border-top: 1px solid var(--line, #d6cdb6); }

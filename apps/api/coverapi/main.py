@@ -125,9 +125,10 @@ def create_app(
     from coverapi import desk
 
     desk.install(app, store)  # the drawing desk: people approve, the AI sorts (ADR-079)
-    from coverapi import drawing_upload
+    from coverapi import drawing_upload, unfold
 
     drawing_upload.install(app, store, jobs)  # route A: a drawing (PDF) -> a cover (ADR-081)
+    unfold.install(app, store)  # the cover unfolded, with where its fabric goes (ADR-085)
     from coverapi import shop
 
     shop.install(app, auth, store.root, jobs, store)

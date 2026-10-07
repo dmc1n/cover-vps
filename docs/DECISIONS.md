@@ -2131,3 +2131,48 @@ whole night".
   - C27 has 25 pieces and 10 vents. A vent that fell on a 16 cm end piece now moves to the
     nearest piece with room (`finish._roomy`), so the drawing's count is kept.
   - Both wait at the top of the Desk for a person.
+
+## ADR-085 — "Unfold": the cover's pieces pulled apart and laid flat, with where the fabric goes
+
+The owner (7 October): "an animation from the 3D model of all panels, how they come together
+and lie flat, so we also see all dimensions and where the extra lengths of fabric come from."
+
+- **The data** (`coverengine/unfold.py`, `GET /api/models/{id}/unfold.json` and `.bin`).
+  - Three shapes of the same points, as on the website's story (ADR-071):
+    - on the cover;
+    - pulled apart along each piece's own normal;
+    - flat on a table in front of the furniture.
+  - On the table every piece lies on its own finished outline (finished.json). Its flat
+    points are turned and shifted onto the net outline, by the best of the turns and the
+    mirror of its main axis.
+  - The table is square-ish (rows about 1.6 × the square root of the cut area long), with the
+    vent hoods and membranes laid beside the pieces.
+  - Computed on request, never in the standard run (ADR-080). It is kept in the model's
+    `unfold/`, keyed by panels.npz and finished.json: C27 takes 6 s the first time, then comes
+    from the cache.
+- **Per piece:**
+  - the net size and the cut size (cm), and the net and cut areas;
+  - the extra between the cut and net outlines, split over seam allowances and the hem in
+    proportion to each edge's length times its allowance;
+  - the ease along its seams (cm);
+  - the vent openings.
+- **Totals:**
+  - the net surface;
+  - plus the seam allowances, the hem, and the vent hoods and membranes, which together make
+    the cut pieces;
+  - plus what is left on the roll between the pieces (the export's simple layout; the machine
+    nests tighter), which makes the fabric used (roll length × roll width).
+- **In the 3D view (button "Unfold")**:
+  - play/pause and a scrubber: on the cover, then pulled apart, then laid flat;
+  - the camera moves from the cover to straight above the table;
+  - on the table: the net outline (solid), the cut outline (dashed), the seam band (orange),
+    the hem band (blue), the vent openings, and a label per piece (net and cut size);
+  - below: the table per piece and the totals, with each as a share of the net surface.
+- **S45:**
+  - net 2.59 m², seam allowances 0.14, hem 0.18, vents 0.63, so 3.54 m² of cut pieces;
+  - 3.73 m of roll, 5.59 m² of fabric.
+- **C27:**
+  - net 18.61 m², seam allowances 1.09 (6 %), hem 1.21 (6 %), vents 1.58 (8 %), so 22.50 m²
+    of cut pieces (+21 %);
+  - the export's layout uses 25.1 m of roll (37.6 m²). It leaves 15.1 m² between the pieces,
+    which the machine's nesting reduces.
