@@ -13,11 +13,23 @@ from coverapi.main import create_app
 from fastapi.testclient import TestClient
 from PIL import Image
 
+REAL_GEMINI = sg.gemini  # the tests of the calls themselves fake the network under them
+REAL_REVERSE = sg.reverse_search
+
 
 @pytest.fixture(autouse=True)
 def no_web_search(monkeypatch: pytest.MonkeyPatch) -> None:
-    """No test may search the web for real (Google's search costs money): nothing found."""
+    """No test may call the AI or search the web for real (both cost money): the photo is not
+    identified, nothing is found, nothing compared; any other paid call fails the test."""
+
+    def paid(*a: Any, **k: Any) -> Any:
+        raise AssertionError("a test made a paid AI call")
+
+    monkeypatch.setattr(sg, "gemini", paid)
+    monkeypatch.setattr(sg, "reverse_search", paid)  # off by default; a test switches it on
+    monkeypatch.setattr(sg, "identify", lambda *a, **k: {})
     monkeypatch.setattr(sg, "search_comparable", lambda *a, **k: [])
+    monkeypatch.setattr(sg, "compare", lambda *a, **k: {})
 
 
 @pytest.fixture()
@@ -137,7 +149,9 @@ def test_a_link_gives_a_proposal_from_the_page(app: Any, monkeypatch: pytest.Mon
                                            _png())})  # fmt: skip
     seen: dict[str, Any] = {}
 
-    def fake_ask(params: Any, photos: list[bytes], facts: Any, lang: str) -> dict[str, Any]:
+    def fake_ask(
+        params: Any, photos: list[bytes], facts: Any, lang: str, hint: Any = None
+    ) -> dict[str, Any]:
         seen.update(photos=len(photos), facts=facts, lang=lang)
         return {"product": "lounger", "summary": "Een ligbed van 198 × 75 cm.",
                 "fields": {"length_cm": {"value": 198, "source": "page", "confidence": 0.95},
@@ -213,13 +227,20 @@ def test_a_photo_alone_starts_from_a_comparable_product_found_on_the_web(
               "sizes_cm": {"length": 448, "depth": 115, "height": 76}}]  # fmt: skip
     monkeypatch.setattr(sg, "search_comparable", lambda *a, **k: found)
 
-    def refuse(*a: Any, **k: Any) -> Any:
+    def refuse(url: str, kinds: Any, *a: Any, **k: Any) -> Any:
+        if kinds == sg.IMAGE_TYPES:  # its picture comes from a CDN that serves robots
+            return url, _png()
         raise sg.SuggestError("the page answered 429")  # shops refuse robots
 
     monkeypatch.setattr(sg, "fetch", refuse)
+    found[0]["image"] = "https://cdn.example/rotunde.jpg"
+    monkeypatch.setattr(sg, "compare", lambda *a, **k: {
+        0: {"same": False, "similarity": 0.8, "why": "same shape, other brand"}})  # fmt: skip
     seen: dict[str, Any] = {}
 
-    def fake_ask(params: Any, photos: list[bytes], facts: Any, lang: str) -> dict[str, Any]:
+    def fake_ask(
+        params: Any, photos: list[bytes], facts: Any, lang: str, hint: Any = None
+    ) -> dict[str, Any]:
         seen["facts"] = facts
         return {"product": "sofa", "summary": "a curved sofa", "fields": {
             "length_cm": {"value": 448, "source": "page", "confidence": 0.9},
@@ -233,3 +254,219 @@ def test_a_photo_alone_starts_from_a_comparable_product_found_on_the_web(
     assert seen["facts"]["product"]["sizes"]["length"] == 448  # the search's sizes were the basis
     assert out["comparable"]["title"] == "Curved Sofa Rotunde"
     assert "comparable" in out["flags"]["length_cm"] and "length_cm" in out["check"]
+
+
+def _photo_flow(monkeypatch: pytest.MonkeyPatch, ident: dict[str, Any],
+                runs: dict[bool, list[dict[str, Any]]],
+                scores: dict[int, dict[str, Any]]) -> dict[str, Any]:  # fmt: skip
+    """A photo alone with faked identify, searches (by brand / by look), web and comparison."""
+    seen: dict[str, Any] = {"searches": []}
+    monkeypatch.setattr(sg, "identify", lambda *a, **k: ident)
+
+    def search(params: Any, png: bytes, idt: Any = None, brand: bool = False) -> Any:
+        seen["searches"].append(brand)
+        return runs.get(brand, [])
+
+    monkeypatch.setattr(sg, "search_comparable", search)
+    monkeypatch.setattr(sg, "fetch", lambda url, kinds, *a, **k: (
+        (url, _png()) if kinds == sg.IMAGE_TYPES else (_ for _ in ()).throw(
+            sg.SuggestError("the page answered 403"))))  # fmt: skip
+
+    def cmp(params: Any, png: bytes, cands: list[dict[str, Any]]) -> Any:
+        seen["candidates"] = [c["title"] for c in cands]
+        return scores
+
+    monkeypatch.setattr(sg, "compare", cmp)
+
+    def fake_ask(params: Any, photos: Any, facts: Any, lang: str, hint: Any = None) -> Any:
+        seen.update(facts=facts, hint=hint)
+        fields = {"length_cm": {"value": 231, "source": "page", "confidence": 0.9}} if facts else {
+            "length_cm": {"value": 220, "source": "photo", "confidence": 0.4}}  # fmt: skip
+        return {"product": "sofa", "summary": "a sofa", "fields": fields}
+
+    monkeypatch.setattr(sg, "ask", fake_ask)
+    return seen
+
+
+def _post_photo(app: Any) -> dict[str, Any]:
+    photo = [("photos", ("s.png", _png(), "image/png"))]
+    r = TestClient(app).post("/api/shop/suggest", files=photo)
+    assert r.status_code == 200, r.text
+    return dict(r.json())
+
+
+def _page(title: str, brand: str = "", same: bool = False) -> dict[str, Any]:
+    slug = title.lower().replace(" ", "-")
+    return {"url": f"https://shop.example/{slug}", "title": title, "brand": brand, "same": same,
+            "image": f"https://cdn.example/{slug}.jpg",
+            "sizes_cm": {"length": 231, "depth": 85, "height": 90}}  # fmt: skip
+
+
+def test_a_recognised_brand_and_model_is_searched_and_shown(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The owner, 7 Oct 2026: recognising the brand and model is wanted. The brand's own search
+    runs beside the search by look; the comparison of pictures confirms it; the proposal names
+    it ("Recognised: ...") and its sizes are the basis, still to check."""
+    ident = {"kind": "sofa", "type": "3-seater sofa", "brand": "SUNS", "model": "Tosca",
+             "brand_confidence": 0.9, "queries": ["outdoor sofa rope back"]}  # fmt: skip
+    runs = {True: [_page("SUNS Tosca 3-seater sofa", "SUNS", True)],
+            False: [_page("Kettal Cala 3-seater"), _page("Tribu Vis a Vis")]}  # fmt: skip
+    scores = {0: {"same": True, "similarity": 0.95, "why": "identical"},
+              1: {"same": False, "similarity": 0.6, "why": "other arms"},
+              2: {"same": False, "similarity": 0.3, "why": "other shape"}}  # fmt: skip
+    seen = _photo_flow(monkeypatch, ident, runs, scores)
+    r = TestClient(app).post("/api/shop/suggest", data={"lang": "nl"},
+                             files=[("photos", ("s.png", _png(), "image/png"))])  # fmt: skip
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert sorted(seen["searches"]) == [False, True]  # by brand and by look
+    assert seen["candidates"][0] == "SUNS Tosca 3-seater sofa"  # results taken in turns
+    assert out["recognised"]["title"] == "SUNS Tosca 3-seater sofa"
+    assert out["recognised"]["brand"] == "SUNS" and out["comparable"] is None
+    assert "the same product" in seen["facts"]["relation"]
+    assert seen["hint"]["type"] == "3-seater sofa"  # the first look goes with the question
+    assert "recognised" in out["flags"]["length_cm"] and "length_cm" in out["check"]
+
+
+def test_a_wrong_brand_guess_and_unlike_products_are_not_taken_over(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The owner's photo, 7 Oct 2026: what it "recognised" made no sense. A product the
+    comparison finds unlike the photo is never the basis: the photo's own estimates instead."""
+    ident = {"kind": "sofa", "brand": "Talenti", "model": "Leaf", "brand_confidence": 0.8}
+    runs = {True: [_page("Talenti Leaf 3 seater sofa", "Talenti", True)],
+            False: [_page("Jardin curved corner set")]}  # fmt: skip
+    scores = {0: {"same": False, "similarity": 0.35, "why": "straight, thin legs"},
+              1: {"same": False, "similarity": 0.5, "why": "other modules"}}  # fmt: skip
+    seen = _photo_flow(monkeypatch, ident, runs, scores)
+    r = TestClient(app).post("/api/shop/suggest",
+                             files=[("photos", ("s.png", _png(), "image/png"))])  # fmt: skip
+    out = r.json()
+    assert out["recognised"] is None and out["comparable"] is None and seen["facts"] is None
+    assert out["flags"]["length_cm"] == ["estimate"]
+
+
+def test_a_page_without_a_picture_counts_only_with_the_recognised_name(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ident = {"brand": "SUNS", "model": "Tosca", "brand_confidence": 0.9}
+    page = _page("SUNS Tosca 3-seater sofa", "SUNS", True) | {"image": ""}
+    other = _page("Some sofa", "", True) | {"image": ""}
+    seen = _photo_flow(monkeypatch, ident, {True: [page], False: [other]}, {})
+    out = _post_photo(app)
+    assert out["recognised"]["title"] == "SUNS Tosca 3-seater sofa"
+    assert seen["facts"]["product"]["sizes"]["length"] == 231
+    low = {**ident, "brand_confidence": 0.5}  # not sure enough of the brand: not recognised
+    seen = _photo_flow(monkeypatch, low, {True: [page], False: [other]}, {})
+    out = _post_photo(app)
+    assert out["recognised"] is None and seen["facts"] is None
+
+
+class _Reply:
+    def __init__(self, doc: dict[str, Any]) -> None:
+        self._b = json.dumps(doc).encode()
+
+    def read(self) -> bytes:
+        return self._b
+
+    def __enter__(self) -> "_Reply":
+        return self
+
+    def __exit__(self, *a: Any) -> None:
+        pass
+
+
+def test_every_gemini_call_and_each_search_query_is_in_the_ledger(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The costs (ADR-078): tokens per call, and Google's fee per search query the model ran."""
+    import urllib.request
+
+    import coverengine.ai
+    from coverengine.params import Registry
+
+    monkeypatch.setenv("COVER_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(coverengine.ai, "_key", lambda provider: "test-key")
+    reply = {"usageMetadata": {"promptTokenCount": 1000, "candidatesTokenCount": 200},
+             "candidates": [{"content": {"parts": [{"text": '{"pages": []}'}]},
+                             "groundingMetadata": {"webSearchQueries": ["a", "b", "c"],
+                             "groundingChunks": [{"web": {"uri": "https://x.example/p",
+                                                          "title": "x.example"}}]}}]}  # fmt: skip
+    sent: list[Any] = []
+
+    def urlopen(req: Any, timeout: float = 0) -> _Reply:
+        sent.append(json.loads(req.data))
+        return _Reply(reply)
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    p = Registry.load(None).resolve()
+    got = REAL_GEMINI(p, [{"text": "hi"}], "suggest search", 5, search=True)
+    assert got["queries"] == ["a", "b", "c"] and got["links"][0]["url"] == "https://x.example/p"
+    assert sent[0]["tools"] == [{"google_search": {}}]
+    rows = [json.loads(x) for f in (tmp_path / "usage").glob("*.jsonl")
+            for x in f.read_text().splitlines()]  # fmt: skip
+    fee = [r for r in rows if r["model"].endswith(" search")]
+    per_query = float(p["suggest.search_query_eur"])  # type: ignore[arg-type]
+    assert len(rows) == 2 and fee[0]["eur"] == pytest.approx(3 * per_query)
+    REAL_GEMINI(p, [{"text": "hi"}], "suggest compare", 5)  # no search: JSON, no fee
+    assert sent[1]["generationConfig"]["responseMimeType"] == "application/json"
+    assert "tools" not in sent[1]
+
+
+def test_the_search_by_image_when_switched_on_comes_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR-092: Google's search by image (off until the owner gives a key). Its pages showing the
+    very picture come first and its best guess of the name is the first query."""
+    from coverengine.params import Registry
+
+    ident = {"kind": "sofa", "queries": ["outdoor sofa rope back"]}
+    seen = _photo_flow(monkeypatch, ident, {False: [_page("Kettal Cala 3-seater")]}, {
+        0: {"same": True, "similarity": 0.97, "why": "the same picture"},
+        1: {"same": False, "similarity": 0.5, "why": "other arms"}})  # fmt: skip
+    queries: list[Any] = []
+    search = sg.search_comparable
+
+    def spy(p: Any, png: bytes, idt: Any = None, brand: bool = False) -> Any:
+        queries.append(list((idt or {}).get("queries") or []))
+        return search(p, png, idt, brand)
+
+    monkeypatch.setattr(sg, "search_comparable", spy)
+    monkeypatch.setattr(sg, "reverse_search", lambda *a, **k: {
+        "labels": ["suns tosca sofa"],
+        "pages": [_page("Tosca 3-zits bank", "SUNS", True)]})  # fmt: skip
+    off = Registry.load(None).resolve()
+    assert sg._reverse(off, _png()) == {"pages": [], "labels": []}  # the default: off
+    on = Registry.load(None).resolve(trial={"suggest.reverse_search": True})
+    out = sg.find_comparable(on, _png(), 5, 1000, 1000)
+    assert seen["candidates"][0] == "Tosca 3-zits bank"
+    assert queries[0][0] == "suns tosca sofa"
+    assert out["recognised"]["name"] == "SUNS Tosca 3-zits bank"
+
+
+def test_the_search_by_image_reads_google_s_answer_and_records_its_fee(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import urllib.request
+
+    import coverengine.ai
+    from coverengine.params import Registry
+
+    monkeypatch.setenv("COVER_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(coverengine.ai, "_key", lambda provider: "test-key")
+    web = {"bestGuessLabels": [{"label": "suns tosca"}], "pagesWithMatchingImages": [
+        {"url": "https://hello-suns.com/tosca", "pageTitle": "<b>Tosca</b> sofa",
+         "fullMatchingImages": [{"url": "https://hello-suns.com/tosca.jpg"}]},
+        {"url": "https://pins.example/1", "pageTitle": "a pin",
+         "partialMatchingImages": [{"url": "https://pins.example/1.jpg"}]}]}  # fmt: skip
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: _Reply(
+        {"responses": [{"webDetection": web}]}))  # fmt: skip
+    p = Registry.load(None).resolve()
+    got = REAL_REVERSE(p, _png())
+    assert got["labels"] == ["suns tosca"]
+    first = {"url": "https://hello-suns.com/tosca", "title": "Tosca sofa",
+             "image": "https://hello-suns.com/tosca.jpg", "same": True}  # fmt: skip
+    assert got["pages"][0] == first
+    assert got["pages"][1]["same"] is False
+    rows = [json.loads(x) for f in (tmp_path / "usage").glob("*.jsonl")
+            for x in f.read_text().splitlines()]  # fmt: skip
+    assert rows[0]["eur"] == pytest.approx(float(p["suggest.reverse_eur"]))
