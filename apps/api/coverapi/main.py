@@ -129,6 +129,10 @@ def create_app(
 
     drawing_upload.install(app, store, jobs)  # route A: a drawing (PDF) -> a cover (ADR-081)
     unfold.install(app, store)  # the cover unfolded, with where its fabric goes (ADR-085)
+    from coverapi import products_sheet
+
+    # the workshop's product list linked to the drawing covers (ADR-091)
+    import_products = products_sheet.install(app, store)
     from coverapi import shop
 
     shop.install(app, auth, store.root, jobs, store)
@@ -293,8 +297,12 @@ def create_app(
         return jobs.submit(JobSpec(model_id, steps, {}))
 
     @app.post("/api/references")
-    async def upload_references(file: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008
-        """One zip of the owner's drawings with their 3D models, paired by name."""
+    async def upload_references(
+        request: Request,
+        file: UploadFile = File(...),  # noqa: B008
+    ) -> dict[str, Any]:
+        """One zip of the owner's drawings with their 3D models, paired by name. A zip with a
+        product list and no drawings is the Desk's product list (ADR-091)."""
         import time
 
         if not (file.filename or "").lower().endswith(".zip"):
@@ -311,6 +319,12 @@ def create_app(
         except zipfile.BadZipFile:
             raise HTTPException(400, "this is not a readable zip file") from None
         drawings = [u for u in batch.unpaired if u.lower().endswith(".pdf")]
+        if not batch.pairs and not drawings and products_sheet.zip_has_sheet(target):
+            from coverapi.security import current_user
+
+            user = current_user(request)
+            return import_products(file.filename or target.name, target.read_bytes(),
+                                   user.name or user.username)  # fmt: skip
         if not batch.pairs and not drawings:
             raise HTTPException(
                 400, "no drawings found: a zip of PDFs, or pairs like 1.step + 1.pdf"

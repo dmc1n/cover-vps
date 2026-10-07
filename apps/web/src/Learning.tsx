@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { fileUrl } from "./api";
+import { ProductsSummary, type ProductsResult } from "./DeskProducts";
 
 // Learning: upload one zip with the owner's drawings and their 3D models, paired by name
 // (1.step + 1.pdf). Every pair is calculated and shown next to its drawing.
@@ -17,6 +18,8 @@ export function Learning() {
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState("");
+  // a zip with the product list and no drawings goes to the Desk's product list (ADR-091)
+  const [products, setProducts] = useState<ProductsResult | null>(null);
   const load = useCallback(() => {
     fetch("/api/references").then((r) => r.json()).then(setBatches).catch((e) => setError(String(e)));
   }, []);
@@ -46,6 +49,12 @@ export function Learning() {
         }
       } else {
         setFile(null);
+        try {
+          const doc = JSON.parse(xhr.responseText);
+          setProducts(doc.kind === "products" ? doc : null);
+        } catch {
+          setProducts(null);
+        }
         load();
       }
     };
@@ -72,6 +81,15 @@ export function Learning() {
           </button>
         </div>
         {error && <p className="error">{error}</p>}
+        {products && (
+          <div className="desk dp-host">
+            <p className="muted">
+              This zip held the product list and no drawings: it was linked to the drawing covers. See them at{" "}
+              <a href="#/desk">the Desk</a>.
+            </p>
+            <ProductsSummary res={products} onClose={() => setProducts(null)} />
+          </div>
+        )}
       </section>
       <h2>Uploaded</h2>
       {!batches ? (

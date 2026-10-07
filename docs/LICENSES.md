@@ -36,6 +36,7 @@ Note column.
 | pre-commit | 4.6.2 | MIT | commit hooks (dev) |  |
 | python-multipart | 0.0.32 | Apache-2.0 | file uploads in the API (M6) |  |
 | httpx | 0.28.1 | BSD-3-Clause | API test client (M6) |  |
+| openpyxl | 3.1.5 | MIT |  |  |
 <!-- END GENERATED -->
 
 ## Not Python

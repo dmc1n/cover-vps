@@ -2296,3 +2296,52 @@ this can happen and how to fix it."
 
 - **Checked:** 12 sloped-box drawings with readable size arrows; the other 8 were right.
   Drawings without arrows or without a strip cannot be checked this way.
+
+## ADR-091 — The workshop's product list linked to the drawing covers
+
+The owner (7 October): "we have an Excel sheet in which all products are linked to the drawings
+we uploaded; please link these products to the right drawings so we can sort easily", "I'd like
+to upload it", "it has to be a zip".
+
+- **Upload** at the Desk ("Upload product list (Excel)", `POST /api/desk-products`): an .xlsx
+  or .csv, or a .zip holding them. An old .xls is refused with "save it as .xlsx". Editors and
+  the Desk's approvers may upload. The studio's drawings-zip button (`POST /api/references`)
+  hands a zip that holds a sheet and no drawings to the same import, with the same summary;
+  zips with drawings behave as before.
+- **A zip is read with care:** one entry with an absolute path or ".." refuses the whole zip;
+  at most `products.max_files` entries and `products.max_bytes` unpacked; __MACOSX and hidden
+  files are skipped. PDFs in it are only listed and matched to existing drawing covers by
+  code ("PDFs in the zip: N, matched: M, new: …"); no model is made from them.
+- **Read by content, not by header names.** Every sheet's header is its first row with two
+  text cells. The link column is the one whose values match the most drawing covers, by
+  - the cover's code or folder name (S40, C23);
+  - the order number on its PDF ("Cover 105", cached in `order_number.txt`);
+  - a code inside a combined name: "cover 39 & 46 - L1 & L5 mirror" answers to L5, while L1
+    stays with drawing-l1, which has it as its own code.
+
+  Matching ignores case, spaces, dashes and leading zeros. A person may pick another column
+  and apply again. The description is the column with the longest text; a short number
+  column ("Cover 1") is the second label. The owner's sheet heads its description column
+  with a fabric colour, so header names could not be trusted.
+- **SUNS models** are linked from the description: its families ("Portofino/ Aspen/ Kota",
+  words that occur in SUNS names and are not type words) and its type (daybed, chaise "CL",
+  lounge chair, N-seater including "2,5" and "searter", bench, corner/"hoek"/L-part,
+  table/side table/dining table, hocker, middle, moon).
+  - A family and a type in common, the same shape (angled, moon), and no left/right
+    crossing: **linked**.
+  - A family in common, but the description names no type ("lounge set normal"):
+    **suggested**, never a link, and tables are not suggested for a lounge set.
+- **Stored** as `products.json` per drawing cover (the rows, the labels, the SUNS links and
+  suggestions) and `drawings.json` per linked SUNS model. Uploading again replaces both;
+  covers no longer in the list lose theirs. Every upload is kept in `products/` in the data
+  folder.
+- **At the Desk:** the products are in the list row, in the search and in a new sort (needs a
+  person first, code, product, status, AI score), and in a "Products" table on the card. A
+  SUNS card shows "Drawings for this product", linked and suggested.
+- **The owner's sheet** (namecode.xlsx, 138 rows, on a copy of the data): linked through
+  "Code", 121 rows on all 115 drawing covers. The 17 rows not linked are S49–S62 and D8–D10,
+  drawings not uploaded yet. Codes D5, S21, S22, S23 and S24 each carry two products (the
+  Blocchi and Vento blocks share their codes), shown as "one code, two products". SUNS: 60
+  models linked, 27 more only suggested.
+- **Better later:** a person confirms or removes a suggested SUNS link on the card; SUNS
+  names that differ in spelling ("Victoria" vs "vittoria") need an alias list.
