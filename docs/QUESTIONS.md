@@ -248,3 +248,12 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
       writing, and structured seam feedback at the Desk.
     - Q2 (2D drawings): the STEP behind each drawing, or a fixed drawing standard; a test set of
       20 drawings with the right answer; structured feedback.
+68. **A real search by image for "start from a photo"** (ADR-092; asked 7 Oct 2026). Gemini
+    can only search the web by words, so a SUNS or other less famous brand is rarely found from
+    a photo alone; Google Lens finds it because it searches by image. Google Cloud Vision "web
+    detection" (the engine behind Lens's visual matches) is built in and switched off. To turn it
+    on: in the Google Cloud project of the Gemini key, enable the "Cloud Vision API" and create an
+    API key restricted to it; put it in deploy/.env as `GOOGLE_VISION_API_KEY`, and set
+    `suggest.reverse_search: true`. **Cost:** the first 1000 photos a month free, then $3.50 per
+    1000 (about €0.0033 a photo); at 10 suggestions a day: free. (Alternative: SerpAPI's Google
+    Lens, $75 a month for 5000 searches; not needed if Cloud Vision is allowed.) Shall we?
