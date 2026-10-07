@@ -2547,3 +2547,7 @@ intermediate step where we can choose, so this doesn't go wrong automatically."
   default, follow).
 - **Better later:** each member's own footprint rather than its plan rectangle (a rounded arm
   is covered square today), and tops that blend across members instead of a step.
+
+Owner's answers (7 Oct 2026, QUESTIONS 69): the step where a longer top meets a shorter one is
+right (no blending); covering each piece as its plan rectangle is fine; an arrangement gets one
+cover over the whole, never covers zipped together (closes that question from ADR-089).

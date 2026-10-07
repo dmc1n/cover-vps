@@ -267,3 +267,6 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
       Good enough for arrangements?
     - the tops slope only down to each piece's front (no diagonal seams on top). Should a piece
       with high arms also slope down to its sides (`arrange.top_slopes: any`)?
+    **Answered (owner, 7 Oct 2026):** the step is good; a rectangle per piece is fine; an
+    arrangement gets one cover over the whole (not zipped covers). Side slopes not asked: stays
+    `front`.
