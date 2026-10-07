@@ -2431,3 +2431,17 @@ really a good idea"; show it to the customer.
 - **Tests** fake every paid call: an autouse fixture fails a test that would call Gemini, the
   search or the image search for real; the decisions are tested on faked identify, searches,
   pictures and comparison scores.
+
+## ADR-093 — Air vents only on the outside, never on an inner wall
+
+Owner, 7 Oct 2026 (C23): "er horen nooit airvents aan de binnenkant te zitten, alleen aan de
+buitenkant". The drawing of C23 points two of its six vents at the inner walls of the L; the
+owner's rule wins over the drawing's positions, the drawing's number still wins (ADR-075), so
+all six now go on the outer walls.
+
+- A skirt piece is on an inner wall when half of it or more lies `features.vent_inner_mm`
+  (300 mm) or more inside the footprint's convex hull (`finish.inner_skirts`, from
+  `panels.npz`). This catches the inner walls of L, U and C shapes and the concave front of a
+  curved sofa, and leaves round and D-shaped pieces alone (their walls lie on the hull).
+- `cover export` and `vents.json` both use it, so the cut file and the 3D view agree.
+- Swept over all models: 43 covers had vents on inner walls and were exported again.

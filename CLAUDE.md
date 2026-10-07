@@ -49,7 +49,7 @@ one-line edit there.
 - Standard features: drawcord hem, wind straps with buckles, handles: which are standard,
   which optional per model? Air vents are standard (owner, 2026-09-30): 25 x 22 cm (W x H), bottom
   edge 5 cm above the lower end of the cover, one per full metre of hem length, spread evenly,
-  at least one. Built as a cut opening with a hood of extra fabric holding a plastic insert
+  at least one, only on the outside of the cover, never on an inner wall of an L, U or C shape (owner, 2026-10-07). Built as a cut opening with a hood of extra fabric holding a plastic insert
   that keeps it open, and a membrane inside against dirt (`features.vent_*`, pieces in M5).
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
   or needs stroked lines, arc support). Learned in M0 by cutting a test sheet.

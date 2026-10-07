@@ -180,6 +180,36 @@ def _roomy(runs: list[HemRun], s_at: float, need: float) -> float:
     return float(np.clip(s_at, lo + need / 2, hi - need / 2))
 
 
+def inner_skirts(model_dir: Any, params: EffectiveParams) -> frozenset[str]:
+    """Skirt pieces on an inner wall: an L, U or C shape's walls facing its own open corner. No
+    air vent ever goes there, only on the outside (owner, 7 Oct 2026, C23). A piece is inner when
+    half of it or more lies `features.vent_inner_mm` or more inside the footprint's convex hull."""
+    from pathlib import Path
+
+    npz, pj = Path(model_dir) / "panels.npz", Path(model_dir) / "panels.json"
+    if not npz.is_file() or not pj.is_file():
+        return frozenset()
+    import json
+
+    names = [p["name"] for p in json.loads(pj.read_text(encoding="utf-8"))["panels"]]
+    data = np.load(npz)
+    v, f, labels = data["vertices"], data["faces"], data["labels"]
+    hull = shapely.MultiPoint(v[:, :2]).convex_hull
+    deep = _p(params, "features.vent_inner_mm")
+    out = set()
+    for i, name in enumerate(names):
+        if not name.startswith("skirt"):
+            continue
+        tri = v[f[labels == i]]
+        if not len(tri):
+            continue
+        pts = np.unique(tri.reshape(-1, 3)[:, :2].round(), axis=0)
+        # half the piece or more that far in (a round piece's middle lies inside, its wall not)
+        if float(np.median(shapely.distance(hull.exterior, shapely.points(pts)))) >= deep:
+            out.add(name)
+    return frozenset(out)
+
+
 def per_side(lengths: dict[str, float], params: EffectiveParams) -> dict[str, int]:
     """Vents per side of the cover: one per full metre of that side, at least one (owner, 1 Oct
     2026: each side separately; 2.10 m: 2, 2.90 m: 2, 3.10 m: 3, 1.40 m: 1). A number written
@@ -250,11 +280,12 @@ def _point_along(pts: Array, s: float) -> tuple[Array, Array]:
 
 
 def place_vents(
-    panels: list[dict[str, Any]], params: EffectiveParams
+    panels: list[dict[str, Any]], params: EffectiveParams, inner: frozenset[str] = frozenset()
 ) -> tuple[dict[str, list[Array]], list[str]]:
-    """Vent openings per skirt panel (rectangles in the panel's coordinates), and warnings."""
+    """Vent openings per skirt panel (rectangles in the panel's coordinates), and warnings.
+    `inner`: skirt pieces on an inner wall (`inner_skirts`), which never get a vent."""
     warnings: list[str] = []
-    order = skirt_order(panels)
+    order = [n for n in skirt_order(panels) if n not in inner]
     runs = _hem_runs(panels, order)
     # only on skirt pieces tall enough for a vent (a low front gives its vents to the sides)
     need = (
@@ -412,15 +443,17 @@ def _vent_pieces(count: int, params: EffectiveParams, start: int) -> list[Piece]
     ]
 
 
-def finish(doc: dict[str, Any], params: EffectiveParams) -> tuple[list[Piece], list[str]]:
-    """Finished pieces from a PatternSet (`pattern.json`)."""
+def finish(
+    doc: dict[str, Any], params: EffectiveParams, inner: frozenset[str] = frozenset()
+) -> tuple[list[Piece], list[str]]:
+    """Finished pieces from a PatternSet (`pattern.json`); `inner`: see `place_vents`."""
     warnings: list[str] = []
     panels = doc["panels"]
     ids = {p["name"]: p["id"] for p in panels}
     label = _p(params, "pen.label_height_mm")
     welded = params["construction.method"] == "welded"
     overlap = _p(params, "welding.overlap_mm")
-    vents, vent_warnings = place_vents(panels, params)
+    vents, vent_warnings = place_vents(panels, params, inner)
     warnings += vent_warnings
     revision = f"{doc['model_id']} r{doc['parameter_hash'][:6]}"  # param-ok: short revision id
     pieces: list[Piece] = []

@@ -104,6 +104,33 @@ def test_vents_spread_and_clear_of_seams() -> None:
         assert np.ptp(r[:, 0]) == pytest.approx(250.0) and np.ptp(r[:, 1]) == pytest.approx(220.0)
 
 
+def test_no_vent_on_an_inner_wall(tmp_path: Path) -> None:
+    """Owner, 7 Oct 2026 (C23): air vents only on the outside, never on the inner walls of an
+    L shape; the drawing's number goes to the outer walls."""
+    import json
+
+    from coverengine.finish.finish import inner_skirts
+
+    # an L of upright walls, 0.4 m high: outer walls and the two inner walls at the corner
+    ring = [(0, 0), (3000, 0), (3000, 1000), (1000, 1000), (1000, 3000), (0, 3000)]
+    names = ["skirt-front", "skirt-right", "skirt-front-2", "skirt-right-2", "skirt-back",
+             "skirt-left"]  # fmt: skip
+    verts, faces, labels = [], [], []
+    for i, (a, b) in enumerate(zip(ring, ring[1:] + ring[:1], strict=True)):
+        k = len(verts)
+        verts += [(*a, 0), (*b, 0), (*b, 400), (*a, 400)]
+        faces += [(k, k + 1, k + 2), (k, k + 2, k + 3)]
+        labels += [i, i]
+    np.savez(tmp_path / "panels.npz", vertices=np.array(verts, dtype=float),
+             faces=np.array(faces), labels=np.array(labels))  # fmt: skip
+    (tmp_path / "panels.json").write_text(json.dumps({"panels": [{"name": n} for n in names]}))
+    inner = inner_skirts(tmp_path, params())
+    assert inner == {"skirt-front-2", "skirt-right-2"}
+    d = doc(square("skirt-front-2", 2000, ["hem", "seam", "seam", "seam"], [False] * 4))
+    vents, _ = place_vents(d["panels"], params(), inner)
+    assert not vents
+
+
 def test_a_low_skirt_gets_a_lower_vent_or_none() -> None:
     """Owner, 1 Oct 2026: same width, lower opening down to 10 cm; lower sides get none."""
     d = doc(square("skirt-front", 250, ["hem", "seam", "seam", "seam"], [False] * 4))

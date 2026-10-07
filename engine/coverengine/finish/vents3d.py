@@ -23,7 +23,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial import cKDTree
 
-from coverengine.finish.finish import place_vents
+from coverengine.finish.finish import inner_skirts, place_vents
 from coverengine.flatten.pattern import _panel_mesh, compensation
 from coverengine.flatten.solve import flatten
 from coverengine.params import EffectiveParams
@@ -60,7 +60,7 @@ def _to_3d(v: Array, f: NDArray[np.int64], uv: Array, p: Array) -> tuple[Array, 
 
 def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> dict[str, Any]:
     """Every vent of the cover in 3D (see the module's docstring)."""
-    vents, _ = place_vents(doc["panels"], params)
+    vents, _ = place_vents(doc["panels"], params, inner_skirts(model_dir, params))
     out: list[dict[str, Any]] = []
     warnings: list[str] = []
     if not vents:
