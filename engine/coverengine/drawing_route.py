@@ -59,15 +59,17 @@ def surface(pieces: list[Any], shape: str, params: EffectiveParams) -> trimesh.S
     """The drawn pieces as a scene with one part per piece; pieces the program made are joined
     where there is no crease (ADR-076)."""
     from coverengine.drawn import scene
+    from coverengine.drawn_merge import absorb_slivers, merge
 
     sc = scene(pieces)
-    if shape not in JOINABLE:
-        return sc
-    from coverengine.drawn_merge import merge
-
     parts = [(str(n), sc.geometry[sc.graph[n][1]].copy()) for n in sc.graph.nodes_geometry]
-    joined = merge(parts, roll_mm(params), float(params["drawn.merge_fold_deg"]),  # type: ignore[arg-type]
-                   float(params["drawn.merge_max_stretch_pct"]))  # type: ignore[arg-type]  # fmt: skip
+    stretch = float(params["drawn.merge_max_stretch_pct"])  # type: ignore[arg-type]
+    if shape in JOINABLE:
+        parts = merge(parts, roll_mm(params), float(params["drawn.merge_fold_deg"]),  # type: ignore[arg-type]
+                      stretch)  # fmt: skip
+    # no slivers, whoever made the seams (ADR-097)
+    joined = absorb_slivers(parts, float(params["seams.min_piece_width_mm"]), roll_mm(params),  # type: ignore[arg-type]
+                            stretch)  # fmt: skip
     out = trimesh.Scene()
     for name, m in joined:
         out.add_geometry(m, node_name=name, geom_name=name)
@@ -244,7 +246,8 @@ def read(
         info["plan_profile"] = {"profile": pp["profile"], "scale_fix": pp["scale_fix"],
                                 "seams": pp["seams"], "lengths": lengths}  # fmt: skip
         if lengths["trusted"]:
-            pieces = plan_profile.build(pp["shape"])
+            pieces = plan_profile.build(pp["shape"], roll,
+                                        float(params["seams.max_skirt_panel_mm"]))  # type: ignore[arg-type]  # fmt: skip
             return {"status": "built", "reader": "plan-profile", "shape": "plan-profile",
                     "pieces": pieces, "info": info, "reasons": []}  # fmt: skip
         reasons.append(f"a C or U shape: only {lengths['matched']} of {lengths['of']} lengths "

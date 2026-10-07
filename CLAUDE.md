@@ -214,6 +214,9 @@ uv run python scripts/drawing_crosscheck.py OUT --pdfs DIR   Gemini and DeepSeek
 uv run python scripts/drawing_features.py --pdfs DIR   vent count and features from each drawing's text onto its cover (ADR-075)
 uv run python scripts/drawing_rebuild.py OUT --pdfs DIR [--dry-run]   drawing covers rebuilt from their own views; better ones replace (ADR-075)
 uv run python scripts/drawing_merge.py [--only ...] [--dry-run]   free-form drawing covers in fewer pieces (ADR-076)
+uv run python scripts/fewer_build.py OUT --codes C27,... | --merge all   drawing covers rebuilt in staging, slivers joined (ADR-097)
+uv run python scripts/fewer_check.py DIR ...   re-measure a built cover from its cut.dxf and patterns (ADR-097)
+uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   drawing, old and new cover side by side
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
 COVER_DATA_DIR=~/cover-data uv run python scripts/learned_check.py [--recalc]   do the Desk's corrections still hold? (ADR-082)
 make e2e        the web app flow in a real browser (Playwright in Docker)
