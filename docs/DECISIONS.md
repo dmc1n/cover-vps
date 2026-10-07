@@ -2248,3 +2248,20 @@ should find a comparison via Google image search and use that as the basis."
 - **AVIF** images are accepted: many shops serve them, SUNS among them.
 - **Tried for real** on a SUNS lounge photo: Westwing "Naomi" 2-seater module, a sofa
   120 × 100 cm, back 70 cm, front 40 cm, all flagged.
+
+## ADR-088 — Air vents shown on the outside of L, U and C shapes
+
+The owner (7 October) on C23: "why are two vents on the inside? It is rejected because we do
+not see two of them." Then: "it is like this on many more models."
+
+- **The cause.** `vents_3d` (ADR-073) turned each vent's normal "away from the middle of the
+  cover". On the inner walls of an L, U or C shape that direction points into the cover, so the
+  vent was drawn 4 mm inside it and could not be seen. The vents themselves (in the cut file)
+  were right; only the 3D picture was wrong.
+- **The fix.** Out is where no cover lies overhead. A point 50 mm beside the wall is tested
+  against the cover's footprint seen from above; if the cover covers it, the normal is turned
+  round. This is right for any plan shape.
+- **Remade for every model:** 39 drawing covers had 2 to 5 vents pointing inwards (the C, L and
+  S series and the corner sets). The old files are kept in
+  cover-data/backup-vents-2026-10-07.
+- **Test:** an L-shaped cover's six vents all face the open side.

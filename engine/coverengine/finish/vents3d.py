@@ -33,6 +33,9 @@ VENTS_JSON = "vents.json"
 SAME_OUTLINE_MM = 1.0  # param-ok: the re-flattened panel must match the stored outline
 
 
+PROBE_MM = 50.0  # param-ok: a point this far beside the wall tells out from in
+
+
 def _barycentric(uv: Array, faces: NDArray[np.int64], p: Array) -> tuple[int, Array]:
     """The flat triangle `p` lies in (or the nearest one) and its barycentric weights."""
     a, b, c = uv[faces[:, 0]], uv[faces[:, 1]], uv[faces[:, 2]]
@@ -65,7 +68,20 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
     data = np.load(model_dir / "panels.npz")
     names = [p["name"] for p in json.loads((model_dir / "panels.json").read_text())["panels"]]
     vertices, faces, labels = data["vertices"], data["faces"], data["labels"]
-    middle = (vertices.min(axis=0) + vertices.max(axis=0)) / 2
+    # out of the cover is where no cover lies overhead (an L or U shape's inner walls face the
+    # open corner: "away from the middle" pointed them into the cover, C23, 7 Oct 2026)
+    import shapely
+
+    tri = vertices[faces][:, :, :2]
+    e1, e2 = tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]
+    big = np.abs(e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0]) > 1.0  # param-ok: mm², not edge-on
+    footprint = shapely.union_all([shapely.Polygon(t) for t in tri[big]]).buffer(
+        1.0
+    )  # param-ok: mm
+
+    def covered(q: np.ndarray) -> bool:
+        return bool(footprint.contains(shapely.Point(float(q[0]), float(q[1]))))
+
     outline_of = {p["name"]: np.asarray(p["outline_mm"], dtype=np.float64) for p in doc["panels"]}
     scale = compensation(params)
     for name, rects in vents.items():
@@ -89,9 +105,12 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
         for rect in rects:
             corners = [_to_3d(v, f, uv, np.asarray(q, dtype=np.float64))[0] for q in rect]
             centre, normal = _to_3d(v, f, uv, np.asarray(rect, dtype=np.float64).mean(axis=0))
-            away = centre - middle
-            away[2] = 0.0
-            if float(normal @ away) < 0:  # out of the cover, not into it
+            flat_n = np.array([normal[0], normal[1], 0.0])
+            if np.linalg.norm(flat_n) > 0:  # an upright wall: step out sideways and look up
+                probe = centre + flat_n / np.linalg.norm(flat_n) * PROBE_MM
+                if covered(probe):  # cover overhead: that was the inside
+                    normal = -normal
+            elif normal[2] < 0:  # a level face (rare): out is up
                 normal = -normal
             # seen from outside the corners run bottom left to top left
             if float(np.cross(corners[1] - corners[0], corners[3] - corners[0]) @ normal) < 0:

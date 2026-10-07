@@ -430,3 +430,40 @@ def test_export_places_the_air_vents_on_the_cover_in_3d(
         assert bottom == pytest.approx([hem + above] * 2, abs=3.0)  # param-ok: mm
         out = np.asarray(x["centre_mm"]) - middle
         assert float(np.dot(x["normal"][:2], out[:2])) > 0
+
+
+def test_the_vents_on_the_inner_walls_of_an_l_face_the_open_corner(tmp_path: Path) -> None:
+    """C23 (7 Oct 2026): on an L shaped cover two vents sat on the inner walls and were drawn
+    inside the cover ("away from the middle" pointed into it). Out is where no cover is
+    overhead."""
+    import json
+
+    import numpy as np
+    import shapely
+    from coverengine.cli import main as cover
+    from coverengine.drawn import build, scene
+    from coverengine.finish.vents3d import ensure_vents
+    from coverengine.io.kind import confirm
+
+    sizes = {"x_length_cm": 294, "y_length_cm": 294, "x_arm_depth_cm": 104,
+             "y_arm_depth_cm": 104, "x_back_strip_cm": 30, "y_back_strip_cm": 30,
+             "back_height_cm": 80, "front_height_cm": 45}  # fmt: skip
+    src = tmp_path / "l.glb"
+    scene(build("L shape", sizes, 1420.0)).export(src)
+    d = tmp_path / "l"
+    assert cover(["import", str(src), "--out", str(d), "--units", "mm", "--up", "z"]) == 0
+    confirm(d, "cover")
+    doc = json.loads((d / "cover.json").read_text())
+    doc.setdefault("parameters", {})["features"] = {"vents_total": 6}
+    (d / "cover.json").write_text(json.dumps(doc))
+    for step in ("hull", "cut", "flatten", "export"):
+        assert cover([step, str(d)]) == 0, step
+    vents = json.loads(ensure_vents(d).read_text())["vents"]  # type: ignore[union-attr]
+    data = np.load(d / "panels.npz")
+    tri = data["vertices"][data["faces"]][:, :, :2]
+    foot = shapely.union_all([shapely.Polygon(t) for t in tri
+                              if shapely.Polygon(t).area > 1]).buffer(1)  # fmt: skip
+    assert len(vents) == 6
+    for v in vents:
+        out = np.array(v["centre_mm"][:2]) + np.array(v["normal"][:2]) * 50
+        assert not foot.contains(shapely.Point(*out)), v["piece"]
