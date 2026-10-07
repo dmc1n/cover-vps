@@ -41,7 +41,7 @@ STEPS = ("hull", "cut", "flatten", "export", "preview")
 READ_FILE = "drawing_read.json"
 SURFACE_FILE = "drawing-surface.glb"
 NEEDS_PERSON = "needs a person"
-JOINABLE = ("swept", "outline", "views")  # the program made these seams
+JOINABLE = ("swept", "outline", "views", "isofit")  # the program made these seams
 SCALE_DIGITS = 5  # param-ok: decimals of the scale kept in drawing_read.json
 
 
@@ -152,6 +152,44 @@ def _correct_solid(mesh: trimesh.Trimesh, fixes: list[tuple[float, float]]) -> l
     return done
 
 
+def _isofit(
+    pdf: Path,
+    views: dict[str, Any],
+    params: EffectiveParams,
+    solid: dict[str, Any] | None,
+    info: dict[str, Any],
+    reasons: list[str],
+) -> dict[str, Any] | None:
+    """The fitted heights when they can be taken and beat the views' shape on the 3D view
+    (silhouette plus creases, by `drawing.isofit_min_gain`); else None, with the reason."""
+    from coverengine import drawing_isofit
+
+    try:
+        res = drawing_isofit.fit(pdf, views, params, roll_mm(params) / CM_TO_MM)
+    except Exception as exc:  # noqa: BLE001 - a drawing the fit cannot read
+        reasons.append(f"the heights could not be fitted to the 3D view: {exc}")
+        return None
+    best = res["fit"]
+    if best is None:
+        info["isofit"] = {"why_not": [res["why"]]}
+        return None
+    why = drawing_isofit.why_not(best, params)
+    info["isofit"] = {**drawing_isofit.info(best), "why_not": why}
+    if why:
+        if solid is None or solid["iou"] < float(params["drawing.min_iou"]):  # type: ignore[arg-type]
+            reasons += why
+        return None
+    if solid is not None:
+        theirs = drawing_isofit.solid_score(solid["solid"], pdf, views, params)
+        info["isofit"]["views_shape_score"] = round(theirs["score"], 3)
+        info["isofit"]["score"] = round(float(best["score"]), 3)
+        if best["score"] < theirs["score"] + float(params["drawing.isofit_min_gain"]):  # type: ignore[arg-type]
+            info["isofit"]["why_not"] = ["the views' own shape fits the 3D view as well"]
+            return None
+    info["isofit"]["how"] = drawing_isofit.describe(best)
+    return best
+
+
 def read(
     pdf: Path, params: EffectiveParams, corrections: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
@@ -232,6 +270,20 @@ def read(
         if b is not None:
             info["solid"] = {"how": b["how"], "fits_3d_view": round(float(b["iou"]), 3),
                              "candidates": len(best["candidates"])}  # fmt: skip
+        # d. the heights over the top view fitted to the 3D view (phase 4, ADR-091): a corner sofa
+        #    whose back is higher than its seat, drawn with no elevation; taken when it fits and
+        #    scores better than the views' shape (a size corrected at the Desk keeps the views)
+        fitted = (
+            _isofit(pdf, views, params, b, info, reasons) if iso is not None and not fixes else None
+        )
+        if fitted is not None:
+            from coverengine import drawing_isofit
+
+            fall = float(params["drawing.isofit_strip_fall_deg"])  # type: ignore[arg-type]
+            return {"status": "built", "reader": "isofit", "shape": "isofit",
+                    "pieces": drawing_isofit.build(fitted, roll / CM_TO_MM, fall), "info": info,
+                    "reasons": []}  # fmt: skip
+        if b is not None:
             if iso is not None and b["iou"] >= min_iou:
                 return {"status": "built", "reader": "views", "shape": "views",
                         "pieces": drawing_solid.pieces(b["solid"], roll), "info": info,
@@ -334,7 +386,9 @@ def build(
     else:
         mine.get("features", {}).pop("vents_total", None)
     cj.write_text(json.dumps(cover_doc, indent=2) + "\n", encoding="utf-8")
-    how = res["info"].get("solid", {}).get("how") or ["the drawn outline straight up"]
+    how = (res["info"].get("isofit", {}).get("how") if res["reader"] == "isofit" else None) or (
+        res["info"].get("solid", {}).get("how") or ["the drawn outline straight up"]
+    )
     tags = set(cover_doc.get("tags") or []) | {"drawing", "reference"}
     if ai:  # advice: a person approves it at the Desk (ADR-083)
         tags.add("ai-read")

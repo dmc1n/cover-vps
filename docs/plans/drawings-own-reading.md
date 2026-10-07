@@ -60,7 +60,7 @@ other (`scripts/drawing_crosscheck.py`, out/drawings/crosscheck/):
 | 1. Quick win | Air vent count and features read from the drawing text, per cover (a new setting `features.vents_total`, spread over the sides) | 16 covers right on vents; one re-run |
 | 2. Views and size arrows | Sort each drawing's lines into views; link sizes to their arrows | per drawing: "the program read: …", shown beside the drawing |
 | 3. Footprint plus heights | The one generator; trapezoid, curved front, rounded end, U, L | S38, S39, D6, S24, S37 rebuilt |
-| 4. Fitting the 3D view | Footprint from the isometric view when there is no plan view | S44, S47, S32, C26 rebuilt |
+| 4. Fitting the 3D view | Heights over the top view's footprint fitted to the 3D view (done for corner sofas, ADR-091); footprint from the 3D view alone still open | C3, C4, C8, C9, C10, C29, C30, C31, S33 built in staging (out/drawings/phase4) |
 | 5. Drawing desk in the studio | One page with every drawing: the drawing beside our cover, the check's outcome, buttons "right" / "wrong, because …" | you approve in minutes; each "wrong" becomes a lesson and a test |
 | 6. Faster and cheaper | Only changed drawings are re-run; the AI check only after a change; builds in parallel (Modal CPU when there are many) | a full run of 130 drawings in about 15 minutes instead of hours |
 
@@ -73,3 +73,22 @@ take one to two days each.
 - **Vents:** when a drawing gives a number, does the drawing win over the rule of one per
   metre? (I assume yes.)
 - **The drawing desk:** who approves the covers? Every editor, or you only?
+
+## Phase 4, as built (7 October 2026, ADR-091)
+
+- **What it does.** A corner sofa (L, C, V) drawn as a top view plus a shaded 3D picture, with
+  no front or side view. Until now route A could only stand the top view straight up, a flat
+  block. The block's outline still covers the picture about 97 %, so the IoU check let it through.
+- **How.** The top view gives the footprint. Over it go the heights: the back height, a flat
+  strip, a slope to the front height, and the arm ends falling to a lower end wall. Each height
+  is one of the sizes written on the drawing, a different one each. They are chosen so that the
+  cover, drawn as the CAD program draws its 3D view, lies on the picture: its outline (IoU ≥ 85 %)
+  and its creases, where faces meet (≥ 65 %). The footprint's own lengths must be written too.
+- **Result.** C4, C8, C9 and C10 come back with every written height: back, strip, front,
+  end wall, hip length. So do C31 and S33, and C3, C29 and C30 (also rejected on shape). The
+  3D view's creases match about 85 % against 35-50 % for the live covers.
+- **Not yet.** The fit needs a shaded 3D picture with its transparency mask. That leaves out:
+  - wireframe drawings (S4/S5, S6/S7, L1, L1/L5, S6, S8, S20, U2, D1, D2): this needs the vector
+    lines read as a 3D view, the next step;
+  - curved footprints without a top view (S32, C28, S44, S43, S25);
+  - shapes outside the family: S19 (an arm block beside the seat), S27 (a Blocchi chair).

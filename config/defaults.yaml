@@ -263,6 +263,29 @@ drawing:
                                  # covers the drawing's 3D view this well; less: "needs a person"
   ai_rounds: 2                   # the "let the AI read it" button: rounds of size feedback to the AI
                                  # (owner, 6 Oct 2026: the button, as advice; ADR-083)
+  # heights fitted to the 3D view (phase 4, ADR-091): the top view's footprint, the heights over it
+  # chosen from the written sizes so the cover drawn as the CAD program draws it lies on the picture
+  isofit_px: 420                 # the 3D view's picture is compared on a grid this many pixels wide
+  isofit_crease_deg: 9.5         # two faces meeting at more than this angle draw a crease
+  isofit_shade_step: 4.5         # the picture's shading stepping by more than this (of 255) per pixel
+                                 # is a crease in the picture
+  isofit_edge_px: 3.5            # a crease within this many pixels of the picture's lies on it
+  isofit_edge_weight: 0.61       # the creases' score counts this much beside the silhouette's IoU
+  isofit_min_crease: 0.65        # ... and must be at least this (0 to 1): a shape whose silhouette fits
+                                 # but whose creases do not lie on the picture's is the wrong shape
+  isofit_trust_share: 0.66       # this share of the footprint's lengths (back bits, depth) must be
+                                 # written on the drawing, or the footprint is not trusted
+  isofit_size_tol: 0.025         # a length matches a written size within 2.5 % (or 2.5 cm)
+  isofit_height_min_cm: 11.5     # heights tried: written sizes between these
+  isofit_height_max_cm: 175
+  isofit_strip_share: 0.56       # a flat back strip is at most this share of the arm's depth
+  isofit_hip_share: 0.43         # an arm's hip at most this share of the shortest back bit
+  isofit_end_share: 0.61         # a bit at the end of the back edge shorter than this share of the
+                                 # longest bit is an arm's end, not the back
+  isofit_strip_fall_deg: 0       # to confirm (owner): the drawings draw the back strip flat, which the
+                                 # water check flags (rule 12); e.g. 6 lets it fall towards the seat
+  isofit_min_gain: 0.021         # the fitted heights replace the views' shape only when they score
+                                 # this much better (silhouette plus creases)
 
 
 drawn:

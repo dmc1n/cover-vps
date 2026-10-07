@@ -2325,3 +2325,54 @@ this can happen and how to fix it."
 
 - **Checked:** 12 sloped-box drawings with readable size arrows; the other 8 were right.
   Drawings without arrows or without a strip cannot be checked this way.
+
+## ADR-091 — Route A fits the heights of a corner sofa to the drawing's 3D view (drawings plan, phase 4)
+
+The owner rejected C4, C8, C9, C10, C31 and S33 (and C3, C29, C30) on shape. These drawings show
+a top view and a shaded 3D picture, and no front or side view. With no elevation to cut it, the
+views reader (ADR-075) stood the top view straight up into a flat block. The block's outline
+covers the 3D view about 97 %, so the IoU check passed a cover that is plainly wrong: these
+sofas' backs are higher than their seats, and their arms end in a hip.
+
+- **The shape family** (`coverengine/drawing_isofit.py`):
+  - the top view's footprint, its scale set by the written lengths;
+  - the back edge: the longest run of the outline on the convex hull, without the arms' ends;
+  - over it, the height by the distance from the back edge (plan_profile, ADR-084): a flat
+    strip at the back height, then a straight slope to the front height at the arm's depth;
+  - an arm may end lower: the top falls to the end wall over the hip's length;
+  - seams where the arms' slopes meet (the corner's bisector), walls split at the outline's
+    corners, a piece wider than the roll cut along its length.
+- **Only written sizes.**
+  - Back, front, strip, end height and hip length are each a size written on the drawing, a
+    different one each: C31 writes 40.6 for its front, so 40.6 is not also its strip.
+  - Vent counts are no sizes: "8 Air Pockets" was being read as 8 in = 20.3 cm.
+  - The footprint's lengths along the back and its depth must be written (2/3 of them).
+- **The 3D view decides.**
+  - Each candidate is drawn as the CAD program draws its 3D view: an isometric projection from
+    one of the four corners, a z-buffer in numpy.
+  - Its silhouette is compared with the picture's transparency mask (IoU, the owner's
+    `drawing.min_iou` 0.85, unchanged).
+  - Its creases (faces meeting at more than 9.5°) are compared with the picture's shading steps,
+    as a soft F-score of distances.
+  - The heights are found group after group: back, then strip and front, then the arm ends.
+    This takes 2-45 s per drawing.
+  - The fit is taken only when its creases score at least `drawing.isofit_min_crease` (0.65) and
+    it beats the views' shape by `isofit_min_gain`. This is the guard the IoU alone could not
+    give: S27's wrong fit had IoU 0.91 and creases 0.19.
+  - Drawings with real elevations keep the views reader: D5, D6, S21, S26, S38, S39 (checked).
+- **Results** (staging builds in out/drawings/phase4/, compare sheets in
+  out/drawings/phase4/compare/):
+  - every written height came back for C4, C8, C9, C10 and S33;
+  - C31 keeps the written 33 cm strip, although its picture suggests nearer 40 along the arms;
+  - creases match 0.77-0.91 against 0.35-0.72 for the live covers and the block.
+- **Water.** The drawings draw the back strip flat, and the hull's water check flags it, as it
+  does on the live C8 and C27. `drawing.isofit_strip_fall_deg` (0, as drawn) tilts it towards
+  the seat; its value is the owner's to choose.
+- **Not covered:**
+  - wireframe drawings (no picture to compare with): the next step, reading the 3D view's own
+    vector lines;
+  - curved footprints without a top view (S32, C28, S43, S44, S25);
+  - shapes outside the family: S19's arm block, S27's chair. These stay with the views reader or
+    "needs a person".
+- **Better alternative, not built:** fit continuous heights and snap them to written sizes
+  afterwards; the discrete search is simpler, deterministic and cannot invent a size.
