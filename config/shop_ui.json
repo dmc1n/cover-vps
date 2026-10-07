@@ -334,6 +334,12 @@
    "en": "An estimate: please measure",
    "de": "Geschätzt: bitte nachmessen",
    "fr": "Estimé : à mesurer"
+  },
+  "suggest_privacy": {
+   "nl": "Uw foto wordt alleen gebruikt om de maten te lezen (door de AI van Google) en wordt alleen bewaard als u bestelt.",
+   "en": "Your photo is only used to read the sizes (by Google's AI) and is only kept if you order.",
+   "de": "Ihr Foto wird nur verwendet, um die Maße zu lesen (durch die KI von Google), und wird nur gespeichert, wenn Sie bestellen.",
+   "fr": "Votre photo sert uniquement à lire les dimensions (par l'IA de Google) et n'est conservée que si vous commandez."
   }
  },
  "status": {

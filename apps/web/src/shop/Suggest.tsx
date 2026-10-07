@@ -94,6 +94,7 @@ export function Suggest({
       >
         {busy ? w("suggest_reading") : w("suggest_go")}
       </button>
+      <p className="s-muted s-privacy">{w("suggest_privacy")}</p>
       {error && <p className="s-error">{error}</p>}
       {got && (
         <div className="s-suggest-card">
