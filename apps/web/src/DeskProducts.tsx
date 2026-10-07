@@ -252,6 +252,14 @@ export function ProductsSummary({
           )}
         </div>
       )}
+      {onClose && (
+        <div className="dp-done">
+          <span className="d-muted">The links are saved.</span>
+          <button className="d-btn d-primary" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      )}
     </section>
   );
 }

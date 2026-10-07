@@ -164,3 +164,11 @@
   background: var(--d-card);
   color: var(--d-ink);
 }
+
+.dp-done {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
