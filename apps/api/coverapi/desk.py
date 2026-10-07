@@ -19,18 +19,26 @@ edits the cut reads), a vent count or height, a skirt seam height (parameter ove
 cover's own settings), a size read wrong, a shape that is missing. Each is kept as a test case,
 and the same parameter correction on `desk.learn_after` covers of a group is proposed as the
 group's rule (coverengine/learned.py). A reject's words are no longer an AI lesson.
+
+Pictures (ADR-096): an approver attaches pictures to a reject, a comment, a fit note or a
+correction (a snapshot of the 3D view or the drawing, a file, a paste), marked with red arrows,
+circles and lines in the browser. They are uploaded first (`POST /api/desk/{id}/pictures`),
+checked and re-encoded as PNG without metadata into the model's desk/ folder, and then named in
+the action; the history entry, learning/desk.jsonl and a correction's test case carry them.
 """
 
 from __future__ import annotations
 
+import io
 import json
 import re
 import threading
 import time
+import warnings
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -42,17 +50,23 @@ REASONS = ("shape", "size", "seams", "vents", "pieces", "other")
 PAGE_DPI = 110  # param-ok: a drawing page as a picture on the desk
 MAX_PAGES = 4  # param-ok
 LOW = 60.0  # param-ok: below this average the AIs found the cover poor
+PICTURES_DIR = "desk"  # the Desk's pictures, in the model's folder (ADR-096)
+PICTURE_RE = re.compile(r"^[0-9]{8}-[0-9]{6}-[0-9]{1,4}\.png$")
+PICTURE_FORMATS = ("JPEG", "PNG", "WEBP")
+WITH_PICTURES = ("reject", "note", "fit")
+MB = 1024 * 1024  # param-ok: bytes in a megabyte
 _lock = threading.Lock()
 
 
 class Action(BaseModel):
-    action: str  # approve | reject | produced | fit | prefer | undo
+    action: str  # approve | reject | note | produced | fit | prefer | undo
     reasons: list[str] = []
     text: str = ""
     done: bool = True
     fits: bool = True
     note: str = ""
     n: int | None = None
+    pictures: list[str] = []  # names returned by POST /api/desk/{id}/pictures (ADR-096)
 
 
 # ---- state ----------------------------------------------------------------------------------
@@ -222,12 +236,98 @@ def drawing_page(d: Path, data_dir: Path, page: int) -> Path:
     return out
 
 
+# ---- pictures (ADR-096) ---------------------------------------------------------------------
+
+
+def _settings() -> Any:
+    from coverengine.params import Registry
+
+    return Registry.load(None).resolve()
+
+
+def picture_file(d: Path, name: str) -> Path | None:
+    """A Desk picture of this model by its name, or None: only names the Desk made itself, so
+    no path can lead out of the model's desk/ folder."""
+    if not PICTURE_RE.match(name):
+        return None
+    path = d / PICTURES_DIR / name
+    return path if path.is_file() else None
+
+
+def save_picture(d: Path, data: bytes, params: Any) -> str:
+    """Check an uploaded picture with Pillow and keep it as a fresh PNG without metadata."""
+    from PIL import Image, ImageOps, UnidentifiedImageError
+
+    most = float(params["desk.picture_max_mb"])
+    if len(data) > most * MB:
+        raise HTTPException(413, f"a picture may be at most {most:g} MB")
+    try:
+        with warnings.catch_warnings():
+            # a picture that unpacks to an enormous size is refused, not only warned about
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(data)) as probe:
+                fmt = probe.format
+                probe.verify()
+            img = Image.open(io.BytesIO(data))
+            img.load()
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError,
+            Image.DecompressionBombError, Image.DecompressionBombWarning):  # fmt: skip
+        raise HTTPException(400, "not a picture: use JPG, PNG or WebP") from None
+    if fmt not in PICTURE_FORMATS:
+        raise HTTPException(400, "not a picture: use JPG, PNG or WebP")
+    upright = ImageOps.exif_transpose(img)  # a phone photo the right way up; its EXIF goes
+    alpha = upright.mode in ("RGBA", "LA", "PA") or "transparency" in upright.info
+    clean = upright.convert("RGBA" if alpha else "RGB")
+    clean.info = {}  # no EXIF, text chunks, ICC or comments are written into the PNG
+    side = int(params["desk.picture_max_side_px"])
+    clean.thumbnail((side, side))
+    folder = d / PICTURES_DIR
+    folder.mkdir(exist_ok=True)
+    with _lock:
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        n = 1
+        while (folder / f"{stamp}-{n}.png").exists():
+            n += 1
+        name = f"{stamp}-{n}.png"
+        clean.save(folder / name, "PNG")
+    return name
+
+
+def check_pictures(d: Path, names: list[str], params: Any) -> list[str]:
+    """The pictures an action names: uploaded for this model, not too many."""
+    names = list(dict.fromkeys(names))
+    most = int(params["desk.pictures_max"])
+    if len(names) > most:
+        raise HTTPException(400, f"at most {most} pictures")
+    missing = [n for n in names if picture_file(d, n) is None]
+    if missing:
+        raise HTTPException(400, f"no such picture: {', '.join(missing)[:200]}")
+    return names
+
+
+def picture_paths(d: Path, names: list[str], base: Path) -> list[str]:
+    """Where the pictures are, relative to the data folder: for the learning step to look."""
+    out = []
+    for n in names:
+        p = d / PICTURES_DIR / n
+        try:
+            out.append(str(p.relative_to(base)))
+        except ValueError:
+            out.append(str(p))
+    return out
+
+
 # ---- actions --------------------------------------------------------------------------------
 
 
 def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
     from coverengine.catalogue import revisions, set_info
 
+    pictures: list[str] = []
+    if a.pictures:
+        if a.action not in WITH_PICTURES:
+            raise HTTPException(400, f"pictures go with {', '.join(WITH_PICTURES)}")
+        pictures = check_pictures(d, a.pictures, _settings())
     with _lock:
         st = state(d)
         before = {k: v for k, v in st.items() if k != "history"}
@@ -247,6 +347,11 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
             st.pop("approved", None)
             st.pop("produced", None)
             entry |= {"reasons": a.reasons, "text": a.text}
+        elif a.action == "note":
+            # a comment: only the history changes (ADR-096)
+            if not (a.text.strip() or pictures):
+                raise HTTPException(400, "write a few words or add a picture")
+            entry["text"] = a.text
         elif a.action == "produced":
             if a.done and st["status"] not in ("approved", "produced"):
                 raise HTTPException(409, "approve the cover before marking it produced")
@@ -286,6 +391,8 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
             return state(d)
         else:
             raise HTTPException(400, f"unknown action {a.action!r}")
+        if pictures:
+            entry["pictures"] = pictures
         entry["before"] = before
         st["history"].append(entry)
         _write(d / "desk.json", st)
@@ -306,6 +413,8 @@ def _catalogue(d: Path, status: str, set_info: Any) -> None:
 def _log(learning: Path, d: Path, entry: dict[str, Any]) -> None:
     learning.mkdir(parents=True, exist_ok=True)
     row = {"model": d.name, **{k: v for k, v in entry.items() if k != "before"}}
+    if entry.get("pictures") and "picture_paths" not in row:  # for the learning step (ADR-096)
+        row["picture_paths"] = picture_paths(d, entry["pictures"], learning.parent)
     with (learning / "desk.jsonl").open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(row) + "\n")
 
@@ -331,6 +440,7 @@ class Feedback(BaseModel):
     above_hem_cm: float | None = None  # vents
     chips: list[str] = []
     text: str = ""
+    pictures: list[str] = []  # names returned by POST /api/desk/{id}/pictures (ADR-096)
 
 
 class RuleRequest(BaseModel):
@@ -390,6 +500,7 @@ def correct(d: Path, fb: Feedback, user: Any, base: Path) -> dict[str, Any]:
     edit: dict[str, Any] | None = None
     expect: dict[str, Any] = {}
     steps: list[str] = []
+    pictures = check_pictures(d, fb.pictures, _settings()) if fb.pictures else []
     _, before_pieces, _ = _pieces(d)
     if fb.kind == "seam":
         if fb.op in ("remove", "add") and not _drawn(d):
@@ -459,7 +570,9 @@ def correct(d: Path, fb: Feedback, user: Any, base: Path) -> dict[str, Any]:
              "axis": fb.axis if fb.op == "add" else None, "at_cm": fb.at_cm, "what": fb.what,
              "read_cm": fb.read_cm, "correct_cm": fb.correct_cm, "count": fb.count,
              "above_hem_cm": fb.above_hem_cm, "chips": fb.chips, "text": fb.text,
-             "params": params, "edit": edit, "by": who, "time": now}  # fmt: skip
+             "params": params, "edit": edit, "by": who, "time": now,
+             # the pictures, and where they are for a later fix to look at (ADR-096)
+             "pictures": pictures, "picture_paths": picture_paths(d, pictures, base)}  # fmt: skip
     entry = {k: v for k, v in entry.items() if v not in (None, "", [], {})}
     with _lock:
         path = d / "feedback.json"
@@ -471,7 +584,10 @@ def correct(d: Path, fb: Feedback, user: Any, base: Path) -> dict[str, Any]:
         st = state(d)
         hist = {"action": f"correct {fb.kind}", "by": who, "time": now,
                 "before": {k: v for k, v in st.items() if k != "history"},
-                "detail": {k: v for k, v in entry.items() if k not in ("by", "time")}}  # fmt: skip
+                "detail": {k: v for k, v in entry.items()
+                           if k not in ("by", "time", "pictures", "picture_paths")}}  # fmt: skip
+        if pictures:
+            hist["pictures"] = pictures
         if st["status"] in ("approved", "produced") and (params or edit):
             # the cover changes: the approval was for the one before
             st["status"] = "ai-checked"
@@ -525,6 +641,7 @@ def install(app: FastAPI, store: Any) -> None:
             "spend": money,
             "can_approve": approver(user, params),
             "reasons": list(REASONS),
+            "pictures_max": int(params["desk.pictures_max"]),  # type: ignore[arg-type]
         }
 
     @app.get("/api/desk/{model_id}")
@@ -572,6 +689,26 @@ def install(app: FastAPI, store: Any) -> None:
 
         job: dict[str, Any] = jobs.submit(JobSpec(model_id, steps, {}))
         return job
+
+    @app.post("/api/desk/{model_id}/pictures")
+    async def pictures_upload(
+        model_id: str,
+        request: Request,
+        files: list[UploadFile] = File(...),  # noqa: B008 - FastAPI's way
+    ) -> dict[str, Any]:
+        """Pictures for a reject, a comment or a correction, checked and kept as PNG
+        (ADR-096). The action that follows names them."""
+        user = current_user(request)
+        params = Registry.load(None).resolve()
+        if not approver(user, params):
+            raise HTTPException(403, "only Rens, Rick, Wouter (desk.approvers) or an admin")
+        d = folder(model_id)
+        most = int(params["desk.pictures_max"])
+        if not files or len(files) > most:
+            raise HTTPException(400, f"send 1 to {most} pictures")
+        limit = int(float(params["desk.picture_max_mb"]) * MB)
+        datas = [await f.read(limit + 1) for f in files]  # one byte more shows "too big"
+        return {"pictures": [save_picture(d, data, params) for data in datas]}
 
     @app.get("/api/desk/{model_id}/correct")
     def correct_view(model_id: str, request: Request) -> dict[str, Any]:

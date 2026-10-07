@@ -1076,3 +1076,150 @@ main:has(.desk) {
   font-size: 11px;
   font-weight: 600;
 }
+
+/* pictures with a reject or a comment, marked in red (ADR-096) */
+.d-dialog-title {
+  grid-column: 1 / -1;
+  font-size: 14px;
+}
+.d-tl-dot.a-note {
+  background: var(--d-sand);
+}
+.d-pics {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--d-line);
+  border-radius: 12px;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.d-pics.over {
+  border-color: var(--d-sage);
+  background: var(--d-soft);
+}
+.d-pics-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.d-pics-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--d-muted);
+  margin-right: 4px;
+}
+.d-pics-hint,
+.d-pics-note {
+  font-size: 12px;
+  color: var(--d-muted);
+}
+.d-pics-note {
+  color: var(--d-bad);
+}
+.d-pics-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.d-pics-list li {
+  position: relative;
+}
+.d-pics-list img,
+.d-thumbs img {
+  height: 64px;
+  max-width: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--d-line);
+  cursor: zoom-in;
+  display: block;
+  background: #fff;
+}
+.d-pics-list button {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--d-line);
+  background: var(--d-card);
+  color: var(--d-ink);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.d-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-basis: 100%;
+  padding-left: 14px;
+}
+.d-thumbs img {
+  height: 56px;
+}
+.d-marker {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgba(20, 24, 20, 0.82);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  animation: d-in 0.2s ease;
+}
+.d-marker-box {
+  background: var(--d-card);
+  color: var(--d-ink);
+  border-radius: 16px;
+  box-shadow: var(--d-shadow);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  max-width: min(1200px, 100%);
+  max-height: 100%;
+}
+.d-marker-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.d-marker-bar .d-seg-ctl {
+  flex: none;
+}
+.d-marker-bar .d-seg-ctl button {
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+.d-marker-grow {
+  flex: 1;
+}
+.d-marker-stage {
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+.d-marker-stage canvas {
+  max-width: 100%;
+  max-height: calc(100vh - 170px);
+  cursor: crosshair;
+  touch-action: none;
+  border-radius: 8px;
+  background: #fff;
+}
+.d-marker-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--d-muted);
+}

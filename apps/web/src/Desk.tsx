@@ -1,12 +1,23 @@
 // The drawing desk (ADR-079): the AI sorts, people approve. A queue of every drawing cover in
 // order of need, one card per cover (the drawing beside our cover, what the program read, what
 // the AIs say), and the actions: approve, reject with a reason, produced, fit after sewing.
-// Keys: j / k next / previous, a approve, r reject, p produced, u undo.
+// Keys: j / k next / previous, a approve, r reject, c comment, p produced, u undo.
+// A reject or a comment takes pictures, marked in red (DeskPictures.tsx, ADR-096).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type ModelDetail } from "./api";
 import { Viewer } from "./Viewer";
 import { Corrections, RulesBar } from "./DeskCorrect";
-import { ProductsPanel, ProductsUpload, type ProductList } from "./DeskProducts";
+import {
+  ProductsPanel,
+  ProductsUpload,
+  type ProductList,
+} from "./DeskProducts";
+import {
+  PictureThumbs,
+  PictureTray,
+  uploadPictures,
+  type Pending,
+} from "./DeskPictures";
 import "./desk.css";
 
 type Scores = {
@@ -43,6 +54,7 @@ interface Queue {
   spend: Spend | null;
   can_approve: boolean;
   reasons: string[];
+  pictures_max?: number;
 }
 interface Verdict {
   same?: boolean;
@@ -61,6 +73,7 @@ interface Hist {
   note?: string;
   n?: number;
   undid?: string;
+  pictures?: string[];
 }
 interface Card extends Item {
   desk: {
@@ -272,7 +285,7 @@ export function Desk({ selected }: { selected: string | null }) {
             The AI sorts, people approve. {q.items.length} drawing covers ·{" "}
             <kbd>j</kbd>
             <kbd>k</kbd> move · <kbd>a</kbd> approve · <kbd>r</kbd> reject ·{" "}
-            <kbd>p</kbd> produced · <kbd>u</kbd> undo
+            <kbd>c</kbd> comment · <kbd>p</kbd> produced · <kbd>u</kbd> undo
           </p>
         </div>
         <div className="d-kpis">
@@ -421,6 +434,7 @@ export function Desk({ selected }: { selected: string | null }) {
               id={selected}
               canAct={q.can_approve}
               reasons={q.reasons}
+              picturesMax={q.pictures_max ?? 8}
               onChanged={load}
               onNext={() =>
                 idx >= 0 && idx + 1 < items.length && open(items[idx + 1].id)
@@ -485,20 +499,26 @@ function CardView({
   id,
   canAct,
   reasons,
+  picturesMax,
   onChanged,
   onNext,
 }: {
   id: string;
   canAct: boolean;
   reasons: string[];
+  picturesMax: number;
   onChanged: () => void;
   onNext: () => void;
 }) {
   const [card, setCard] = useState<Card | null>(null);
   const [model, setModel] = useState<ModelDetail | null>(null);
   const [page, setPage] = useState(0);
-  const [zoom, setZoom] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
+  const [zoom, setZoom] = useState<string | null>(null);
+  // the dialog at the bottom: a reject (reasons, words, pictures) or a comment (ADR-096)
+  const [dialog, setDialog] = useState<"" | "reject" | "note">("");
+  const [pending, setPending] = useState<Pending[]>([]);
+  const [sending, setSending] = useState(false);
+  const snap = useRef<(() => string | null) | null>(null);
   const [why, setWhy] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [fitNote, setFitNote] = useState("");
@@ -562,16 +582,52 @@ function CardView({
       try {
         await getJSON(`/api/desk/${id}`, body);
         setMsg(done);
-        setRejecting(false);
+        setDialog("");
         load();
         onChanged();
         if (next) setTimeout(onNext, 350);
+        return true;
       } catch (e) {
         setMsg(String((e as Error).message ?? e));
+        return false;
       }
     },
     [id, load, onChanged, onNext],
   );
+
+  // a reject or a comment: the pictures go up first, then the action names them
+  const send = async (
+    body: Record<string, unknown>,
+    done: string,
+    next: boolean,
+  ) => {
+    setSending(true);
+    setMsg("");
+    try {
+      // only pictures not sent yet go up: a refused action (no reason given) and a second
+      // try do not upload them twice
+      const fresh = pending.filter((p) => !p.name);
+      const names = await uploadPictures(id, fresh);
+      const sent = pending.map((p) =>
+        p.name ? p : { ...p, name: names[fresh.indexOf(p)] },
+      );
+      setPending(sent);
+      const pictures = sent.map((p) => p.name as string);
+      if (await act({ ...body, pictures }, done, next)) {
+        sent.forEach((p) => URL.revokeObjectURL(p.url));
+        setPending([]);
+        setText("");
+      }
+    } catch (e) {
+      setMsg(String((e as Error).message ?? e));
+    } finally {
+      setSending(false);
+    }
+  };
+  const openDialog = (kind: "reject" | "note") => {
+    setDialog(kind);
+    setTimeout(() => textRef.current?.focus(), 50);
+  };
 
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
@@ -579,10 +635,8 @@ function CardView({
       if (!canAct || !card) return;
       if (t && ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) return;
       if (e.key === "a") act({ action: "approve" }, "Approved", true);
-      if (e.key === "r") {
-        setRejecting(true);
-        setTimeout(() => textRef.current?.focus(), 50);
-      }
+      if (e.key === "r") openDialog("reject");
+      if (e.key === "c") openDialog("note");
       if (e.key === "p")
         act(
           { action: "produced", done: card.desk.status !== "produced" },
@@ -722,7 +776,7 @@ function CardView({
             <img
               src={`/api/desk/${card.id}/page/${page}`}
               alt="the drawing"
-              onClick={() => setZoom(true)}
+              onClick={() => setZoom(`/api/desk/${card.id}/page/${page}`)}
             />
           ) : (
             <div className="d-noimg big">No drawing found</div>
@@ -731,7 +785,12 @@ function CardView({
         <figure className="d-3d">
           <figcaption>Our cover</figcaption>
           {model ? (
-            <Viewer id={card.id} files={model.files} stamp={0} />
+            <Viewer
+              id={card.id}
+              files={model.files}
+              stamp={0}
+              snapshot={snap}
+            />
           ) : card.has_picture ? (
             <img
               src={`/api/models/${card.id}/files/cover.png`}
@@ -880,8 +939,8 @@ function CardView({
                 <span
                   className={`d-tl-dot a-${h.action.replace(/\s+/g, "-")}`}
                 />
-                <strong>{h.action}</strong> {h.by && <>by {h.by}</>}{" "}
-                <time>{when(h.time)}</time>
+                <strong>{h.action === "note" ? "comment" : h.action}</strong>{" "}
+                {h.by && <>by {h.by}</>} <time>{when(h.time)}</time>
                 {h.reasons && h.reasons.length > 0 && (
                   <em> · {h.reasons.join(", ")}</em>
                 )}
@@ -896,6 +955,13 @@ function CardView({
                 {h.done != null && (
                   <em> · {h.done ? "produced" : "not produced"}</em>
                 )}
+                {h.pictures && h.pictures.length > 0 && (
+                  <PictureThumbs
+                    id={card.id}
+                    names={h.pictures}
+                    onOpen={setZoom}
+                  />
+                )}
               </li>
             ))}
             {!st.history.length && <li className="d-muted">Nothing yet.</li>}
@@ -909,7 +975,7 @@ function CardView({
             Only Rens, Rick, Wouter or an admin can decide here.
           </span>
         )}
-        {canAct && !rejecting && (
+        {canAct && !dialog && (
           <>
             <button
               className="d-btn d-primary"
@@ -920,9 +986,16 @@ function CardView({
             </button>
             <button
               className="d-btn d-danger"
-              onClick={() => setRejecting(true)}
+              onClick={() => openDialog("reject")}
             >
               ✕ Reject <kbd>r</kbd>
+            </button>
+            <button
+              className="d-btn d-ghost"
+              title="A remark with pictures, without changing the status"
+              onClick={() => openDialog("note")}
+            >
+              Comment <kbd>c</kbd>
             </button>
             <label
               className={`d-check ${st.status === "approved" || st.status === "produced" ? "" : "off"}`}
@@ -978,56 +1051,78 @@ function CardView({
             )}
           </>
         )}
-        {canAct && rejecting && (
+        {canAct && dialog && (
           <div className="d-reject">
-            <div className="d-chips">
-              {reasons.map((r) => (
-                <button
-                  key={r}
-                  className={why.includes(r) ? "on" : ""}
-                  onClick={() =>
-                    setWhy(
-                      why.includes(r)
-                        ? why.filter((x) => x !== r)
-                        : [...why, r],
-                    )
-                  }
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
+            {dialog === "reject" ? (
+              <div className="d-chips">
+                {reasons.map((r) => (
+                  <button
+                    key={r}
+                    className={why.includes(r) ? "on" : ""}
+                    onClick={() =>
+                      setWhy(
+                        why.includes(r)
+                          ? why.filter((x) => x !== r)
+                          : [...why, r],
+                      )
+                    }
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <strong className="d-dialog-title">Comment</strong>
+            )}
             <textarea
               ref={textRef}
-              placeholder="What is wrong? (kept in the history; to change the cover itself, use “Correct this cover”)"
+              placeholder={
+                dialog === "reject"
+                  ? "What is wrong? (kept in the history; to change the cover itself, use “Correct this cover”)"
+                  : "Your remark (kept in the history; the status stays as it is)"
+              }
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
             <button
-              className="d-btn d-danger"
+              className={`d-btn ${dialog === "reject" ? "d-danger" : "d-primary"}`}
+              disabled={sending}
               onClick={() =>
-                act({ action: "reject", reasons: why, text }, "Rejected", true)
+                dialog === "reject"
+                  ? send(
+                      { action: "reject", reasons: why, text },
+                      "Rejected",
+                      true,
+                    )
+                  : send({ action: "note", text }, "Comment saved", false)
               }
             >
-              Reject
+              {sending
+                ? "Sending…"
+                : dialog === "reject"
+                  ? "Reject"
+                  : "Save comment"}
             </button>
-            <button
-              className="d-btn d-ghost"
-              onClick={() => setRejecting(false)}
-            >
+            <button className="d-btn d-ghost" onClick={() => setDialog("")}>
               Cancel
             </button>
+            <PictureTray
+              pending={pending}
+              onChange={setPending}
+              snapshot3d={() => snap.current?.() ?? null}
+              drawingUrl={
+                card.pages ? `/api/desk/${card.id}/page/${page}` : null
+              }
+              max={picturesMax}
+            />
           </div>
         )}
         {msg && <span className="d-msg">{msg}</span>}
       </div>
 
       {zoom && (
-        <div className="d-zoom" onClick={() => setZoom(false)}>
-          <img
-            src={`/api/desk/${card.id}/page/${page}`}
-            alt="the drawing, large"
-          />
+        <div className="d-zoom" onClick={() => setZoom(null)}>
+          <img src={zoom} alt="large" />
         </div>
       )}
     </article>

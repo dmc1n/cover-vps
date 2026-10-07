@@ -23,6 +23,10 @@
   - **Approve** (key `a`): the catalogue status becomes "checked".
   - **Reject** (`r`): choose a reason (shape, size, seams, vents, pieces) and write what is
     wrong. It is kept in the history. To change the cover itself, use "Correct this cover".
+  - **Comment** (`c`): a remark for the history; the status stays as it is.
+  - **Pictures** with a reject or a comment: a snapshot of the 3D view or the drawing, a file,
+    a drop or a paste (Ctrl+V), marked with red arrows, circles and lines (ADR-096). The
+    history shows them as thumbnails; click one to enlarge it.
   - **Produced** (`p`): the cover was really made; the catalogue status becomes "production".
   - **Fits / does not fit:** after sewing, with a note.
   - **Undo** (`u`) takes back the last step. Use `j` and `k` to go to the next or previous
@@ -109,8 +113,14 @@ correcties wordt het een regel voor alle hoezen (ADR-082).
   (zoals C27: 235,1 cm tegen 96,5 inch).
 - **Bijna goed:** keur dan af met een kleine opmerking, niet goedkeuren. Anders leert het
   programma niets.
-- **Een plaatje zegt meer:** een screenshot met een pijl of cirkel mag naar Rick; die geeft het
-  door.
+- **Een plaatje zegt meer:** voeg het zelf toe, in het venster van Reject of Comment, onder
+  "Pictures":
+  1. **Snapshot 3D** neemt de 3D-hoes zoals je hem nu draait; **Snapshot drawing** de
+     tekening. Of **Upload…** een foto (JPG, PNG, WebP), sleep hem erin, of plak met Ctrl+V.
+  2. Teken in rood: **Arrow** (sleep naar waar de pijl moet wijzen), **Circle** of **Line**.
+     **Undo** of Ctrl+Z haalt de laatste weg, **Clear** alles.
+  3. **Use this picture**, dan **Reject** of **Save comment**. Het plaatje staat in de
+     geschiedenis van de hoes (klik om te vergroten); het programma en Claude zien het daar.
 
 **Minder handig:** alleen "klopt niet" of "vorm fout". Dan moet geraden worden wat er bedoeld is.
 

@@ -305,6 +305,10 @@ desk:                            # the drawing desk: people approve covers, AI o
                                  # model (to confirm: the 314 SUNS models are all still "draft")
   learn_after: 5                 # the same correction on this many covers of a group is proposed
                                  # as the group's rule; a person accepts it (ADR-082)
+  picture_max_mb: 15             # a picture attached at the Desk (snapshot, photo, screenshot) may be
+                                 # at most this large as uploaded (ADR-096)
+  pictures_max: 8                # at most this many pictures on one reject, comment or correction
+  picture_max_side_px: 2400      # a larger picture is scaled down to this longest side when kept
 
 products:                        # the workshop's product list linked to the drawing covers (ADR-091)
   max_bytes: 52428800            # an uploaded list, or a zip unpacked, at most this large (50 MB)

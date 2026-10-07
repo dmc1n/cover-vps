@@ -204,9 +204,14 @@ def create_app(
         out["desk_status"] = desk.state(d)["status"]
         return out
 
-    @app.get("/api/models/{model_id}/files/{name}")
+    @app.get("/api/models/{model_id}/files/{name:path}")
     def file(model_id: str, name: str, request: Request) -> FileResponse:
         d = model_or_404(model_id)
+        if name.startswith(desk.PICTURES_DIR + "/"):  # a Desk picture (ADR-096)
+            pic = desk.picture_file(d, name.removeprefix(desk.PICTURES_DIR + "/"))
+            if pic is None:
+                raise HTTPException(404, f"no file {name!r}")
+            return FileResponse(pic, media_type="image/png")
         if name == "sizes.pdf":  # made when it is opened (ADR-080)
             from coverengine.export.drawing import ensure_sizes
 

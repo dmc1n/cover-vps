@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { UnfoldView, type FrameHook } from "./Unfold";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -201,6 +201,7 @@ export function Viewer({
   rainBusy,
   onDrape,
   drapeBusy,
+  snapshot,
 }: {
   id: string;
   files: string[];
@@ -209,6 +210,8 @@ export function Viewer({
   rainBusy?: boolean;
   onDrape?: (engine?: string) => void;
   drapeBusy?: boolean;
+  // set to a function that returns the current view as a PNG data URL (the Desk's pictures)
+  snapshot?: MutableRefObject<(() => string | null) | null>;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -376,7 +379,15 @@ export function Viewer({
       for (const hook of frameHooks.current) hook();
       renderer.render(scene, camera);
     });
+    // render and read in the same task: the drawing buffer is still there, so no
+    // preserveDrawingBuffer (and its cost on every frame) is needed
+    if (snapshot)
+      snapshot.current = () => {
+        renderer.render(scene, camera);
+        return renderer.domElement.toDataURL("image/png");
+      };
     return () => {
+      if (snapshot) snapshot.current = null;
       alive = false;
       rainAnim.current = null;
       sceneRef.current = null;

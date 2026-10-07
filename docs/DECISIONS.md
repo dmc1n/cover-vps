@@ -2551,3 +2551,40 @@ intermediate step where we can choose, so this doesn't go wrong automatically."
 Owner's answers (7 Oct 2026, QUESTIONS 69): the step where a longer top meets a shorter one is
 right (no blending); covering each piece as its plan rectangle is fine; an arrangement gets one
 cover over the whole, never covers zipped together (closes that question from ADR-089).
+
+## ADR-096 — Pictures at the Desk: the approver attaches and marks them himself
+
+The owner (7 October): "make an option so Rens can add a screenshot himself". Until now a
+picture with an arrow or circle went by mail to Rick, who passed it on; it was not kept with the
+cover, and the learning step never saw it.
+
+- **Where:** the Reject dialog, and a new **Comment** (key `c`, action `note`): words and
+  pictures in the history, the status unchanged. A correction (`POST /api/desk/{id}/correct`)
+  takes pictures too through the API; its form has no picture buttons yet.
+- **Sources** (apps/web/src/DeskPictures.tsx): "Snapshot 3D" (the viewer renders and reads its
+  canvas in the same task, so `preserveDrawingBuffer` and its per-frame cost are not needed),
+  "Snapshot drawing" (the drawing page shown), "Upload…" (JPG, PNG, WebP), drag-and-drop and
+  Ctrl+V.
+- **Marking:** every picture opens a small editor: red arrows, circles (ellipses) and freehand
+  lines, Undo (also Ctrl+Z), Clear. The marked picture is drawn into a canvas at the picture's
+  own size and sent as PNG.
+- **Storage:** `POST /api/desk/{id}/pictures` (multipart, only `desk.approvers` or an admin, as
+  for approve/reject) checks each file with Pillow (JPEG, PNG or WebP only; a picture that
+  unpacks to an enormous size is refused), turns it upright by its EXIF, re-encodes it as a new
+  PNG with no metadata (EXIF, text, ICC dropped), scales it to at most
+  `desk.picture_max_side_px` (2400), and keeps it as `models/<id>/desk/<yyyymmdd-hhmmss>-<n>.png`.
+  Limits: `desk.picture_max_mb` (15) per picture, `desk.pictures_max` (8) per request and per
+  action. The action then names them (`pictures`); names that are not this model's pictures
+  are refused.
+- **Served** by the existing logged-in file route, `/api/models/{id}/files/desk/<name>`; only
+  names the Desk made itself (a fixed pattern) are served from desk/, so no path leads out.
+- **Linked:** the history entry in desk.json carries `pictures` (file names), the card shows
+  them as thumbnails (click to enlarge). learning/desk.jsonl adds `picture_paths` (relative to
+  the data folder), and so do a correction's feedback.json entry and its test case
+  (learning/cases/); `scripts/learned_check.py` lists them under a case "to do by hand". A
+  future fix, or Claude, opens them from there (ADR-082).
+- **Uploaded once:** the pictures go up when Reject or Save comment is pressed; if the action
+  is then refused (no reason given), the second try reuses them.
+- **Not yet:** a picture uploaded for an action that never succeeds (refused, then cancelled)
+  stays in desk/ unlinked; it costs little and a clean-up can come later. Undo takes back the
+  history entry, not its files.

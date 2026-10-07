@@ -36,6 +36,7 @@ USED_FOR = {
     "python-multipart": "file uploads in the API (M6)",
     "httpx": "API test client (M6)",
     "pymupdf": "reading the owner's PDF drawings (learning)",
+    "pillow": "pictures attached at the Desk, checked and re-encoded (ADR-096)",
     "pytest": "tests (dev)",
     "ruff": "lint and format (dev)",
     "mypy": "type checks (dev)",

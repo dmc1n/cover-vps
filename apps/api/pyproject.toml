@@ -11,6 +11,7 @@ dependencies = [
   "httpx",
   "pymupdf",
   "openpyxl>=3.1.5",
+  "pillow",  # pictures at the Desk are checked and re-encoded (ADR-096)
 ]
 
 [project.scripts]

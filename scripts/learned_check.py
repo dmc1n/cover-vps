@@ -44,7 +44,10 @@ def main() -> int:
             continue
         d = models / name
         if case.get("check") != "auto":
-            rows.append({"case": path.name, "model": name, "result": "to do by hand"})
+            # the pictures the person attached show what is meant (ADR-096)
+            pics = (case.get("feedback") or {}).get("picture_paths") or []
+            rows.append({"case": path.name, "model": name, "result": "to do by hand",
+                         "pictures": pics})  # fmt: skip
             continue
         if not (d / "cover.json").is_file():
             rows.append({"case": path.name, "model": name, "result": "cover gone"})
@@ -59,6 +62,8 @@ def main() -> int:
                      "why": bad})  # fmt: skip
     for r in rows:
         print(f"{r['result']:14} {r['case']}  {'; '.join(r.get('why') or [])}")
+        for pic in r.get("pictures") or []:
+            print(f"{'':14} picture: {pic}")
     held = sum(1 for r in rows if r["result"] == "holds")
     failed = sum(1 for r in rows if r["result"] == "FAILS")
     print(f"{held} hold, {failed} fail, {len(rows) - held - failed} other, of {len(rows)} cases")
