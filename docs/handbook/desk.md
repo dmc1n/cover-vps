@@ -85,3 +85,33 @@ by product.
 
   A SUNS model's card shows the drawings it is linked to.
 - Uploading again replaces the links; every upload is kept in `products/` in the data folder.
+
+## Afkeuren: welke feedback helpt (voor Rens)
+
+Hoe preciezer de afkeuring, hoe sneller de hoes goed is. Het programma leert ervan: na 5 gelijke
+correcties wordt het een regel voor alle hoezen (ADR-082).
+
+**Per afkeuring:**
+
+1. **Soort fout:** kies de reden in de Desk: vorm, maat, naden, vents of stukken.
+2. **Waar:** welke kant of welk deel, bijvoorbeeld "linker arm", "rugstrook", "binnenhoek" of
+   de naam van het stuk ("skirt-front-2", zie de lijst met stukken op de kaart).
+3. **Wat het moet zijn, het liefst met een getal:**
+   - "rughoogte moet 90 cm zijn, nu 84";
+   - "1 vent te veel aan de achterkant";
+   - "naad moet op de vouw, niet 10 cm ervoor".
+4. **Waarom**, als het niet uit de tekening blijkt: "zo naaien wij dat altijd", "past niet om de
+   armleuning". Zulke regels gaan voor alle hoezen gelden.
+
+**Ook handig:**
+
+- **Twijfel over de tekening zelf:** zeg welke maat op de tekening fout of onduidelijk is
+  (zoals C27: 235,1 cm tegen 96,5 inch).
+- **Bijna goed:** keur dan af met een kleine opmerking, niet goedkeuren. Anders leert het
+  programma niets.
+- **Een plaatje zegt meer:** een screenshot met een pijl of cirkel mag naar Rick; die geeft het
+  door.
+
+**Minder handig:** alleen "klopt niet" of "vorm fout". Dan moet geraden worden wat er bedoeld is.
+
+Eén zin met **waar, wat en een getal** is genoeg.
