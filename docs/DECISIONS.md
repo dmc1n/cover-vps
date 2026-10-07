@@ -2265,3 +2265,34 @@ not see two of them." Then: "it is like this on many more models."
   S series and the corner sets). The old files are kept in
   cover-data/backup-vents-2026-10-07.
 - **Test:** an L-shaped cover's six vents all face the open side.
+
+## ADR-090 — Length and depth of the sloped-box drawing covers read from the size arrows
+
+The owner (7 October) on drawing-s40: "x and y are swapped; this happens more often. Check how
+this can happen and how to fix it."
+
+- **How it happened.** These covers were read by the AI earlier (ADR-046). In a 3D view it
+  had to guess which size is the length (along the back) and which the depth (along the side
+  that shows the slope):
+  - S40 and S31 had them swapped;
+  - S36 took the 30 cm strip for the depth;
+  - S29 took the front height (72) for the depth.
+- **Read, not guessed** (`scripts/drawing_axes_check.py`).
+  - The size arrows (ADR-075) tell each size's direction: one of the two isometric axes
+    (±30°), or upright.
+  - The flat strip on top is sized along the depth, so the axis carrying the strip's size is
+    the depth axis. The longest size along it is the depth, and the longest along the other
+    axis is the length.
+  - A first rule, "from the back height to the front height", failed on S41, where the front
+    height is drawn at another corner.
+- **Fixed** (new revisions; backups in cover-data/backup-drawing-s*-axes-2026-10-07):
+
+  | Cover | Before | After |
+  |---|---|---|
+  | S40 | 105 × 92 | 92 × 105 |
+  | S31 | 105 × 95 | 95 × 105 |
+  | S36 | 115 × 30, no strip | 115 × 112, strip 30 |
+  | S29 | 95 × 72 | 95 × 95 |
+
+- **Checked:** 12 sloped-box drawings with readable size arrows; the other 8 were right.
+  Drawings without arrows or without a strip cannot be checked this way.
