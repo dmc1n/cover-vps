@@ -1066,3 +1066,13 @@ main:has(.desk) {
 .d-ai-note.busy {
   font-style: italic;
 }
+
+/* reopened after a fix: a person looks again (owner, 7 Oct 2026) */
+.d-second {
+  background: color-mix(in srgb, #c8a24a 22%, transparent);
+  color: inherit;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}

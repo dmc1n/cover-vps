@@ -21,6 +21,7 @@ interface Item {
   outcome: string | null;
   scores: Scores;
   tags: string[];
+  second_round?: string | null;
   catalogue: string;
   pieces: number;
   vents: number;
@@ -154,15 +155,23 @@ export function Desk({ selected }: { selected: string | null }) {
   const items = useMemo(() => {
     const all = q?.items ?? [];
     return all.filter((i) => {
+      if (status === "second" && !i.second_round) return false;
       if (status === "open" && ["approved", "produced"].includes(i.status))
         return false;
-      if (status !== "open" && status !== "all" && i.status !== status)
+      if (
+        status !== "open" &&
+        status !== "all" &&
+        status !== "second" &&
+        i.status !== status
+      )
         return false;
       if (series === "SUNS" && !i.id.startsWith("suns-")) return false;
       if (
         series &&
         series !== "SUNS" &&
-        !(i.id.startsWith("drawing-") && i.code.toUpperCase().startsWith(series))
+        !(
+          i.id.startsWith("drawing-") && i.code.toUpperCase().startsWith(series)
+        )
       )
         return false;
       if (search) {
@@ -271,7 +280,14 @@ export function Desk({ selected }: { selected: string | null }) {
               onChange={(e) => setSearch(e.target.value)}
             />
             <div className="d-seg-ctl">
-              {["open", "all", "rejected", "approved", "produced"].map((s) => (
+              {[
+                "open",
+                "second",
+                "all",
+                "rejected",
+                "approved",
+                "produced",
+              ].map((s) => (
                 <button
                   key={s}
                   className={status === s ? "on" : ""}
@@ -281,7 +297,9 @@ export function Desk({ selected }: { selected: string | null }) {
                     ? "To do"
                     : s === "all"
                       ? "All"
-                      : STATUS_LABEL[s]}
+                      : s === "second"
+                        ? "2nd round"
+                        : STATUS_LABEL[s]}
                 </button>
               ))}
             </div>
@@ -327,6 +345,11 @@ export function Desk({ selected }: { selected: string | null }) {
                     <span>{i.vents} vents</span>
                     {i.tags.includes("shape-to-check") && (
                       <span className="d-flag">shape to check</span>
+                    )}
+                    {i.second_round && (
+                      <span className="d-second" title={i.second_round}>
+                        2nd round
+                      </span>
                     )}
                   </div>
                 </div>
@@ -583,23 +606,25 @@ function CardView({
             ck.outcome !== "agreed: same" &&
             st.status !== "approved" &&
             st.status !== "produced" && (
-            <button
-              className={`d-ai ${aiJob ? "busy" : ""}`}
-              disabled={!!aiJob}
-              title="The AI reads the drawing: a proposal (about 1–5 cents), marked 'read by the AI', to approve here"
-              onClick={async () => {
-                setAiNote("");
-                try {
-                  const r = await api.aiReadDrawing(card.id);
-                  setAiJob(r.job.id);
-                } catch (e) {
-                  setAiNote(String((e as Error).message ?? e));
-                }
-              }}
-            >
-              {aiJob ? "AI is reading… (about a minute)" : "Let the AI read it"}
-            </button>
-          )}
+              <button
+                className={`d-ai ${aiJob ? "busy" : ""}`}
+                disabled={!!aiJob}
+                title="The AI reads the drawing: a proposal (about 1–5 cents), marked 'read by the AI', to approve here"
+                onClick={async () => {
+                  setAiNote("");
+                  try {
+                    const r = await api.aiReadDrawing(card.id);
+                    setAiJob(r.job.id);
+                  } catch (e) {
+                    setAiNote(String((e as Error).message ?? e));
+                  }
+                }}
+              >
+                {aiJob
+                  ? "AI is reading… (about a minute)"
+                  : "Let the AI read it"}
+              </button>
+            )}
           <a className="d-open" href={`#/model/${card.id}`}>
             Open model ↗
           </a>
@@ -611,6 +636,12 @@ function CardView({
           {aiJob
             ? "The AI is reading the drawing and the program builds its proposal. This card updates by itself."
             : aiNote}
+        </p>
+      )}
+      {card.second_round && (
+        <p className="d-ai-note" role="status">
+          <strong>2nd round · </strong>
+          {card.second_round}
         </p>
       )}
       <div className="d-split">
@@ -798,6 +829,7 @@ function CardView({
                   <em> · {h.reasons.join(", ")}</em>
                 )}
                 {h.text && <q>{h.text}</q>}
+                {h.note && h.fits == null && <em> · {h.note}</em>}
                 {h.fits != null && (
                   <em>
                     {" "}

@@ -152,6 +152,10 @@ def brief(d: Path) -> dict[str, Any]:
         "vents": vents,
         "has_picture": (d / "cover.png").is_file(),
         "last": last and {k: last.get(k) for k in ("action", "by", "time")},
+        # reopened after a fix, for a person to look again (owner, 7 Oct 2026)
+        "second_round": (st.get("second_round") or {}).get("why")
+        if st["status"] not in ("approved", "produced", "rejected")
+        else None,
         "priority": list(priority(st["status"], c.get("outcome"), sc["avg"])),
         "updated": (d / "cover.png").stat().st_mtime if (d / "cover.png").is_file() else None,
     }
