@@ -129,6 +129,9 @@ def create_app(
 
     drawing_upload.install(app, store, jobs)  # route A: a drawing (PDF) -> a cover (ADR-081)
     unfold.install(app, store)  # the cover unfolded, with where its fabric goes (ADR-085)
+    from coverapi import arrangements
+
+    arrangements.install(app, store, jobs)  # furniture placed together, one cover (ADR-089)
     from coverapi import shop
 
     shop.install(app, auth, store.root, jobs, store)

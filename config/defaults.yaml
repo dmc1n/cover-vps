@@ -328,6 +328,13 @@ ai:                              # AI advice on cover layouts (the key: DEEPSEEK
   check_model: gemini-3.8-flash  # the picture check of a built cover (ADR-072): same verdicts as
                                  # the Pro model on S47/S44, about 10x cheaper and faster (owner, 6 Oct 2026)
 
+arrange:                         # furniture placed together, one cover over the whole (ADR-089)
+  hull_top: box                  # the cover over an arrangement: box (as the SUNS sets) or tensioned
+  box_pieces: 8                  # to confirm: a box cover over an arrangement in this many pieces
+  gap_mm: 0                      # members placed with "snap" stand this far apart (0: touching)
+  grid_mm: 10                    # dragging on the page moves a member in steps of this size
+  rotation_step_deg: 90          # the page's turn buttons turn a member by this much
+
 suggest:                         # "start from a photo or a link" in the configurator (ADR-086)
   per_hour: 10                   # suggestions per visitor per hour (the AI costs a little each)
   photo_max_bytes: 10485760      # a customer's photo, at most this large (10 MB)
