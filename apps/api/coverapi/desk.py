@@ -24,6 +24,7 @@ group's rule (coverengine/learned.py). A reject's words are no longer an AI less
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from pathlib import Path
@@ -121,7 +122,14 @@ def _pieces(d: Path) -> tuple[list[dict[str, Any]], int, int]:
 def _code(d: Path) -> str:
     st = _read(d / "desk.json")
     c = check(d)
-    return str(st.get("code") or c.get("code") or d.name.removeprefix("drawing-").upper())
+    if st.get("code") or c.get("code"):
+        return str(st.get("code") or c.get("code"))
+    if d.name.startswith("drawing-"):
+        return d.name.removeprefix("drawing-").upper()
+    # a catalogue model (SUNS): its own name, as its notes carry it ("…: SUNS-Chaise lounge-…")
+    notes = str(_read(d / "cover.json").get("notes") or "")
+    name = notes.rsplit(": ", 1)[-1] if ": " in notes else d.name
+    return re.sub(r"\s+", " ", name.replace("-", " ").replace("_", " ")).strip()[:80]
 
 
 def brief(d: Path) -> dict[str, Any]:
@@ -488,7 +496,7 @@ def install(app: FastAPI, store: Any) -> None:
         return d
 
     @app.get("/api/desk")
-    def queue(request: Request, scope: str = "drawings") -> dict[str, Any]:
+    def queue(request: Request, scope: str = "all") -> dict[str, Any]:
         user = current_user(request)
         params = Registry.load(None).resolve()
         dirs = sorted(p for p in Path(store.models).iterdir() if (p / "cover.json").is_file())

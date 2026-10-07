@@ -107,7 +107,8 @@ const OUTCOME_LABEL: Record<string, string> = {
   "person to check": "AIs disagree",
   "check failed": "check failed",
 };
-const SERIES = ["C", "S", "D", "L", "R", "T", "U"];
+// the drawings' series, and the SUNS catalogue (owner, 7 Oct 2026: every approval at the Desk)
+const SERIES = ["C", "S", "D", "L", "R", "T", "U", "SUNS"];
 const when = (t?: number) =>
   t
     ? new Date(t * 1000).toLocaleString(undefined, {
@@ -157,7 +158,13 @@ export function Desk({ selected }: { selected: string | null }) {
         return false;
       if (status !== "open" && status !== "all" && i.status !== status)
         return false;
-      if (series && !i.code.toUpperCase().startsWith(series)) return false;
+      if (series === "SUNS" && !i.id.startsWith("suns-")) return false;
+      if (
+        series &&
+        series !== "SUNS" &&
+        !(i.id.startsWith("drawing-") && i.code.toUpperCase().startsWith(series))
+      )
+        return false;
       if (search) {
         const s = search.toLowerCase();
         if (!`${i.code} ${i.id} ${i.tags.join(" ")}`.toLowerCase().includes(s))

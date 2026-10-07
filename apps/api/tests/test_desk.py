@@ -54,14 +54,16 @@ def login(app: Any, user: str) -> TestClient:
 
 
 def test_the_queue_puts_what_needs_a_person_first(app: Any) -> None:
-    q = login(app, "vera").get("/api/desk").json()
+    q = login(app, "vera").get("/api/desk?scope=drawings").json()
     order = [i["id"] for i in q["items"]]
     # AIs disagree, poor, middling, not checked, then what the AIs found right
     assert order == ["drawing-c", "drawing-b", "drawing-d", "drawing-e", "drawing-a"]
     assert q["items"][0]["vents"] == 4 and q["items"][0]["pieces"] == 1
     assert q["counts"]["ai-checked"] == 4 and q["counts"]["new"] == 1
     assert q["can_approve"] is False
-    assert len(login(app, "vera").get("/api/desk?scope=all").json()["items"]) == 6
+    # by default every model (owner, 7 Oct 2026: all approvals at the Desk), SUNS ones too
+    every = login(app, "vera").get("/api/desk").json()["items"]
+    assert len(every) == 6 and any(i["id"] == "suns-chair" for i in every)
 
 
 def test_only_approvers_decide_and_the_catalogue_follows(app: Any, tmp_path: Path) -> None:
