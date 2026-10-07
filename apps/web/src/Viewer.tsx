@@ -101,6 +101,97 @@ function ventGroup(vents: Vent[]): THREE.Group {
   return group;
 }
 
+// Dimensions (the owner, 7 Oct 2026): the cover's overall length, depth and height drawn on
+// the 3D view, in cm, to compare with the drawing (not only the pieces' sizes).
+const DIMS_KEY = "viewer.dims";
+const dimsSaved = () => {
+  try {
+    return localStorage.getItem(DIMS_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+function label(text: string, size: number): THREE.Sprite {
+  const c = document.createElement("canvas");
+  c.width = 320;
+  c.height = 80;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "rgba(255,255,255,0.92)";
+  g.strokeStyle = "#3c443c";
+  g.lineWidth = 3;
+  g.beginPath();
+  g.roundRect(4, 4, 312, 72, 18);
+  g.fill();
+  g.stroke();
+  g.fillStyle = "#1f241f";
+  g.font = "600 40px 'DM Sans', system-ui, sans-serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(text, 160, 42);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(c),
+      depthTest: false,
+      transparent: true,
+    }),
+  );
+  sprite.scale.set(size, size / 4, 1);
+  sprite.renderOrder = 10;
+  return sprite;
+}
+
+function dimGroup(box: THREE.Box3): THREE.Group {
+  const g = new THREE.Group();
+  const s = box.getSize(new THREE.Vector3());
+  const m = box.min;
+  const off = Math.max(s.x, s.z) * 0.06; // the lines stand a little away from the cover
+  const mat = new THREE.LineBasicMaterial({
+    color: "#c0392b",
+    depthTest: false,
+  });
+  const line = (a: THREE.Vector3, b: THREE.Vector3, text: string) => {
+    const tick = new THREE.Vector3().subVectors(b, a).normalize();
+    const n =
+      Math.abs(tick.y) > 0.9
+        ? new THREE.Vector3(1, 0, 0)
+        : new THREE.Vector3(0, 1, 0);
+    const t = n.clone().multiplyScalar(off * 0.3);
+    const geo = new THREE.BufferGeometry().setFromPoints([
+      a,
+      b,
+      a.clone().sub(t),
+      a.clone().add(t),
+      b.clone().sub(t),
+      b.clone().add(t),
+    ]);
+    const segs = new THREE.LineSegments(geo, mat);
+    segs.renderOrder = 9;
+    g.add(segs);
+    const l = label(text, Math.max(s.x, s.z) * 0.18);
+    l.position.copy(a).add(b).multiplyScalar(0.5);
+    g.add(l);
+  };
+  const cm = (v: number) => `${(v * 100).toFixed(1)} cm`; // the scene is in metres
+  const y0 = m.y + 0.002;
+  line(
+    new THREE.Vector3(m.x, y0, box.max.z + off),
+    new THREE.Vector3(box.max.x, y0, box.max.z + off),
+    cm(s.x),
+  );
+  line(
+    new THREE.Vector3(box.max.x + off, y0, m.z),
+    new THREE.Vector3(box.max.x + off, y0, box.max.z),
+    cm(s.z),
+  );
+  line(
+    new THREE.Vector3(m.x - off, m.y, box.max.z + off),
+    new THREE.Vector3(m.x - off, box.max.y, box.max.z + off),
+    cm(s.y),
+  );
+  return g;
+}
+
 export function Viewer({
   id,
   files,
@@ -131,6 +222,7 @@ export function Viewer({
   const [drape, setDrape] = useState<Drape | null>(null);
   const [water, setWater] = useState(true); // the water heatmap over the draped cover
   const [showVents, setShowVents] = useState(ventsSaved);
+  const [showDims, setShowDims] = useState(dimsSaved);
   const drapeAnim = useRef<{
     mesh: THREE.Mesh;
     frames: Float32Array[];
@@ -470,6 +562,33 @@ export function Viewer({
     };
   }, [showVents, id, stamp, files]);
 
+  // the overall dimensions, on request: measured on the cover (its pieces, else its surface)
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!showDims || !scene) return;
+    let group: THREE.Group | null = null;
+    let tries = 0;
+    const timer = setInterval(() => {
+      const cover =
+        groups.current["panels.glb"] ??
+        groups.current["preview.glb"] ??
+        groups.current["hull.glb"] ??
+        groups.current["model.glb"];
+      tries += 1;
+      if (!cover && tries < 40) return; // still loading
+      clearInterval(timer);
+      if (!cover || !sceneRef.current) return;
+      const box = new THREE.Box3().setFromObject(cover);
+      if (box.isEmpty()) return;
+      group = dimGroup(box);
+      sceneRef.current.add(group);
+    }, 250);
+    return () => {
+      clearInterval(timer);
+      if (group) scene.remove(group);
+    };
+  }, [showDims, id, stamp, files]);
+
   const shownRef = useRef(shown);
   shownRef.current = shown;
   useEffect(() => {
@@ -513,6 +632,21 @@ export function Viewer({
             Show air vents
           </label>
         )}
+        <label title="The cover's overall length, depth and height in cm, to compare with the drawing">
+          <input
+            type="checkbox"
+            checked={showDims}
+            onChange={(e) => {
+              setShowDims(e.target.checked);
+              try {
+                localStorage.setItem(DIMS_KEY, e.target.checked ? "1" : "0");
+              } catch {
+                /* a private window: not remembered */
+              }
+            }}
+          />
+          Show dimensions
+        </label>
         <span className="muted">
           Drag to turn, scroll to zoom, right-drag to move.
         </span>
