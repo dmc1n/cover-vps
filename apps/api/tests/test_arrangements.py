@@ -29,6 +29,14 @@ def test_place_snap_and_build_one_cover(app: Any) -> None:
     snapped = c.post("/api/arrangements/snap", json={"members": members, "i": 1, "j": 0,
                                                      "side": "right"}).json()["member"]  # fmt: skip
     assert snapped["x_mm"] == pytest.approx(800, abs=0.1)  # 400 + 400: touching on the right
+    # the plans to choose from before building (ADR-095)
+    plans = c.post("/api/arrangements/footprints", json={"members": [members[0], snapped]}).json()
+    assert plans["default"] == "follow"
+    assert [p["footprint"] for p in plans["options"]] == ["follow", "box", "smooth"]
+    assert all(p["outline_mm"] and p["size_mm"][0] > 1600 for p in plans["options"])
+    assert c.get("/api/arrangements/settings").json()["footprint"] == "follow"
+    bad = {"name": "x", "members": [members[0], snapped], "footprint": "round"}
+    assert c.post("/api/arrangements", json=bad).status_code == 400
     r = c.post("/api/arrangements", json={"name": "Two boxes", "members": [members[0], snapped]})
     assert r.status_code == 200, r.text
     built = r.json()
@@ -41,7 +49,9 @@ def test_place_snap_and_build_one_cover(app: Any) -> None:
     assert listed[0]["id"] == "arr-two-boxes" and listed[0]["built"] and listed[0]["stale"] == []
     brief = next(m for m in c.get("/api/models").json() if m["id"] == "arr-two-boxes")
     assert "arrangement" in (brief.get("tags") or [])  # in the catalogue, so at the Desk too
-    assert c.get("/api/arrangements/arr-two-boxes").json()["members"][1]["model_id"] == "box-b"
+    one = c.get("/api/arrangements/arr-two-boxes").json()
+    assert one["members"][1]["model_id"] == "box-b"
+    assert one["footprint"] == "follow"  # the plan it was built with, stored
 
 
 def test_wrong_requests_are_refused(app: Any) -> None:

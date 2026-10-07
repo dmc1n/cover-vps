@@ -257,3 +257,13 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     `suggest.reverse_search: true`. **Cost:** the first 1000 photos a month free, then $3.50 per
     1000 (about €0.0033 a photo); at 10 suggestions a day: free. (Alternative: SerpAPI's Google
     Lens, $75 a month for 5000 searches; not needed if Cloud Vision is allowed.) Shall we?
+69. **Arrangement covers that follow the pieces** (ADR-095; asked 7 Oct 2026; pictures in
+    out/arrangements/compare/). The Portofino corner is now an L with a sharp inner corner, 9
+    pieces, all on the roll. Three points:
+    - where the chaise longue's long slope meets the sofa's shorter one, the chaise's inner
+      wall continues up as a step (up to about 27 cm at the sofa's front, nothing at the back).
+      Is that right, or should the two tops blend into one surface there?
+    - each piece is covered as its rectangle seen from above (a rounded arm is covered square).
+      Good enough for arrangements?
+    - the tops slope only down to each piece's front (no diagonal seams on top). Should a piece
+      with high arms also slope down to its sides (`arrange.top_slopes: any`)?

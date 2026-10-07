@@ -54,3 +54,15 @@ we produce a cover; so we can also make larger covers for fixed arrangements."
    round, with the top following each member (the current hull), or one flat top over all?
 4. **Names.** Should an arrangement get a product number or name in the catalogue, like the
    SUNS sets ("Portofino corner set left")?
+
+## Follow-up, 7 October 2026: the cover follows the pieces (ADR-095)
+
+The owner on the Portofino corner: "you drew a sloping side instead of an L shape with a sharp
+corner ... think about an intermediate step where we can choose."
+
+- Done: the plan is chosen on the page before building (follow the products, one rectangle,
+  smoothed); the default follows the pieces with right-angled inner corners and straight
+  walls; each piece has its own top (question 3 above: the top follows each member, a step
+  where one is higher).
+- Still open: one cover or several (question 1), names (question 4), and whether the step
+  between two pieces' tops should rather be one blended top.

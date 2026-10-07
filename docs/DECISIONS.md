@@ -2496,3 +2496,54 @@ sofas' backs are higher than their seats, and their arms end in a hip.
     "needs a person".
 - **Better alternative, not built:** fit continuous heights and snap them to written sizes
   afterwards; the discrete search is simpler, deterministic and cannot invent a size.
+
+## ADR-095 — An arrangement's cover follows its pieces; the plan is chosen before building
+
+The owner, 7 Oct 2026, on `arr-portofino-chaise-2seater` (a chaise longue and a 2-seater as an
+L): "you drew a sloping side instead of an L shape with a sharp corner. When generating these
+big covers the cover must follow the product and not draw diagonal lines. Think about an
+intermediate step where we can choose, so this doesn't go wrong automatically."
+
+- **Cause.** Not the drape hull: arrangements are built as box covers (ADR-089), and the box of
+  ADR-038 is an intersection of half-spaces, so always convex. Growing it to 8 pieces added, as
+  the face that took away the most room, a near-vertical wall (normal 0.41, -0.91) straight
+  across the L's open corner; the top was one slope over the whole L (1.66 m across, over the
+  roll). No setting of the convex box can make an inner corner.
+- **The plan comes first** (`coverengine/hull/plan.py`). Each member's plan rectangle (stored
+  in arrangement.json as `plan_mm`; older files: from the members' sizes); sides of neighbours
+  within `arrange.align_mm` (30) lined up outward (the chaise's back is 5 mm behind the
+  sofa's: no 5 mm jog); gaps closed up to the arrangement's gap plus `arrange.close_mm` (50);
+  offset by the clearance with mitred corners. Walls stand straight down on every edge, the
+  inner corner is a right angle, corner seams at every corner.
+- **The top per member.** Flat faces tangent to that member only, sloping down to its own front
+  (`arrange.top_slopes: front`; `any` also allows back and side slopes, which give diagonal
+  hip seams): the flat top, then the slope that takes away the most room, at most
+  `arrange.top_faces` (2), each worth `arrange.top_gain_pct` (5 %) of the room. A face flatter
+  than `hull.min_slope_deg` is tilted towards an outside edge of the member; neighbours' faces
+  that agree within `align_mm` become one plane (the Portofino's back strip is one 300 x 3480
+  piece). Each member's part of the plan is pushed up, cut by its faces (manifold3d), and the
+  parts are joined: where the chaise's long slope is higher than the sofa's short one, the
+  chaise's inner wall runs on up as a step. Rule 12 is checked on a grid (`arrange.cell_mm`).
+- **Pieces.** Every flat face is a piece (`hull_parts.npy`, so the cut keeps them; slivers under
+  `seams.min_piece_width_mm` are folded into a neighbour). A top wider than the roll is cut into
+  strips whose seams run downhill (the "one rectangle" plan of the Portofino: 3 strips of 116
+  cm).
+- **Chosen before building.** The Arrangements page asks `POST /api/arrangements/footprints`
+  and shows three top views with their sizes in cm and the floor they cover that no piece
+  stands on: **Follow the products (sharp corners)** (default, `arrange.footprint: follow`),
+  **One rectangle around everything** (`box`) and **Smoothed outline** (`smooth`, the convex
+  box of ADR-089). The choice is stored in arrangement.json (`footprint`), which is now an
+  input of the hull step; choosing another plan for a built arrangement builds it again.
+- **Learned** (ADR-055): an AI lesson for box covers, the audit's new `plan` check (an
+  arrangement meant to follow its pieces may not cover more than 0.02 m2 of empty floor), and
+  tests: an L of three boxes gives an L with its corner within 2 mm of the members' corner, no
+  outline point more than 3 mm outside the members plus clearance, walls vertical, pieces on the
+  roll, vents off the inner walls, identical files on a second run.
+- **Portofino, staging** (out/arrangements/, pictures in out/arrangements/compare/): 348.0 x
+  204.3 cm, 9 pieces, widest in its narrow direction 137.8 cm with allowances (the chaise's
+  slope; was a 166 cm top), 7 vents, all on outer walls (back 3, left 2, the chaise's front 1,
+  the sofa's end 1); the two inner walls get none. `arr-portofino-2-c`, the mirror image, the
+  same. Both live arrangements are to be rebuilt (they have no `footprint` yet, so they get the
+  default, follow).
+- **Better later:** each member's own footprint rather than its plan rectangle (a rounded arm
+  is covered square today), and tops that blend across members instead of a step.

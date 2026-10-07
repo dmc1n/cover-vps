@@ -2,8 +2,12 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
+import numpy as np
 import pytest
+import shapely
+import trimesh
 from coverengine import arrange as ar
 from coverengine.cli import main as cover
 from coverengine.io.model_io import import_model
@@ -88,3 +92,120 @@ def test_a_changed_member_makes_the_arrangement_stale(models: Path, tmp_path: Pa
     glb = tmp_path / "box-b" / "model.glb"
     glb.write_bytes(glb.read_bytes() + b" ")  # a member changed
     assert ar.stale(tmp_path, doc) == ["box-b"]
+
+
+# ---- the cover's plan follows the members (ADR-095) -----------------------------------------
+# The owner, 7 Oct 2026, on the Portofino corner: "you drew a sloping side instead of an L shape
+# with a sharp corner; the cover must follow the product and not draw diagonal lines".
+
+
+def _l_members() -> list[ar.Member]:
+    """Box A (800 x 600) and, on its right, two boxes turned to 600 x 800 one behind the other,
+    backs in line with A: an L (1400 x 1600) whose inner corner is at A's front right (in the
+    arrangement's frame: x 100, y 200)."""
+    return [
+        ar.Member("box-a"),
+        ar.Member("box-b", 700, -100, 90),
+        ar.Member("box-b", 700, -900, 90),
+    ]
+
+
+def _plan(d: Path) -> Any:
+    """The cover seen from above (hull.glb is glTF: metres, Y up)."""
+    m = trimesh.load(d / "hull.glb", force="mesh")
+    v = np.asarray(m.vertices) * 1000.0
+    tri = np.column_stack([v[:, 0], -v[:, 2]])[m.faces]
+    polys = [shapely.Polygon(t) for t in tri]
+    return shapely.union_all([p for p in polys if p.area > 1.0]).buffer(0.5).buffer(-0.5)
+
+
+def test_an_l_arrangement_gets_an_l_cover_with_a_sharp_inner_corner(models: Path) -> None:
+    from coverengine.audit import plan_checks
+    from coverengine.finish.finish import inner_skirts
+    from coverengine.finish.vents3d import vents_3d
+
+    params = Registry.load().resolve()
+    c = float(params["hull.clearance_mm"])  # type: ignore[arg-type]
+    src = ar.write(models, "arr-l", "L", _l_members())
+    d = models / "arr-l"
+    assert ar.read(d)["footprint"] == "follow"  # the company default, stored
+    assert cover(["import", str(src), "--out", str(d), "--units", "mm", "--up", "z"]) == 0
+    (d / "cover.json").write_text(json.dumps({"format_version": 1, "tags": ["arrangement"],
+                                              "parameters": {"hull": {"top": "box"}}}))  # fmt: skip
+    for step in ("hull", "cut", "flatten", "export"):
+        assert cover([step, str(d)]) == 0, step
+    hull = json.loads((d / "hull.json").read_text())
+    assert hull["box"]["plan"]["footprint"] == "follow"
+    assert hull["drainage"]["drains"]  # rule 12
+
+    # seen from above: the members' union offset by the clearance, and nothing more
+    rects = [shapely.Polygon(r) for r in ar.plan_rects(ar.read(d))]
+    members = shapely.union_all(rects)
+    plan = _plan(d)
+    allowed = members.buffer(c, join_style="mitre").buffer(3.0)  # a few mm
+    outline = np.asarray(plan.exterior.coords)
+    assert all(allowed.contains(shapely.Point(p)) for p in outline), "a point outside the members"
+    assert plan.area == pytest.approx(members.buffer(c, join_style="mitre").area, rel=0.01)
+    # the inner corner is a right angle at the members' corner, not cut off diagonally
+    assert plan.exterior.distance(shapely.Point(100 - c, 200 - c)) < 2.0
+    assert not plan.contains(shapely.Point(100 - c - 60, 200 - c - 60))
+    # every wall stands straight down; the rest is top, sloped enough for water
+    mesh = trimesh.load(d / "hull.glb", force="mesh")
+    up = np.asarray(mesh.face_normals)[:, 1]  # glTF: Y up
+    slope = np.sin(np.radians(float(params["hull.min_slope_deg"])))  # type: ignore[arg-type]
+    assert np.all((np.abs(up) < 1e-6) | (up >= slope - 1e-6))
+    # every piece fits the roll; vents only on the outer walls (ADR-093)
+    fin = json.loads((d / "finished.json").read_text())
+    usable = float(params["roll.usable_width_mm"])  # type: ignore[arg-type]
+    assert all(min(p["size_mm"]) <= usable for p in fin["pieces"])
+    inner = inner_skirts(d, params)
+    assert len(inner) == 2  # the two walls of the inner corner
+    vents = vents_3d(d, json.loads((d / "pattern.json").read_text()), params)["vents"]
+    assert vents and not any(v["piece"] in inner for v in vents)
+
+    # the same input gives the same cover (rule 10)
+    first = (d / "hull.glb").read_bytes(), (d / "hull_parts.npy").read_bytes()
+    assert cover(["hull", str(d), "--force"]) == 0
+    assert ((d / "hull.glb").read_bytes(), (d / "hull_parts.npy").read_bytes()) == first
+    assert plan_checks(d, params)[0]["ok"]  # the audit agrees
+
+    # the smoothed plan, chosen on the page, gives the first version's box (a diagonal wall
+    # across the open corner); the audit notes it as chosen, and flags it when follow was meant
+    doc = json.loads((d / ar.ARRANGEMENT_JSON).read_text())
+    (d / ar.ARRANGEMENT_JSON).write_text(json.dumps({**doc, "footprint": "smooth"}))
+    assert cover(["hull", str(d)]) == 0  # arrangement.json is an input of the hull step
+    assert json.loads((d / "hull.json").read_text())["box"]["chosen_by"] != "plan"
+    assert not (d / "hull_parts.npy").is_file()
+    assert _plan(d).contains(shapely.Point(100 - c - 60, 200 - c - 60))
+    assert plan_checks(d, params)[0]["ok"]
+    (d / ar.ARRANGEMENT_JSON).write_text(json.dumps(doc))
+    assert not plan_checks(d, params)[0]["ok"]
+
+
+def test_the_page_offers_three_plans_before_building(models: Path) -> None:
+    params = Registry.load().resolve()
+    c = float(params["hull.clearance_mm"])  # type: ignore[arg-type]
+    options = {o["footprint"]: o for o in ar.footprints(models, _l_members(), 0.0, params)}
+    assert set(options) == set(ar.FOOTPRINTS)
+    follow, box, smooth = (shapely.Polygon(options[k]["outline_mm"]) for k in ar.FOOTPRINTS)
+    assert options["follow"]["empty_m2"] == 0  # nothing over empty floor
+    assert options["box"]["size_mm"] == pytest.approx([1400 + 2 * c, 1600 + 2 * c], abs=1)
+    assert box.area > smooth.area > follow.area  # the smoothed one cuts the corner diagonally
+    corner = shapely.Point(100 - c - 60, 200 - c - 60)
+    assert smooth.contains(corner) and box.contains(corner) and not follow.contains(corner)
+    with pytest.raises(Exception, match="footprint"):
+        ar.write(models, "arr-bad", "Bad", _l_members(), footprint="round")
+
+
+def test_older_arrangements_without_plan_rectangles_still_get_them() -> None:
+    size = {"size_mm": [800, 600, 700]}
+    doc = {"members": [{"model_id": "a", "version": size},
+                       {"model_id": "b", "x_mm": 700, "y_mm": -100, "rot_deg": 90,
+                        "version": size}]}  # fmt: skip
+    a, b = (np.asarray(r) for r in ar.plan_rects(doc))
+    assert a.min(axis=0) == pytest.approx([-700, -200]) and a.max(axis=0) == pytest.approx(
+        [100, 400]
+    )
+    assert b.min(axis=0) == pytest.approx([100, -400]) and b.max(axis=0) == pytest.approx(
+        [700, 400]
+    )

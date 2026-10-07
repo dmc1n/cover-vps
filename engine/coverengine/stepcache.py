@@ -32,7 +32,7 @@ from coverengine.params import EffectiveParams
 STEPS_DIR = "steps"
 # what each step reads from the steps before it, and what it must leave behind
 INPUTS = {
-    "hull": ("model.glb", "parts.json", "kind.json", "cover.json"),
+    "hull": ("model.glb", "parts.json", "kind.json", "cover.json", "arrangement.json"),
     "cut": (
         "hull.glb",
         "hull.json",

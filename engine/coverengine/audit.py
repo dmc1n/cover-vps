@@ -12,6 +12,8 @@ The program measures, for each model:
 - drape: once the cover was dropped over the furniture, not too many folds, no deep sag;
 - slivers: no piece narrower than seams.min_piece_width_mm (ADR-055); a top that would fit
   the roll in one piece with folds is noted.
+- plan: an arrangement built to follow its pieces lies, seen from above, within the pieces plus
+  the clearance: no diagonal across an open corner (ADR-095).
 
 Then, with `--ai`, the AI gets three straight views (front, side, top: the furniture in grey,
 the cover in see-through blue, furniture outside the cover in red), the product photo and the
@@ -181,6 +183,34 @@ def sliver_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, An
     return out
 
 
+def plan_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
+    """An arrangement whose cover should follow its members (ADR-095): seen from above, the
+    cover lies within the members' rectangles plus the clearance, so no wall runs diagonally
+    across an open corner (owner, 7 Oct 2026, the Portofino corner)."""
+    from coverengine import arrange
+
+    if not (model_dir / arrange.ARRANGEMENT_JSON).is_file():
+        return []
+    import shapely
+
+    doc = arrange.read(model_dir)
+    chosen = arrange.footprint_of(doc, params)
+    cover = load_model(model_dir / "hull.glb")
+    tri = np.asarray(cover.vertices)[np.asarray(cover.faces)][:, :, :2]
+    plan = shapely.union_all([shapely.Polygon(t) for t in tri if shapely.Polygon(t).area > 1])
+    c = float(params["hull.clearance_mm"])  # type: ignore[arg-type]
+    rects = [shapely.Polygon(r) for r in arrange.plan_rects(doc)]
+    own = shapely.union_all(rects).buffer(c + float(params["arrange.align_mm"]), join_style="mitre")  # type: ignore[arg-type]
+    empty = float(plan.difference(own).area) / 1e6
+    if chosen != "follow":
+        return [_check("plan", True, f"the plan chosen is {chosen}: {empty:.2f} m2 over empty "
+                                     "floor, as chosen")]  # fmt: skip
+    return [_check("plan", empty < SCRAP_M2,
+                   "the cover follows the pieces seen from above" if empty < SCRAP_M2 else
+                   f"{empty:.2f} m2 of the cover lies over empty floor (a diagonal across an "
+                   "open corner?)")]  # fmt: skip
+
+
 def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     """The program's checks for one model."""
     from coverengine.hull.box import Box
@@ -290,6 +320,7 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
         )
     )
     checks += sliver_checks(model_dir, params)
+    checks += plan_checks(model_dir, params)
     checks += drape_checks(model_dir, params)
     views(furniture, cover, bad, model_dir / AUDIT_PNG)
     return {

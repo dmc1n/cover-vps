@@ -18,5 +18,15 @@
     "check": "The audit's slivers check (no piece narrower than seams.min_piece_width_mm) and its top pieces note.",
     "applies_to": "box",
     "ai_model": "owner"
+  },
+  {
+    "time": 1791400000,
+    "model_id": "arr-portofino-chaise-2seater",
+    "complaint": "You drew a sloping side instead of an L shape with a sharp corner; when generating these big covers the cover must follow the product and not draw diagonal lines (the owner, 7 Oct 2026).",
+    "cause": "The box cover is the intersection of flat half-spaces, so it is always convex: over a chaise longue and a 2-seater placed as an L, the face that took away the most room was a slanted wall across the open inner corner, and one top spanned the whole L (1.66 m in its narrowest direction, over the roll).",
+    "rule": "A cover over furniture placed together follows the pieces seen from above: their rectangles joined, right-angled inner corners, every wall straight down, nothing spanning an open corner; tops slope down to each piece's own front and pieces wider than the roll are split with seams running downhill. One rectangle round everything, or the smoothed outline, only when chosen on the page.",
+    "check": "The audit's plan check (the cover within the pieces plus the clearance, seen from above) and the tests in engine/tests/test_arrange.py (an L gives an L with a sharp inner corner).",
+    "applies_to": "box",
+    "ai_model": "owner"
   }
 ]

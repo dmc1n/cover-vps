@@ -364,6 +364,21 @@ arrange:                         # furniture placed together, one cover over the
   gap_mm: 0                      # members placed with "snap" stand this far apart (0: touching)
   grid_mm: 10                    # dragging on the page moves a member in steps of this size
   rotation_step_deg: 90          # the page's turn buttons turn a member by this much
+  footprint: follow              # follow | box | smooth   the cover's plan, chosen on the page before the
+                                 # cover is built (ADR-095; stored in arrangement.json). follow: the
+                                 # members' own rectangles joined, sharp inner corners, walls straight
+                                 # down on every side; box: one rectangle round everything; smooth: the
+                                 # tightest box with slanted walls (a diagonal across an L's inner corner)
+  close_mm: 50                   # follow: gaps between members narrower than gap_mm plus this are closed
+  align_mm: 30                   # follow: member sides and roof heights this close are lined up (no jogs)
+  top_faces: 2                   # follow and box: at most this many roof faces per member besides the
+                                 # top (a slope from the front edge to the top of the back, ...)
+  top_gain_pct: 5                # a further roof face only when it takes away this share of the room
+  top_slopes: front              # front | any   roof faces slope only down to each member's front (from
+                                 # the top of its back), so walls stand straight and every seam on the top
+                                 # runs straight across the member; any: also down to its back and sides
+                                 # (hip seams then run diagonally across the top)
+  cell_mm: 20                    # follow and box: grid for the room and the water check (mm)
 
 suggest:                         # "start from a photo or a link" in the configurator (ADR-086)
   per_hour: 10                   # suggestions per visitor per hour (the AI costs a little each)

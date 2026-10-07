@@ -327,6 +327,9 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
             "the balloons down to the edges of the table; here few pieces matter more than a "
             "tight fit, a simple roof of 2 or 4 roof pieces is usual)"
         )
+    planned = _arrangement_plan(model_dir, model, points, params)
+    if planned is not None:
+        return planned
     mesh, box, warnings = box_hull(points, model, params, product)
     if blocks or held:  # chairs and balloons widen the box on purpose: not a bay to follow
         warnings = [w for w in warnings if "far from a box" not in w]
@@ -344,6 +347,39 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
         _remember(model_dir, keep)
     report["chairs"] = seated
     return Hull(mesh, report, warnings)
+
+
+def _arrangement_plan(
+    model_dir: Path, model: trimesh.Trimesh, points: Array, params: EffectiveParams
+) -> Hull | None:
+    """An arrangement's box cover whose plan follows its members or is one rectangle round
+    them (ADR-095); None for the smoothed box of ADR-089 and for every other model."""
+    from coverengine import arrange
+    from coverengine.hull import plan
+
+    if not (model_dir / arrange.ARRANGEMENT_JSON).is_file():
+        return None
+    doc = arrange.read(model_dir)
+    footprint = arrange.footprint_of(doc, params)
+    if footprint == "smooth":
+        return None
+    rects = arrange.plan_rects(doc)
+    # the arrangement's frame is the model's frame (imported in mm, Z up, not moved); centre
+    # them on each other anyway, in case the import placed it differently
+    pts = np.asarray([p for r in rects for p in r], np.float64)
+    lo, hi = model.bounds
+    shift = (lo[:2] + hi[:2]) / 2 - (pts.min(axis=0) + pts.max(axis=0)) / 2
+    rects = [[[x + shift[0], y + shift[1]] for x, y in r] for r in rects]
+    built = plan.build(points, rects, footprint, float(doc.get("gap_mm") or 0.0), params)
+    v, f = np.asarray(model.vertices), np.asarray(model.faces)
+    report = _plain_report(model_dir, built.mesh, v, f, params, "box", built.warnings)
+    report["drainage"] = built.report["drainage"]
+    pieces = int(built.parts.max()) + 1
+    report["box"] = {"pieces": pieces, "chosen": pieces, "chosen_by": "plan",
+                     "reason": f"footprint {footprint}: the members' plan (ADR-095)",
+                     "options": [], "plan": built.report}  # fmt: skip
+    report["support"] = None
+    return Hull(built.mesh, report, built.warnings, parts=built.parts)
 
 
 def _remember(model_dir: Path, hull_values: dict[str, Any]) -> None:

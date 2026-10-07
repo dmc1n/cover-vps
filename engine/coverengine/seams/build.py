@@ -174,7 +174,7 @@ def _cut_cover(
         raise CoverError(f"no cover surface at {hull_path} (run cover hull first)")
     hull = load_model(hull_path)
     hull = trimesh.Trimesh(hull.vertices, hull.faces, process=True)
-    drawn = _drawn_parts(model_dir, hull) if params["hull.top"] == "given" else None
+    drawn = _drawn_parts(model_dir, hull) if params["hull.top"] in ("given", "box") else None
     if (
         drawn is not None
         or params["hull.top"] == "box"

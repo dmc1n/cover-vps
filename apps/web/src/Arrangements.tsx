@@ -21,6 +21,67 @@ interface Settings {
   gap_mm: number;
   grid_mm: number;
   rotation_step_deg: number;
+  footprint?: string;
+}
+/** One plan the cover can take, seen from above at the hem (ADR-095). */
+interface Plan {
+  footprint: string;
+  outline_mm: number[][];
+  size_mm: number[];
+  area_m2: number;
+  empty_m2: number;
+  rects_mm: number[][][];
+}
+
+const PLAN_NAMES: Record<string, [string, string]> = {
+  follow: [
+    "Follow the products (sharp corners)",
+    "Each piece's own outline joined; straight walls, right-angled inner corners.",
+  ],
+  box: [
+    "One rectangle around everything",
+    "A simple box over the whole arrangement; spans open corners.",
+  ],
+  smooth: [
+    "Smoothed outline",
+    "The tightest box with slanted walls; cuts open corners diagonally.",
+  ],
+};
+
+/** A small top view of one plan: the pieces in grey, the cover's outline in red. */
+function PlanPreview({ plan }: { plan: Plan }) {
+  const pts = [...plan.outline_mm, ...plan.rects_mm.flat()];
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const x0 = Math.min(...xs);
+  const x1 = Math.max(...xs);
+  const y0 = Math.min(...ys);
+  const y1 = Math.max(...ys);
+  const pad = Math.max(x1 - x0, y1 - y0) * 0.06;
+  const w = x1 - x0 + 2 * pad;
+  const line = w / 150;
+  const poly = (ring: number[][]) =>
+    ring.map(([x, y]) => `${x},${-y}`).join(" ");
+  return (
+    <svg
+      viewBox={`${x0 - pad} ${-(y1 + pad)} ${w} ${y1 - y0 + 2 * pad}`}
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {plan.rects_mm.map((r, i) => (
+        <polygon
+          key={i}
+          points={poly(r)}
+          className="member"
+          strokeWidth={line / 2}
+        />
+      ))}
+      <polygon
+        points={poly(plan.outline_mm)}
+        className="cover"
+        strokeWidth={line}
+      />
+    </svg>
+  );
 }
 interface Listed {
   id: string;
@@ -94,6 +155,11 @@ export function Arrangements() {
   const [snapTo, setSnapTo] = useState<number>(0);
   const [side, setSide] = useState("right");
   const [align, setAlign] = useState("back");
+  // the cover's plan, chosen before the cover is built (ADR-095)
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansFor, setPlansFor] = useState("");
+  const [footprint, setFootprint] = useState("follow");
+  const [builtFootprint, setBuiltFootprint] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const drag = useRef<{
     i: number;
@@ -119,7 +185,10 @@ export function Arrangements() {
         ),
       );
     call<Settings>("/api/arrangements/settings")
-      .then(setSettings)
+      .then((s) => {
+        setSettings(s);
+        if (s.footprint) setFootprint(s.footprint);
+      })
       .catch(() => undefined);
     reload();
   }, [reload]);
@@ -137,6 +206,29 @@ export function Arrangements() {
         .then((o) => setOutlines((cur) => ({ ...cur, [id]: o })))
         .catch((e) => setMsg(String(e.message ?? e)));
   }, [need]);
+
+  // the plans to choose from, asked again a moment after the pieces stop moving
+  const placement = JSON.stringify([members, settings.gap_mm]);
+  useEffect(() => {
+    if (!members.length) {
+      setPlans([]);
+      setPlansFor("");
+      return;
+    }
+    const t = setTimeout(() => {
+      call<{ options: Plan[] }>("/api/arrangements/footprints", {
+        members,
+        gap_mm: settings.gap_mm,
+      })
+        .then((r) => {
+          setPlans(r.options);
+          setPlansFor(placement);
+        })
+        .catch((e) => setMsg(String(e.message ?? e)));
+    }, 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placement]);
 
   // the job building the cover: followed until it is done
   useEffect(() => {
@@ -210,29 +302,37 @@ export function Arrangements() {
       setMsg(String((e as Error).message ?? e));
     }
   };
-  const build = async () => {
+  const build = async (plan: string = footprint) => {
     setMsg("");
     try {
-      const r = await call<{ model_id: string; job: Job }>(
+      const r = await call<{ model_id: string; job: Job; footprint: string }>(
         "/api/arrangements",
         {
           name: name || "Arrangement",
           members,
           model_id: editing,
           gap_mm: settings.gap_mm,
+          footprint: plan,
         },
       );
       setEditing(r.model_id);
       setBuilt(r.model_id);
+      setBuiltFootprint(r.footprint);
       setJob(r.job);
     } catch (e) {
       setMsg(String((e as Error).message ?? e));
     }
   };
   const open = async (id: string) => {
-    const doc = await call<{ name: string; members: Member[] }>(
-      `/api/arrangements/${id}`,
-    );
+    const doc = await call<{
+      name: string;
+      members: Member[];
+      footprint?: string;
+    }>(`/api/arrangements/${id}`);
+    // arrangements made before ADR-095 have no choice stored: they were built smoothed, and
+    // the default plan is offered for the next build
+    setFootprint(doc.footprint ?? settings.footprint ?? "follow");
+    setBuiltFootprint(doc.footprint ?? "smooth");
     setMembers(
       doc.members.map(({ model_id, x_mm, y_mm, rot_deg, mirror }) => ({
         model_id,
@@ -489,10 +589,16 @@ export function Arrangements() {
               )}
             </div>
           )}
+          {members.length > 0 && (
+            <p className="muted">
+              Cover plan: <b>{PLAN_NAMES[footprint]?.[0] ?? footprint}</b>{" "}
+              (choose below)
+            </p>
+          )}
           <button
             className="primary"
             disabled={!members.length || running}
-            onClick={build}
+            onClick={() => build()}
           >
             {running
               ? "Building the cover…"
@@ -500,6 +606,16 @@ export function Arrangements() {
                 ? "Build cover again"
                 : "Build cover"}
           </button>
+          {built &&
+            builtFootprint &&
+            builtFootprint !== footprint &&
+            !running && (
+              <p className="muted">
+                The cover was built as “
+                {PLAN_NAMES[builtFootprint]?.[0] ?? builtFootprint}”: build it
+                again for the plan chosen now.
+              </p>
+            )}
           {job && (
             <p className="muted">
               {job.status === "done"
@@ -518,6 +634,62 @@ export function Arrangements() {
           {msg && <p className="error">{msg}</p>}
         </section>
       </div>
+
+      {members.length > 0 && (
+        <section className="card">
+          <h3>Cover plan</h3>
+          <p className="muted">
+            Seen from above at the hem. Choose how the cover runs round the
+            pieces before it is built
+            {built ? "; choosing another plan builds the cover again" : ""}.
+          </p>
+          {plans.length === 0 ? (
+            <p className="muted">Working out the plans…</p>
+          ) : (
+            <div className="arrange-plans">
+              {plans.map((p) => {
+                const [title, note] = PLAN_NAMES[p.footprint] ?? [
+                  p.footprint,
+                  "",
+                ];
+                return (
+                  <button
+                    key={p.footprint}
+                    className={footprint === p.footprint ? "on" : ""}
+                    disabled={running}
+                    onClick={() => {
+                      setFootprint(p.footprint);
+                      // a built cover is built again with the plan chosen
+                      if (built && p.footprint !== builtFootprint)
+                        void build(p.footprint);
+                    }}
+                  >
+                    <PlanPreview plan={p} />
+                    <b>
+                      {title}
+                      {p.footprint === (settings.footprint ?? "follow")
+                        ? " — default"
+                        : ""}
+                    </b>
+                    <span>
+                      {(p.size_mm[0] / 10).toFixed(1)} ×{" "}
+                      {(p.size_mm[1] / 10).toFixed(1)} cm,{" "}
+                      {p.area_m2.toFixed(2)} m² seen from above
+                      {p.empty_m2 > 0.005
+                        ? `, of which ${p.empty_m2.toFixed(2)} m² over empty floor`
+                        : ""}
+                    </span>
+                    <span className="muted">{note}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {plansFor !== placement && plans.length > 0 && (
+            <p className="muted">The pieces moved: updating the plans…</p>
+          )}
+        </section>
+      )}
     </div>
   );
 }

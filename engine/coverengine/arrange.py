@@ -39,6 +39,10 @@ M_TO_MM = 1000.0  # param-ok: unit
 SIDES = ("left", "right", "front", "back")
 SLUG_CHARS = 60  # param-ok: an arrangement's id at most this long
 CLOSE_MM = 5.0  # param-ok: the footprint's slits closed and its outline smoothed by this
+# The cover's plan over an arrangement (ADR-095), chosen on the page before the cover is built:
+# follow the members (their rectangles joined, sharp inner corners), one rectangle round
+# everything, or the smoothed box of the first version (slanted walls across an L's corner).
+FOOTPRINTS = ("follow", "box", "smooth")
 
 
 @dataclass
@@ -112,21 +116,44 @@ def snap(members: list[Member], meshes: dict[str, trimesh.Trimesh], i: int, j: i
     return m
 
 
+def rect(width: float, depth: float, m: Member) -> list[list[float]]:
+    """A member's plan rectangle as it stands (its furniture's plan box, turned, its middle at
+    x_mm, y_mm): four corners, counter-clockwise. Mirroring does not change a rectangle."""
+    a = math.radians(m.rot_deg)
+    c, s = math.cos(a), math.sin(a)
+    half = ((-width / 2, -depth / 2), (width / 2, -depth / 2), (width / 2, depth / 2),
+            (-width / 2, depth / 2))  # fmt: skip
+    return [[m.x_mm + x * c - y * s, m.y_mm + x * s + y * c] for x, y in half]
+
+
 def combine(models: Path, members: list[Member]) -> trimesh.Trimesh:
     """Every member placed, as one mesh, its plan box centred on the origin."""
+    return combined(models, members)[0]
+
+
+def combined(
+    models: Path, members: list[Member]
+) -> tuple[trimesh.Trimesh, list[list[list[float]]]]:
+    """The joined mesh (its plan box centred on the origin) and every member's plan rectangle
+    in that same frame."""
     if not members:
         raise CoverError("an arrangement needs at least one member")
     cache: dict[str, trimesh.Trimesh] = {}
     parts = []
+    rects = []
     for m in members:
         if m.model_id not in cache:
             cache[m.model_id] = furniture(models, m.model_id)
         parts.append(placed(cache[m.model_id], m))
+        w, d = cache[m.model_id].extents[:2]
+        rects.append(rect(float(w), float(d), m))
     whole = trimesh.util.concatenate(parts)
     assert isinstance(whole, trimesh.Trimesh)
     lo, hi = whole.bounds
-    whole.apply_translation((-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, 0.0))
-    return whole
+    sx, sy = -(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2
+    whole.apply_translation((sx, sy, 0.0))
+    moved = [[[round(float(x + sx), 3), round(float(y + sy), 3)] for x, y in r] for r in rects]
+    return whole, moved
 
 
 def version(models: Path, model_id: str) -> dict[str, Any]:
@@ -150,16 +177,21 @@ def slug(name: str) -> str:
 
 
 def write(models: Path, model_id: str, name: str, members: list[Member],
-          gap_mm: float = 0.0) -> Path:  # fmt: skip
+          gap_mm: float = 0.0, footprint: str = "follow") -> Path:  # fmt: skip
     """The arrangement's furniture as one GLB (mm, Z up) and its arrangement.json in the new
-    model's folder; the caller imports the GLB (`cover import --units mm --up z`)."""
+    model's folder; the caller imports the GLB (`cover import --units mm --up z`).
+    `footprint` is the cover's plan chosen on the page (ADR-095): follow, box or smooth."""
+    if footprint not in FOOTPRINTS:
+        raise CoverError(f"footprint: one of {', '.join(FOOTPRINTS)}")
     out = models / model_id
     out.mkdir(parents=True, exist_ok=True)
-    whole = combine(models, members)
+    whole, rects = combined(models, members)
     src = out / SOURCE_GLB
     whole.export(src)
     doc = {"format_version": 1, "id": model_id, "name": name, "gap_mm": gap_mm,
-           "members": [{**asdict(m), "version": version(models, m.model_id)} for m in members],
+           "footprint": footprint,
+           "members": [{**asdict(m), "version": version(models, m.model_id), "plan_mm": r}
+                       for m, r in zip(members, rects, strict=True)],
            "size_mm": [round(float(x), 1) for x in whole.extents],
            "time": time.time()}  # fmt: skip
     tmp = out / (ARRANGEMENT_JSON + ".tmp")
@@ -177,6 +209,76 @@ def read(model_dir: Path) -> dict[str, Any]:
         raise CoverError(f"{model_dir.name}: not an arrangement")
     doc: dict[str, Any] = json.loads(path.read_text())
     return doc
+
+
+def plan_rects(doc: dict[str, Any]) -> list[list[list[float]]]:
+    """Every member's plan rectangle in the arrangement's frame (as in arrangement.glb). Older
+    arrangement.json files have no plan_mm: the rectangles from the members' sizes, centred
+    as `combined` centres the whole (exact for members turned in steps of 90 degrees)."""
+    members = doc.get("members") or []
+    if members and all(m.get("plan_mm") for m in members):
+        return [m["plan_mm"] for m in members]
+    rects = []
+    for m in members:
+        size = (m.get("version") or {}).get("size_mm")
+        if not size:
+            raise CoverError(f"{m.get('model_id')}: its size is not recorded; build it again")
+        rects.append(rect(float(size[0]), float(size[1]), Member.of(m)))
+    pts = np.asarray([p for r in rects for p in r], dtype=np.float64)
+    shift = -(pts.min(axis=0) + pts.max(axis=0)) / 2
+    return [[[float(x + shift[0]), float(y + shift[1])] for x, y in r] for r in rects]
+
+
+def footprint_of(doc: dict[str, Any], params: Any) -> str:
+    """The plan chosen for the arrangement's cover, else the company default."""
+    chosen = str(doc.get("footprint") or params["arrange.footprint"])
+    return chosen if chosen in FOOTPRINTS else str(params["arrange.footprint"])
+
+
+def footprints(
+    models: Path, members: list[Member], gap_mm: float, params: Any
+) -> list[dict[str, Any]]:
+    """The plans the page offers before the cover is built (ADR-095): for each, its outline
+    seen from above at the hem (mm), its size and how much floor it covers that no member
+    stands on."""
+    import shapely
+
+    from coverengine.hull import plan as hp
+    from coverengine.hull.box import Box, drain
+
+    whole, rects = combined(models, members)
+    c = float(params["hull.clearance_mm"])
+    hem = float(params["hull.hem_height_mm"])
+    polys = hp.aligned([shapely.Polygon(r) for r in rects], [hp.rect_angle(r) for r in rects],
+                       float(params["arrange.align_mm"]))  # fmt: skip
+    own = shapely.union_all(polys).buffer(c, join_style=hp.MITRE)
+    close = gap_mm + float(params["arrange.close_mm"])
+    out = []
+    for name in FOOTPRINTS:
+        if name == "smooth":
+            above = trimesh.intersections.slice_mesh_plane(
+                whole, plane_normal=[0.0, 0.0, 1.0], plane_origin=[0.0, 0.0, hem], cap=False
+            )
+            box = Box(np.asarray(above.vertices, np.float64), hem, c)
+            sets = box.grow(int(params["hull.box_max_pieces"]))
+            want = int(params["arrange.box_pieces"])
+            planes = min(sets, key=lambda s: abs(len(s) - 1 - want))
+            solid = box.solid(drain(box, planes, float(params["hull.min_slope_deg"])))
+            pts = solid.points if solid is not None else above.vertices
+            shape = shapely.MultiPoint(np.asarray(pts)[:, :2]).convex_hull
+        else:
+            shape, _ = hp.outline(polys, name, close, c)
+        x0, y0, x1, y1 = shape.bounds
+        out.append({
+            "footprint": name,
+            "outline_mm": [[round(float(x), 1), round(float(y), 1)]
+                           for x, y in shape.exterior.coords],
+            "size_mm": [round(x1 - x0, 1), round(y1 - y0, 1)],
+            "area_m2": round(shape.area / 1e6, 3),
+            "empty_m2": round(shape.difference(own).area / 1e6, 3),
+            "rects_mm": [[[round(x, 1), round(y, 1)] for x, y in r] for r in rects],
+        })  # fmt: skip
+    return out
 
 
 def stale(models: Path, doc: dict[str, Any]) -> list[str]:

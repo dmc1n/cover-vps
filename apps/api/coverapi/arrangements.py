@@ -4,6 +4,9 @@
 - GET  /api/arrangements/settings            the page's grid, turn step and default gap
 - GET  /api/arrangements/outline/{model_id}  a member's footprint from above (mm, centred)
 - POST /api/arrangements/snap                put one member against another's side
+- POST /api/arrangements/footprints          the cover's plans to choose from before building
+                                             (follow the members, one rectangle, smoothed;
+                                             ADR-095), each with its outline and size
 - GET  /api/arrangements/{model_id}          one arrangement (its members and places)
 - POST /api/arrangements                     make or update one and build its cover (a job:
                                              import → hull → cut → flatten → export)
@@ -35,6 +38,12 @@ class ArrangementIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     members: list[MemberIn] = Field(min_length=1, max_length=20)
     model_id: str | None = None  # update this arrangement (else a new one, named after `name`)
+    gap_mm: float = 0.0
+    footprint: str | None = None  # follow | box | smooth (ADR-095); None: arrange.footprint
+
+
+class FootprintsIn(BaseModel):
+    members: list[MemberIn] = Field(min_length=1, max_length=20)
     gap_mm: float = 0.0
 
 
@@ -85,7 +94,8 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
     def settings(request: Request) -> dict[str, Any]:
         require(request, "view")
         p = params()
-        return {k: p[f"arrange.{k}"] for k in ("gap_mm", "grid_mm", "rotation_step_deg")}
+        keys = ("gap_mm", "grid_mm", "rotation_step_deg", "footprint")
+        return {k: p[f"arrange.{k}"] for k in keys}
 
     @app.get("/api/arrangements/outline/{model_id}")
     def outline(model_id: str, request: Request) -> dict[str, Any]:
@@ -112,6 +122,19 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
         except CoverError as exc:
             raise HTTPException(400, str(exc)) from None
         return {"member": moved.__dict__}
+
+    @app.post("/api/arrangements/footprints")
+    def footprints(body: FootprintsIn, request: Request) -> dict[str, Any]:
+        """The plans the cover can take, seen from above, before it is built (ADR-095)."""
+        require(request, "view")
+        for m in body.members:
+            member_ok(m.model_id)
+        members = [ar.Member(**m.model_dump()) for m in body.members]
+        try:
+            options = ar.footprints(Path(store.models), members, body.gap_mm, params())
+        except CoverError as exc:
+            raise HTTPException(400, str(exc)) from None
+        return {"default": str(params()["arrange.footprint"]), "options": options}
 
     @app.get("/api/arrangements/{model_id}")
     def one(model_id: str, request: Request) -> dict[str, Any]:
@@ -142,8 +165,12 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
                 model_id, n = f"{ar.slug(body.name)}-{n}", n + 1
         d = Path(store.models) / model_id
         members = [ar.Member(**m.model_dump()) for m in body.members]
+        footprint = body.footprint or str(params()["arrange.footprint"])
+        if footprint not in ar.FOOTPRINTS:
+            raise HTTPException(400, f"footprint: one of {', '.join(ar.FOOTPRINTS)}")
         try:
-            src = ar.write(Path(store.models), model_id, body.name, members, body.gap_mm)
+            src = ar.write(Path(store.models), model_id, body.name, members, body.gap_mm,
+                           footprint)  # fmt: skip
         except CoverError as exc:
             raise HTTPException(400, str(exc)) from None
         p = params()
@@ -160,4 +187,5 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
         cj.write_text(json.dumps(doc, indent=2) + "\n")
         steps = ["import", "hull", "cut", "flatten", "export"]
         job = jobs.submit(JobSpec(model_id, steps, {}, source=str(src), units="mm", up="z"))
-        return {"model_id": model_id, "job": job, "size_mm": ar.read(d)["size_mm"]}
+        return {"model_id": model_id, "job": job, "size_mm": ar.read(d)["size_mm"],
+                "footprint": footprint}  # fmt: skip
