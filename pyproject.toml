@@ -26,7 +26,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["testdata/generated"]
+extend-exclude = ["testdata/generated", ".claude"]  # .claude: helpers' work in progress
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
