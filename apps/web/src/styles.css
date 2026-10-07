@@ -315,3 +315,27 @@ fieldset.card legend { font-weight: 600; text-transform: capitalize; padding: 0 
 .unfold-table td, .unfold-table th, .unfold-totals td { font-variant-numeric: tabular-nums; }
 .unfold-totals { margin-top: 10px; max-width: 640px; }
 .unfold-totals tr.sum td { font-weight: 600; border-top: 1px solid var(--line, #d6cdb6); }
+
+/* arrangements (ADR-089): furniture placed together, one cover */
+.arrange { display: grid; gap: 16px; }
+.arrange-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.arrange-head > input { flex: 1 1 260px; }
+.arrange-find { position: relative; flex: 2 1 320px; }
+.arrange-find input { width: 100%; }
+.arrange-find ul { position: absolute; z-index: 5; left: 0; right: 0; margin: 4px 0 0; padding: 6px;
+  list-style: none; background: #fff; border: 1px solid #d9d6cc; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); max-height: 320px; overflow: auto; }
+.arrange-find li { padding: 3px 4px; }
+.arrange-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; }
+@media (max-width: 900px) { .arrange-body { grid-template-columns: 1fr; } }
+.arrange-plan svg { width: 100%; height: 520px; touch-action: none; user-select: none; }
+.arrange-ground { fill: #f6f3ea; }
+.arrange-member { cursor: grab; }
+.arrange-member.on polygon { stroke: #c0392b; }
+.arrange-label { fill: #1f241f; font-weight: 700; pointer-events: none; }
+.arrange-size { margin-bottom: 6px; }
+.arrange-side ol { padding-left: 18px; margin: 6px 0 12px; }
+.arrange-side li { cursor: pointer; padding: 2px 0; }
+.arrange-side li.on { font-weight: 600; }
+.arrange-side .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.arrange-tools .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }

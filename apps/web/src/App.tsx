@@ -1,3 +1,4 @@
+import { Arrangements } from "./Arrangements";
 import { Desk } from "./Desk";
 import { DrawingUpload } from "./DrawingUpload";
 import { useCallback, useEffect, useState } from "react";
@@ -106,6 +107,9 @@ export function App() {
           <a href="#/catalogue" className="nav">
             Catalogue
           </a>
+          <a href="#/arrangements" className="nav">
+            Arrangements
+          </a>
           <a href="#/learning" className="nav">
             Learning
           </a>
@@ -125,6 +129,8 @@ export function App() {
             <Desk
               selected={hash.match(/^#\/desk\/([a-z0-9-]+)/)?.[1] ?? null}
             />
+          ) : hash.startsWith("#/arrangements") ? (
+            <Arrangements />
           ) : hash.startsWith("#/catalogue") ? (
             <Gallery />
           ) : hash.startsWith("#/learning") ? (

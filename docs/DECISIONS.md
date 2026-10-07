@@ -2265,3 +2265,32 @@ not see two of them." Then: "it is like this on many more models."
   S series and the corner sets). The old files are kept in
   cover-data/backup-vents-2026-10-07.
 - **Test:** an L-shaped cover's six vents all face the open side.
+
+## ADR-089 — Arrangements: furniture placed together, one cover over the whole
+
+The owner (7 October): "put products together, e.g. the SUNS Portofino 2-seater with its
+chaise longue. We first place the products in the arrangement we want, then make a cover, so
+we can also make larger covers for fixed arrangements."
+
+- **An arrangement is an ordinary model** `arr-<name>`. `coverengine/arrange.py` places each
+  member's `model.glb` (mirror, turn about z, move to its plan position, stand on the ground),
+  joins them into one mesh (`arrangement.glb`, mm, Z up, centred) and the normal job imports
+  and builds it: import → hull → cut → flatten → export. So the arrangement has everything a
+  model has (3D, size drawing, cut files, revisions, Unfold, the Desk) without new code paths.
+  It is marked furniture at once (`kind.json` confirmed).
+- **`arrangement.json`** keeps the name, the members with their places and, per member, the
+  hash, revision and size of the `model.glb` it was made from. The list and the page say when a
+  member changed since ("stale"): build again. Nesting arrangements is refused.
+- **Placing** happens in the studio page **Arrangements**: a top view of each member's footprint
+  (from the API, the union of its triangles seen from above), drag on a grid, turn in steps,
+  mirror, and **Snap** (one member against another's side, lined up at the back, front or middle;
+  computed by the engine so the page and the cover agree). New settings `arrange.*`: grid,
+  turn step, gap, and the hull for arrangements.
+- **Hull: box, 8 pieces** (`arrange.hull_top`, `arrange.box_pieces`), as the SUNS sets. The
+  tensioned route failed at the cut on the Portofino corner ("not a disk"); kept for later.
+- **Tried for real** on copies of the two Portofino models (never the live data): the corner
+  is 346.0 × 201.8 × 84.6 cm, 8 pieces and 4 vents, built in 25 s. Open points, in
+  docs/plans/arrangements.md: the box's top spans the L as one slope and is 1658 mm in its
+  narrowest direction, over the roll (the size drawing warns); no vent on the low back of the
+  chaise longue; one cover or several that zip together; a top that follows each member.
+- **Better later:** a top per member joined by seams (an L-shaped top), and zip-together covers.
