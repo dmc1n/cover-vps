@@ -306,10 +306,10 @@
    "fr": "Proposer les dimensions"
   },
   "suggest_reading": {
-   "nl": "We lezen je meubel…",
-   "en": "Reading your furniture…",
-   "de": "Wir lesen Ihr Möbel…",
-   "fr": "Nous lisons votre meuble…"
+   "nl": "We zoeken je meubel op… (dit kan een minuut duren)",
+   "en": "Looking up your furniture… (this can take a minute)",
+   "de": "Wir suchen Ihr Möbel… (das kann eine Minute dauern)",
+   "fr": "Nous recherchons votre meuble… (cela peut prendre une minute)"
   },
   "suggest_check": {
    "nl": "De gemarkeerde maten zijn geschat: meet ze even na.",
@@ -346,6 +346,18 @@
    "en": "Based on a comparable product we found online — please check the sizes against your furniture:",
    "de": "Basierend auf einem vergleichbaren Produkt, das wir online gefunden haben — bitte prüfen Sie die Maße an Ihrem Möbel:",
    "fr": "Basé sur un produit comparable trouvé en ligne — vérifiez les dimensions sur votre meuble :"
+  },
+  "suggest_recognised": {
+   "nl": "Herkend:",
+   "en": "Recognised:",
+   "de": "Erkannt:",
+   "fr": "Reconnu :"
+  },
+  "suggest_recognised_note": {
+   "nl": "De maten komen van de productpagina. Controleer ze even: veel meubels bestaan in meer maten.",
+   "en": "The sizes come from the product page. Please check them: many pieces come in more than one size.",
+   "de": "Die Maße stammen von der Produktseite. Bitte prüfen Sie sie: viele Möbel gibt es in mehreren Größen.",
+   "fr": "Les dimensions viennent de la page du produit. Vérifiez-les : beaucoup de meubles existent en plusieurs tailles."
   }
  },
  "status": {
