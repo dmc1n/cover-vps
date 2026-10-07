@@ -212,6 +212,8 @@ quote:                           # the webshop configurator's proposal and price
   prices_are_placeholders: true  # shown as "indicative" until the owner has set the prices
   ease_cm: 2.5                   # to confirm: room added on every side of the customer's sizes
   back_strip_cm: 30              # flat strip along the back of a sofa cover (the owner's drawings: 25-35)
+  lounger_slope_cm: 35           # a lounger with a raised headrest: the cover slopes over this length
+                                 # from the head down to the body (owner, 7 Oct 2026; to confirm)
   fabric_eur_per_m: 24.5         # to confirm: Coverlast purchase price per metre of roll (152 cm)
   waste_pct: 12.5                # to confirm: cutting waste beyond the simple row layout
   labour_eur_per_hour: 42.5      # to confirm: sewing and cutting, per hour

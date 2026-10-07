@@ -48,10 +48,13 @@ PERCENT = 100.0  # param-ok: ratio to percent
 # config/quote_products.json (the owner can change them there)
 PRODUCTS_JSON = Path(__file__).resolve().parents[2] / "config" / "quote_products.json"
 PRODUCTS: dict[str, dict[str, Any]] = {
-    k: {"label": v["label"], "fields": {f: tuple(t) for f, t in v["fields"].items()}}
+    k: {"label": v["label"],
+        "fields": {f: tuple(t[:3]) for f, t in v["fields"].items()},
+        # a size asked only when a yes/no is ticked (a lounger's headrest, owner 7 Oct 2026)
+        "requires": {f: t[3] for f, t in v["fields"].items() if len(t) > 3}}  # noqa: PLR2004
     for k, v in json.loads(PRODUCTS_JSON.read_text(encoding="utf-8")).items()
     if not k.startswith("_")
-}
+}  # fmt: skip
 
 
 def _p(params: EffectiveParams, key: str) -> float:
@@ -75,6 +78,7 @@ def options(params: EffectiveParams) -> dict[str, Any]:
                         "min": lo,
                         "max": hi,
                         "unit": "cm" if f.endswith("_cm") else None,
+                        "requires": v["requires"].get(f),
                     }
                     for f, (d, lo, hi) in v["fields"].items()
                 ],  # fmt: skip
@@ -151,8 +155,21 @@ def _sizes(
             "strip_corner": "mitre",
         }, facts  # fmt: skip
     if product == "lounger":
-        return "box", {"length_cm": v["length_cm"] + 2 * ease, "depth_cm": v["width_cm"] + 2 * ease,
-                       "height_cm": v["height_cm"] + ease}, facts  # fmt: skip
+        if not v.get("headrest"):  # a flat lounger (owner, 7 Oct 2026): a low box
+            return "box", {"length_cm": v["length_cm"] + 2 * ease,
+                           "depth_cm": v["width_cm"] + 2 * ease,
+                           "height_cm": v["height_cm"] + ease}, facts  # fmt: skip
+        # a raised headrest: high over the head, a slope, low over the body (the head at the
+        # back of the sloped box, the lounger's length its depth)
+        head = max(v["headrest_height_cm"], v["height_cm"])
+        slope = _p(params, "quote.lounger_slope_cm")
+        depth = v["length_cm"] + 2 * ease
+        back = min(v["headrest_length_cm"] + ease, depth - slope)
+        low = v["height_cm"] + ease
+        return "sloped box", {"length_cm": v["width_cm"] + 2 * ease, "depth_cm": depth,
+                              "back_height_cm": head + ease, "front_height_cm": low,
+                              "back_strip_cm": back,
+                              "front_strip_cm": max(0.0, depth - back - slope)}, facts  # fmt: skip
     return "box", {"length_cm": v["length_cm"] + 2 * ease, "depth_cm": v["width_cm"] + 2 * ease,
                    "height_cm": v["height_cm"] + ease}, facts  # fmt: skip
 
@@ -372,6 +389,8 @@ def _bbox_cm(product: str, g: dict[str, Any]) -> list[float]:
         dims = [v["length_cm"], v["depth_cm"], v["back_height_cm"]]
     else:
         dims = [v["length_cm"], v["width_cm"], v["height_cm"]]
+        if product == "lounger" and g.get("headrest"):
+            dims[2] = max(dims[2], v["headrest_height_cm"])
     return sorted(dims[:2])[::-1] + [dims[2]]
 
 
@@ -424,6 +443,12 @@ def cover_mesh(product: str, given: dict[str, Any], params: EffectiveParams,
         n = max(2, int(facts.get("balloons") or 1))
         reach = 0.0 if support == "frame" else (L / 2) * (1 - 1 / n)  # the outer balloons' x
         m = _roof(L, W, H, rise, reach, hip=support == "balloons")
+    if product == "lounger" and shape == "sloped box":
+        # the sloped box runs its depth along y; the lounger lies along x with its head at +x
+        m.apply_transform(trimesh.transformations.rotation_matrix(math.pi / 2, (0, 0, 1)))
+        hi = m.vertices[:, 2] > m.vertices[:, 2].max() - 1.0  # param-ok: mm, the head's top
+        if m.vertices[hi, 0].mean() < m.vertices[:, 0].mean():
+            m.apply_transform(trimesh.transformations.rotation_matrix(math.pi, (0, 0, 1)))
     c = (m.bounds[0] + m.bounds[1]) / 2
     m.apply_translation((-c[0], -c[1], 0.0))
     return m

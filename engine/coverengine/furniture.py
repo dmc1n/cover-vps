@@ -27,7 +27,6 @@ SEAT_H_CM = 46.0  # param-ok: display
 CHAIR_BACK_CM = 90.0  # param-ok: display
 ARM_CM = 14.0  # param-ok: display
 BACK_CM = 18.0  # param-ok: display
-LOUNGER_BACK_CM = 52.0  # param-ok: display: the raised back of a lounger
 HALF = 0.5  # param-ok: the middle of a place
 CHAIR_BACK_THICK_CM = 4.5  # param-ok: display
 CHAIR_GAP_CM = 4.5  # param-ok: display
@@ -172,8 +171,13 @@ def build(product: str, v: dict[str, Any], room_cm: float | None = None,
             float(v["width_cm"]),
             float(v["height_cm"]),
         )  # param-ok  # noqa: E501
-        parts += [_box(-L / 2, -W / 2, 0, L / 2, W / 2, H * 0.6),  # param-ok: display
-                  _box(L / 2 - LOUNGER_BACK_CM, -W / 2, 0, L / 2, W / 2, H)]  # fmt: skip
+        if v.get("headrest"):  # a raised head end (the owner, 7 Oct 2026: an option)
+            hh = max(float(v["headrest_height_cm"]), H)
+            hl = float(v["headrest_length_cm"])
+            parts += [_box(-L / 2, -W / 2, 0, L / 2, W / 2, H),
+                      _box(L / 2 - hl, -W / 2, 0, L / 2, W / 2, hh)]  # fmt: skip
+        else:  # a flat lounger: the lying surface only
+            parts.append(_box(-L / 2, -W / 2, 0, L / 2, W / 2, H))
         parts = [p.apply_scale(cm) for p in parts]
     else:
         L, W, H = (

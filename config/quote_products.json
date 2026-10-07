@@ -1,5 +1,5 @@
 {
- "_about": "What a customer can cover in the webshop configurator (ADR-061): per product its label and fields [default, min, max] in cm (min null: a yes/no). Edit freely; the API and the configurator follow.",
+ "_about": "What a customer can cover in the webshop configurator (ADR-061): per product its label and fields [default, min, max] in cm (min null: a yes/no). Edit freely; the API and the configurator follow. A fourth value names the yes/no field a size belongs to (asked only when that is ticked: a lounger's headrest, owner 7 Oct 2026).",
  "dining_set": {
   "label": "Dining set (table and chairs)",
   "fields": {
@@ -114,9 +114,26 @@
     120
    ],
    "height_cm": [
+    40,
+    20,
+    80
+   ],
+   "headrest": [
+    false,
+    null,
+    null
+   ],
+   "headrest_height_cm": [
+    80,
+    40,
+    120,
+    "headrest"
+   ],
+   "headrest_length_cm": [
     50,
-    25,
-    110
+    20,
+    90,
+    "headrest"
    ]
   }
  },

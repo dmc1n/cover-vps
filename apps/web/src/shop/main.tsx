@@ -33,6 +33,8 @@ interface Field {
   min: number | null;
   max: number | null;
   unit: string | null;
+  /** asked only when this yes/no is ticked (a lounger's headrest sizes) */
+  requires?: string | null;
 }
 interface Info {
   content: Content;
@@ -674,36 +676,41 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
                 </button>
               </div>
             ) : (
-              products[product].fields.map((f) =>
-                f.min === null ? (
-                  <label key={f.key} className="s-check">
-                    <input
-                      type="checkbox"
-                      checked={!!sizes[f.key]}
-                      onChange={(e) =>
-                        setSizes({ ...sizes, [f.key]: e.target.checked })
-                      }
-                    />{" "}
-                    {tx.field(f.key)}
-                  </label>
-                ) : (
-                  <label key={f.key} className="s-range">
-                    <span>
+              products[product].fields
+                .filter((f) => !f.requires || !!sizes[f.requires])
+                .map((f) =>
+                  f.min === null ? (
+                    <label key={f.key} className="s-check">
+                      <input
+                        type="checkbox"
+                        checked={!!sizes[f.key]}
+                        onChange={(e) =>
+                          setSizes({ ...sizes, [f.key]: e.target.checked })
+                        }
+                      />{" "}
                       {tx.field(f.key)}
-                      <b>{Number(sizes[f.key] ?? f.default)} cm</b>
-                    </span>
-                    <input
-                      type="range"
-                      min={f.min}
-                      max={f.max ?? undefined}
-                      value={Number(sizes[f.key] ?? f.default)}
-                      onChange={(e) =>
-                        setSizes({ ...sizes, [f.key]: Number(e.target.value) })
-                      }
-                    />
-                  </label>
-                ),
-              )
+                    </label>
+                  ) : (
+                    <label key={f.key} className="s-range">
+                      <span>
+                        {tx.field(f.key)}
+                        <b>{Number(sizes[f.key] ?? f.default)} cm</b>
+                      </span>
+                      <input
+                        type="range"
+                        min={f.min}
+                        max={f.max ?? undefined}
+                        value={Number(sizes[f.key] ?? f.default)}
+                        onChange={(e) =>
+                          setSizes({
+                            ...sizes,
+                            [f.key]: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </label>
+                  ),
+                )
             )}
             <MatchCard
               info={info}

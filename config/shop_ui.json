@@ -350,6 +350,24 @@
   "short_side_cm": {
    "nl": "Korte zijde",
    "en": "Short side"
+  },
+  "headrest": {
+   "nl": "Met hoofdeinde (opstaande rugleuning)",
+   "en": "With a headrest (raised back)",
+   "de": "Mit Kopfteil (hochgestellte Rückenlehne)",
+   "fr": "Avec dossier relevé"
+  },
+  "headrest_height_cm": {
+   "nl": "Hoogte hoofdeinde",
+   "en": "Headrest height",
+   "de": "Höhe Kopfteil",
+   "fr": "Hauteur du dossier"
+  },
+  "headrest_length_cm": {
+   "nl": "Lengte hoofdeinde",
+   "en": "Headrest length",
+   "de": "Länge Kopfteil",
+   "fr": "Longueur du dossier"
   }
  },
  "product": {
