@@ -116,7 +116,9 @@ def written_cm(pdf: Path) -> list[float]:
         k = _bare_factor(page.get_text())
         for b in page.get_text("blocks"):
             text = b[4]
-            if re.search(r"order number|product number|fabric type", text, re.I):
+            if re.search(
+                r"order number|product number|fabric type|air\s*pocket|air\s*vent", text, re.I
+            ):
                 continue
             vals = [(float(v.replace(",", ".")), (u or "").lower()) for v, u in CM.findall(text)]
             cms = [v for v, u in vals if u == "cm"]
