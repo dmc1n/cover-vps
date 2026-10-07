@@ -84,6 +84,18 @@ def record(params: EffectiveParams, model: str, usage: Any, what: str = "") -> f
     return eur
 
 
+def record_eur(model: str, eur: float, what: str = "") -> None:
+    """Write a cost known in euros (a search fee) to the month's ledger."""
+    try:
+        _dir().mkdir(parents=True, exist_ok=True)
+        row = {"t": round(time.time(), 1), "model": model, "in": 0, "out": 0,
+               "eur": round(eur, EUR_DIGITS), "what": what}  # fmt: skip
+        with _ledger().open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row) + "\n")
+    except OSError:
+        pass
+
+
 def _rows(when: float | None = None) -> list[dict[str, Any]]:
     path = _ledger(when)
     if not path.is_file():

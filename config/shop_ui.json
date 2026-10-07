@@ -340,6 +340,12 @@
    "en": "Your photo is only used to read the sizes (by Google's AI) and is only kept if you order.",
    "de": "Ihr Foto wird nur verwendet, um die Maße zu lesen (durch die KI von Google), und wird nur gespeichert, wenn Sie bestellen.",
    "fr": "Votre photo sert uniquement à lire les dimensions (par l'IA de Google) et n'est conservée que si vous commandez."
+  },
+  "suggest_comparable": {
+   "nl": "Gebaseerd op een vergelijkbaar product dat we online vonden — controleer of de maten bij uw meubel passen:",
+   "en": "Based on a comparable product we found online — please check the sizes against your furniture:",
+   "de": "Basierend auf einem vergleichbaren Produkt, das wir online gefunden haben — bitte prüfen Sie die Maße an Ihrem Möbel:",
+   "fr": "Basé sur un produit comparable trouvé en ligne — vérifiez les dimensions sur votre meuble :"
   }
  },
  "status": {

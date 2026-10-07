@@ -2222,3 +2222,29 @@ a link to its page, and get a proposal from that.
     was raised, and that the flat seat is 39.5 cm high.
   - **From the photo alone:** 195 × 65 × 80 cm, all marked as estimates.
   - Each took about 9–11 s.
+
+## ADR-087 — A photo alone starts from a comparable product found on the web
+
+The owner (7 October), after trying photo uploads: "uploading works but little happens; we
+should find a comparison via Google image search and use that as the basis."
+
+- **What happened before.** A photo alone gave only estimates from the picture (all "please
+  measure").
+- **Google's reverse image search** (Cloud Vision web detection) cannot be used with the
+  Gemini API key: it needs a service account.
+- **Gemini with Google Search** works with the same key.
+  - The AI identifies the furniture and searches for its product page, or the most similar
+    products for sale, and reads their written sizes.
+  - With `thinkingLevel: low` it answers in about 18 s, and the whole suggestion takes about
+    40 s. At the default level it took over 90 s.
+- **Real pages first.** The program tries to read each page itself (the safe fetcher of
+  ADR-086). Many shops refuse robots (403/429) or build their sizes in JavaScript; then the
+  sizes the search read from that page are used.
+- **Never the customer's own sizes.** The proposal names the comparable product with its link,
+  and every field it gave is flagged "comparable" and must be checked.
+- **Cost:** about €0.04 per photo (the search fee `suggest.search_eur`, to confirm, plus the
+  tokens), recorded in the cost ledger (ADR-078). Tests fake the search, so they make no paid
+  calls.
+- **AVIF** images are accepted: many shops serve them, SUNS among them.
+- **Tried for real** on a SUNS lounge photo: Westwing "Naomi" 2-seater module, a sofa
+  120 × 100 cm, back 70 cm, front 40 cm, all flagged.

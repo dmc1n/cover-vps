@@ -334,6 +334,12 @@ suggest:                         # "start from a photo or a link" in the configu
   fetch_timeout_s: 8             # a webshop page or its image must arrive within this
   fetch_max_bytes: 2000000       # ... and be at most this large
   ai_timeout_s: 60               # how long the AI may take to read it
+  search: true                   # a photo without a link: the AI looks up comparable products on the web
+                                 # (Gemini with Google Search) and their pages' sizes become the basis
+                                 # (owner, 7 Oct 2026: "via Google image search a comparison as the basis")
+  search_pages: 5                # at most this many product pages fetched to find written sizes
+  search_timeout_s: 90           # the search may take this long (it looks up several pages)
+  search_eur: 0.035              # to confirm: what one search costs (Google's grounding fee), for the budget
 
 match:                           # the customer's sizes against the covers we already make (ADR-064)
   tight_cm: 1.25                 # to confirm (Q57): an existing cover may be this much smaller and still count as exact

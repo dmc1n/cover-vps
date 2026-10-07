@@ -14,6 +14,12 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 
+@pytest.fixture(autouse=True)
+def no_web_search(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test may search the web for real (Google's search costs money): nothing found."""
+    monkeypatch.setattr(sg, "search_comparable", lambda *a, **k: [])
+
+
 @pytest.fixture()
 def app(tmp_path: Path) -> Any:
     return create_app(tmp_path / "data")
@@ -196,3 +202,34 @@ def test_a_flat_lounger_asks_nothing_about_a_headrest_a_raised_one_does() -> Non
         "length_cm": {"value": 198, **page}, "width_cm": {"value": 70, **page},
         "height_cm": {"value": 35, **page}, "headrest": {"value": True, **page}}})  # fmt: skip
     assert set(raised["check"]) == {"headrest_height_cm", "headrest_length_cm"}
+
+
+def test_a_photo_alone_starts_from_a_comparable_product_found_on_the_web(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The owner, 7 Oct 2026: a photo alone gave only estimates; now a comparable product found
+    by the web search gives written sizes as the basis, always marked "comparable"."""
+    found = [{"url": "https://shop.example/curved-sofa", "title": "Curved Sofa Rotunde",
+              "sizes_cm": {"length": 448, "depth": 115, "height": 76}}]  # fmt: skip
+    monkeypatch.setattr(sg, "search_comparable", lambda *a, **k: found)
+
+    def refuse(*a: Any, **k: Any) -> Any:
+        raise sg.SuggestError("the page answered 429")  # shops refuse robots
+
+    monkeypatch.setattr(sg, "fetch", refuse)
+    seen: dict[str, Any] = {}
+
+    def fake_ask(params: Any, photos: list[bytes], facts: Any, lang: str) -> dict[str, Any]:
+        seen["facts"] = facts
+        return {"product": "sofa", "summary": "a curved sofa", "fields": {
+            "length_cm": {"value": 448, "source": "page", "confidence": 0.9},
+            "depth_cm": {"value": 115, "source": "page", "confidence": 0.9}}}  # fmt: skip
+
+    monkeypatch.setattr(sg, "ask", fake_ask)
+    r = TestClient(app).post("/api/shop/suggest", data={"lang": "nl"},
+                             files=[("photos", ("sofa.png", _png(), "image/png"))])  # fmt: skip
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert seen["facts"]["product"]["sizes"]["length"] == 448  # the search's sizes were the basis
+    assert out["comparable"]["title"] == "Curved Sofa Rotunde"
+    assert "comparable" in out["flags"]["length_cm"] and "length_cm" in out["check"]

@@ -40,7 +40,7 @@ MAX_REDIRECTS = 3
 MAX_PHOTOS = 3
 HOUR_S = 3600.0
 PAGE_TYPES = ("text/html", "application/xhtml+xml")
-IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
+IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp", "image/avif")  # many shops send AVIF
 PHOTO_EDGE_PX = 1600  # photos are made this small before the AI sees them (fewer tokens)
 SNIPPET_CHARS = 220
 SNIPPETS_MAX = 10
@@ -265,7 +265,7 @@ def photo_png(data: bytes) -> bytes:
         im = Image.open(io.BytesIO(data))
         im.load()
     except (UnidentifiedImageError, OSError):
-        raise SuggestError("that file is not a photo (JPG, PNG or WebP please)") from None
+        raise SuggestError("that file is not a photo (JPG, PNG, WebP or AVIF please)") from None
     rgb = im.convert("RGB")
     rgb.thumbnail((PHOTO_EDGE_PX, PHOTO_EDGE_PX))
     out = io.BytesIO()
@@ -333,6 +333,72 @@ def ask(
     ans = ask_parts(vision, system, parts)
     ans.pop("_usage", None)
     return ans
+
+
+SEARCH = """Identify the outdoor furniture in this photo as exactly as you can and search the web
+for its product page, or the pages of the most similar products for sale, that state its sizes.
+Read the sizes from those pages (in cm; convert inches and mm). Answer JSON only (no markdown):
+{"what": "a short name of the furniture",
+"pages": [{"url": "<the product page URL>", "title": "<product name>",
+"sizes_cm": {"length": <n>, "width": <n>, "depth": <n>, "height": <n>, "seat_height": <n>}}]}
+with at most 5 pages, the best match first; leave out sizes a page does not state."""
+
+
+def search_comparable(params: Any, png: bytes) -> list[dict[str, Any]]:
+    """Comparable products on the web for a photo (owner, 7 Oct 2026): Gemini with Google Search
+    names product pages; the grounding's own links come first (they are real search results).
+    The costs go into the month's ledger."""
+    import base64
+    import urllib.request
+
+    from coverengine import spend
+    from coverengine.ai import _key
+
+    spend.guard(params)
+    model = str(params["ai.vision_model"])
+    body = {"contents": [{"parts": [
+        {"inline_data": {"mime_type": "image/png", "data": base64.b64encode(png).decode()}},
+        {"text": SEARCH}]}], "tools": [{"google_search": {}}],
+        "generationConfig": {"thinkingConfig": {"thinkingLevel": "low"}}}  # fmt: skip
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={
+        "Content-Type": "application/json", "x-goog-api-key": _key("gemini")})  # fmt: skip
+    timeout = float(params["suggest.search_timeout_s"])  # type: ignore[arg-type]
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 - Google's API
+        reply = json.loads(r.read())
+    u = reply.get("usageMetadata") or {}
+    out_tokens = int(u.get("candidatesTokenCount") or 0) + int(u.get("thoughtsTokenCount") or 0)
+    usage = {"prompt_tokens": u.get("promptTokenCount"), "completion_tokens": out_tokens}
+    spend.record(params, model, usage, "suggest search")
+    fee = float(params["suggest.search_eur"])  # type: ignore[arg-type]
+    spend.record_eur(model + " search", fee, "suggest search")
+    cand = (reply.get("candidates") or [{}])[0]
+    text = "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts", []))
+    pages: list[dict[str, Any]] = []
+    # the named pages first (they carry the sizes the search read), then the search's own
+    # results (real pages, without sizes)
+    m = re.search(r"\{.*\}", text, re.S)
+    if m:
+        try:
+            for pg in json.loads(m.group(0)).get("pages") or []:
+                if isinstance(pg, dict) and str(pg.get("url", "")).startswith("http"):
+                    raw = pg.get("sizes_cm")
+                    sizes: dict[str, Any] = raw if isinstance(raw, dict) else {}
+                    kept = {k: v for k, v in sizes.items() if isinstance(v, int | float) and v > 0}
+                    pages.append({"url": str(pg["url"]), "title": str(pg.get("title") or ""),
+                                  "sizes_cm": kept})  # fmt: skip
+        except json.JSONDecodeError:
+            pass
+    for ch in (cand.get("groundingMetadata") or {}).get("groundingChunks") or []:
+        web = ch.get("web") or {}
+        if str(web.get("uri", "")).startswith("http"):
+            pages.append({"url": str(web["uri"]), "title": str(web.get("title") or "")})
+    seen, out = set(), []
+    for pg in pages:
+        if pg["url"] not in seen:
+            seen.add(pg["url"])
+            out.append(pg)
+    return out
 
 
 def proposal(ans: dict[str, Any]) -> dict[str, Any]:
@@ -445,8 +511,37 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
                         pngs.append(photo_png(img))
                     except SuggestError:
                         pass  # the page's facts alone
+            comparable = None
+            if not facts and pngs and bool(p["suggest.search"]):
+                # a photo alone: a comparable product's page gives written sizes (ADR-087)
+                try:
+                    found = search_comparable(p, pngs[0])
+                    for pg in found[: int(p["suggest.search_pages"])]:  # type: ignore[arg-type]
+                        try:
+                            final, html = fetch(pg["url"], PAGE_TYPES, timeout, page_max)
+                            f = page_facts(html, final)
+                        except SuggestError:  # many shops refuse robots: the search read it
+                            f, final = {}, pg["url"]
+                        if not ((f.get("product") or {}).get("sizes") or f.get("sizes_text")):
+                            if not pg.get("sizes_cm"):
+                                continue
+                            f = {"url": final, "title": pg.get("title", ""), "image": "",
+                                 "product": {"name": pg.get("title"), "sizes": pg["sizes_cm"]},
+                                 "sizes_text": [], "read_by": "the web search"}  # fmt: skip
+                        facts = f
+                        comparable = {"url": final, "title": f.get("title") or pg.get("title")}
+                        break
+                except (CoverError, OSError, ValueError):
+                    comparable = None  # the photo alone, as before
             ans = ask(p, pngs, facts, lang)
             out = proposal(ans)
+            if comparable is not None:
+                # a comparable product's sizes: a good start, never the customer's own
+                for f, marks in out["flags"].items():
+                    if marks is not None and f in (ans.get("fields") or {}):
+                        out["flags"][f] = sorted({*marks, "comparable"})
+                out["check"] = [f for f, m in out["flags"].items() if m]
+                out["comparable"] = comparable
         except SuggestError as exc:
             raise HTTPException(400, str(exc)) from None
         except CoverError as exc:  # the month's AI budget, or the AI did not answer
