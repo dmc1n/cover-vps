@@ -292,3 +292,13 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     - **Odoo (step 2):** the URL and database name, an API user + key, the Odoo version
       (Community/Enterprise), the installed apps (Sales, Purchase, MRP, Inventory, Accounting,
       multi-currency) and the company currency.
+71. **Air vents on the front (inner) walls of L, U and C covers?** (ADR-101; asked 8 Oct 2026,
+    Rens's rejections, group A.) On 7 Oct (C23) the rule became "never a vent on an inner wall"
+    (ADR-093). On 8 Oct Rens circled exactly those walls on 30 covers (C1–C31, S33, L4, the
+    L4/L8 mirror, the Portofino corner): "per back panel move one vent to the front, at the
+    circles". The drawings' own arrows point there too (C2). Was the 7 Oct remark about vents
+    drawn *inside the fabric* (the 3D bug of ADR-088), or about the front walls? Options:
+    (a) Rens is right: `features.vent_inner_walls: true` for all covers (one line), the staged
+    covers in out/rejections/A go live; (b) keep ADR-093: the vents stay on the outer walls, the
+    back walls get one each and the rest goes to the ends; (c) per cover only where Rens asked.
+    Also see 66: R1–R3 staged with the vents at the top of the band (`features.vent_align: top`).

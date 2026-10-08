@@ -48,5 +48,15 @@
     "check": "engine/tests/test_given_creases.py (a given surface with creases is cut on them).",
     "applies_to": "all",
     "ai_model": "owner"
+  },
+  {
+    "time": 1791480002,
+    "model_id": "drawing-c1",
+    "complaint": "The right number of vents, but too many at the back, the side not seen on the drawing: per back panel move one vent to the front, at the circles; all at the same height on the skirt, in the middle of the panels (Rens, 8 Oct 2026, 49 covers).",
+    "cause": "The drawing's vent count was spread over the sides by length, so the long back walls got two or three and the front walls of an L, U or C (skipped as inner walls) none; a free top edge counted as hem and got a vent upside down; a box cover's low band got no vents at all.",
+    "rule": "Vents go round every side of the cover, the seen front too: one in the middle of each piece first, a side not served yet before another piece facing the same way, extra ones on the longest pieces; the drawing's number kept; all at the bottom, never on a free top edge; a band too low for a vent hands it to the piece above.",
+    "check": "The audit's vents check (count, every side served, none high up a wall) and scripts/fewer_check.py.",
+    "applies_to": "all",
+    "ai_model": "approver"
   }
 ]

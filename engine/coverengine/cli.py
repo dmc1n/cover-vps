@@ -212,7 +212,7 @@ def _cmd_export(args: argparse.Namespace) -> int:
     import json as _json
 
     from coverengine.export.cut import write_export
-    from coverengine.finish.finish import FINISHED_JSON, finish, finished_set, inner_skirts
+    from coverengine.finish.finish import FINISHED_JSON, finish, finished_set, vent_walls
     from coverengine.flatten.pattern import PATTERN_JSON
 
     pattern = args.model / PATTERN_JSON
@@ -221,7 +221,7 @@ def _cmd_export(args: argparse.Namespace) -> int:
     cover_json = args.model / "cover.json"
     params = resolve_params(args, cover_json if cover_json.is_file() else None)
     doc = _json.loads(pattern.read_text(encoding="utf-8"))
-    pieces, warnings = finish(doc, params, inner_skirts(args.model, params))
+    pieces, warnings = finish(doc, params, vent_walls(args.model, params))
     finished = finished_set(doc, pieces, warnings, params)
     out = args.out or args.model
     out.mkdir(parents=True, exist_ok=True)
