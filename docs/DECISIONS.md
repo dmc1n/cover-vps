@@ -2778,6 +2778,11 @@ panels on the top instead of 4".
 - **Check.** The audit's new *gentle folds* check fails a box cover with a seam between two
   same-side pieces at a fold of at most the limit whose widths together fit the roll. Tests in
   `engine/tests/test_facets.py`; an AI lesson for box covers.
+- **Sweep (8 Oct, live covers, read only).** 148 box covers get fewer pieces when rebuilt
+  (mostly one or two fewer: gable tops of tables, stools and hockers); the list is in the
+  rejections run's `sweep.json`. Covers are not rebuilt by this change; the Sorrento 3-seater
+  with corner, where Rens asked for more pieces, must be kept out of a mass rebuild until the
+  owner decides. Given covers cut on their creases: S53, S60 and D8.
 - **Not done.** The cross-side case (a top face onto a wall) stays a seam: the skirt is where
   the vents and the hem go.
 
