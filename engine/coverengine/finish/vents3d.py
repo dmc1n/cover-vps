@@ -23,7 +23,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial import cKDTree
 
-from coverengine.finish.finish import inner_skirts, place_vents
+from coverengine.finish.finish import place_vents, vent_walls
 from coverengine.flatten.pattern import _panel_mesh, compensation
 from coverengine.flatten.solve import flatten
 from coverengine.params import EffectiveParams
@@ -34,6 +34,7 @@ SAME_OUTLINE_MM = 1.0  # param-ok: the re-flattened panel must match the stored 
 
 
 PROBE_MM = 50.0  # param-ok: a point this far beside the wall tells out from in
+UPRIGHT = 0.05  # param-ok: a face whose normal rises more than this is sloping, not upright
 
 
 def _barycentric(uv: Array, faces: NDArray[np.int64], p: Array) -> tuple[int, Array]:
@@ -60,7 +61,7 @@ def _to_3d(v: Array, f: NDArray[np.int64], uv: Array, p: Array) -> tuple[Array, 
 
 def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> dict[str, Any]:
     """Every vent of the cover in 3D (see the module's docstring)."""
-    vents, _ = place_vents(doc["panels"], params, inner_skirts(model_dir, params))
+    vents, _ = place_vents(doc["panels"], params, vent_walls(model_dir, params))
     out: list[dict[str, Any]] = []
     warnings: list[str] = []
     if not vents:
@@ -106,7 +107,12 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
             corners = [_to_3d(v, f, uv, np.asarray(q, dtype=np.float64))[0] for q in rect]
             centre, normal = _to_3d(v, f, uv, np.asarray(rect, dtype=np.float64).mean(axis=0))
             flat_n = np.array([normal[0], normal[1], 0.0])
-            if np.linalg.norm(flat_n) > 0:  # an upright wall: step out sideways and look up
+            if abs(float(normal[2])) > UPRIGHT:
+                # a sloping face (a box cover's side over a low band, ADR-099): the cover never
+                # overhangs, so out is up; the probe beside it would land under its own slope
+                if normal[2] < 0:
+                    normal = -normal
+            elif np.linalg.norm(flat_n) > 0:  # an upright wall: step out sideways and look up
                 probe = centre + flat_n / np.linalg.norm(flat_n) * PROBE_MM
                 if covered(probe):  # cover overhead: that was the inside
                     normal = -normal

@@ -49,7 +49,9 @@ one-line edit there.
 - Standard features: drawcord hem, wind straps with buckles, handles: which are standard,
   which optional per model? Air vents are standard (owner, 2026-09-30): 25 x 22 cm (W x H), bottom
   edge 5 cm above the lower end of the cover, one per full metre of hem length, spread evenly,
-  at least one, only on the outside of the cover, never on an inner wall of an L, U or C shape (owner, 2026-10-07). Built as a cut opening with a hood of extra fabric holding a plastic insert
+  at least one, only on the outside of the cover, never on an inner wall of an L, U or C shape (owner, 2026-10-07;
+  Rens asks for them on the front walls too: QUESTIONS 71, `features.vent_inner_walls`). Round every side first,
+  one in the middle of each piece, the drawing's count kept, never on a free top edge (Rens, 2026-10-08, ADR-099). Built as a cut opening with a hood of extra fabric holding a plastic insert
   that keeps it open, and a membrane inside against dirt (`features.vent_*`, pieces in M5).
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
   or needs stroked lines, arc support). Learned in M0 by cutting a test sheet.
@@ -217,6 +219,7 @@ uv run python scripts/drawing_merge.py [--only ...] [--dry-run]   free-form draw
 uv run python scripts/fewer_build.py OUT --codes C27,... | --merge all   drawing covers rebuilt in staging, slivers joined (ADR-097)
 uv run python scripts/fewer_check.py DIR ...   re-measure a built cover from its cut.dxf and patterns (ADR-097)
 uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   drawing, old and new cover side by side
+uv run python scripts/vents_compare.py OUT.png --old DIR --new DIR [--pics ...]   a cover's vents before/after, with the Desk's marked pictures (ADR-099)
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
 COVER_DATA_DIR=~/cover-data uv run python scripts/learned_check.py [--recalc]   do the Desk's corrections still hold? (ADR-082)
 make e2e        the web app flow in a real browser (Playwright in Docker)

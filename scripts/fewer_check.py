@@ -204,8 +204,27 @@ def check(model: Path, vents_expected: int | None) -> dict[str, Any]:
         notes.append(f"cut.dxf has {openings} openings, finished.json {vents}")
     if vents_expected is not None and vents != vents_expected:
         bad.append(f"{vents} vents, the drawing says {vents_expected}")
-    if on_inner:
+    feats = {}
+    if (model / "cover.json").is_file():
+        feats = (
+            json.loads((model / "cover.json").read_text()).get("parameters", {}).get("features", {})
+        )
+    if on_inner and feats.get("vent_inner_walls"):  # asked for on this cover (ADR-099)
+        notes.append("vents on the front (inner) walls, as set: " + ", ".join(on_inner))
+    elif on_inner:
         bad.append("vents on an inner wall: " + ", ".join(on_inner))
+    # no vent hangs high up a wall (C24: from a free top edge, upside down; ADR-099)
+    v3 = model / "vents.json"
+    if v3.is_file() and feats.get("vent_align", "bottom") == "bottom":
+        low = float(vtx[:, 2].min())
+        reach = (float(params["features.vent_above_hem_mm"]) * 2
+                 + float(params["features.vent_min_height_mm"])
+                 + float(params["stitching.allowance_mm"]))  # fmt: skip
+        high = [f"{x['piece']} at {min(c[2] for c in x['corners_mm']) / 10:.0f} cm"
+                for x in json.loads(v3.read_text())["vents"]
+                if min(c[2] for c in x["corners_mm"]) - low > reach]  # fmt: skip
+        if high:
+            bad.append("vents high up a wall: " + ", ".join(high))
 
     res = {
         "model": model.name,
@@ -240,6 +259,9 @@ def main() -> int:
                 json.loads((m / "cover.json").read_text()).get("parameters", {}).get("features", {})
             )
             want = feats.get("vents_total")
+            places = [x for x in str(feats.get("vent_positions") or "").split(",") if x.strip()]
+            if places:  # placed by hand on this cover (ADR-099)
+                want = len(places)
         r = check(m, want)
         rows.append(r)
         print(

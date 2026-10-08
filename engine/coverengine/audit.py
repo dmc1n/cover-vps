@@ -12,6 +12,7 @@ The program measures, for each model:
 - drape: once the cover was dropped over the furniture, not too many folds, no deep sag;
 - slivers: no piece narrower than seams.min_piece_width_mm (ADR-055); a top that would fit
   the roll in one piece with folds is noted.
+- vents: the drawing's number, round every side of the cover, none high up a wall (ADR-099);
 - plan: an arrangement built to follow its pieces lies, seen from above, within the pieces plus
   the clearance: no diagonal across an open corner (ADR-095).
 
@@ -211,6 +212,63 @@ def plan_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
                    "open corner?)")]  # fmt: skip
 
 
+def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
+    """The air vents (Rens, 8 Oct 2026; ADR-099): the drawing's number; round every side of the
+    cover (no side without one while another side has two); none high up a wall (a vent hung
+    from a free top edge, upside down, C24)."""
+    import math
+
+    from coverengine.finish.finish import vent_bases, vent_walls
+    from coverengine.finish.vents3d import ensure_vents
+
+    path = ensure_vents(model_dir) if (model_dir / "panels.npz").is_file() else None
+    if path is None:
+        return []
+    vents = json.loads(path.read_text(encoding="utf-8"))["vents"]
+    panels = json.loads((model_dir / "pattern.json").read_text(encoding="utf-8"))["panels"]
+    walls = vent_walls(model_dir, params)
+    skip = frozenset() if params["features.vent_inner_walls"] else walls.inner
+    bases, _ = vent_bases(panels, params, skip)
+    problems = []
+    places = [x for x in str(params["features.vent_positions"]).split(",") if x.strip()]
+    want = len(places) or int(params["features.vents_total"])
+    if want and len(vents) != want:
+        problems.append(f"{len(vents)} vents, {want} asked for")
+    # the sides: pieces with room for a vent, grouped by the way they face
+    cos = math.cos(math.radians(float(params["features.vent_wall_angle_deg"])))  # type: ignore[arg-type]
+    count = {n: 0 for n in bases}
+    for x in vents:
+        count[x["piece"]] = count.get(x["piece"], 0) + 1
+    sides: list[list[str]] = []
+    for name in sorted(bases, key=lambda n: (-count.get(n, 0), n)):
+        f = walls.facing.get(name)
+        for side in sides:
+            g = walls.facing.get(side[0])
+            if f is not None and g is not None and f[0] * g[0] + f[1] * g[1] >= cos:
+                side.append(name)
+                break
+        else:
+            sides.append([name])
+    per = [sum(count.get(n, 0) for n in s) for s in sides]
+    if per and min(per) == 0 and max(per) >= 2 and not places:
+        empty = [s[0].removeprefix("skirt-") for s, k in zip(sides, per, strict=True) if not k]
+        problems.append("no vent on a side facing like " + ", ".join(empty) + " while another "
+                        f"side has {max(per)}")  # fmt: skip
+    if params["features.vent_align"] == "bottom" and vents:
+        low = float(np.load(model_dir / "panels.npz")["vertices"][:, 2].min())
+        reach = (2 * float(params["features.vent_above_hem_mm"])  # type: ignore[arg-type]
+                 + float(params["features.vent_min_height_mm"])  # type: ignore[arg-type]
+                 + float(params["stitching.allowance_mm"]))  # type: ignore[arg-type]  # fmt: skip
+        high = [x["piece"] for x in vents if min(c[2] for c in x["corners_mm"]) - low > reach]
+        if high:
+            problems.append("high up a wall (upside down?): " + ", ".join(high))
+    detail = "; ".join(problems) or (
+        f"{len(vents)} vents on {sum(1 for k in per if k)} of {len(sides)} sides, at the "
+        + str(params["features.vent_align"])
+    )
+    return [_check("vents", not problems, detail)]
+
+
 def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     """The program's checks for one model."""
     from coverengine.hull.box import Box
@@ -321,6 +379,7 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     )
     checks += sliver_checks(model_dir, params)
     checks += plan_checks(model_dir, params)
+    checks += vent_checks(model_dir, params)
     checks += drape_checks(model_dir, params)
     views(furniture, cover, bad, model_dir / AUDIT_PNG)
     return {

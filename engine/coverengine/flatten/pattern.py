@@ -171,6 +171,9 @@ def build_patterns(
                 "length_3d_mm": round(l3, 2),
                 "length_2d_mm": round(l2, 2),
                 "wiggle_mm": round(wiggle(outline[idx]), 2),
+                # how high the edge runs on the cover: a vent hangs only from the bottom hem,
+                # never from a free top edge (C24, S25; ADR-099)
+                "z_mm": [round(float(z), 1) for z in (v3[idx][:, 2].min(), v3[idx][:, 2].max())],
             }
             if seam_index != HEM:
                 s = seams[seam_index]

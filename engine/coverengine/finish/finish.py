@@ -162,68 +162,113 @@ def side_of(panel: str) -> str:
     return re.sub(r"-\d+$", "", panel)
 
 
-def _roomy(runs: list[HemRun], s_at: float, need: float) -> float:
-    """Where along a side a vent goes: `s_at`, unless the piece of hem there is too short for a
-    vent (a narrow end piece, C27); then the nearest point on a piece long enough (so the count
-    on the drawing is kept, owner 5 Oct 2026)."""
-    acc, spans = 0.0, []
-    for r in runs:
-        spans.append((acc, acc + r.length, r.length >= need))
-        acc += r.length
-    for lo, hi, ok in spans:
-        if lo <= s_at <= hi and ok:
-            return s_at
-    roomy = [(lo, hi) for lo, hi, ok in spans if ok]
-    if not roomy:
-        return s_at  # nowhere roomier: warned as before
-    lo, hi = min(roomy, key=lambda sp: min(abs(s_at - sp[0]), abs(s_at - sp[1])))
-    return float(np.clip(s_at, lo + need / 2, hi - need / 2))
+@dataclass(frozen=True)
+class Walls:
+    """What the 3D cover tells about each piece, for the vents (`vent_walls`): the pieces on an
+    inner wall, and the way each piece faces (a unit vector in plan, out of the cover)."""
+
+    inner: frozenset[str] = frozenset()
+    facing: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
-def inner_skirts(model_dir: Any, params: EffectiveParams) -> frozenset[str]:
-    """Skirt pieces on an inner wall: an L, U or C shape's walls facing its own open corner. No
-    air vent ever goes there, only on the outside (owner, 7 Oct 2026, C23). A piece is inner when
-    half of it or more lies `features.vent_inner_mm` or more inside the footprint's convex hull."""
+PROBE_MM = 50.0  # param-ok: a point this far beside a wall tells out from in (as vents3d)
+EDGE_ON_MM2 = 2.0  # param-ok: twice a triangle's plan area below this: upright, edge-on
+GROW_MM = 1.0  # param-ok: the footprint grown this much (the triangles' own seams)
+
+
+def vent_walls(model_dir: Any, params: EffectiveParams) -> Walls:
+    """For every piece, from `panels.npz`: whether its bottom lies on an inner wall (an L, U or
+    C shape's walls facing its own open corner: half of its bottom edge or more lies
+    `features.vent_inner_mm` or more inside the footprint's convex hull; ADR-093), and which way
+    its lower part faces (ADR-099: the vents go round all sides of the cover)."""
+    import json
     from pathlib import Path
 
     npz, pj = Path(model_dir) / "panels.npz", Path(model_dir) / "panels.json"
     if not npz.is_file() or not pj.is_file():
-        return frozenset()
-    import json
-
+        return Walls()
     names = [p["name"] for p in json.loads(pj.read_text(encoding="utf-8"))["panels"]]
     data = np.load(npz)
     v, f, labels = data["vertices"], data["faces"], data["labels"]
     hull = shapely.MultiPoint(v[:, :2]).convex_hull
     deep = _p(params, "features.vent_inner_mm")
-    out = set()
+    band = _p(params, "features.vent_above_hem_mm") + _p(params, "features.vent_height_mm")
+    near = _p(params, "features.vent_above_hem_mm")
+    tri = v[f]
+    e1, e2 = tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]
+    normal = np.cross(e1, e2)
+    # seen from above, the cover covers what its not-upright faces cover (as vents3d)
+    flat = np.abs(normal[:, 2]) > EDGE_ON_MM2
+    footprint = shapely.union_all([shapely.Polygon(t[:, :2]) for t in tri[flat]]).buffer(GROW_MM)
+    inner, facing = set(), {}
     for i, name in enumerate(names):
-        if not name.startswith("skirt"):
+        mine = labels == i
+        if not mine.any():
             continue
-        tri = v[f[labels == i]]
-        if not len(tri):
+        t = tri[mine]
+        z0 = float(t[:, :, 2].min())
+        pts = t.reshape(-1, 3)
+        bottom = np.unique(pts[pts[:, 2] <= z0 + near][:, :2].round(), axis=0)
+        if not len(bottom):
             continue
-        pts = np.unique(tri.reshape(-1, 3)[:, :2].round(), axis=0)
-        # half the piece or more that far in (a round piece's middle lies inside, its wall not)
-        if float(np.median(shapely.distance(hull.exterior, shapely.points(pts)))) >= deep:
-            out.add(name)
-    return frozenset(out)
+        # half the bottom or more that far in (a round piece's middle lies inside, its wall not)
+        if float(np.median(shapely.distance(hull.exterior, shapely.points(bottom)))) >= deep:
+            inner.add(name)
+        low = t[:, :, 2].mean(axis=1) <= z0 + band
+        n = normal[mine][low][:, :2].sum(axis=0)
+        size = float(np.linalg.norm(n))
+        if size <= 0:
+            continue
+        d = n / size
+        probe = bottom.mean(axis=0) + d * PROBE_MM
+        if footprint.contains(shapely.Point(float(probe[0]), float(probe[1]))):
+            d = -d  # cover beyond it: that was the inside
+        facing[name] = (float(d[0]), float(d[1]))
+    return Walls(frozenset(inner), facing)
 
 
-def per_side(lengths: dict[str, float], params: EffectiveParams) -> dict[str, int]:
+def inner_skirts(model_dir: Any, params: EffectiveParams) -> frozenset[str]:
+    """Skirt pieces on an inner wall (ADR-093), see `vent_walls`."""
+    return frozenset(n for n in vent_walls(model_dir, params).inner if n.startswith("skirt"))
+
+
+def _spread(
+    pieces: list[str],
+    lengths: dict[str, float],
+    n: int,
+    same: Any,
+) -> dict[str, int]:
+    """`n` vents over `pieces` (Rens, 8 Oct 2026: "the right number, but too many at the back"):
+    first one per piece, a side not served yet before one that is, the longest first; then each
+    further vent to the piece with the most length per vent (the longest walls get two)."""
+    order = sorted(pieces, key=lambda p: (-lengths[p], p))
+    counts = dict.fromkeys(order, 0)
+    served: list[str] = []
+    left = n
+    while left > 0 and any(counts[p] == 0 for p in order):
+        new = [p for p in order if counts[p] == 0 and not any(same(p, q) for q in served)]
+        p = new[0] if new else next(q for q in order if counts[q] == 0)
+        counts[p] = 1
+        served.append(p)
+        left -= 1
+    while left > 0 and order:
+        p = max(order, key=lambda q: (lengths[q] / (counts[q] + 1), -order.index(q)))
+        counts[p] += 1
+        left -= 1
+    return counts
+
+
+def per_side(
+    lengths: dict[str, float], params: EffectiveParams, same: Any = None
+) -> dict[str, int]:
     """Vents per side of the cover: one per full metre of that side, at least one (owner, 1 Oct
     2026: each side separately; 2.10 m: 2, 2.90 m: 2, 3.10 m: 3, 1.40 m: 1). A number written
-    on the drawing (`features.vents_total`) always wins: spread over the sides by length."""
+    on the drawing (`features.vents_total`) always wins: one on every side first, then the
+    longest sides get more (Rens, 8 Oct 2026; ADR-099)."""
     total = int(params["features.vents_total"])
     if total <= 0 or not lengths:
         return {k: vent_count(v, params) for k, v in lengths.items()}
-    # the drawing's own number (owner, 5 Oct 2026): spread by length, largest remainder first
-    whole = sum(lengths.values()) or 1.0
-    exact = {k: total * v / whole for k, v in lengths.items()}
-    out = {k: int(x) for k, x in exact.items()}
-    for k in sorted(exact, key=lambda k: (out[k] - exact[k], k))[: total - sum(out.values())]:
-        out[k] += 1
-    return out
+    return _spread(list(lengths), lengths, total, same or (lambda a, b: a == b))
 
 
 @dataclass
@@ -231,6 +276,7 @@ class HemRun:
     panel: str
     points: Array  # along the hem, in the panel's own coordinates
     length: float
+    kind: str = "hem"  # hem: the cover's lower end; above: the seam over a skirt too low for a vent
 
 
 def _hem_runs(panels: list[dict[str, Any]], skirt_order: list[str]) -> list[HemRun]:
@@ -279,102 +325,244 @@ def _point_along(pts: Array, s: float) -> tuple[Array, Array]:
     return pts[i] + t * (s - acc[i]), t
 
 
-def place_vents(
-    panels: list[dict[str, Any]], params: EffectiveParams, inner: frozenset[str] = frozenset()
-) -> tuple[dict[str, list[Array]], list[str]]:
-    """Vent openings per skirt panel (rectangles in the panel's coordinates), and warnings.
-    `inner`: skirt pieces on an inner wall (`inner_skirts`), which never get a vent."""
+def _run(outline: Array, e: dict[str, Any], name: str, kind: str) -> HemRun:
+    pts = outline[edge_indices(len(outline), e["range"])]
+    return HemRun(name, pts, float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum()), kind)
+
+
+def vent_bases(
+    panels: list[dict[str, Any]], params: EffectiveParams, skip: frozenset[str] = frozenset()
+) -> tuple[dict[str, list[HemRun]], list[str]]:
+    """Where vents can stand, per piece: the runs of its bottom edge (ADR-099).
+
+    With the edges' heights in `pattern.json` (`z_mm`): every piece's hem at the cover's lower
+    end, never a free edge higher up (C24's vent hung upside down from the top of a wall); and
+    over a skirt too low for a vent, the seam on top of it (`features.vent_above_low_skirt`;
+    a box cover's 12 cm band, Rens 8 Oct 2026). Without them (an older pattern.json): the skirt
+    pieces' hems, as before. `skip`: pieces that never get one (inner walls)."""
     warnings: list[str] = []
-    order = [n for n in skirt_order(panels) if n not in inner]
-    runs = _hem_runs(panels, order)
-    # only on skirt pieces tall enough for a vent (a low front gives its vents to the sides)
     need = (
         _p(params, "features.vent_above_hem_mm")
-        + _p(params, "features.vent_height_mm")
+        + _p(params, "features.vent_min_height_mm")
         + _p(params, "stitching.allowance_mm")
     )
     height = {p["name"]: float(np.ptp(np.asarray(p["outline_mm"])[:, 1])) for p in panels}
-    # a low side gets a lower opening, same width, at least vent_min_height_mm (owner, 1 Oct
-    # 2026); the plastic insert, the hood and the membrane stay the same size
-    least = need - _p(params, "features.vent_height_mm") + _p(params, "features.vent_min_height_mm")
-    tall = [r for r in runs if height.get(r.panel, 0.0) >= least]
-    runs = tall  # a side lower than that gets no vent (warned below)
-    total = sum(r.length for r in runs)
-    out: dict[str, list[Array]] = {}
-    # one per full metre of each side, at least one per side (owner, 1 Oct 2026)
-    sides: dict[str, list[HemRun]] = {}
-    for r in runs:
-        sides.setdefault(side_of(r.panel), []).append(r)
-    low = sorted({side_of(r.panel) for r in _hem_runs(panels, order)} - set(sides))
-    for side in low:
+    edges = [e for p in panels for e in p["edges"]]
+    has_z = bool(edges) and all("z_mm" in e for e in edges)
+    out: dict[str, list[HemRun]] = {}
+    low: dict[str, float] = {}  # skirt too low for a vent -> the height of its top
+    if not has_z:
+        for r in _hem_runs(panels, [n for n in skirt_order(panels) if n not in skip]):
+            if height.get(r.panel, 0.0) >= need:
+                out.setdefault(r.panel, []).append(r)
+            else:
+                low[r.panel] = 0.0
+    else:
+        hems = [e["z_mm"][0] for e in edges if e["kind"] == "hem"]
+        lowest = min(hems) if hems else 0.0
+        reach = _p(params, "features.vent_min_height_mm")  # higher than this is no bottom hem
+        for p in panels:
+            name = p["name"]
+            if name in skip:
+                continue
+            outline = np.asarray(p["outline_mm"], dtype=np.float64)
+            runs = [_run(outline, e, name, "hem") for e in p["edges"]
+                    if e["kind"] == "hem" and e["z_mm"][1] <= lowest + reach]  # fmt: skip
+            if not runs:
+                continue
+            top = max(e["z_mm"][1] for e in p["edges"])
+            if name.startswith("skirt") and top - lowest < need:
+                low[name] = top
+                continue
+            out[name] = runs
+        if params["features.vent_above_low_skirt"]:
+            for p in panels:
+                name = p["name"]
+                if name in skip or name in out or name in low:
+                    continue
+                outline = np.asarray(p["outline_mm"], dtype=np.float64)
+                runs = [_run(outline, e, name, "above") for e in p["edges"]
+                        if e["kind"] == "seam" and e.get("mate") in low
+                        and e["z_mm"][1] <= low[e["mate"]] + reach]  # fmt: skip
+                if runs:
+                    out[name] = runs
+            # the low skirts handed their vents up; one that found no piece above is warned
+            served = {e.get("mate") for p in panels if p["name"] in out for e in p["edges"]}
+            low = {k: v for k, v in low.items() if k not in served}
+    for name in sorted(low):
+        side = side_of(name).removeprefix("skirt-") or "skirt"
         warnings.append(
-            f"no air vent on the {side.removeprefix('skirt-') or 'skirt'}: the skirt there is "
-            f"lower than {least / MM_PER_CM:.1f} cm"
+            f"no air vent on the {side}: the skirt there is lower than {need / MM_PER_CM:.1f} cm"
         )
-    if total <= 0:
-        return out, warnings
-    shares = per_side({k: sum(r.length for r in v) for k, v in sides.items()}, params)
+    return out, warnings
+
+
+def _explicit(
+    text: str, bases: dict[str, list[HemRun]]
+) -> tuple[list[tuple[str, float]], list[str]]:
+    """`features.vent_positions`: "piece@fraction, ..." -> (piece, mm along its bottom edge)."""
+    out, warnings = [], []
+    for item in (x.strip() for x in text.split(",")):
+        if not item:
+            continue
+        name, _, frac = item.partition("@")
+        name = name.strip()
+        try:
+            at = float(frac) if frac.strip() else 0.5  # param-ok: no fraction: the middle
+        except ValueError:
+            warnings.append(f"vent_positions: {item!r} is not piece@fraction")
+            continue
+        if name not in bases:
+            warnings.append(f"vent_positions: {name} has no bottom edge for a vent")
+            continue
+        total = sum(r.length for r in bases[name])
+        out.append((name, float(np.clip(at, 0.0, 1.0)) * total))
+    return out, warnings
+
+
+def _sides(names: list[str], panels: list[dict[str, Any]], same: Any) -> list[list[str]]:
+    """Pieces that join and face the same way are one side of the cover (for one per metre)."""
+    parent = {n: n for n in names}
+
+    def root(n: str) -> str:
+        while parent[n] != n:
+            n = parent[n]
+        return n
+
+    for p in panels:
+        if p["name"] not in parent:
+            continue
+        for e in p["edges"]:
+            m = e.get("mate")
+            if e["kind"] == "seam" and m in parent and same(p["name"], m):
+                parent[root(m)] = root(p["name"])
+    groups: dict[str, list[str]] = {}
+    for n in names:
+        groups.setdefault(root(n), []).append(n)
+    return list(groups.values())
+
+
+def place_vents(
+    panels: list[dict[str, Any]],
+    params: EffectiveParams,
+    walls: frozenset[str] | Walls = frozenset(),
+) -> tuple[dict[str, list[Array]], list[str]]:
+    """Vent openings per piece (rectangles in the piece's coordinates), and warnings.
+
+    `walls`: `vent_walls` (or only the set of inner pieces). The rule (ADR-099, Rens 8 Oct 2026):
+    every side of the cover gets vents, the seen front too, one in the middle of each piece
+    first, a side not served yet before one that is; the drawing's number
+    (`features.vents_total`) is kept, the extra ones go to the longest pieces; without a number,
+    one per full metre of each side. All at one height (`features.vent_align`). Per model,
+    `features.vent_positions` places them by hand."""
+    if isinstance(walls, frozenset):
+        walls = Walls(inner=walls)
+    warnings: list[str] = []
+    skip = frozenset() if params["features.vent_inner_walls"] else walls.inner
+    bases, base_warnings = vent_bases(panels, params, skip)
+    warnings += base_warnings
     w = _p(params, "features.vent_width_mm")
-    full_h = h = _p(params, "features.vent_height_mm")
+    allowance = _p(params, "stitching.allowance_mm")
+    # a piece whose bottom edge is too short for a vent hands it on (the count is kept)
+    room = {}
+    for name, runs in bases.items():
+        longest = max(r.length for r in runs)
+        if longest - w >= 2 * allowance:
+            room[name] = runs
+        else:
+            warnings.append(
+                f"no room for an air vent on {name}: {longest / MM_PER_CM:.0f} cm "
+                f"of hem, a vent needs {(w + 2 * allowance) / MM_PER_CM:g} cm"
+            )
+    lengths = {n: sum(r.length for r in runs) for n, runs in room.items()}
+    cos = math.cos(math.radians(_p(params, "features.vent_wall_angle_deg")))
+
+    def same(a: str, b: str) -> bool:
+        fa, fb = walls.facing.get(a), walls.facing.get(b)
+        if fa is None or fb is None:
+            return side_of(a) == side_of(b)
+        return fa[0] * fb[0] + fa[1] * fb[1] >= cos
+
+    places: list[tuple[str, float]] = []
+    text = str(params["features.vent_positions"]).strip()
+    if text:
+        places, more = _explicit(text, room)
+        warnings += more
+    elif lengths:
+        if int(params["features.vents_total"]) > 0:
+            counts = per_side(lengths, params, same)
+        else:
+            counts = {}
+            for side in _sides(sorted(lengths), panels, same):
+                n = vent_count(sum(lengths[k] for k in side), params)
+                counts.update(_spread(side, lengths, n, same))
+        for name in sorted(counts, key=lambda k: (-lengths[k], k)):
+            k = counts[name]
+            places += [(name, (j + 0.5) * lengths[name] / k) for j in range(k)]  # param-ok: middles
+    by_name = {p["name"]: p for p in panels}
+    out: dict[str, list[Array]] = {}
+    for k, (name, s_at) in enumerate(places, start=1):
+        acc = 0.0
+        runs = room[name]
+        for r in runs:
+            if s_at <= acc + r.length or r is runs[-1]:
+                rect, problem = _vent_at(by_name[name], r, s_at - acc, params, k)
+                if problem:
+                    warnings.append(problem)
+                if rect is not None:
+                    out.setdefault(name, []).append(rect)
+                break
+            acc += r.length
+    return out, warnings
+
+
+def _vent_at(
+    panel: dict[str, Any], r: HemRun, local: float, params: EffectiveParams, k: int
+) -> tuple[Array | None, str]:
+    """One vent opening on `panel`, `local` mm along its bottom run `r`."""
+    w = _p(params, "features.vent_width_mm")
+    full_h = _p(params, "features.vent_height_mm")
     above = _p(params, "features.vent_above_hem_mm")
     clear = _p(params, "features.vent_seam_clearance_mm")
     allowance = _p(params, "stitching.allowance_mm")
-    by_name = {p["name"]: p for p in panels}
-    k = 0
-    for side, side_runs in sides.items():
-        side_total = sum(r.length for r in side_runs)
-        n = shares[side]
-        for j in range(n):
-            k += 1
-            s_at = (j + 0.5) * side_total / n  # param-ok: the middle of each share
-            s_at = _roomy(side_runs, s_at, w + 2 * allowance)
-            acc = 0.0
-            for r in side_runs:
-                if s_at <= acc + r.length or r is side_runs[-1]:
-                    local = s_at - acc
-                    # a short side still gets its vent (owner, 1 Oct 2026): centred, as far
-                    # from the seams as it can be, at least the seam allowance
-                    gap = clear if r.length >= w + 2 * clear else (r.length - w) / 2
-                    lo, hi = w / 2 + gap, r.length - w / 2 - gap
-                    if gap < allowance:
-                        warnings.append(
-                            f"no room for air vent {k} on {r.panel}: {r.length / MM_PER_CM:.0f} cm "
-                            f"of hem, a vent needs {(w + 2 * allowance) / MM_PER_CM:g} cm"
-                        )
-                        break
-                    local = float(np.clip(local, lo, hi))
-                    centre, t = _point_along(r.points, local)
-                    up = np.array([-t[1], t[0]])  # into the panel (counter-clockwise outline)
-                    base = centre + up * above
-                    poly = shapely.Polygon(np.asarray(by_name[r.panel]["outline_mm"]))
-                    # the height of the piece where the vent goes (a sloping piece is lower at
-                    # one end), over the vent's whole width
-                    local = _height_at(poly, centre, t, up, w)
-                    room_h = local - above - allowance
-                    h = min(full_h, math.floor(room_h / MM_PER_CM) * MM_PER_CM)  # whole cm
-                    if h < _p(params, "features.vent_min_height_mm"):
-                        warnings.append(
-                            f"no air vent {k} on {r.panel}: only {local / MM_PER_CM:.1f} cm high "
-                            "there"
-                        )
-                        break
-                    least_h = _p(params, "features.vent_min_height_mm")
-
-                    # a curved or sloping piece: lower the opening a cm at a time until it fits
-                    rect = _opening(base, t, up, w, h)
-                    while not _fits(poly, rect, allowance) and h - MM_PER_CM >= least_h:
-                        h -= MM_PER_CM
-                        rect = _opening(base, t, up, w, h)
-                    if not _fits(poly, rect, allowance):
-                        warnings.append(
-                            f"air vent {k} does not fit in {r.panel}, even "
-                            f"{least_h / MM_PER_CM:g} cm high: the piece is too low or too "
-                            "curved there"
-                        )
-                    out.setdefault(r.panel, []).append(rect)
-                    break
-                acc += r.length
-    return out, warnings
+    least_h = _p(params, "features.vent_min_height_mm")
+    # a short piece still gets its vent (owner, 1 Oct 2026): centred, as far from the seams
+    # as it can be, at least the seam allowance
+    gap = clear if r.length >= w + 2 * clear else (r.length - w) / 2
+    if gap < allowance:
+        return None, (
+            f"no room for air vent {k} on {r.panel}: {r.length / MM_PER_CM:.0f} cm "
+            f"of hem, a vent needs {(w + 2 * allowance) / MM_PER_CM:g} cm"
+        )
+    local = float(np.clip(local, w / 2 + gap, r.length - w / 2 - gap))
+    centre, t = _point_along(r.points, local)
+    up = np.array([-t[1], t[0]])  # into the panel (counter-clockwise outline)
+    poly = shapely.Polygon(np.asarray(panel["outline_mm"]))
+    # the height of the piece where the vent goes (a sloping piece is lower at one end), over
+    # the vent's whole width
+    tall = _height_at(poly, centre, t, up, w)
+    room_h = tall - above - allowance
+    h = min(full_h, math.floor(room_h / MM_PER_CM) * MM_PER_CM)  # whole cm
+    if h < least_h:
+        return None, f"no air vent {k} on {r.panel}: only {tall / MM_PER_CM:.1f} cm high there"
+    # where on the skirt's height (owner 30 Sep: 5 cm above the hem; a drawing's "at Top")
+    lift = above
+    align = params["features.vent_align"]
+    if r.kind == "hem" and align == "top":
+        lift = max(above, tall - _p(params, "features.vent_below_top_mm") - h)
+    elif r.kind == "hem" and align == "middle":
+        lift = max(above, (tall - h) / 2)
+    rect = _opening(centre + up * lift, t, up, w, h)
+    # a curved or sloping piece: lower the opening a cm at a time until it fits
+    while not _fits(poly, rect, allowance) and h - MM_PER_CM >= least_h:
+        h -= MM_PER_CM
+        rect = _opening(centre + up * lift, t, up, w, h)
+    if not _fits(poly, rect, allowance):
+        return rect, (
+            f"air vent {k} does not fit in {r.panel}, even {least_h / MM_PER_CM:g} cm high: "
+            "the piece is too low or too curved there"
+        )
+    return rect, ""
 
 
 def _vent_pieces(count: int, params: EffectiveParams, start: int) -> list[Piece]:
@@ -444,9 +632,10 @@ def _vent_pieces(count: int, params: EffectiveParams, start: int) -> list[Piece]
 
 
 def finish(
-    doc: dict[str, Any], params: EffectiveParams, inner: frozenset[str] = frozenset()
+    doc: dict[str, Any], params: EffectiveParams, inner: frozenset[str] | Walls = frozenset()
 ) -> tuple[list[Piece], list[str]]:
-    """Finished pieces from a PatternSet (`pattern.json`); `inner`: see `place_vents`."""
+    """Finished pieces from a PatternSet (`pattern.json`); `inner`: `vent_walls`, see
+    `place_vents`."""
     warnings: list[str] = []
     panels = doc["panels"]
     ids = {p["name"]: p["id"] for p in panels}

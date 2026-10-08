@@ -2752,3 +2752,49 @@ docs/plans/prices-costing.md; handbook: docs/handbook/prices.md.
   of the catalogue's 2-seaters, or any cover the owner picks. The maths did not change.
 - **Better later:** price per colour/quality in the configurator, separate workcenters, shipping
   per country and box size, duties per HS code, the B2B storefront.
+
+## ADR-099 — Air vents round every side, one in the middle of each piece, never upside down
+
+Rens (approver) rejected 49 covers on their vents on 8 Oct 2026 (group A of
+docs/plans/rejections-2026-10-08.md). His words: "the right number of vents, but too many at
+the back (the side not seen on the drawing): per back panel move one to the front, at the
+circles"; "circles: add, crosses: remove"; "the same height on the skirt, in the middle of the
+panels"; the Portofino daybed "2 per side, 8 in total". Read from his 64 marked pictures (each
+twice by the vision model, and by eye against the covers' own vents.json):
+
+- **The cause.** `per_side` spread the drawing's count over the sides *by length*: the long back
+  walls got two or three, the short ends one, and every front (seen) wall of an L, U or C none,
+  because ADR-093 skips inner walls. Every circle on the C, L and S33 covers lies on such a front
+  wall; every cross is the second or third vent of a back wall.
+- **The rule now** (`finish.place_vents`, `vent_bases`, `_spread`): a vent goes on any piece
+  with a bottom edge long enough; first one per piece, a side not served yet (pieces facing
+  within `features.vent_wall_angle_deg` of each other) before a second piece facing the same
+  way, the longest first; each further vent to the piece with the most length per vent (the
+  longest walls get two). Each piece's vents sit at the middles of equal shares of its bottom
+  edge, so one vent is in the middle of the piece. The drawing's number is kept; without one,
+  one per full metre of each side (owner, 1 Oct) where a side is the pieces that join and face
+  the same way. The way a piece faces comes from panels.npz (`vent_walls`), out of the cover.
+- **Never upside down** (C24's vent at 63–85 cm, S25 "upside down"): a free top edge is a hem
+  too, and a vent hung from it. `cover flatten` now writes each edge's height (`z_mm`); a vent
+  goes only on a hem at the cover's lower end (within `vent_min_height_mm`). Old pattern.json
+  files without heights keep the old behaviour until flattened again.
+- **A skirt too low for a vent** (a box cover's 12 cm band: Kota, Evora, Portofino chaise and
+  daybed, 2-seater) hands its vents to the piece above, placed over the seam
+  (`features.vent_above_low_skirt`, default on); before, those sides had none (the warning
+  "no air vent on the back: lower than 16.5 cm").
+- **Front (inner) walls** (`features.vent_inner_walls`, default **false** = ADR-093 stands):
+  Rens's circles on 30 covers are exactly the walls the owner excluded on 7 Oct (C23). That
+  is the owner's call (docs/QUESTIONS.md 71); the staged covers set it per cover.
+- **By hand** (`features.vent_positions`, "piece@fraction, ..."): where a person's marks differ
+  from the rule; wins over the count.
+- **Height on the skirt** (`features.vent_align` bottom | middle | top, `vent_below_top_mm`):
+  bottom stays the default (owner, 30 Sep: 5 cm above the hem); R1–R3 say "at Top"
+  (QUESTIONS 66): staged with top, to the owner.
+- **Checks:** `cover audit` has a "vents" check (the count asked for, no side without a vent
+  while another side has two, none high up a wall); `scripts/fewer_check.py` fails a vent high
+  up a wall and accepts front-wall vents only where the cover asks for them;
+  `scripts/vents_compare.py` draws before/after with the marked pictures. Tests in
+  test_finish.py. Lesson in config/ai_lessons.json.
+- **Better later:** read the circles' positions off the picture onto the 3D cover
+  automatically (the camera of a Desk picture is not stored; the vision reading names the wall
+  only).

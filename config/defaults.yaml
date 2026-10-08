@@ -148,6 +148,23 @@ features:                        # per-cover defaults, overridden per model
   vent_inner_mm: 300             # never an air vent on an inner wall (owner, 7 Oct 2026: only on
                                  # the outside): a skirt piece whose middle lies this far inside
                                  # the footprint's convex hull (an L/U/C shape's open corner)
+  vent_inner_walls: false        # to confirm (ADR-099): true puts vents on the front (inner) walls of
+                                 # an L, U or C too, as Rens marked on 30 covers (8 Oct 2026);
+                                 # false keeps the owner's rule of 7 Oct (ADR-093)
+  vent_wall_angle_deg: 45        # pieces facing within this angle of each other face the same side:
+                                 # the vents go round all sides first, longest piece first (ADR-099)
+  vent_align: bottom             # bottom | middle | top   where on the skirt: bottom edge
+                                 # vent_above_hem_mm above the hem (owner, 30 Sep), centred on the
+                                 # skirt's height, or top edge vent_below_top_mm under the skirt's
+                                 # top ("4 Air Pockets at Top", R1-R3; to confirm, QUESTIONS 66)
+  vent_below_top_mm: 50          # to confirm: with vent_align top, the vent's top edge this far
+                                 # below the top of the skirt
+  vent_above_low_skirt: true     # a skirt too low for a vent (a box cover's 12 cm band) hands its
+                                 # vents to the piece above it, placed over the seam (Rens, 8 Oct)
+  vent_positions: ""             # per model, where the rule cannot reach (Rens's circles): places as
+                                 # "piece@fraction" along its bottom edge, comma separated
+                                 # ("skirt-back@0.5, top-2@0.25"); empty = the rule. Wins over
+                                 # vents_total and the per-metre rule (ADR-099)
   vent_seam_clearance_mm: 100    # to confirm; a vent keeps this far from a vertical seam; a short
                                  # side gets its vent centred, closer (owner: it must have one)
   vent_hood_depth_mm: 80         # to confirm; the hood piece is this much deeper than the vent

@@ -170,13 +170,16 @@ def test_vents_one_per_full_metre_of_each_side() -> None:
 
 
 def test_the_number_on_the_drawing_always_wins_spread_by_length() -> None:
-    """Owner, 5 Oct 2026: "4 Air Pocket" on the drawing beats one per metre."""
+    """Owner, 5 Oct 2026: "4 Air Pocket" on the drawing beats one per metre. Rens, 8 Oct 2026
+    (S22, D4): one on every side first, then the longest sides get more (ADR-099)."""
     from coverengine.finish.finish import per_side
 
     sides = {"back": 3000, "front": 3000, "left": 900, "right": 900}
     assert sum(per_side(sides, params()).values()) == 8
     four = per_side(sides, params(**{"features.vents_total": 4}))
-    assert four == {"back": 2, "front": 2, "left": 0, "right": 0}
+    assert four == {"back": 1, "front": 1, "left": 1, "right": 1}
+    six = per_side(sides, params(**{"features.vents_total": 6}))
+    assert six == {"back": 2, "front": 2, "left": 1, "right": 1}
     assert sum(per_side(sides, params(**{"features.vents_total": 7})).values()) == 7
 
 
@@ -205,13 +208,135 @@ def test_table_covers_get_a_middle_cord_line_and_every_hood_a_logo() -> None:
     assert any(t == "LOGO" for t, _, _ in hood.pen_text)
 
 
+def wall(
+    name: str, length: float, high: float, z0: float = 50.0, top: str = "seam", mate: str = "x"
+) -> dict[str, Any]:
+    """An upright skirt-like piece with its edges' heights (`z_mm`): bottom hem, right seam, top
+    (`top`: seam to `mate`, or a free edge, kind hem), left seam."""
+    p = square(name, length, ["hem", "seam", top, "seam"], [False] * 4)
+    p["outline_mm"] = [[0.0, 0.0], [length, 0.0], [length, high], [0.0, high]]
+    zs = [[z0, z0], [z0, z0 + high], [z0 + high, z0 + high], [z0, z0 + high]]
+    for e, z in zip(p["edges"], zs, strict=True):
+        e["z_mm"] = z
+    if top == "seam":
+        p["edges"][2]["mate"] = mate
+    return p
+
+
 def test_a_vent_on_a_too_short_piece_moves_to_a_roomy_one() -> None:
     """C27 (6 Oct 2026): a share of the drawing's vents fell on a 16 cm end piece and was lost;
-    it moves to the nearest piece of the same side with room, so the count is kept."""
-    from coverengine.finish.finish import HemRun, _roomy
+    it goes to a piece with room instead, so the count is kept."""
+    d = doc(wall("skirt-front-1", 160, 400), wall("skirt-front-2", 2000, 400))
+    vents, warnings = place_vents(d["panels"], params(**{"features.vents_total": 2}))
+    assert len(vents["skirt-front-2"]) == 2 and "skirt-front-1" not in vents
+    assert any("a vent needs 28 cm" in w for w in warnings)
 
-    runs = [HemRun("skirt-front-1", np.array([[0, 0], [160, 0]]), 160.0),
-            HemRun("skirt-front-2", np.array([[160, 0], [2160, 0]]), 2000.0)]  # fmt: skip
-    at = _roomy(runs, 80.0, 310.0)
-    assert 160.0 + 155.0 <= at <= 2160.0 - 155.0
-    assert _roomy(runs, 900.0, 310.0) == 900.0
+
+def test_vents_go_round_every_side_first_in_the_middle_of_each_piece() -> None:
+    """Rens, 8 Oct 2026 (S18, D4, C1-C31): "the right number, but too many at the back": one on
+    every side first, in the middle of the piece, a side not served yet before a second piece
+    facing the same way; the drawing's number kept (ADR-099)."""
+    from coverengine.finish.finish import Walls
+
+    d = doc(wall("skirt-back", 3800, 800), wall("skirt-front-2", 2700, 370),
+            wall("skirt-front-1", 1100, 800), wall("skirt-left", 1100, 800),
+            wall("skirt-right", 1100, 800))  # fmt: skip
+    walls = Walls(facing={"skirt-back": (0.0, 1.0), "skirt-front-2": (0.0, -1.0),
+                          "skirt-front-1": (0.0, -1.0), "skirt-left": (-1.0, 0.0),
+                          "skirt-right": (1.0, 0.0)})  # fmt: skip
+    vents, _ = place_vents(d["panels"], params(**{"features.vents_total": 4}), walls)
+    assert sorted(vents) == ["skirt-back", "skirt-front-2", "skirt-left", "skirt-right"]
+    (back,) = vents["skirt-back"]
+    assert back[:, 0].mean() == pytest.approx(1900.0)  # the middle of the piece
+    vents, _ = place_vents(d["panels"], params(**{"features.vents_total": 6}), walls)
+    assert len(vents["skirt-back"]) == 2 and len(vents["skirt-front-1"]) == 1
+    bottoms = {round(float(r[:, 1].min())) for rs in vents.values() for r in rs}
+    assert bottoms == {50}  # all at one height
+
+
+def test_no_vent_hangs_from_a_free_top_edge() -> None:
+    """C24 and S25 (Rens, 8 Oct 2026: "upside down"): an open top edge is a hem too; a vent
+    goes only on the bottom hem, at the cover's lower end."""
+    d = doc(wall("skirt-back", 2940, 900, top="hem"))
+    vents, _ = place_vents(d["panels"], params(**{"features.vents_total": 2}))
+    assert len(vents["skirt-back"]) == 2
+    assert all(r[:, 1].max() < 450 for r in vents["skirt-back"])
+
+
+def test_a_skirt_too_low_hands_its_vents_to_the_piece_above() -> None:
+    """Rens, 8 Oct 2026 (Kota, Evora, Portofino daybed: "2 per side, 8 in total"): a box
+    cover's 12 cm band has no room for a vent; the piece above it gets them, over the seam."""
+    band = wall("skirt-right", 2100, 120, mate="top-2")
+    side = wall("top-2", 2100, 700, z0=170.0)
+    side["edges"][0].update({"kind": "seam", "mate": "skirt-right", "seam": "s", "lap_side": "x"})
+    vents, warnings = place_vents(doc(band, side)["panels"], params())
+    assert len(vents["top-2"]) == 2 and "skirt-right" not in vents
+    assert not any("lower than" in w for w in warnings)
+    vents, warnings = place_vents(
+        doc(band, side)["panels"], params(**{"features.vent_above_low_skirt": False})
+    )
+    assert not vents and any("lower than 16.5 cm" in w for w in warnings)
+
+
+def test_inner_walls_on_request_and_positions_by_hand() -> None:
+    """ADR-093 by default; `features.vent_inner_walls` puts them on the front (inner) walls as
+    Rens marked; `features.vent_positions` places them where the rule cannot reach."""
+    d = doc(wall("skirt-front-2", 2000, 400), wall("skirt-back", 3000, 800))
+    inner = frozenset({"skirt-front-2"})
+    vents, _ = place_vents(d["panels"], params(**{"features.vents_total": 2}), inner)
+    assert sorted(vents) == ["skirt-back"]
+    vents, _ = place_vents(
+        d["panels"],
+        params(**{"features.vents_total": 2, "features.vent_inner_walls": True}),
+        inner,
+    )
+    assert sorted(vents) == ["skirt-back", "skirt-front-2"]
+    by_hand = params(**{"features.vent_positions": "skirt-back@0.25, skirt-back@0.75, nope@1"})
+    vents, warnings = place_vents(d["panels"], by_hand, inner)
+    xs = sorted(float(r[:, 0].mean()) for r in vents["skirt-back"])
+    assert xs == pytest.approx([750.0, 2250.0]) and "skirt-front-2" not in vents
+    assert any("nope" in w for w in warnings)
+
+
+def test_vents_at_the_top_of_the_skirt_on_request() -> None:
+    """R1-R3 ("4 Air Pockets at Top"; QUESTIONS 66): `features.vent_align` top or middle."""
+    d = doc(wall("skirt-front", 3000, 870))
+    top = params(**{"features.vents_total": 1, "features.vent_align": "top"})
+    ((rect,),) = place_vents(d["panels"], top)[0].values()
+    assert rect[:, 1].max() == pytest.approx(870 - 50) and np.ptp(rect[:, 1]) == 220
+    mid = params(**{"features.vents_total": 1, "features.vent_align": "middle"})
+    ((rect,),) = place_vents(d["panels"], mid)[0].values()
+    assert rect[:, 1].mean() == pytest.approx(435)
+
+
+def test_vent_walls_face_out_of_the_cover(tmp_path: Path) -> None:
+    """The way each piece faces, out of the cover, also on an L's inner walls (ADR-099)."""
+    import json
+
+    from coverengine.finish.finish import vent_walls
+
+    ring = [(0, 0), (3000, 0), (3000, 1000), (1000, 1000), (1000, 3000), (0, 3000)]
+    names = ["skirt-front", "skirt-right", "skirt-front-2", "skirt-right-2", "skirt-back",
+             "skirt-left"]  # fmt: skip
+    verts, faces, labels = [], [], []
+    for i, (a, b) in enumerate(zip(ring, ring[1:] + ring[:1], strict=True)):
+        k = len(verts)
+        verts += [(*a, 0), (*b, 0), (*b, 400), (*a, 400)]
+        faces += [(k, k + 1, k + 2), (k, k + 2, k + 3)]
+        labels += [i, i]
+    # the roof, so the footprint knows where the cover is
+    k = len(verts)
+    verts += [(x, y, 400) for x, y in ring]
+    faces += [(k, k + 1, k + 2), (k, k + 2, k + 3), (k, k + 3, k + 4), (k, k + 4, k + 5)]
+    labels += [6] * 4
+    np.savez(tmp_path / "panels.npz", vertices=np.array(verts, dtype=float),
+             faces=np.array(faces), labels=np.array(labels))  # fmt: skip
+    (tmp_path / "panels.json").write_text(
+        json.dumps({"panels": [{"name": n} for n in [*names, "top"]]})
+    )
+    walls = vent_walls(tmp_path, params())
+    want = {"skirt-front": (0, -1), "skirt-right": (1, 0), "skirt-front-2": (0, 1),
+            "skirt-right-2": (1, 0), "skirt-back": (0, 1), "skirt-left": (-1, 0)}  # fmt: skip
+    for name, d in want.items():
+        assert walls.facing[name] == pytest.approx(d, abs=1e-6), name
+    assert {"skirt-front-2", "skirt-right-2"} <= walls.inner
