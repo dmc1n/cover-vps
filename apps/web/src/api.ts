@@ -804,6 +804,8 @@ export interface PriceSet {
   components: Component[];
   labour: { rate: number; currency: Currency; operations: Operation[] };
   channels: Record<ChannelKey, Channel>;
+  /** fields the owner confirmed at their documented value (no longer "placeholder") */
+  confirmed?: string[];
 }
 export interface PriceVersion {
   version: number;
@@ -821,6 +823,9 @@ export interface PricesState {
   draft_errors: string[];
   defaults: PriceSet;
   can_edit: boolean;
+  /** ids of the fields still at their "to confirm" default (costing.FIELD_KEYS) */
+  placeholders: string[];
+  placeholder_total: number;
   choices: {
     per: string[];
     per_label: Record<string, string>;
@@ -891,6 +896,8 @@ export interface Costing {
 }
 export interface CostingProducts {
   models: { id: string; name: string; kind: string }[];
+  /** a representative cover for the live examples */
+  example: string | null;
   configurator: {
     product: string;
     label: string;
@@ -901,6 +908,14 @@ export interface CostingProducts {
       max: number | null;
     }[];
   }[];
+}
+
+export interface PriceCheck {
+  errors: string[];
+  placeholders: string[];
+  placeholder_total: number;
+  costing: Costing | null;
+  costing_error?: string;
 }
 
 export const prices = {
@@ -934,6 +949,14 @@ export const prices = {
     ),
   products: () =>
     fetch("/api/prices/products").then((r) => json<CostingProducts>(r)),
+  /** the page's unsaved numbers: errors, placeholders and one cover's costing under them */
+  check: (
+    data: PriceSet,
+    what: { model?: string; product?: string; sizes?: unknown },
+  ) =>
+    send("POST", "/api/prices/check", { data, ...what }).then((r) =>
+      json<PriceCheck>(r),
+    ),
   costing: (q: Record<string, string>) =>
     fetch(`/api/prices/costing?${new URLSearchParams(q)}`).then((r) =>
       json<Costing>(r),

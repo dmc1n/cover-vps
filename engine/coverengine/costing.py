@@ -217,6 +217,90 @@ def default_price_set(params: EffectiveParams) -> dict[str, Any]:
     }
 
 
+# ---- which values are still placeholders --------------------------------------------------------
+
+# A field of the price set and the config/defaults.yaml key its default comes from. A field whose
+# key is marked "to confirm" there, and whose value is still that default, is a placeholder on the
+# admin page until the owner changes it or confirms it (the set's `confirmed` list).
+FIELD_KEYS = {
+    "exchange.idr_per_eur": "quote.idr_per_eur",
+    "fabric:coverlast.price": "quote.fabric_eur_per_m",
+    "fabric:coverlast.waste_pct": "quote.waste_pct",
+    "fabric:coverlast.colours": "quote.colours",
+    "fabric:coverlast.roll_width_mm": "roll.width_mm",
+    "component:vent_set.price": "quote.vent_eur",
+    "component:cord.price": "quote.cord_eur_per_m",
+    "component:elastic.price": "quote.elastic_eur_per_m",
+    "component:balloon.price": "quote.balloon_eur",
+    "component:frame.price": "quote.frame_eur",
+    "labour.rate": "quote.labour_eur_per_hour",
+    "operation:cut_setup.minutes": "quote.minutes_cut_setup",
+    "operation:piece.minutes": "quote.minutes_per_piece",
+    "operation:seam.minutes": "quote.minutes_per_seam_m",
+    "operation:vent.minutes": "quote.minutes_per_vent",
+    "operation:hem.minutes": "quote.minutes_per_hem_m",
+    "operation:pack.minutes": "quote.minutes_pack",
+    "b2c.pct": "quote.markup_pct",
+    "b2b.pct": "quote.b2b_markup_pct",
+    "b2c.vat_pct": "quote.vat_pct",
+    "b2b.vat_pct": "quote.vat_pct",
+    "b2c.shipping": "quote.b2c_shipping_eur",
+    "b2b.shipping": "quote.b2b_shipping_eur",
+    "b2c.duties": "quote.duties_pct",
+    "b2b.duties": "quote.duties_pct",
+    "b2c.packaging": "quote.packaging_eur",
+    "b2b.packaging": "quote.packaging_eur",
+}
+
+
+def field_value(ps: dict[str, Any], fid: str) -> Any:
+    """A field of the price set by its id (FIELD_KEYS), with its currency or mode when it has
+    one, so a price switched to rupiah is no longer the euro default; None when it is gone."""
+    try:
+        if fid == "exchange.idr_per_eur":
+            return ps["exchange"]["idr_per_eur"]
+        if fid == "labour.rate":
+            return [ps["labour"]["rate"], ps["labour"]["currency"]]
+        if ":" in fid:
+            kind, rest = fid.split(":", 1)
+            code, attr = rest.rsplit(".", 1)
+            rows = {
+                "fabric": ps["fabrics"],
+                "component": ps["components"],
+                "operation": ps["labour"]["operations"],
+            }[kind]
+            row = next((r for r in rows if r.get("code") == code), None)
+            if row is None:
+                return None
+            return [row[attr], row["currency"]] if attr == "price" else row[attr]
+        channel, attr = fid.split(".", 1)
+        ch = ps["channels"][channel]
+        if attr in ("shipping", "packaging"):
+            return [ch["extras"][attr]["amount"], ch["extras"][attr]["currency"]]
+        if attr == "duties":
+            return [ch["extras"]["duties"]["mode"], ch["extras"]["duties"]["value"]]
+        return ch[attr]
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def placeholders(
+    ps: dict[str, Any], documented: dict[str, Any], unconfirmed: set[str]
+) -> list[str]:
+    """The ids of the fields still at their documented placeholder: the yaml key is "to confirm"
+    (`unconfirmed`), the value equals `documented` (the yaml's own price set) and the owner has
+    not confirmed it (the set's `confirmed` list)."""
+    confirmed = set(ps.get("confirmed") or [])
+    out = []
+    for fid, key in FIELD_KEYS.items():
+        if key not in unconfirmed or fid in confirmed:
+            continue
+        v = field_value(ps, fid)
+        if v is not None and v == field_value(documented, fid):
+            out.append(fid)
+    return out
+
+
 # ---- checking a price set -----------------------------------------------------------------------
 
 

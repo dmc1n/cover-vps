@@ -186,3 +186,53 @@ def test_the_odoo_records_have_the_bill_of_materials(app: Any) -> None:
     }
     assert r["res.currency.rate"][0]["currency_id"] == "IDR"
     assert login(app, "eddy").get("/api/prices/odoo").status_code == 403
+
+
+def test_the_page_checks_unsaved_numbers_and_costs_the_example(app: Any) -> None:
+    """POST /api/prices/check: the live examples beside the settings and the placeholder marks,
+    with the numbers as typed (nothing saved, nothing published)."""
+    admin, editor = login(app, "rick"), login(app, "eddy")
+    state = admin.get("/api/prices").json()
+    total = state["placeholder_total"]
+    assert total >= 20 and len(state["placeholders"]) == total  # nothing confirmed yet
+    assert "fabric:coverlast.price" in state["placeholders"]
+    assert "b2c.vat_pct" not in state["placeholders"]  # Dutch VAT is not "to confirm"
+    assert editor.get("/api/prices/products").json()["example"] == "drawing-t1"
+    base = state["current"]
+    live = admin.get("/api/prices/costing?model=drawing-t1").json()
+    typed = copy.deepcopy(base)
+    typed["fabrics"][0]["price"] = 450000
+    typed["fabrics"][0]["currency"] = "IDR"
+    typed["labour"]["operations"][1]["minutes"] = "13"  # as the page may send it
+    typed["confirmed"] = ["b2c.pct"]
+    r = editor.post("/api/prices/check", json={"data": typed, "model": "drawing-t1"}).json()
+    assert r["errors"] == [] and r["placeholder_total"] == total
+    left = set(r["placeholders"])
+    assert "fabric:coverlast.price" not in left  # changed
+    assert "operation:piece.minutes" not in left  # changed
+    assert "b2c.pct" not in left  # confirmed at its value
+    assert "b2b.pct" in left and len(left) == total - 3
+    c = r["costing"]
+    fabric = next(x for x in c["lines"] if x["section"] == "fabric")
+    assert fabric["currency"] == "IDR"
+    assert fabric["eur"] == pytest.approx(
+        fabric["qty"] * 450000 / base["exchange"]["idr_per_eur"], abs=0.02
+    )
+    assert c["labour_minutes"] > live["labour_minutes"] and c["name"] == "Drawing T1"
+    # nothing was saved or published
+    after = admin.get("/api/prices").json()
+    assert after["draft"] is None and after["current"] == base
+    # a configurator product, wrong numbers, a cover that is not there
+    k = editor.post(
+        "/api/prices/check", json={"data": base, "product": "sofa", "sizes": {"length_cm": 200}}
+    ).json()
+    assert k["costing"]["kind"] == "configurator"
+    bad = copy.deepcopy(base)
+    bad["channels"]["b2c"]["method"] = "margin"
+    bad["channels"]["b2c"]["pct"] = 100
+    b = editor.post("/api/prices/check", json={"data": bad, "model": "drawing-t1"}).json()
+    assert b["errors"] and b["costing"] is None
+    n = editor.post("/api/prices/check", json={"data": base, "model": "nope"}).json()
+    assert n["costing"] is None and "no calculated cover" in n["costing_error"]
+    assert editor.post("/api/prices/check", json={}).status_code == 400
+    assert login(app, "vera").post("/api/prices/check", json={"data": base}).status_code == 403

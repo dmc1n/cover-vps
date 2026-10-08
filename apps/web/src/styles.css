@@ -377,7 +377,51 @@ fieldset.card legend { font-weight: 600; text-transform: capitalize; padding: 0 
 .prices td.down { color: var(--ok); }
 .prices .prices-moves { border-left: 4px solid var(--sand); }
 .prices table.list { display: block; overflow-x: auto; }
+/* what each tab is for, every field's unit and help, placeholders, live examples */
+.prices .prices-flow { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 10px 0; counter-reset: flow; }
+.prices .prices-flow li { flex: 1 1 160px; display: grid; gap: 2px; padding: 8px 12px; background: var(--cream); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.prices .prices-flow li span { color: var(--muted); font-size: 12px; }
+.prices .prices-intro { margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--sage); background: var(--accent-soft); border-radius: 0 var(--radius) var(--radius) 0; font-size: 14px; line-height: 1.45; }
+.prices .prices-intro p { margin: 4px 0; }
+.prices .help { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.prices td .help { max-width: 380px; }
+.prices .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px 22px; margin: 8px 0; }
+.prices .fields.one { grid-template-columns: 1fr; gap: 12px; }
+.prices .field { display: grid; gap: 4px; align-content: start; }
+.prices .field-label { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.prices .field-input { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.prices .field .help { margin: 0; }
+.prices .ph { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 11.5px; font-weight: 500; padding: 1px 8px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); white-space: nowrap; }
+.prices td .ph { display: flex; width: fit-content; margin-top: 4px; }
+.prices .ph button.link { color: var(--accent); font-size: 11.5px; text-decoration: underline; padding: 0 2px; }
+.prices .pill.ph-count { background: var(--warn-soft); color: var(--warn); font-weight: 600; margin-left: 0; }
+.prices .pill.ok { background: var(--ok-soft); color: var(--ok); margin-left: 0; }
+.prices .code-row { margin-top: 4px; font-size: 11.5px; color: var(--muted); }
+.prices .code-row input { width: 110px; font-size: 12px; padding: 2px 6px; }
+.prices .nowrap { white-space: nowrap; display: inline-flex; gap: 4px; align-items: center; }
+.prices td.example-cell { font-size: 13px; min-width: 150px; }
+.prices .prices-example { margin-top: 14px; padding: 10px 14px; border: 1px dashed var(--sand); border-radius: 8px; background: var(--cream); font-size: 13.5px; }
+.prices .prices-example p { margin: 6px 0 2px; }
+.prices .example-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.prices .example-head select { max-width: 100%; font-size: 13px; }
+.prices .example-list { margin: 6px 0; padding-left: 18px; }
+.prices ol.worked { margin: 6px 0 2px; padding-left: 20px; display: grid; gap: 3px; }
+.prices details.explain { margin: 6px 0 2px; font-size: 13.5px; }
+.prices details.explain summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+.prices dl.terms { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 8px 0 4px; }
+.prices dl.terms dt { font-weight: 600; }
+.prices dl.terms dd { margin: 0; }
 @media (max-width: 700px) {
   .prices .prices-channels { grid-template-columns: 1fr; }
   .prices label.setting { flex-direction: column; align-items: flex-start; }
+  .prices .fields { grid-template-columns: 1fr; }
+  .prices dl.terms { grid-template-columns: 1fr; }
+  .prices dl.terms dd { margin-bottom: 6px; }
+  .prices .ph { white-space: normal; }
+  /* components and operations: one card per row, every cell with its label */
+  .prices table.prices-table thead { display: none; }
+  .prices table.prices-table tr { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .prices table.prices-table td { display: block; border: none; padding: 0 4px; }
+  .prices table.prices-table td[data-label]::before { content: attr(data-label); display: block; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+  .prices table.prices-table input.wide { min-width: 0; width: 100%; box-sizing: border-box; }
 }

@@ -19,6 +19,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -201,6 +202,22 @@ def compare(
     return {"rows": changed, "changed": len(changed), "total": len(rows)}
 
 
+def example(facts: dict[str, dict[str, Any]]) -> str | None:
+    """A representative cover for the page's live examples: the middle one (by metres of
+    fabric) of the catalogue's 2-seaters, else of the catalogue, else of all covers."""
+    seater = [
+        k
+        for k, f in facts.items()
+        if f["kind"] == "catalogue" and re.search(r"2[ -]seater", f["name"], re.IGNORECASE)
+    ]
+    catalogue = [k for k, f in facts.items() if f["kind"] == "catalogue"]
+    pool = seater or catalogue or list(facts)
+    if not pool:
+        return None
+    pool.sort(key=lambda k: (float(facts[k].get("fabric_m") or 0), k))
+    return pool[len(pool) // 2]
+
+
 def costing_csv(c: dict[str, Any], title: str) -> str:
     buf = io.StringIO()
     w = csv.writer(buf)
@@ -358,6 +375,7 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
     from coverengine import costing
     from coverengine import quote as q
     from coverengine.errors import CoverError
+    from coverengine.params.registry import Registry
 
     from coverapi.security import require
     from coverapi.shop import shop_params
@@ -386,6 +404,22 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             raise HTTPException(400, "; ".join(errs))
         return ps
 
+    reg = Registry.load(None)
+    documented = costing.default_price_set(reg.resolve())
+    unconfirmed = {k for k, spec in reg.specs.items() if spec.to_confirm}
+
+    def marks(ps: dict[str, Any]) -> dict[str, Any]:
+        """Which values are still the documented placeholders ("to confirm" in the yaml)."""
+        ids = [
+            f
+            for f, key in costing.FIELD_KEYS.items()
+            if key in unconfirmed and costing.field_value(ps, f) is not None
+        ]
+        return {
+            "placeholders": costing.placeholders(ps, documented, unconfirmed),
+            "placeholder_total": len(ids),
+        }
+
     @app.get("/api/prices")
     def get_prices(request: Request) -> dict[str, Any]:
         user = require(request, "edit")
@@ -399,6 +433,7 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             "draft_errors": costing.validate(d["data"]) if d else [],
             "defaults": defaults(auth),
             "can_edit": user.may("admin"),
+            **marks(d["data"] if d else (pub["data"] if pub else defaults(auth))),
             "choices": {
                 "per": list(costing.PER),
                 "per_label": costing.PER_LABEL,
@@ -511,9 +546,11 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
     @app.get("/api/prices/products")
     def products(request: Request) -> dict[str, Any]:
         require(request, "edit")
-        rows = [{"id": k, "name": f["name"], "kind": f["kind"]} for k, f in facts.all().items()]
+        every = facts.all()
+        rows = [{"id": k, "name": f["name"], "kind": f["kind"]} for k, f in every.items()]
         return {
             "models": rows,
+            "example": example(every),
             "configurator": [
                 {
                     "product": k,
@@ -527,27 +564,23 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             ],
         }
 
-    def costing_for(request: Request) -> tuple[dict[str, Any], str]:
-        """?model=<id> or ?product=<p>&sizes=<json>&colour=..; &set=draft|current."""
-        qp = request.query_params
-        ps = which(qp.get("set"))
-        model = qp.get("model")
+    def cost_of(
+        ps: dict[str, Any],
+        model: str | None,
+        product: str = "",
+        sizes: Any = None,
+        colour: str | None = None,
+        vents: bool = True,
+    ) -> tuple[dict[str, Any], str]:
+        """The costing of a calculated cover (`model`) or of a configurator product with its
+        sizes, under the price set `ps`."""
         if model:
             f = facts.get(model)
             if f is None:
                 raise HTTPException(404, "no calculated cover (finished.json) for this model")
-            c = costing.costing(f, ps, model, colour=qp.get("colour") or None)
+            c = costing.costing(f, ps, model, colour=colour)
             return {**c, "model": model, "name": f["name"], "kind": f["kind"]}, model
-        product = qp.get("product") or ""
-        try:
-            sizes = json.loads(qp.get("sizes") or "{}")
-        except ValueError:
-            raise HTTPException(400, "sizes: JSON") from None
-        given = {
-            **(sizes if isinstance(sizes, dict) else {}),
-            "colour": qp.get("colour") or None,
-            "vents": qp.get("vents", "true") != "false",
-        }
+        given = {**(sizes if isinstance(sizes, dict) else {}), "colour": colour, "vents": vents}
         try:
             full = q.proposal(product, given, shop_params(auth), ps)
         except CoverError as exc:
@@ -561,6 +594,53 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             "kind": "configurator",
             "sizes_cm": full["sizes_cm"],
         }, f"configurator-{product}"
+
+    def costing_for(request: Request) -> tuple[dict[str, Any], str]:
+        """?model=<id> or ?product=<p>&sizes=<json>&colour=..; &set=draft|current."""
+        qp = request.query_params
+        ps = which(qp.get("set"))
+        try:
+            sizes = json.loads(qp.get("sizes") or "{}")
+        except ValueError:
+            raise HTTPException(400, "sizes: JSON") from None
+        return cost_of(
+            ps,
+            qp.get("model"),
+            qp.get("product") or "",
+            sizes,
+            qp.get("colour") or None,
+            qp.get("vents", "true") != "false",
+        )
+
+    @app.post("/api/prices/check")
+    async def check(request: Request) -> dict[str, Any]:
+        """The page's numbers as they are typed, before anything is saved: what is wrong, which
+        values are still placeholders, and (with `model`, or `product` and `sizes`) the costing
+        of that one cover under these numbers, for the live examples beside the settings."""
+        require(request, "edit")
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        if not isinstance(body, dict) or not isinstance(body.get("data"), dict):
+            raise HTTPException(400, "send {data: the price set, model: a cover to cost}")
+        ps = costing.normalised(body["data"])
+        errs = costing.validate(ps)
+        out: dict[str, Any] = {"errors": errs, **marks(ps), "costing": None}
+        if errs or not (body.get("model") or body.get("product")):
+            return out
+        try:
+            out["costing"] = cost_of(
+                ps,
+                str(body.get("model") or "") or None,
+                str(body.get("product") or ""),
+                body.get("sizes"),
+            )[0]
+        except HTTPException as exc:
+            out["costing_error"] = exc.detail
+        except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
+            out["costing_error"] = f"cannot cost with these numbers: {exc}"
+        return out
 
     @app.get("/api/prices/costing")
     def get_costing(request: Request) -> dict[str, Any]:
