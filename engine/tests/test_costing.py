@@ -218,3 +218,24 @@ def test_the_configurator_uses_the_price_set() -> None:
     assert q1["price"]["b2b_ex_vat_eur"] < q1["price"]["sale_ex_vat_eur"]
     # the yaml defaults when nothing is published
     assert quote.proposal("sofa", {}, PARAMS)["price"]["placeholder_prices"] is True
+
+
+def test_placeholders_are_the_documented_values_still_to_confirm() -> None:
+    reg = Registry.load(None)
+    unconfirmed = {k for k, s in reg.specs.items() if s.to_confirm}
+    documented = costing.default_price_set(PARAMS)
+    ps = copy.deepcopy(documented)
+    every = costing.placeholders(ps, documented, unconfirmed)
+    assert "fabric:coverlast.price" in every and "exchange.idr_per_eur" in every
+    assert "b2c.vat_pct" not in every and "fabric:coverlast.roll_width_mm" not in every
+    assert all(costing.FIELD_KEYS[f] in unconfirmed for f in every)
+    # changed, switched to rupiah, or confirmed: no longer a placeholder
+    ps["labour"]["operations"][0]["minutes"] += 1
+    ps["components"][0]["currency"] = "IDR"
+    ps["channels"]["b2b"]["extras"]["duties"]["mode"] = "fixed"
+    ps["confirmed"] = ["b2c.pct"]
+    left = set(costing.placeholders(ps, documented, unconfirmed))
+    gone = {"operation:cut_setup.minutes", "component:vent_set.price", "b2b.duties", "b2c.pct"}
+    assert left == set(every) - gone
+    assert costing.field_value(ps, "component:nope.price") is None
+    assert costing.validate(ps) == []  # the confirmed list does not trouble the checks

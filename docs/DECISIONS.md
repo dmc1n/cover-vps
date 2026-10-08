@@ -2741,5 +2741,14 @@ docs/plans/prices-costing.md; handbook: docs/handbook/prices.md.
   product.template, mrp.bom (+ lines and operations), mrp.workcenter and product.pricelist,
   with external ids `cover_studio.<code>`. No connection; step 2 uses Odoo's XML-RPC/JSON-RPC
   against their own server.
+- **A page that explains itself** (owner, 8 Oct: "very basic, add more information so I know
+  what I fill in"): an intro per tab, a unit and a help line per field, "terms explained"
+  that open on a tap (tablet: no hovering), and a "placeholder — please confirm" mark with a
+  counter. A field is a placeholder while its yaml key says "to confirm", its value equals the
+  yaml default (`costing.FIELD_KEYS`, `placeholders()`) and it is not in the set's
+  `confirmed` list ("keep this value"). Live examples cost one real cover with the unsaved
+  numbers: `POST /api/prices/check` {data, model | product + sizes} returns the errors, the
+  placeholders and that costing; nothing is saved. The example is the middle (by fabric metres)
+  of the catalogue's 2-seaters, or any cover the owner picks. The maths did not change.
 - **Better later:** price per colour/quality in the configurator, separate workcenters, shipping
   per country and box size, duties per HS code, the B2B storefront.
