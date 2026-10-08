@@ -1,0 +1,23 @@
+/* The home page's film (ADR-101). The cover sits a little right of centre in every shot, so
+   the headline has the calm left; on a narrow screen the crop follows the cover. Colours come
+   from the shared tokens. */
+.hf {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 58% 50%;
+  background: var(--olive-2);
+}
+.hf-empty {
+  background: radial-gradient(
+    120% 90% at 70% 20%,
+    var(--sage) 0%,
+    var(--olive-2) 70%
+  );
+}
+@media (max-aspect-ratio: 1/1) {
+  .hf {
+    object-position: 62% 50%;
+  }
+}

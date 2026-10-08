@@ -1,5 +1,5 @@
 // The home page as one scrolling story (docs/plans/scroll-site.md, ADR-067), in the S2DIO house
-// style. The film shrinks into the arch of the logo; then one pinned 3D scene in which scrolling
+// style. The film (HeroFilm, ADR-101) shrinks into the arch of the logo; then one pinned 3D scene in which scrolling
 // morphs our own data (the furniture, the cover, its pieces, flat on the roll, sewn and fitted,
 // the rain); then the workshop in arch-framed clips sliding sideways; true numbers; the FAQ.
 // Smooth scrolling (Lenis) and scrubbed motion (GSAP ScrollTrigger); visitors who asked their
@@ -10,6 +10,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { StoryScene } from "./StoryScene";
 import { StoryFrames } from "./StoryFrames";
+import { HeroFilm } from "./HeroFilm";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -156,15 +157,13 @@ export function Story({
     <div className="st" ref={root}>
       <section className="st-hero">
         <div className="st-hero-frame">
-          {clip("hero") ? (
-            <video
-              src={clip("hero")}
-              poster={clip("hero_poster") || undefined}
-              autoPlay={!calm}
-              muted
-              loop
-              playsInline
-              preload="auto"
+          {clip("hero") || clip("hero_av1") || clip("hero_poster") ? (
+            <HeroFilm
+              media={{
+                h264: clip("hero"),
+                av1: clip("hero_av1"),
+                poster: clip("hero_poster"),
+              }}
             />
           ) : (
             <div className="st-hero-fallback" />

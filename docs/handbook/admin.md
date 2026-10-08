@@ -122,7 +122,12 @@ Three tabs on the admin page belong to it.
   - prices: on the **Prices & costing** tab now (versioned, B2C and B2B; docs/handbook/prices.md);
   - delivery costs per country;
   - the Mollie key (`test_…` to try, `live_…` for real);
-  - the balloon and frame products, colours, and the film's address.
+  - the balloon and frame products, colours, and the film's address: **film_url** (H.264),
+    **film_av1** (the same film in AV1, smaller and sharper where the browser plays it) and
+    **film_poster** (its first frame). For the scroll story the same three are
+    `story_media.hero`, `hero_av1` and `hero_poster`. The film files go in the data folder's
+    `media/`; a new film gets a new name (`hero-kota2-…`), because the website keeps
+    `/media` files for a day. How the film is made: ADR-101 (`scripts/film/`).
 
   The empty fields are listed at the top.
 - **Website (AI):** type what should change on the site, in plain words, for example "add a

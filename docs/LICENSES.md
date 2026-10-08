@@ -47,3 +47,6 @@ Note column.
 | React, Vite, Three.js | MIT | web app (M6) |
 | cloudflared | Apache-2.0 | Cloudflare Tunnel (M6) |
 | Single-stroke pen font (`coverengine/export/strokefont.py`) | ours | pen text |
+| Blender 4.2 LTS | GPL-3.0-or-later | renders the website's films offline (ADR-065, ADR-071, ADR-101); not shipped |
+| FFmpeg (static build, libaom, libx264) | GPL-3.0 | encodes the films offline (ADR-101); not shipped |
+| Poly Haven assets: HDRIs *hotel_rooftop_balcony*, *kloofendal_overcast*; textures *stretch_poplin*, *large_grey_tiles*, *white_plaster_02*, *concrete_floor_02*; model *potted_plant_04* | CC0-1.0 | the hero film's light, weave, stone, plaster and plant (`scripts/film/hero_assets.py`, ADR-101) |

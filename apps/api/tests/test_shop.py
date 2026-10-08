@@ -265,6 +265,22 @@ def test_the_film_is_served_with_byte_ranges(app: Any) -> None:
     assert c.get("/media/other.exe").status_code == 404
 
 
+def test_the_home_film_comes_in_av1_and_h264_with_a_poster(app: Any) -> None:
+    """ADR-101: the hero film in two codecs and its poster reach the page through the settings;
+    the media names it uses are served."""
+    admin = _login(app)
+    film = {"film_url": "/media/hero-kota1-h264.mp4", "film_av1": "/media/hero-kota1-av1.mp4",
+            "film_poster": "/media/hero-kota1.jpg"}  # fmt: skip
+    assert admin.put("/api/admin/shop/settings", json=film).status_code == 200
+    got = TestClient(app).get("/api/shop/info").json()["settings"]
+    assert {k: got[k] for k in film} == film
+    media = app.state.store.root / "media"
+    media.mkdir(parents=True, exist_ok=True)
+    for name in ("hero-kota1-h264.mp4", "hero-kota1-av1.mp4", "hero-kota1.jpg", "hero-kota1.webp"):
+        (media / name).write_bytes(b"x" * 10)
+        assert TestClient(app).get(f"/media/{name}").status_code == 200
+
+
 def test_the_website_reaches_the_studio_with_its_key_and_the_public_does_not(app: Any) -> None:
     """ADR-066: the website (its own domain, a Cloudflare Worker) uses the studio's shop with a
     key; with the link closed, the public is sent to the website and the API refuses them."""

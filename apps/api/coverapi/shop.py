@@ -70,7 +70,8 @@ SHOP_DEFAULTS: dict[str, Any] = {
         "frame": {"name": "Cover frame", "size": "", "photo": ""},
     },  # fmt: skip
     "colours": "",
-    "film_url": "",
+    "film_url": "",  # the home page's film, H.264 (/media/<file>.mp4)
+    "film_av1": "",  # the same film in AV1, played where the browser can (ADR-101)
     "film_poster": "",
     "logo_url": "",
     "home_story": False,  # the scroll story as the home page (on: live; preview.<domain> always)
@@ -795,6 +796,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             or [{"country": x["country"], "name": x["name"], "eur": 0} for x in s["shipping"]],
             "payment": bool(s["payment"].get("mollie_key")),
             "film_url": s["film_url"],
+            "film_av1": s["film_av1"],
             "film_poster": s["film_poster"],
             "logo_url": s["logo_url"],
             "home_story": bool(s["home_story"]),
