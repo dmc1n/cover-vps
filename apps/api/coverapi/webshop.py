@@ -144,7 +144,9 @@ def install(app: FastAPI, auth: Any, quotes_dir: Path, models_dir: Path) -> None
         p = params()
         given = {**req.sizes, "vents": req.vents, "colour": req.colour}
         try:
-            full = q.proposal(req.product, given, p)
+            from coverapi.prices import current
+
+            full = q.proposal(req.product, given, p, current(auth))
             glb = q.preview_glb(req.product, given, p)
         except CoverError as exc:
             raise HTTPException(400, str(exc)) from None

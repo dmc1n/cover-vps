@@ -12,7 +12,8 @@ shapes we already make from the owner's drawings (`drawn.py`) and the company ru
 
 Every piece of these shapes is flat, so its size and area are exact: the proposal takes well
 under a second. The price comes from the cost model `quote.*` in config/defaults.yaml (to
-confirm by the owner). The definitive pattern is made after the order, with the full program.
+confirm by the owner), or from the price set published on the admin page (ADR-098,
+`costing.py`). The definitive pattern is made after the order, with the full program.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ import numpy as np
 import shapely
 import trimesh
 
-from coverengine import drawn
+from coverengine import costing, drawn
 from coverengine.errors import CoverError
 from coverengine.params import EffectiveParams
 
@@ -41,8 +42,6 @@ def _join(meshes: Any) -> trimesh.Trimesh:
 MM_PER_CM = 10.0  # param-ok: unit conversion
 MM_PER_M = 1000.0  # param-ok: unit conversion
 MM2_PER_M2 = 1e6  # param-ok: unit conversion
-MIN_PER_H = 60.0  # param-ok: unit conversion
-PERCENT = 100.0  # param-ok: ratio to percent
 
 # what a customer can cover: the fields (cm), their defaults and sensible ranges, in
 # config/quote_products.json (the owner can change them there)
@@ -210,7 +209,10 @@ def _shelf(rects: list[tuple[float, float]], width: float) -> float:
     return float(sum(r[1] for r in rows))
 
 
-def proposal(product: str, given: dict[str, Any], params: EffectiveParams) -> dict[str, Any]:
+def proposal(product: str, given: dict[str, Any], params: EffectiveParams,
+             prices: dict[str, Any] | None = None) -> dict[str, Any]:  # fmt: skip
+    """The proposal and its price. `prices` is the published price set (ADR-098); without one,
+    the defaults of config/defaults.yaml."""
     shape, sizes, facts = _sizes(product, given, params)
     allowance = _p(params, "stitching.allowance_mm")
     roll_usable = _p(params, "roll.usable_width_mm")
@@ -253,7 +255,13 @@ def proposal(product: str, given: dict[str, Any], params: EffectiveParams) -> di
     cord_m = (hem_mm / MM_PER_M + _p(params, "quote.cord_extra_m")) * (
         2 if facts.get("middle_cord") else 1)  # fmt: skip
     seam_m = _seam_length(pieces) / MM_PER_M
-    cost = _cost(roll_mm / MM_PER_M, len(pieces), seam_m, vents, cord_m, facts["balloons"], params)
+    colour = given.get("colour") or colours(params)[0]
+    cost = _cost({"piece": len(pieces), "fabric_m": roll_mm / MM_PER_M, "seam_m": seam_m,
+                  "hem_m": hem_mm / MM_PER_M, "vent": vents, "cord_m": cord_m,
+                  "roll_width_mm": _p(params, "roll.width_mm"), "fabric_m2": cut_area / MM2_PER_M2,
+                  # the balloons are sold next to the cover (the shop's support), not in it
+                  "balloon": 0},
+                 prices or costing.default_price_set(params), colour)  # fmt: skip
     return {
         "product": product,
         "shape": shape,
@@ -268,7 +276,8 @@ def proposal(product: str, given: dict[str, Any], params: EffectiveParams) -> di
         "drawcord_m": round(cord_m, 1),
         "balloons": facts["balloons"],
         "chair_space": facts.get("chair_space", False),
-        "colour": given.get("colour") or colours(params)[0],
+        "hem_m": round(hem_mm / MM_PER_M, 1),
+        "colour": colour,
         "price": cost,
         "note": "a proposal from rough sizes; the definitive pattern is made after the order",
     }
@@ -300,29 +309,23 @@ def _seam_length(pieces: list[drawn.Piece]) -> float:
     )
 
 
-def _cost(roll_m: float, pieces: int, seam_m: float, vents: int, cord_m: float, balloons: int,
-          params: EffectiveParams) -> dict[str, Any]:  # fmt: skip
-    waste = 1 + _p(params, "quote.waste_pct") / PERCENT
-    fabric = roll_m * waste * _p(params, "quote.fabric_eur_per_m")
-    minutes = (_p(params, "quote.minutes_base") + pieces * _p(params, "quote.minutes_per_piece")
-               + seam_m * _p(params, "quote.minutes_per_seam_m")
-               + vents * _p(params, "quote.minutes_per_vent"))  # fmt: skip
-    labour = minutes / MIN_PER_H * _p(params, "quote.labour_eur_per_hour")
-    parts = (vents * _p(params, "quote.vent_eur") + cord_m * _p(params, "quote.cord_eur_per_m")
-             + balloons * _p(params, "quote.balloon_eur"))  # fmt: skip
-    cost = fabric + labour + parts
-    sale = cost * (1 + _p(params, "quote.markup_pct") / PERCENT)
-    vat = sale * _p(params, "quote.vat_pct") / PERCENT
+def _cost(facts: dict[str, Any], prices: dict[str, Any], colour: str | None) -> dict[str, Any]:
+    """The consumer price (and the full costing for our side; the customer never sees it)."""
+    c = costing.costing(facts, prices, colour=colour)
+    b2c, b2b = c["channels"]["b2c"], c["channels"]["b2b"]
     return {
-        "fabric_eur": round(fabric, 2),
-        "labour_minutes": round(minutes),
-        "labour_eur": round(labour, 2),
-        "parts_eur": round(parts, 2),
-        "cost_eur": round(cost, 2),
-        "sale_ex_vat_eur": round(sale, 2),
-        "vat_eur": round(vat, 2),
-        "sale_eur": round(sale + vat, 2),
-        "placeholder_prices": bool(params["quote.prices_are_placeholders"]),
+        "fabric_eur": c["fabric_eur"],
+        "labour_minutes": round(c["labour_minutes"]),
+        "labour_eur": c["labour_eur"],
+        "parts_eur": c["components_eur"],
+        "cost_eur": c["cost_eur"],
+        "extras_eur": b2c["extras_eur"],
+        "sale_ex_vat_eur": b2c["net_eur"],
+        "vat_eur": b2c["vat_eur"],
+        "sale_eur": b2c["gross_eur"],
+        "b2b_ex_vat_eur": b2b["net_eur"],
+        "placeholder_prices": c["indicative"],
+        "costing": c,
     }
 
 
@@ -556,7 +559,8 @@ def balloons_mesh(product: str, given: dict[str, Any], params: EffectiveParams
     return _join(balls)
 
 
-def rain_check(product: str, given: dict[str, Any], params: EffectiveParams) -> dict[str, Any]:
+def rain_check(product: str, given: dict[str, Any], params: EffectiveParams,
+               prices: dict[str, Any] | None = None) -> dict[str, Any]:  # fmt: skip
     """Where rain stays on the proposed cover without support, with balloons and with a frame,
     and what the shop advises (the upsell). Box covers only; the other shapes are checked
     as they are."""
@@ -592,22 +596,20 @@ def rain_check(product: str, given: dict[str, Any], params: EffectiveParams) -> 
             "dry": dry,
             "_water_glb": water,
         }
+    ps = prices or costing.default_price_set(params)
     advice = None
     if "balloons" in out and not out["none"]["dry"]:
         n = max(1, int(facts.get("balloons") or 1))
         if out["balloons"]["dry"]:
             advice = {"support": "balloons", "count": n,
-                      "price_eur": round(n * _p(params, "quote.balloon_eur")
-                                         * (1 + _p(params, "quote.markup_pct") / PERCENT)
-                                         * (1 + _p(params, "quote.vat_pct") / PERCENT), 2),
+                      "price_eur": round(
+                          n * costing.accessory_price(ps, "balloon", "b2c")["gross_eur"], 2),
                       "why": f"without support {out['none']['flat_m2']} m2 of the top is flat: "
                              "water stays. "
                              f"With {n} balloon(s) under the cover it runs off."}  # fmt: skip
         elif "frame" in out and out["frame"]["dry"]:
             advice = {"support": "frame", "count": 1,
-                      "price_eur": round(_p(params, "quote.frame_eur")
-                                         * (1 + _p(params, "quote.markup_pct") / PERCENT)
-                                         * (1 + _p(params, "quote.vat_pct") / PERCENT), 2),
+                      "price_eur": costing.accessory_price(ps, "frame", "b2c")["gross_eur"],
                       "why": "a frame gives the top a fixed slope: water runs off."}  # fmt: skip
     return {"options": out, "advice": advice}
 

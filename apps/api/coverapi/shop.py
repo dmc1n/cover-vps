@@ -622,10 +622,11 @@ def shop_params(auth: Any) -> Any:
 
 
 def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
+    from coverengine import costing
     from coverengine import quote as q
     from coverengine.errors import CoverError
 
-    from coverapi import mailer
+    from coverapi import mailer, prices
     from coverapi.security import _address, require
 
     site = Site(data / "site")
@@ -709,9 +710,9 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         s = settings()
         key = s["payment"].get("mollie_key") or ""
         s["payment"]["mollie_key"] = (key[:5] + "…" + key[-4:]) if key else ""  # never in full
-        missing = [k for k, v in s["company"].items() if not v] + [
-            k for k, v in s["prices"].items() if v in (None, "")
-        ]  # fmt: skip
+        # the prices are on the Prices & costing tab now (ADR-098); "prices" here only feeds
+        # the defaults until the first price set is published
+        missing = [k for k, v in s["company"].items() if not v]
         return {"settings": s, "missing": missing, "defaults": SHOP_DEFAULTS,
                 "link_key_set": bool(auth.setting(LINK_SETTING, ""))}  # fmt: skip
 
@@ -801,7 +802,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             "story_media": s["story_media"],
             "colours": q.colours(p),
             "products": s["products"],
-            "indicative": bool(p["quote.prices_are_placeholders"]),
+            "indicative": bool(prices.current(auth).get("indicative", True)),
             "languages": site_languages(auth),
             "matching": str(p["match.mode"]),
         }
@@ -825,27 +826,26 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         from coverengine import match as mt
 
         p = shop_params(auth)
+        ps = prices.current(auth)  # the published price set (ADR-098)
         stock = _stock(req.stock_model, req.product) if req.stock_model else None
         sizes = (
             {**req.sizes, **mt.fields_for(req.product, stock["size_cm"])} if stock else req.sizes
         )
         given = {**sizes, "vents": req.vents, "colour": req.colour}
         try:
-            full = q.proposal(req.product, given, p)
-            rain = q.rain_check(req.product, given, p)
+            full = q.proposal(req.product, given, p, ps)
+            rain = q.rain_check(req.product, given, p, ps)
             glb = q.scene_glb(req.product, given, p, req.support)
         except CoverError as exc:
             raise HTTPException(400, str(exc)) from None
         if stock:  # an existing cover: its own sizes, and the stock discount (when set)
             off = settings()["matching"].get("stock_discount_pct") or 0
             full["price"]["sale_eur"] = round(full["price"]["sale_eur"] * (1 - float(off) / 100), 2)  # noqa: PLR2004 - percent
-        extra = 0.0
-        markup = 1 + float(p["quote.markup_pct"]) / 100  # noqa: PLR2004 - percent
-        vat = 1 + float(p["quote.vat_pct"]) / 100  # noqa: PLR2004 - percent
+        extra = 0.0  # the support is sold next to the cover, at the consumer price list's price
         if req.support == "balloons":
-            extra = full["balloons"] * float(p["quote.balloon_eur"]) * markup * vat
+            extra = full["balloons"] * costing.accessory_price(ps, "balloon", "b2c")["gross_eur"]
         elif req.support == "frame":
-            extra = float(p["quote.frame_eur"]) * markup * vat
+            extra = costing.accessory_price(ps, "frame", "b2c")["gross_eur"]
         qid = q.new_id()
         for support, r in rain["options"].items():  # the water in 3D, per support
             water = r.pop("_water_glb", None)

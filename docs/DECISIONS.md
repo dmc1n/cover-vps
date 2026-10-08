@@ -2697,3 +2697,49 @@ kept (10, 8, 4, 4), none on an inner wall.
   view); it is the same drawing as drawing-l1 (10 pieces).
 - **For the owner** (open questions): is the flat back strip sewn as its own piece (as drawn) or
   folded from the slope? Is the hidden back wall one band (as now) or a piece per section?
+
+## ADR-098 — Prices and costing: a versioned price set per channel, shaped for Odoo
+
+The owner (7–8 Oct 2026): "an admin page where I easily fill in prices and make costings; later
+it must link to our Odoo in Indonesia." A fixed IDR→EUR rate entered by hand, both currencies
+shown; two channels (B2C webshop, B2B Sunsit and dealers) with their own price lists; shipping,
+duties and packaging as lines of their own; all admins may edit. Plan and Odoo mapping:
+docs/plans/prices-costing.md; handbook: docs/handbook/prices.md.
+
+- **One price set**, a JSON document (`coverengine/costing.py`): exchange, fabrics, components,
+  labour (rate and operations), channels (extras, method, rounding, VAT, fixed prices). Every
+  component and operation is counted `per` a fact of the cover (cover, piece, seam_m, hem_m,
+  vent, cord_m, elastic_m, fabric_m, balloon, frame), so a bill of materials follows from the
+  facts and the owner can add lines without code.
+- **The facts come from the real cut pieces:** `finished.json` (panels, seam and hem edges,
+  vent hoods, the cut plan's roll length) and `hull.json` (balloons, frame); the configurator's
+  proposal gives the same facts. Metres of fabric = the cut plan's roll length + waste, scaled
+  when a fabric's roll is narrower.
+- **Prices:** markup (base × (1 + p)) or margin (base ÷ (1 − p)) on the landed cost (cost +
+  extras, the default) or on cost alone; rounded up to .95 / .99 / whole / 5 / 10 on the shown
+  price (incl. VAT for B2C, ex VAT for B2B); a fixed price per product wins in its channel.
+  Duties as a % are taken of cost + shipping (customs value).
+- **Versioned in app.db**, not the yaml: table `price_sets` (append only; a rollback is a new
+  version pointing at the old one) and the setting `prices_draft`. Draft → preview (every
+  price that moves) → publish; audit log entries `prices published` and `prices rolled back`.
+  Until the first publish the set is the yaml defaults with the old Shop settings prices on
+  top, so nothing changes in the shop until the owner publishes. "Indicative" is part of the
+  set.
+- **The yaml keeps the defaults:** `quote.minutes_base` is split into `minutes_cut_setup`,
+  `minutes_pack` and `minutes_per_hem_m`; new `fabric_name`, `elastic_eur_per_m`,
+  `b2b_markup_pct`, `b2c_/b2b_rounding`, `b2c_/b2b_shipping_eur`, `duties_pct`, `packaging_eur`,
+  `idr_per_eur`, `idr_rate_date` (all to confirm).
+- **Who reads it:** the shop's quote, the rain check's upsell, the support price, the public
+  API and `shop/info`'s "indicative" (`prices.current(auth)`). The Shop settings' prices block
+  is hidden (it only feeds the defaults now).
+- **A fix on the way:** the configurator counted the table balloons in the cover's own cost and
+  then charged them again as the support upsell. The balloons are now only sold next to the
+  cover (accessory price per channel).
+- **Rights:** admins edit and publish; editors see prices and costings (`#/prices`); viewers
+  get 403.
+- **Odoo seam:** `coverapi/odoo.py` maps the set and a cover's costing onto res.currency.rate,
+  product.template, mrp.bom (+ lines and operations), mrp.workcenter and product.pricelist,
+  with external ids `cover_studio.<code>`. No connection; step 2 uses Odoo's XML-RPC/JSON-RPC
+  against their own server.
+- **Better later:** price per colour/quality in the configurator, separate workcenters, shipping
+  per country and box size, duties per HS code, the B2B storefront.

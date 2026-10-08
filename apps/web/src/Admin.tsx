@@ -11,12 +11,14 @@ import {
   User,
   WebshopSettings,
 } from "./api";
+import { Prices } from "./Prices";
 
 type Tab =
   | "users"
   | "orders"
   | "matches"
   | "shop"
+  | "prices"
   | "website"
   | "webshop"
   | "mail"
@@ -45,6 +47,7 @@ export function Admin() {
             "orders",
             "matches",
             "shop",
+            "prices",
             "website",
             "webshop",
             "mail",
@@ -64,6 +67,7 @@ export function Admin() {
                 orders: "Orders",
                 matches: "Matches",
                 shop: "Shop settings",
+                prices: "Prices & costing",
                 website: "Website (AI)",
                 webshop: "Requests",
                 mail: "Mail and address",
@@ -85,6 +89,7 @@ export function Admin() {
         {tab === "orders" && <Orders />}
         {tab === "matches" && <Matches />}
         {tab === "shop" && <ShopSettings />}
+        {tab === "prices" && <Prices canEdit />}
         {tab === "website" && <Website />}
       </section>
     </>
@@ -1154,8 +1159,8 @@ function ShopSettings() {
         <p className="muted">
           Everything the shop needs. Empty fields are shown as placeholders in
           the shop; payments work as soon as a Mollie key is filled in (test_…
-          for testing, live_… for real). Prices: set them and tick{" "}
-          <i>confirmed</i> to drop "indicative".
+          for testing, live_… for real). The prices are on the{" "}
+          <i>Prices &amp; costing</i> tab.
         </p>
         {missing.length > 0 && (
           <p className="error">Still to fill in: {missing.join(", ")}</p>
@@ -1188,7 +1193,9 @@ function ShopSettings() {
           New website key
         </button>
       </section>
-      {Object.entries(s).map(([k, v]) => field([k], v))}
+      {Object.entries(s)
+        .filter(([k]) => k !== "prices") // on the Prices & costing tab now (ADR-098)
+        .map(([k, v]) => field([k], v))}
       <button className="primary">Save</button>
     </form>
   );

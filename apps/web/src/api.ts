@@ -331,8 +331,8 @@ export const api = {
   uploadDrawing: (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return fetch("/api/models/drawing", { method: "POST", body: form }).then((r) =>
-      json<{ model_id: string; code: string; job: Job }>(r),
+    return fetch("/api/models/drawing", { method: "POST", body: form }).then(
+      (r) => json<{ model_id: string; code: string; job: Job }>(r),
     );
   },
   rebuildDrawing: (id: string) =>
@@ -748,5 +748,194 @@ export const approvals = {
   ask: (id: string) =>
     send("POST", `/api/models/${id}/approval-request`).then((r) =>
       json<{ mailed: string[]; not_mailed: string[] }>(r),
+    ),
+};
+
+// ---- prices and costing (ADR-098) ---------------------------------------------------------------
+
+export type Currency = "EUR" | "IDR";
+export interface Fabric {
+  code: string;
+  name: string;
+  colours: string;
+  price: number;
+  currency: Currency;
+  roll_width_mm: number;
+  waste_pct: number;
+}
+export interface Component {
+  code: string;
+  name: string;
+  per: string;
+  price: number;
+  currency: Currency;
+}
+export interface Operation {
+  code: string;
+  name: string;
+  per: string;
+  minutes: number;
+}
+export interface Money {
+  amount: number;
+  currency: Currency;
+}
+export interface Channel {
+  name: string;
+  method: "markup" | "margin";
+  pct: number;
+  base: "landed" | "cost";
+  rounding: string;
+  vat_pct: number;
+  show_vat: boolean;
+  extras: {
+    shipping: Money;
+    duties: { mode: "pct" | "fixed"; value: number; currency?: Currency };
+    packaging: Money;
+  };
+  fixed: Record<string, number>;
+}
+export type ChannelKey = "b2c" | "b2b";
+export interface PriceSet {
+  format_version: number;
+  indicative: boolean;
+  exchange: { idr_per_eur: number; date: string; note: string };
+  fabrics: Fabric[];
+  components: Component[];
+  labour: { rate: number; currency: Currency; operations: Operation[] };
+  channels: Record<ChannelKey, Channel>;
+}
+export interface PriceVersion {
+  version: number;
+  created: number;
+  username: string;
+  note: string;
+  from_version: number | null;
+  data: PriceSet;
+}
+export interface PricesState {
+  published: PriceVersion | null;
+  current: PriceSet;
+  using_defaults: boolean;
+  draft: { data: PriceSet; by: string; time: number } | null;
+  draft_errors: string[];
+  defaults: PriceSet;
+  can_edit: boolean;
+  choices: {
+    per: string[];
+    per_label: Record<string, string>;
+    currencies: Currency[];
+    roundings: string[];
+    methods: string[];
+    bases: string[];
+    duty_modes: string[];
+  };
+}
+export interface PriceMove {
+  key: string;
+  name: string;
+  kind: string;
+  before: { cost: number; b2c: number; b2b: number };
+  after: { cost: number; b2c: number; b2b: number };
+  delta_b2c: number;
+}
+export interface CostLine {
+  section: string;
+  code: string;
+  name: string;
+  qty: number;
+  unit: string;
+  unit_price: number;
+  currency: Currency;
+  eur: number;
+  idr: number;
+  note: string;
+}
+export interface ChannelPrice {
+  name: string;
+  extras: { code: string; name: string; eur: number; idr: number }[];
+  extras_eur: number;
+  landed_eur: number;
+  method: string;
+  pct: number;
+  base: string;
+  show_vat: boolean;
+  vat_pct: number;
+  net_eur: number;
+  vat_eur: number;
+  gross_eur: number;
+  shown_eur: number;
+  margin_eur: number;
+  margin_pct: number;
+  fixed: boolean;
+  accessories: Record<string, { count: number; shown_eur: number }>;
+}
+export interface Costing {
+  name: string;
+  kind: string;
+  model?: string;
+  product?: string;
+  sizes_cm?: Record<string, unknown>;
+  facts: Record<string, number>;
+  fabric: { code: string; name: string };
+  lines: CostLine[];
+  fabric_eur: number;
+  components_eur: number;
+  labour_eur: number;
+  labour_minutes: number;
+  cost_eur: number;
+  cost_idr: number;
+  channels: Record<string, ChannelPrice>;
+  exchange: { idr_per_eur: number; date: string };
+  indicative: boolean;
+}
+export interface CostingProducts {
+  models: { id: string; name: string; kind: string }[];
+  configurator: {
+    product: string;
+    label: string;
+    fields: {
+      key: string;
+      default: number | boolean;
+      min: number | null;
+      max: number | null;
+    }[];
+  }[];
+}
+
+export const prices = {
+  state: () => fetch("/api/prices").then((r) => json<PricesState>(r)),
+  saveDraft: (data: PriceSet) =>
+    send("PUT", "/api/prices/draft", { data }).then((r) =>
+      json<{ draft: PricesState["draft"]; errors: string[] }>(r),
+    ),
+  discard: () =>
+    send("DELETE", "/api/prices/draft").then((r) => json<unknown>(r)),
+  preview: (data?: PriceSet) =>
+    send("POST", "/api/prices/preview", data ? { data } : {}).then((r) =>
+      json<{
+        errors: string[];
+        rows: PriceMove[];
+        changed: number;
+        total: number;
+      }>(r),
+    ),
+  publish: (note: string) =>
+    send("POST", "/api/prices/publish", { note }).then((r) =>
+      json<{ version: number; prices_changed: number }>(r),
+    ),
+  versions: () =>
+    fetch("/api/prices/versions").then((r) =>
+      json<{ versions: PriceVersion[] }>(r),
+    ),
+  rollback: (v: number) =>
+    send("POST", `/api/prices/rollback/${v}`).then((r) =>
+      json<{ version: number }>(r),
+    ),
+  products: () =>
+    fetch("/api/prices/products").then((r) => json<CostingProducts>(r)),
+  costing: (q: Record<string, string>) =>
+    fetch(`/api/prices/costing?${new URLSearchParams(q)}`).then((r) =>
+      json<Costing>(r),
     ),
 };

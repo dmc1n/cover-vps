@@ -211,22 +211,28 @@ drape:                           # the drape simulation: the sewn cover falling 
   max_sag_cm: 24                 # to confirm: ... or where the top sags deeper than this (water)
   fold_deg: 28                   # a point bends at least this much between two triangles: a fold
 quote:                           # the webshop configurator's proposal and price (ADR-061); ALL prices are
-                                 # placeholders until the owner gives the real ones (QUESTIONS 52)
+                                 # placeholders until the owner gives the real ones (QUESTIONS 52).
+                                 # Prices & costing (ADR-098): these are the documented defaults; the
+                                 # price set published on the admin page (app.db, versioned) replaces them
   prices_are_placeholders: true  # shown as "indicative" until the owner has set the prices
   ease_cm: 2.5                   # to confirm: room added on every side of the customer's sizes
   back_strip_cm: 30              # flat strip along the back of a sofa cover (the owner's drawings: 25-35)
   lounger_slope_cm: 35           # a lounger with a raised headrest: the cover slopes over this length
                                  # from the head down to the body (owner, 7 Oct 2026; to confirm)
+  fabric_name: "Sunbrella Coverlast"  # the default fabric's name in the price set
   fabric_eur_per_m: 24.5         # to confirm: Coverlast purchase price per metre of roll (152 cm)
   waste_pct: 12.5                # to confirm: cutting waste beyond the simple row layout
   labour_eur_per_hour: 42.5      # to confirm: sewing and cutting, per hour
-  minutes_base: 27.5             # to confirm: per cover (cutting setup, hem, packing)
+  minutes_cut_setup: 12.5        # to confirm: per cover, setting up the cutting table
+  minutes_pack: 6.5              # to confirm: per cover, folding and packing
+  minutes_per_hem_m: 1.75        # to confirm: per metre of hem with its cord channel
   minutes_per_piece: 6.5         # to confirm
   minutes_per_seam_m: 2.5        # to confirm: double stitching per metre of seam
   minutes_per_vent: 9.5          # to confirm: opening, hood, insert, logo
   vent_eur: 3.75                 # to confirm: insert, membrane, logo
   cord_eur_per_m: 0.65           # to confirm: drawcord per metre
   cord_extra_m: 1.25             # cord beyond the hem's length (to tie)
+  elastic_eur_per_m: 0.85        # to confirm: elastic per metre (covers with an elastic hem)
   balloon_eur: 14.5              # to confirm: one table balloon
   balloon_rise_cm: 18.5          # to confirm: how far a balloon lifts the cover's top in the middle
   frame_eur: 64.5                # to confirm: a frame under the cover (a gabled roof)
@@ -234,6 +240,15 @@ quote:                           # the webshop configurator's proposal and price
   flat_ok_m2: 0.125              # the rain check calls a top dry up to this flat area (a narrow ridge)
   markup_pct: 87.5               # to confirm: on the cost price
   vat_pct: 21                    # Dutch VAT
+  b2c_rounding: "0.95"           # consumer prices (incl. VAT) up to the next .95: none | 0.01 | 0.95 | 0.99 | 0.90 | 1 | 5 | 10
+  b2b_markup_pct: 45             # to confirm: business price list (Sunsit, dealers), on the landed cost
+  b2b_rounding: "1"              # business prices (ex VAT) up to whole euros: none | 0.01 | 0.95 | 0.99 | 0.90 | 1 | 5 | 10
+  b2c_shipping_eur: 18.5         # to confirm: shipping per cover to the consumer channel (a cost line of its own)
+  b2b_shipping_eur: 9.5          # to confirm: shipping per cover to a business customer (pallets, shared)
+  duties_pct: 12.5               # to confirm: import duties, % of cost price plus shipping (EU tariff 6306)
+  packaging_eur: 2.75            # to confirm: box and bag per cover
+  idr_per_eur: 18500             # to confirm: the fixed exchange rate, rupiah per euro (entered by hand)
+  idr_rate_date: "2026-10-08"    # the date of that rate
   colours: "Charcoal, Navy, Light Grey, Taupe"  # to confirm: the Coverlast colours offered (comma separated)
 roll:
   width_mm: 1500

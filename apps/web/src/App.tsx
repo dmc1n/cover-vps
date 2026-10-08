@@ -26,6 +26,7 @@ import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { Gallery } from "./Gallery";
 import { QuickSearch } from "./QuickSearch";
 import { Admin, Website } from "./Admin";
+import { Prices } from "./Prices";
 import { Reference } from "./Reference";
 import {
   Account,
@@ -113,6 +114,11 @@ export function App() {
           <a href="#/learning" className="nav">
             Learning
           </a>
+          {user.role !== "viewer" && (
+            <a href="#/prices" className="nav">
+              Prices
+            </a>
+          )}
           <a href="#/guide" className="nav">
             Guide
           </a>
@@ -137,6 +143,8 @@ export function App() {
             <Learning />
           ) : hash.startsWith("#/admin") && user.role === "admin" ? (
             <Admin />
+          ) : hash.startsWith("#/prices") && user.role !== "viewer" ? (
+            <Prices canEdit={user.role === "admin"} />
           ) : hash.startsWith("#/website") && user.role !== "viewer" ? (
             <>
               <section className="card">

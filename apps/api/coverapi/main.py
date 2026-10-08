@@ -142,6 +142,9 @@ def create_app(
     from coverapi import shop_suggest
 
     shop_suggest.install(app, auth, store.root, store)  # sizes from a photo or a link (ADR-086)
+    from coverapi import prices
+
+    prices.install(app, auth, store)  # prices and costing, versioned (ADR-098)
 
     def model_or_404(model_id: str) -> Path:
         try:

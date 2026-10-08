@@ -51,15 +51,10 @@ reached through this API.
 
 ## Prices
 
-The price comes from `quote.*` in `config/defaults.yaml`:
-
-- the fabric per metre and the cutting waste;
-- the sewing time per cover, per piece, per metre of seam and per vent, and the hourly rate;
-- the parts;
-- the markup and VAT.
-
-Until the owner has set them, `quote.prices_are_placeholders` is true, and the price is shown
-as indicative.
+The price comes from the price set published on Admin → **Prices & costing** (ADR-098,
+docs/handbook/prices.md): materials, labour, the exchange rate and the B2C price list. Before
+anything is published, the documented defaults `quote.*` in `config/defaults.yaml` are used.
+Until the owner switches "indicative" off and publishes, the price is shown as indicative.
 
 ## Start from a photo or a link (ADR-086)
 

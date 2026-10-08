@@ -119,7 +119,7 @@ Three tabs on the admin page belong to it.
 
 - **Shop settings:** everything the shop needs:
   - company data and domain;
-  - prices (tick *confirmed* to drop "indicative");
+  - prices: on the **Prices & costing** tab now (versioned, B2C and B2B; docs/handbook/prices.md);
   - delivery costs per country;
   - the Mollie key (`test_…` to try, `live_…` for real);
   - the balloon and frame products, colours, and the film's address.

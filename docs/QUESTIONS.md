@@ -270,3 +270,25 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     **Answered (owner, 7 Oct 2026):** the step is good; a rectangle per piece is fine; an
     arrangement gets one cover over the whole (not zipped covers). Side slopes not asked: stays
     `front`.
+70. **Prices & costing** (ADR-098, docs/plans/prices-costing.md; asked 8 Oct 2026). Everything
+    on Admin → Prices & costing is a placeholder until you fill it in; please give (or type in
+    and publish yourself):
+    - **Exchange rate:** rupiah per euro (now 18,500) and from which date.
+    - **Fabric:** Coverlast purchase price per metre and its currency (now € 24.50), roll width
+      (now 1500 mm), cutting waste (now 12.5 %); other fabrics/qualities with their colours.
+    - **Components** (price and currency): vent set (€ 3.75), drawcord per m (€ 0.65), elastic
+      per m (€ 0.85), balloon (€ 14.50), frame (€ 64.50); anything else per cover (labels,
+      thread, bags)?
+    - **Labour:** hourly rate and currency (now € 42.50 / h), minutes for cutting setup (12.5),
+      per piece (6.5), per metre of seam (2.5), per vent (9.5), per metre of hem (1.75),
+      packing (6.5).
+    - **B2C:** markup or margin and % (now markup 87.5 %), rounding (now up to .95, incl. VAT),
+      VAT 21 %; shipping per cover (€ 18.50), duties (12.5 % of cost + shipping), packaging
+      (€ 2.75).
+    - **B2B:** markup or margin and % (now markup 45 %), rounding (whole euros, ex VAT);
+      shipping (€ 9.50), duties (12.5 %), packaging (€ 2.75); fixed prices for Sunsit?
+    - Is the markup on cost + extra costs (now) or on the cost price only? Are balloons and the
+      frame always sold separately (now), or part of some covers?
+    - **Odoo (step 2):** the URL and database name, an API user + key, the Odoo version
+      (Community/Enterprise), the installed apps (Sales, Purchase, MRP, Inventory, Accounting,
+      multi-currency) and the company currency.
