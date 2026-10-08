@@ -468,6 +468,11 @@ def _box_cut(
             bool(params["seams.fold_merge"]),
         )
         label = np.unique(label, return_inverse=True)[1].astype(np.int64)
+    else:  # a cover drawn in parts by the program (ADR-103): the folds it made
+        hull_json = model_dir / "hull.json"
+        if hull_json.is_file():
+            plan = (json.loads(hull_json.read_text(encoding="utf-8")).get("box") or {}).get("plan")
+            folds = list((plan or {}).get("folds_mm") or [])
     # the people's corrections at the Desk: join pieces, split a piece (ADR-082)
     from coverengine import learned
 

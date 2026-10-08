@@ -349,7 +349,10 @@ def mesh_of(box: Box, planes: list[Array]) -> trimesh.Trimesh:
 
 def box_hull(
     points: Array, model: trimesh.Trimesh, params: EffectiveParams, product: str
-) -> tuple[trimesh.Trimesh, dict[str, Any], list[str]]:
+) -> tuple[trimesh.Trimesh, dict[str, Any], list[str], list[Array], Box]:
+    """The box cover, its report and warnings, and its faces (planes n.p + d <= 0 inside, the
+    open bottom first) with the box itself (its mirror lines), for a plan of its own
+    (hull/outline.py)."""
     hem = _p(params, "hull.hem_height_mm")
     box = Box(points, hem, _p(params, "hull.clearance_mm"))
     sets = box.grow(int(params["hull.box_max_pieces"]))
@@ -376,7 +379,7 @@ def box_hull(
         "reason": why,
         "options": rows,
     }
-    return mesh, report, warnings
+    return mesh, report, warnings, planes, box
 
 
 # A box cover spans bays seen from above; warn when the convex footprint is this much larger.

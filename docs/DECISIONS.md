@@ -2752,3 +2752,85 @@ docs/plans/prices-costing.md; handbook: docs/handbook/prices.md.
   of the catalogue's 2-seaters, or any cover the owner picks. The maths did not change.
 - **Better later:** price per colour/quality in the configurator, separate workcenters, shipping
   per country and box size, duties per HS code, the B2B storefront.
+
+## ADR-103 — A box cover's plan comes from the furniture seen from above: round, follow or box; no chair space round a chair
+
+Rens at the Desk, 8 Oct 2026 (groups D, E, F of `docs/plans/rejections-2026-10-08.md`, 42
+covers): 18 round tables (Grado, Sorolo, Nova): "make the cover round in top view, not square /
+octagonal"; 12 organic lounges (Casto, Feroli, Fiora, Pienza, Vento hocker, Vivaro, Aspen, Pico):
+"follow the (round) outline from the top view better"; 12 chairs, lounge parts and picnic tables:
+"empty space, cover too roomy". All 26 marked pictures were read twice by Gemini Flash (the marks
+and where they are; the change asked per mark); the two readings agreed on every picture, and
+with what I saw myself (out/rejections/{E,F}/vision.json).
+
+**Causes.**
+- *Round and organic:* all 30 are box covers (ADR-038), an intersection of half-spaces, so the
+  plan is a convex polygon with a few straight sides: a round table and its ring of chair space
+  (ADR-044) became a square (5 pieces) or an octagon (Nova 140, 9 pieces); a kidney sofa's bay
+  was spanned by a straight wall; round corners became chamfers over empty floor.
+- *Six dining chairs (Antas, Pemba, Santorini, Sato, Tosca, Vado):* "dining" is in their names, so
+  `hull/chairs.py` took them for dining tables and added 33 cm of chair space before and behind
+  them, 87 cm high: covers about 1 m deep over 0.6 m chairs. The catalogue has 29 such chairs.
+- *Lucia, picnic tables:* the box piece count remembered in cover.json (an AI choice, ADR-080)
+  left the slope Rens drew uncut.
+
+**The rules** (`hull/outline.py`, `config/defaults.yaml`).
+- `hull.plan: auto | box | round | follow`. The footprint: the furniture above the hem seen from
+  above (height map on `hull.plan_cell_mm`, gaps under `hull.bridge_gap_mm` closed, holes filled),
+  plus the chair space of a table.
+- **Round** when the footprint fills at least `hull.round_fill` (0.93) of its smallest circle (a
+  regular octagon 0.90, a square 0.64): a cylinder skirt and a cone on top, every furniture,
+  chair-space and balloon point the clearance under it, the slope at least `hull.min_slope_deg`
+  (of those the one with the least room): water runs off everywhere (rule 12), the skirt's top
+  edge is level (rule 13). The top is cut into equal sectors whose seams run straight down from
+  the apex, as few as fit the roll (`hull.round_top_pieces`; at least 2, a cone is no flat disc);
+  the skirt into strips, a multiple of the sectors so the seams line up, at most
+  `seams.max_skirt_panel_mm`, the front in the middle of a strip. Built ring by ring, so every
+  seam is on mesh edges; cone sectors and cylinder strips are developable (stretch < 0.1 %).
+- **Follow** when a side or corner of the box's plan stands more than `hull.plan_follow_mm` (24
+  mm; the hocker's chamfers stood 31 mm out) beyond the footprint plus the clearance: the walls
+  stand straight down on that outline; grid steps are shaved off and grown back, bays and inner
+  corners rounded to `hull.plan_round_mm` (500), so the seams along it are smooth (rule 13); the
+  top is the box's own top faces, which span seats (rule 12). The outline extruded is cut by those
+  faces (manifold3d); its long triangles are halved edge by edge (a remesher rounded the shallow
+  creases between top faces off: 7 mm zig-zag seams; triangle-by-triangle subdivision left
+  T-joints: pieces that were not one sheet). Pieces: each top face, the wall cut at its corners
+  (a net turn over `seams.corner_angle_deg` within `seams.corner_window_mm`; a jog out and back
+  is no corner) and where longer than `seams.max_skirt_panel_mm` (or the roll width when the wall
+  is higher); slivers join a neighbour of their own kind and never close a ring; tops wider than
+  the roll are cut in strips downhill (a cut that would tear the sheet is moved a hair); on request
+  (`seams.fold_merge`) top faces join with a fold, as on box covers. The box's mirror lines come
+  from its convex outside, so the plan is mirrored only where it really is symmetric (a kidney's
+  bay would have been filled by its mirror image). Arrangements keep the plan chosen on their
+  page (ADR-095).
+- **Chair space only round tables:** never round furniture named chair, stool, sofa or bench, and
+  only when the top is at least `hull.table_top_min_mm` (400) deep both ways.
+- **Audit:** `chairs` (chair space round furniture that is no table fails) and `outline` (a box
+  over furniture that is round from above fails; one that would follow is noted). The `furniture
+  inside` measure now signs each point by the nearest face, the angle-weighted normal and the
+  winding number of the cover capped at its hem together: the nearest face's normal alone called
+  points deep inside a bay "outside" (next to an inner corner of the wall).
+- **Learned** (ADR-055): two AI lessons (`config/ai_lessons.json`), the audit checks above, tests
+  `engine/tests/test_outline.py` (round table: round hem, level skirt, pieces in the roll; kidney
+  sofa: bay kept, walls upright, water runs off; chairs are no tables; roundness tells a circle
+  from an octagon and a square).
+
+**Results** (staging `out/rejections/{D,E,F}/`, before/after pictures in `compare/`, per cover in
+`results.json`; every cover `cover audit` ok, no engine warnings, `scripts/fewer_check.py` PASS,
+looked at against Rens's picture): 18 round tables round (fabric -23 to -24 %, Nova 140 -9 %;
+4 or 6 pieces instead of 6 or 10); 6 chairs without chair space (fabric -23 to -37 %); 11 lounges
+and the Aspen side table follow their outline (0 to -13 %); the Ferla picnic tables -17 %; Lucia gets the back slope Rens drew
+(cover.json `hull.box_pieces` 8), the Ferla picnic tables the roof slopes to the benches (the
+rule's piece count, plan kept straight: `hull.plan: box`); the Vento hocker is 3 pieces, its top
+one panel with a fold (`seams.fold_merge`). Doubt, to the owner: Fiave L-part (Rens's line
+follows the cushions over the seat: water, rule 12), Nuna (the egg-shaped back in side view needs
+a curved cover), Vento angled 2-seater (asks for a seam layout, group C).
+
+**Sweep** (`out/rejections/sweep.json`, the 294 live box covers that are not arrangements): 29
+round (18 rejected + 11 lounge tables: Farzi, Ronda, Nova lounge, Sorolo 140/160), 152 follow
+(129 not rejected), 113 stay a box; 29 chairs lose their chair space (23 not rejected). Nothing
+is rebuilt live by this change; the covers change when they are built again.
+
+**Better later:** a box chooser that weighs the plan's walls (its faces are chosen for the convex
+box, then the walls are swapped); folds as pen lines also for covers with their own plan through
+the cut's join (now passed through hull.json); a curved cover for egg-shaped chairs.

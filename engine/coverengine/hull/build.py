@@ -330,11 +330,24 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
     planned = _arrangement_plan(model_dir, model, points, params)
     if planned is not None:
         return planned
-    mesh, box, warnings = box_hull(points, model, params, product)
+    mesh, box, warnings, planes, solid = box_hull(points, model, params, product)
+    from coverengine.arrange import ARRANGEMENT_JSON
+
+    # an arrangement's plan is chosen on its page (ADR-095): the smoothed box stays the box
+    arranged = (model_dir / ARRANGEMENT_JSON).is_file()
+    shaped = None if arranged else _own_plan(model, points, blocks, mesh, planes, solid, params)
+    if shaped is not None:
+        mesh, plan_report, more, parts = shaped
+        warnings = [w for w in warnings if "far from a box" not in w] + more
+        box = {**box, "pieces": int(parts.max()) + 1, "plan": plan_report}
+    else:
+        parts = None
     if blocks or held:  # chairs and balloons widen the box on purpose: not a bay to follow
         warnings = [w for w in warnings if "far from a box" not in w]
     report = _plain_report(model_dir, mesh, v, f, params, "box", warnings)
     report["box"] = box
+    if parts is not None:
+        report["drainage"] = box["plan"]["drainage"]
     report["support"] = held
     # the AI decides once: its choice is kept in the model's cover.json, so the next run gives
     # the same cover (rule 10; the Kota went from 7 to 6 pieces between two runs)
@@ -346,7 +359,38 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
     if keep:
         _remember(model_dir, keep)
     report["chairs"] = seated
-    return Hull(mesh, report, warnings)
+    return Hull(mesh, report, warnings, parts=parts)
+
+
+def _own_plan(
+    model: trimesh.Trimesh,
+    points: Array,
+    blocks: list[Array],
+    box_mesh: trimesh.Trimesh,
+    planes: list[Array],
+    box: Any,
+    params: EffectiveParams,
+) -> tuple[trimesh.Trimesh, dict[str, Any], list[str], IntArray] | None:
+    """A box cover whose plan is the furniture's own (ADR-103): round for a piece of furniture
+    that is round seen from above, following its outline where the box's straight sides stand
+    over empty floor; None to keep the box."""
+    from coverengine.hull import outline
+
+    if str(params["hull.plan"]) == "box":
+        return None
+    seen = outline.study(model.vertices, model.faces, blocks, box_mesh, box.mirrors, params)
+    kind = outline.decide(seen, params)
+    c = _p(params, "hull.clearance_mm")
+    if kind == "round":
+        shaped = outline.round_cover(points, seen.centre, seen.radius + c, params)
+    elif kind == "follow":
+        top_z = float(points[:, 2].max()) + 2 * c
+        shaped = outline.follow_cover(seen.plan, planes, top_z, params)
+    else:
+        return None
+    facts, why = seen.facts(), seen.why(kind)
+    report = {**shaped.report, **facts, "reason": why}
+    return shaped.mesh, report, shaped.warnings, shaped.parts
 
 
 def _arrangement_plan(

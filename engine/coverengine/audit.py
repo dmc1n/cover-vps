@@ -14,6 +14,9 @@ The program measures, for each model:
   the roll in one piece with folds is noted.
 - plan: an arrangement built to follow its pieces lies, seen from above, within the pieces plus
   the clearance: no diagonal across an open corner (ADR-095).
+- outline: a box cover seen from above: no chair space round a chair; round furniture has a
+  round cover; where the box's straight sides stand far beyond the furniture's outline, the
+  walls follow it (ADR-103).
 
 Then, with `--ai`, the AI gets three straight views (front, side, top: the furniture in grey,
 the cover in see-through blue, furniture outside the cover in red), the product photo and the
@@ -55,6 +58,7 @@ GREY, BLUE, RED = "#7d828c", "#1f5fbf", "#e0302a"  # param-ok: display colours
 PALE = "#cfe0f7"  # param-ok: display colour (the cover's area)
 PAD_SHARE = 0.03  # param-ok: display margin
 ON_TOP = 10  # param-ok: drawing order (red dots over everything)
+HALF = 0.5  # param-ok: a winding number above a half is inside
 
 
 def _check(name: str, ok: bool, detail: str) -> dict[str, Any]:
@@ -74,13 +78,46 @@ def outside(furniture: trimesh.Trimesh, cover: trimesh.Trimesh) -> tuple[Array, 
 
     pts, _ = trimesh.sample.sample_surface(furniture, SAMPLES, seed=0)
     pts = np.vstack([pts, furniture.vertices])
-    d2, face, near = igl.point_mesh_squared_distance(
-        np.asarray(pts, np.float64),
-        np.asarray(cover.vertices, np.float64),
-        np.asarray(cover.faces, np.int32),
+    v, f = np.asarray(cover.vertices, np.float64), np.asarray(cover.faces, np.int64)
+    d2, face, near = igl.point_mesh_squared_distance(np.asarray(pts, np.float64), v, f)
+    by_face = np.einsum("ij,ij->i", pts - near, cover.face_normals[face]) > 0
+    # the angle-weighted normal of the nearest feature as well: the nearest face's normal alone
+    # calls a point deep inside "outside" next to an inner (reflex) corner of the cover (a cover
+    # that follows a bay, ADR-103); either alone can slip at the open hem, so a point is outside
+    # only when both say so
+    signed, _, _, _ = igl.signed_distance(
+        np.asarray(pts, np.float64), v, f, sign_type=igl.SIGNED_DISTANCE_TYPE_PSEUDONORMAL
     )
-    side = np.einsum("ij,ij->i", pts - near, cover.face_normals[face])
-    return pts, np.where(side > 0, np.sqrt(d2), -np.sqrt(d2))
+    out = by_face & (np.asarray(signed) > 0)
+    closed = _capped(cover)
+    if closed is not None and out.any():  # the last word: the cover closed at the hem
+        w = igl.winding_number(
+            np.asarray(closed.vertices, np.float64),
+            np.asarray(closed.faces, np.int64),
+            np.asarray(pts[out], np.float64),
+        )
+        out[np.flatnonzero(out)[np.abs(np.asarray(w)) > HALF]] = False
+    return pts, np.where(out, np.sqrt(d2), -np.sqrt(d2))
+
+
+def _capped(cover: trimesh.Trimesh) -> trimesh.Trimesh | None:
+    """The cover closed by a flat cap over its hem (when the hem is one level loop)."""
+    from manifold3d import triangulate
+
+    try:
+        loops = trimesh.Trimesh(cover.vertices, cover.faces, process=True).outline()
+        rings = [loops.vertices[e.points] for e in loops.entities]
+        z = np.concatenate([r[:, 2] for r in rings])
+        if np.ptp(z) > 1.0:  # param-ok: a level hem (mm)
+            return None
+        tris = np.asarray(triangulate([r[:-1, :2] for r in rings]), np.int64)
+        flat = np.vstack([r[:-1] for r in rings])
+        cap = trimesh.Trimesh(flat, tris, process=False)
+        both = trimesh.util.concatenate([trimesh.Trimesh(cover.vertices, cover.faces), cap])
+        trimesh.repair.fix_normals(both)
+        return both if isinstance(both, trimesh.Trimesh) else None
+    except Exception:  # noqa: BLE001 - no cap: the two signs decide
+        return None
 
 
 def mirror_gap(cover: trimesh.Trimesh, axis: int, mid: float) -> float:
@@ -211,6 +248,48 @@ def plan_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
                    "open corner?)")]  # fmt: skip
 
 
+def outline_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
+    """A box cover seen from above (ADR-103, Rens at the Desk, 8 Oct 2026): no chair space
+    round a chair; a piece of furniture round from above has a round cover, one whose outline
+    the box's straight sides stand far from has walls that follow it."""
+    from coverengine import arrange
+    from coverengine.hull import chairs, masks, outline
+
+    hull_json = model_dir / "hull.json"
+    if (model_dir / arrange.ARRANGEMENT_JSON).is_file() or not hull_json.is_file():
+        return []
+    hull = json.loads(hull_json.read_text(encoding="utf-8"))
+    if hull.get("top") != "box":
+        return []
+    out = []
+    seated = hull.get("chairs") or {}
+    furniture = load_model(model_dir)
+    v, f = masks.apply(furniture.vertices, furniture.faces, masks.load_masks(model_dir))
+    if seated and chairs.kind(model_dir, float(np.max(v[:, 2])), params) == "none":
+        out.append(_check("chairs", False, "chair space round furniture that is no table "
+                          "(a chair): the cover is far too roomy"))  # fmt: skip
+    plan = (hull.get("box") or {}).get("plan") or {}
+    if plan.get("kind") in ("round", "follow"):
+        return [*out, _check("outline", True, f"plan {plan['kind']}: {plan.get('reason', '')}")]
+    extra = []
+    if seated.get("ring"):
+        ring = seated["ring"]
+        a = np.linspace(0, 2 * np.pi, chairs.RING_POINTS, endpoint=False)
+        r, (cx, cy) = float(ring["radius_mm"]), ring["centre_mm"]
+        extra.append(np.column_stack([cx + r * np.cos(a), cy + r * np.sin(a), np.zeros_like(a)]))
+    for lo, hi in seated.get("blocks") or []:
+        extra.append(np.array([[x, y, 0.0] for x in (lo[0], hi[0]) for y in (lo[1], hi[1])]))
+    seen = outline.study(v, f, extra, load_model(model_dir / "hull.glb"), [], params)
+    kind = outline.decide(seen, params)
+    detail = (f"seen from above the furniture fills {PERCENT * seen.fill:.0f} % of its circle; "
+              f"the box's sides stand up to {seen.out_mm:.0f} mm beyond its outline")  # fmt: skip
+    if kind != "box":
+        detail = f"built as a box, but should be {kind}: {detail} (rebuild the hull, ADR-103)"
+    # a square cover over a round table is wrong; a box over an organic outline is roomier than
+    # it needs to be, noted until the cover is built again
+    return [*out, _check("outline", kind != "round", detail)]
+
+
 def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     """The program's checks for one model."""
     from coverengine.hull.box import Box
@@ -321,6 +400,7 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     )
     checks += sliver_checks(model_dir, params)
     checks += plan_checks(model_dir, params)
+    checks += outline_checks(model_dir, params)
     checks += drape_checks(model_dir, params)
     views(furniture, cover, bad, model_dir / AUDIT_PNG)
     return {

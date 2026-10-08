@@ -35,6 +35,23 @@ hull:                            # the cover surface (drape hull)
   box_ai: false                  # true: the AI chooses the number of pieces instead (a paid call each time)
   box_max_pieces: 10             # box cover: options tried, up to this many pieces
   box_volume_slack_pct: 5        # box cover without AI: extra volume allowed over the tightest box
+  plan: auto                     # auto | box | round | follow   a box cover's plan seen from above
+                                 # (Rens, 8 Oct 2026; ADR-103): round = a round top (cone on the
+                                 # support) on a round skirt; follow = walls on the furniture's own
+                                 # outline under the box's top faces; box = the convex box. auto:
+                                 # round when round_fill is reached, follow when the box stands
+                                 # more than plan_follow_mm beyond the outline, else box
+  round_fill: 0.93               # round from above: the footprint fills this share of its smallest
+                                 # circle (a circle 1, a regular octagon 0.90, a square 0.64)
+  plan_follow_mm: 24             # follow when a side or corner of the box's plan stands more than
+                                 # this beyond the furniture's outline plus the clearance (Rens
+                                 # rejected a hocker whose chamfered corners stood 31 mm out)
+  plan_cell_mm: 10               # grid for the footprint seen from above
+  plan_round_mm: 500             # follow: bays and inner corners of the outline narrower than twice
+                                 # this are rounded to this radius, so the seams along it are smooth
+                                 # lines (rule 13; at least seams.min_weld_radius_mm)
+  round_top_pieces: 0            # a round top in this many equal sectors; 0 = the fewest that fit
+                                 # the roll (at least 2: a cone is not a flat disc)
   support: none                  # none | balloons | balloon | frame   support under the cover
                                  # for flat tops (tables): balloons = the workshop's balloons
                                  # (balloon_model) in a grid; frame = a ridge beam along the long
@@ -47,6 +64,8 @@ hull:                            # the cover surface (drape hull)
   chair_height_dining_mm: 870    # cover height over dining tables of 74 to 77 cm (owner: as T1)
   chair_height_low_dining_mm: 870  # the same as dining (owner, 1 Oct 2026: same cover)
   chair_height_low_bar_mm: 1230  # owner, 1 Oct 2026: as the round bar covers R5, R6, R10
+  table_top_min_mm: 400          # chair space only round a table whose top is at least this deep
+                                 # both ways (a chair's highest part is a backrest rail; ADR-103)
   dining_table_min_mm: 740       # a table this high up to dining_table_max_mm is a dining table
   dining_table_max_mm: 770
   balloon_model: table-baloon    # the balloon's model folder (owner, 1 Oct 2026: one size)

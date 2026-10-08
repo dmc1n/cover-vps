@@ -128,3 +128,21 @@ exactly, every seam is a straight edge. The program tries 5 to 10 pieces and the
 many (fewer pieces means more room between cover and furniture); `hull.box_pieces` fixes the
 number yourself. A flat top gets a slight slope (or a low gable on a table) so water runs off.
 
+Seen from above, the box cover is not always straight-sided (ADR-103, after Rens's rejections
+of 8 October 2026). The program first looks at the furniture from above (`hull.plan: auto`):
+
+- **Round** furniture (a round table with its chairs round it, a round side table): the cover
+  is a round skirt with a shallow cone on top that rests on the balloons; water runs off in
+  every direction, the skirt seam is at one height, the top is cut into equal slices (2 for most
+  dining tables, as few as fit the roll; `hull.round_top_pieces` to choose), the skirt into
+  strips whose seams line up with the top's.
+- **Organic** furniture (a kidney or moon sofa, a chaise longue with round corners): when the
+  box's straight sides would stand more than `hull.plan_follow_mm` (24 mm) beyond the
+  furniture's outline, the walls follow the outline instead, with bays and inner corners rounded
+  (`hull.plan_round_mm`) so the seams are smooth. The top stays the box's own sloping faces, so
+  seats are still spanned and water runs off.
+- Otherwise the straight box, as before. `hull.plan: box | round | follow` forces one.
+
+`hull.json` says which plan was used and why (`box.plan`), and `cover audit` checks it (the
+`outline` check).
+
