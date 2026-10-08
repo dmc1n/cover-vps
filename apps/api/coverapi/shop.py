@@ -448,8 +448,9 @@ CREATE TABLE IF NOT EXISTS orders (
   model_id TEXT,
   updated REAL
 )"""
+# on_account: a B2B order, invoiced (ADR-104)
 STATUSES = ("awaiting_payment", "paid", "in_production", "sewn", "shipped", "cancelled", "failed",
-            "returned")  # fmt: skip
+            "returned", "on_account")  # fmt: skip
 MATCH_TABLE = """
 CREATE TABLE IF NOT EXISTS match_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1394,6 +1395,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             db.execute("UPDATE orders SET model_id=?, status='in_production', updated=? "
                        "WHERE id=?", (model_id, time.time(), oid))  # fmt: skip
         return model_id
+
+    app.state.shop_produce = produce  # a B2B order on account goes the same way (ADR-104)
 
     @app.get("/api/admin/orders")
     def orders(request: Request) -> dict[str, Any]:
