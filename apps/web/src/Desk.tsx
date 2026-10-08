@@ -529,6 +529,7 @@ function CardView({
   const [aiJob, setAiJob] = useState<string | null>(null);
   const [aiNote, setAiNote] = useState("");
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const load = useCallback(() => {
     getJSON<Card>(`/api/desk/${id}`)
       .then(setCard)
@@ -626,7 +627,12 @@ function CardView({
   };
   const openDialog = (kind: "reject" | "note") => {
     setDialog(kind);
-    setTimeout(() => textRef.current?.focus(), 50);
+    // the whole dialog in sight, its Pictures row too: focusing the text alone scrolled
+    // only that far, and the picture buttons stayed below the screen (Rens, 8 Oct 2026)
+    setTimeout(() => {
+      textRef.current?.focus({ preventScroll: true });
+      dialogRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+    }, 50);
   };
 
   useEffect(() => {
@@ -930,6 +936,10 @@ function CardView({
             load();
             onChanged();
           }}
+          snapshot3d={() => snap.current?.() ?? null}
+          drawingUrl={card.pages ? `/api/desk/${card.id}/page/${page}` : null}
+          picturesMax={picturesMax}
+          paste={!dialog}
         />
         <section className="d-panel d-wide">
           <h3>History</h3>
@@ -1052,7 +1062,7 @@ function CardView({
           </>
         )}
         {canAct && dialog && (
-          <div className="d-reject">
+          <div className="d-reject" ref={dialogRef}>
             {dialog === "reject" ? (
               <div className="d-chips">
                 {reasons.map((r) => (
@@ -1074,6 +1084,15 @@ function CardView({
             ) : (
               <strong className="d-dialog-title">Comment</strong>
             )}
+            <PictureTray
+              pending={pending}
+              onChange={setPending}
+              snapshot3d={() => snap.current?.() ?? null}
+              drawingUrl={
+                card.pages ? `/api/desk/${card.id}/page/${page}` : null
+              }
+              max={picturesMax}
+            />
             <textarea
               ref={textRef}
               placeholder={
@@ -1106,15 +1125,6 @@ function CardView({
             <button className="d-btn d-ghost" onClick={() => setDialog("")}>
               Cancel
             </button>
-            <PictureTray
-              pending={pending}
-              onChange={setPending}
-              snapshot3d={() => snap.current?.() ?? null}
-              drawingUrl={
-                card.pages ? `/api/desk/${card.id}/page/${page}` : null
-              }
-              max={picturesMax}
-            />
           </div>
         )}
         {msg && <span className="d-msg">{msg}</span>}

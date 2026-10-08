@@ -3,6 +3,7 @@
 // recalculated at once and kept as a test case; the same correction on several covers of a
 // group is proposed as the group's rule (RulesBar, on top of the Desk).
 import { useCallback, useEffect, useState } from "react";
+import { PictureTray, uploadPictures, type Pending } from "./DeskPictures";
 
 interface SeamPoint {
   id: string;
@@ -75,10 +76,19 @@ export function Corrections({
   id,
   canAct,
   onChanged,
+  snapshot3d,
+  drawingUrl,
+  picturesMax,
+  paste = true,
 }: {
   id: string;
   canAct: boolean;
   onChanged: () => void;
+  // pictures with a correction (ADR-096): the same sources as the reject dialog
+  snapshot3d: () => string | null;
+  drawingUrl: string | null;
+  picturesMax: number;
+  paste?: boolean;
 }) {
   const [v, setV] = useState<CorrectView | null>(null);
   const [tab, setTab] = useState<Tab>("seams");
@@ -95,6 +105,7 @@ export function Corrections({
   const [rightCm, setRightCm] = useState("");
   const [chips, setChips] = useState<string[]>([]);
   const [text, setText] = useState("");
+  const [pics, setPics] = useState<Pending[]>([]);
   const load = useCallback(
     () =>
       call<CorrectView>(`/api/desk/${id}/correct`)
@@ -113,10 +124,19 @@ export function Corrections({
     setBusy(true);
     setMsg("");
     try {
+      // the pictures go up once; a refused correction keeps their names for the next try
+      const fresh = pics.filter((p) => !p.name);
+      const names = await uploadPictures(id, fresh);
+      const sent = pics.map((p) =>
+        p.name ? p : { ...p, name: names[fresh.indexOf(p)] },
+      );
+      setPics(sent);
       const out = await call<{ steps: string[]; job: unknown }>(
         `/api/desk/${id}/correct`,
-        body,
+        { ...body, pictures: sent.map((p) => p.name as string) },
       );
+      sent.forEach((p) => URL.revokeObjectURL(p.url));
+      setPics([]);
       setMsg(
         out.steps.length
           ? `${done} · recalculating (${out.steps.join(" → ")}) · kept as a test case`
@@ -454,6 +474,18 @@ export function Corrections({
             )}
           </div>
         </div>
+      )}
+
+      {canAct && (
+        <PictureTray
+          pending={pics}
+          onChange={setPics}
+          snapshot3d={snapshot3d}
+          drawingUrl={drawingUrl}
+          max={picturesMax}
+          paste={paste}
+          label="Pictures with the correction"
+        />
       )}
 
       {v.feedback.length > 0 && (

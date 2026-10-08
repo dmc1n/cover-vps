@@ -409,7 +409,9 @@
   border-radius: 18px;
   box-shadow: var(--d-shadow);
   border: 1px solid var(--d-line);
-  overflow: hidden;
+  /* clip, not hidden: "hidden" made the card a scroll container, so the action bar did not
+     stick to the screen and an open Reject dialog ran below it (ADR-096) */
+  overflow: clip;
   animation: d-in 0.25s ease;
 }
 @keyframes d-in {
@@ -681,6 +683,9 @@
 .d-actions {
   position: sticky;
   bottom: 0;
+  z-index: 5;
+  max-height: calc(100vh - 24px); /* an open dialog never runs off the screen */
+  overflow-y: auto;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;

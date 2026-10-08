@@ -2589,6 +2589,55 @@ cover, and the learning step never saw it.
   stays in desk/ unlinked; it costs little and a clean-up can come later. Undo takes back the
   history entry, not its files.
 
+**8 October 2026: Rens could not add a picture on live (v1.23.0).** The server logs showed his
+rejects (reasons and words) but not one picture upload. The owner learned that it failed in
+Microsoft Edge and worked in another browser. Checked in real Chromium, Edge 154, WebKit and
+Firefox, 1440 and 820 px wide, on copies of C2 and C18 with the v1.23.0 build:
+
+- **The cause found: the Pictures row was below the screen.** `.d-card` had `overflow: hidden`.
+  That made the card its own scroll container, so the action bar did not stick to the window,
+  and the open Reject dialog grew downwards past the bottom edge. Focusing the text box
+  scrolled only that far. With a 900 px window the picture buttons sat 0 to 30 px above the
+  edge, under the browser's own bars. Rens chose a reason, wrote his words and pressed Reject
+  without ever seeing the buttons. The size of the window decides this, not the browser
+  engine, which fits "Edge failed, another browser worked". With the window scrolled to the
+  buttons, all five sources worked in all four browsers, Edge too.
+- **Fixed** (apps/web: desk.css, Desk.tsx):
+  - The card clips with `overflow: clip`, which is not a scroll container, so the bar sticks
+    again.
+  - The bar is at most the window's height and scrolls inside itself.
+  - Opening Reject or Comment scrolls the whole dialog into view.
+  - The Pictures row now comes before the text box, so it is seen before Reject is pressed.
+- **Never silent** (DeskPictures.tsx, Viewer.tsx). Every step that a browser can refuse now
+  says so in the Pictures block, with "use Chrome or Firefox, or attach a screenshot with
+  Upload…":
+  - a canvas that cannot be read back (privacy settings, policies): checked when the block
+    opens;
+  - an empty or refused 3D copy;
+  - a picture that cannot be read;
+  - a marked picture that cannot be saved (toBlob, then toDataURL as a second way);
+  - an upload the server refuses.
+- **WebGL off:**
+  - A browser without WebGL (graphics acceleration off, blocked by a policy; Firefox in the
+    test container) used to blank the whole page. The viewer now catches it, explains it on
+    the card, and the 3D snapshot says why it cannot copy the view.
+  - Large photos are drawn at most `desk.picture_max_side_px` on a side, because Safari on an
+    iPad refuses very large canvases.
+  - A photo with no file type (some Windows set-ups) is taken by its name; the server checks
+    it anyway.
+- **"Correct this cover"** has the same Pictures block. A correction sends its pictures, and
+  they reach the test case. Only the tray of the open dialog listens to Ctrl+V.
+- **Test:** `apps/web/e2e/desk_pictures.py` runs this per browser (chromium, msedge, webkit,
+  firefox) and width. It checks:
+  - the Pictures row is on the screen without scrolling;
+  - every source makes a marked picture, and a POST to `.../pictures` happens;
+  - the reject names the pictures, and a correction carries one;
+  - the thumbnails load;
+  - a browser that blocks canvas reading gets the message.
+
+  Run against v1.23.0 it fails on the first point. Edge comes from a local image with
+  `playwright install msedge`.
+
 ## ADR-097 — C- and U-shaped drawing covers in the pieces the drawing draws; no slivers
 
 The owner (7 Oct 2026, twice): "some drawings like C27 still have too many panels"; "look very

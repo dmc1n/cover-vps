@@ -18,7 +18,49 @@ export const pictureUrl = (id: string, name: string) =>
   `/api/models/${encodeURIComponent(id)}/files/desk/${encodeURIComponent(name)}`;
 
 const ACCEPT = ["image/jpeg", "image/png", "image/webp"];
+const MAX_SIDE = 2400; // as desk.picture_max_side_px: no need to draw a picture larger
+const ACCEPT_EXT = /\.(jpe?g|jfif|png|webp)$/i;
 const RED = "#e0241b";
+// said in the Pictures block whenever this browser cannot do a step: never nothing at all
+// (8 Oct 2026: in Rens's browser, Microsoft Edge, no picture was sent and nothing was said)
+export const OTHER_BROWSER =
+  "If it keeps failing, use Chrome or Firefox, or attach a screenshot with Upload…";
+const why = (e: unknown) =>
+  e instanceof Error ? e.message : String(e ?? "unknown error");
+
+/** A canvas made into a PNG: toBlob, and toDataURL when toBlob gives nothing (some
+ * browsers and privacy settings return null). Throws with a reason when both fail. */
+export async function canvasPng(c: HTMLCanvasElement): Promise<Blob> {
+  const viaBlob = await new Promise<Blob | null>((ok) => {
+    try {
+      c.toBlob((b) => ok(b), "image/png");
+    } catch {
+      ok(null);
+    }
+  });
+  if (viaBlob && viaBlob.size > 0) return viaBlob;
+  const url = c.toDataURL("image/png"); // throws SecurityError on a blocked canvas
+  if (!url.startsWith("data:image/png"))
+    throw new Error("the browser gave no picture");
+  return await (await fetch(url)).blob();
+}
+
+/** Can this browser draw a picture and read it back as PNG? (the marking needs it) */
+export async function picturesWork(): Promise<string> {
+  try {
+    const c = document.createElement("canvas");
+    c.width = c.height = 4;
+    const g = c.getContext("2d");
+    if (!g) return "This browser gives no drawing canvas.";
+    g.fillStyle = RED;
+    g.fillRect(0, 0, 4, 4);
+    const png = await canvasPng(c);
+    if (!png.size) return "This browser does not save drawn pictures.";
+    return "";
+  } catch (e) {
+    return `This browser blocks reading drawn pictures (${why(e)}).`;
+  }
+}
 
 /** Upload the marked pictures; the names the server gives back go with the action. */
 export async function uploadPictures(
@@ -34,7 +76,10 @@ export async function uploadPictures(
   });
   if (r.status === 401) window.dispatchEvent(new Event("login-needed"));
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.detail ?? `${r.status}`);
+  if (!r.ok)
+    throw new Error(`Pictures not sent: ${data.detail ?? `error ${r.status}`}`);
+  if (!Array.isArray(data.pictures) || data.pictures.length !== pics.length)
+    throw new Error("Pictures not sent: the server did not take them");
   return data.pictures as string[];
 }
 
@@ -55,12 +100,16 @@ export function PictureTray({
   snapshot3d,
   drawingUrl,
   max,
+  paste = true,
+  label = "Pictures",
 }: {
   pending: Pending[];
   onChange: (p: Pending[]) => void;
   snapshot3d: () => string | null;
   drawingUrl: string | null;
   max: number;
+  paste?: boolean; // only one tray on the page listens to Ctrl+V
+  label?: string;
 }) {
   const [marking, setMarking] = useState<{
     source: string;
@@ -68,7 +117,17 @@ export function PictureTray({
   } | null>(null);
   const [over, setOver] = useState(false);
   const [note, setNote] = useState("");
+  const [broken, setBroken] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    let live = true;
+    picturesWork().then((m) => live && setBroken(m));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const fail = (what: string, e?: unknown) =>
+    setNote(`${what}${e === undefined ? "" : `: ${why(e)}`}. ${OTHER_BROWSER}`);
   const pendingRef = useRef(pending);
   pendingRef.current = pending;
   const full = pending.length >= max;
@@ -76,21 +135,33 @@ export function PictureTray({
   const fromFile = useCallback(
     async (f: File | Blob) => {
       setNote("");
-      if (!ACCEPT.includes(f.type)) {
-        setNote("Only JPG, PNG or WebP pictures.");
+      // some Windows set-ups give a photo no type: then its name decides, the server checks
+      const name = (f as File).name ?? "";
+      if (
+        !ACCEPT.includes(f.type) &&
+        !(f.type === "" && ACCEPT_EXT.test(name))
+      ) {
+        setNote(
+          `Only JPG, PNG or WebP pictures (this is ${f.type || name || "unknown"}).`,
+        );
         return;
       }
       if (pendingRef.current.length >= max) {
         setNote(`At most ${max} pictures.`);
         return;
       }
-      setMarking({ source: await readAsDataUrl(f) });
+      try {
+        setMarking({ source: await readAsDataUrl(f) });
+      } catch (e) {
+        setNote(`This picture could not be read: ${why(e)}.`);
+      }
     },
     [max],
   );
 
   // Ctrl+V while the dialog is open: a picture from the clipboard
   useEffect(() => {
+    if (!paste) return;
     const onPaste = (e: ClipboardEvent) => {
       if (marking) return;
       const item = [...(e.clipboardData?.items ?? [])].find((i) =>
@@ -103,7 +174,7 @@ export function PictureTray({
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [fromFile, marking]);
+  }, [fromFile, marking, paste]);
 
   const done = (blob: Blob, source: string) => {
     const url = URL.createObjectURL(blob);
@@ -137,16 +208,28 @@ export function PictureTray({
       }}
     >
       <div className="d-pics-bar">
-        <span className="d-pics-label">Pictures</span>
+        <span className="d-pics-label">{label}</span>
         <button
           type="button"
           className="d-btn d-ghost d-small"
           disabled={full}
           onClick={() => {
             setNote("");
-            const shot = snapshot3d();
-            if (shot) setMarking({ source: shot });
-            else setNote("The 3D view is not ready yet.");
+            let shot: string | null = null;
+            try {
+              shot = snapshot3d();
+            } catch (e) {
+              fail("This browser would not copy the 3D view", e);
+              return;
+            }
+            if (!shot)
+              setNote(
+                "The 3D view is not ready yet: wait until the cover shows.",
+              );
+            else if (shot.length < 200)
+              // an empty "data:," when WebGL may not be read back (blocked or lost)
+              fail("This browser gave an empty copy of the 3D view");
+            else setMarking({ source: shot });
           }}
         >
           Snapshot 3D
@@ -209,12 +292,26 @@ export function PictureTray({
           ))}
         </ul>
       )}
-      {note && <span className="d-pics-note">{note}</span>}
+      {broken && (
+        <span className="d-pics-note" role="alert">
+          {broken} Pictures need Chrome, Edge or Firefox with normal settings;
+          or mail a screenshot.
+        </span>
+      )}
+      {note && (
+        <span className="d-pics-note" role="alert">
+          {note}
+        </span>
+      )}
       {marking && (
         <Marker
           source={marking.source}
           onDone={done}
           onCancel={() => setMarking(null)}
+          onFail={(what, e) => {
+            setMarking(null);
+            fail(what, e);
+          }}
         />
       )}
     </div>
@@ -278,10 +375,12 @@ export function Marker({
   source,
   onDone,
   onCancel,
+  onFail,
 }: {
   source: string;
   onDone: (png: Blob, source: string) => void;
   onCancel: () => void;
+  onFail: (what: string, e?: unknown) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
@@ -297,27 +396,35 @@ export function Marker({
     im.src = source;
   }, [source]);
 
-  const lw = img
-    ? Math.max(3, Math.round(Math.max(img.width, img.height) / 220))
-    : 3;
+  // a big photo is drawn smaller: Safari on an iPad refuses canvases above ~16 million
+  // pixels, and the server keeps at most this side anyway (desk.picture_max_side_px)
+  const fit = img
+    ? Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight))
+    : 1;
+  const w = img ? Math.max(1, Math.round(img.naturalWidth * fit)) : 1;
+  const h = img ? Math.max(1, Math.round(img.naturalHeight * fit)) : 1;
+  const lw = Math.max(3, Math.round(Math.max(w, h) / 220));
   const paint = useCallback(() => {
     const c = canvas.current;
     if (!c || !img) return;
     const g = c.getContext("2d");
-    if (!g) return;
+    if (!g) {
+      setErr("This browser gives no drawing canvas. " + OTHER_BROWSER);
+      return;
+    }
     g.clearRect(0, 0, c.width, c.height);
-    g.drawImage(img, 0, 0);
+    g.drawImage(img, 0, 0, w, h);
     for (const s of shapes) drawShape(g, s, lw);
     if (drag.current) drawShape(g, drag.current, lw);
-  }, [img, shapes, lw]);
+  }, [img, shapes, lw, w, h]);
   useEffect(() => {
     const c = canvas.current;
     if (c && img) {
-      c.width = img.naturalWidth;
-      c.height = img.naturalHeight;
+      c.width = w;
+      c.height = h;
     }
     paint();
-  }, [img, paint]);
+  }, [img, paint, w, h]);
 
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
@@ -391,9 +498,15 @@ export function Marker({
             type="button"
             className="d-btn d-primary d-small"
             disabled={!img}
-            onClick={() =>
-              canvas.current?.toBlob((b) => b && onDone(b, source), "image/png")
-            }
+            onClick={async () => {
+              const c = canvas.current;
+              if (!c) return;
+              try {
+                onDone(await canvasPng(c), source);
+              } catch (e) {
+                onFail("The marked picture could not be saved", e);
+              }
+            }}
           >
             Use this picture
           </button>

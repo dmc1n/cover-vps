@@ -228,6 +228,7 @@ export function Viewer({
   const [showVents, setShowVents] = useState(ventsSaved);
   const [showDims, setShowDims] = useState(dimsSaved);
   const [unfolding, setUnfolding] = useState(false);
+  const [glError, setGlError] = useState("");
   const frameHooks = useRef<FrameHook[]>([]);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -275,7 +276,23 @@ export function Viewer({
       0.01,
       100,
     );
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch (e) {
+      // no WebGL (switched off, blocked by a policy, no graphics driver): say so here,
+      // instead of an error that blanks the whole page (8 Oct 2026, ADR-096)
+      const why = e instanceof Error ? e.message : String(e);
+      setGlError(why);
+      if (snapshot)
+        snapshot.current = () => {
+          throw new Error(`3D (WebGL) does not work in this browser (${why})`);
+        };
+      return () => {
+        if (snapshot) snapshot.current = null;
+      };
+    }
+    setGlError("");
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(el.clientWidth, el.clientHeight);
     el.appendChild(renderer.domElement);
@@ -742,7 +759,15 @@ export function Viewer({
           )}
         </span>
       </div>
-      <div className="canvas" ref={host} />
+      <div className="canvas" ref={host}>
+        {glError && (
+          <p className="gl-error" role="alert">
+            The 3D view needs WebGL, which this browser does not give ({glError}
+            ). Turn on “Use graphics acceleration when available” in the
+            browser’s settings, or use Chrome or Firefox.
+          </p>
+        )}
+      </div>
       {unfolding && (
         <UnfoldView
           id={id}

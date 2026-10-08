@@ -121,6 +121,9 @@ correcties wordt het een regel voor alle hoezen (ADR-082).
      **Undo** of Ctrl+Z haalt de laatste weg, **Clear** alles.
   3. **Use this picture**, dan **Reject** of **Save comment**. Het plaatje staat in de
      geschiedenis van de hoes (klik om te vergroten); het programma en Claude zien het daar.
+  4. Het werkt ook bij **Correct this cover** ("Pictures with the correction").
+  5. Lukt iets niet, dan staat er in rood onder "Pictures" waarom. Probeer dan Chrome of
+     Firefox, of maak een schermafdruk en kies **Upload…**.
 
 **Minder handig:** alleen "klopt niet" of "vorm fout". Dan moet geraden worden wat er bedoeld is.
 
