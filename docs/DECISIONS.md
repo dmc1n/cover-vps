@@ -2752,3 +2752,57 @@ docs/plans/prices-costing.md; handbook: docs/handbook/prices.md.
   of the catalogue's 2-seaters, or any cover the owner picks. The maths did not change.
 - **Better later:** price per colour/quality in the configurator, separate workcenters, shipping
   per country and box size, duties per HS code, the B2B storefront.
+
+## ADR-099 — A gentle fold is no seam: box faces that lie flat together are one piece
+
+Rens (approver), 8 October 2026, on 11 SUNS box covers (bar chairs Virenze and Fishbone, bar
+tables 80x80 HPL and teak, chair Vittoria, corners Aspen, Avero and Emar, Monte Vari dining
+table, Sato bench, Vento daybed): "crossed-out panels can become one panel"; Monte Vari: "2
+panels on the top instead of 4".
+
+- **Why the engine split them.** Not the roll, not the stretch: every crossed pair was two flat
+  box faces meeting at a gentle fold. A flat table or stool top is drained into a gable of two
+  faces at `hull.min_slope_deg` each (rule 12), a 10 degree fold; the box's greedy face choice
+  added near-parallel faces (3 to 7 degrees: Vittoria, Fishbone, Monte Vari, Sato). Each flat
+  face was its own piece (ADR-038), and joining was only done for slivers or on request
+  (`seams.fold_merge`, ADR-055).
+- **The rule.** `seams.fold_join_max_deg` (15, to confirm): neighbouring faces on the same side
+  (both top or both skirt) whose fold is at most this are one piece with a FOLD pen line, the
+  gentlest fold first, while the piece fits the roll (`roll.usable_width_mm` minus the
+  allowances) and is no longer than the longest piece. Two flat faces unfold exactly (0 %
+  stretch), so the fit does not change; the shape of the cover does not change either.
+  Measured on the rejected covers: every crossed pair is 3 to 10 degrees; the pairs Rens left
+  alone are 23 degrees and more (Vittoria's back slope 33, the daybed's front halves 23).
+  Monte Vari: the two 7 degree pairs join first, then the 10 degree ridge would make the top
+  1.6 m wide, over the roll, so it stays a seam: 2 top pieces, as Rens asked.
+- **Check.** The audit's new *gentle folds* check fails a box cover with a seam between two
+  same-side pieces at a fold of at most the limit whose widths together fit the roll. Tests in
+  `engine/tests/test_facets.py`; an AI lesson for box covers.
+- **Not done.** The cross-side case (a top face onto a wall) stays a seam: the skirt is where
+  the vents and the hem go.
+
+## ADR-100 — A cover surface of its own is cut along its own creases
+
+Rens, 8 October 2026, on S53 and S60 (customer cover models, `hull.top: given`): "for the cut
+pieces please follow the lines of the original model", "follow the seams of the original
+model as shown by the red lines".
+
+- **Why.** A given cover surface went through the usual seams step: a level skirt seam and a
+  roll split across the top. The surface's own creases (the top's front and back edges, 25 to
+  90 degrees) were ignored, so the seams ran beside them.
+- **The rule.** `seams.given_crease_deg` (20): a given surface not drawn in parts is cut into
+  the pieces its creases sharper than this enclose (scrap bits from meshing go to their
+  neighbour), seams on the creases; a smooth surface (one piece) keeps the usual seams, and a
+  surface of a few flat faces keeps one piece per face with its 45 degree corner splits
+  (ADR-045). The red
+  lines were mapped onto the 3D cover by fitting the Desk snapshot's camera (silhouette and
+  flat-colour match, IoU 0.99 on S53) and lie on those creases.
+- **Clash, for the owner.** The front crease of S53 and S60 is not level (45 to 79 cm), so the
+  skirt is no longer cut at one height (rule 13, `seams.skirt_seam: level`). The covers are
+  built in staging and put to the owner; they are not replaced live until he chooses.
+- **Furniture part lines.** "The original model" could also mean the furniture's own parts
+  (model.glb). Not usable as a general seam source: the SUNS furniture files are thousands of
+  tiny parts (Sorrento 2-seater: 11,302 kept parts, the weave and cushions), so their
+  boundaries are no lines a cover could follow. The red lines on the SUNS box sofas ask for a
+  different box (a straight front-wall edge, a roof seam from the apex), which is an owner
+  question, not a seams file: a box cover's seams are its edges.

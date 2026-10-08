@@ -216,6 +216,7 @@ uv run python scripts/drawing_rebuild.py OUT --pdfs DIR [--dry-run]   drawing co
 uv run python scripts/drawing_merge.py [--only ...] [--dry-run]   free-form drawing covers in fewer pieces (ADR-076)
 uv run python scripts/fewer_build.py OUT --codes C27,... | --merge all   drawing covers rebuilt in staging, slivers joined (ADR-097)
 uv run python scripts/fewer_check.py DIR ...   re-measure a built cover from its cut.dxf and patterns (ADR-097)
+uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT   the Desk picture's red marks mapped onto the cover's panels and 3D (camera fitted, ADR-100)
 uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   drawing, old and new cover side by side
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
 COVER_DATA_DIR=~/cover-data uv run python scripts/learned_check.py [--recalc]   do the Desk's corrections still hold? (ADR-082)

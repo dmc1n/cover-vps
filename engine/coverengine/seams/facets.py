@@ -7,6 +7,10 @@ piece (0 % stretch), so they can be cut as one piece with a fold line in pen.
 
 - A face narrower than `seams.min_piece_width_mm` (a sliver) always goes into the neighbour it
   shares the longest edge with, on the same side (top or skirt), if the two fit the roll.
+- Neighbouring faces on the same side (top or skirt) that meet at a gentle fold, at most
+  `seams.fold_join_max_deg`, are one piece with a fold line (Rens, 8 October 2026: "crossed-out
+  panels can become one panel", on gable tops of 10 degrees and near-flat pairs of 3 to 7
+  degrees; ADR-099), smallest fold first, as long as they fit the roll and the longest piece.
 - With `seams.fold_merge` (per model, on the owner's request) neighbouring top faces are joined
   as long as they fit the roll width and the longest piece.
 
@@ -111,6 +115,12 @@ def unfolded(
     return shapely.union_all(shapes).buffer(0)
 
 
+def fold_deg(a: Facet, b: Facet) -> float:
+    """The angle (degrees) between two flat faces' directions: 0 when they lie in one plane."""
+    na, nb = np.cross(a.u, a.v), np.cross(b.u, b.v)
+    return float(np.degrees(np.arccos(np.clip(float(na @ nb), -1.0, 1.0))))
+
+
 def size_on_roll(outline: shapely.Geometry) -> tuple[float, float]:
     """(width, length) of the narrowest rectangle round the outline (rotation is free)."""
     box = np.asarray(shapely.minimum_rotated_rectangle(outline).exterior.coords)[:4]
@@ -127,8 +137,10 @@ def join(
     roll_width: float,
     max_length: float,
     fold_merge: bool,
+    gentle_deg: float = 0.0,
 ) -> tuple[NDArray[np.int64], list[str], list[list[list[float]]]]:
-    """New labels: slivers joined into a neighbour, and (fold_merge) top faces joined while they
+    """New labels: slivers joined into a neighbour, faces on the same side meeting at a fold of
+    at most `gentle_deg` joined (0: never), and (fold_merge) top faces joined while they
     fit the roll. `top[r]` says whether flat face r is part of the top. Returns the labels,
     what was done (in words) and the folds: the two 3D ends of every edge that is now inside a
     piece."""
@@ -194,7 +206,20 @@ def join(
                 break
         else:
             notes.append(f"a {width / MM_PER_CM:.1f} cm narrow face could not be joined: check it")
-    # 2 on request: top faces together while they fit the roll
+    # 2 gentle folds (ADR-099): neighbours on the same side whose fold is at most gentle_deg
+    # lie flat together; the gentlest fold first, while the piece fits the roll
+    for angle, a, b in sorted(
+        (fold_deg(facets[a], facets[b]), a, b)
+        for (a, b) in shared
+        if facets[a].top == facets[b].top
+    ):
+        if angle > gentle_deg:
+            break
+        ga, gb = owner[a], owner[b]
+        if ga != gb and fits(groups[ga] + groups[gb], groups[ga], groups[gb]):
+            merge(ga, gb)
+            notes.append(f"two faces at a {angle:.0f} degree fold joined into one piece (fold)")
+    # 3 on request: top faces together while they fit the roll
     if fold_merge:
         changed = True
         while changed:

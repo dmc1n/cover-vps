@@ -26,6 +26,10 @@ writes the pieces as they are cut:
   upper piece's edge must land.
 - **Hem:** 50 mm (`hem.allowance_mm`), the fold line on the pen layer; cord exits as pen marks
   (`hem.cord_exits`).
+- **Folds instead of seams:** two flat faces of a box cover that meet at a gentle fold (at
+  most `seams.fold_join_max_deg`, 15 degrees, such as the gable over a table top) are cut as
+  one piece with a FOLD pen line, when it fits the roll (ADR-099). A customer's own cover
+  model is cut along its own creases (`seams.given_crease_deg`, ADR-100).
 - **Air vents:** 25 × 22 cm, 5 cm above the hem, one per full metre of hem, spread evenly, at
   least 10 cm from a vertical seam. The opening is cut out of the skirt piece; the hood and the
   membrane are separate pieces in the list. If the skirt is too low for a vent, you get a

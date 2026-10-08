@@ -12,6 +12,8 @@ The program measures, for each model:
 - drape: once the cover was dropped over the furniture, not too many folds, no deep sag;
 - slivers: no piece narrower than seams.min_piece_width_mm (ADR-055); a top that would fit
   the roll in one piece with folds is noted.
+- gentle folds: a box cover has no seam between two pieces on the same side that meet at a fold
+  of at most seams.fold_join_max_deg and would fit the roll together (Rens, 8 Oct 2026; ADR-099).
 - plan: an arrangement built to follow its pieces lies, seen from above, within the pieces plus
   the clearance: no diagonal across an open corner (ADR-095).
 
@@ -55,6 +57,7 @@ GREY, BLUE, RED = "#7d828c", "#1f5fbf", "#e0302a"  # param-ok: display colours
 PALE = "#cfe0f7"  # param-ok: display colour (the cover's area)
 PAD_SHARE = 0.03  # param-ok: display margin
 ON_TOP = 10  # param-ok: drawing order (red dots over everything)
+SHORT_SIDE = 1.05  # param-ok: a seam this close to a piece's width runs along its short side
 
 
 def _check(name: str, ok: bool, detail: str) -> dict[str, Any]:
@@ -181,6 +184,51 @@ def sliver_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, An
                           f"{together / MM_PER_CM:.0f} cm wide: one piece with folds would fit "
                           "the roll (seams.fold_merge, on request)"))  # fmt: skip
     return out
+
+
+def fold_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
+    """A box cover: no seam between two pieces on the same side (top or skirt) whose faces meet
+    at a fold of at most seams.fold_join_max_deg, when the two would fit the roll together:
+    those lie flat as one piece with a fold line (Rens, 8 Oct 2026, ADR-099)."""
+    limit = float(params["seams.fold_join_max_deg"])
+    cut_path, npz = model_dir / "panels.json", model_dir / "panels.npz"
+    if limit <= 0 or not cut_path.is_file() or not npz.is_file():
+        return []
+    hull = json.loads((model_dir / "hull.json").read_text(encoding="utf-8"))
+    if hull.get("top") != "box":
+        return []
+    panels = json.loads(cut_path.read_text(encoding="utf-8"))["panels"]
+    data = np.load(npz)
+    faces = np.asarray(data["original_vertex"])[np.asarray(data["faces"])]
+    labels = np.asarray(data["labels"])
+    pts = np.zeros((int(faces.max()) + 1, 3))
+    pts[np.asarray(data["original_vertex"])] = np.asarray(data["vertices"])
+    mesh = trimesh.Trimesh(pts, faces, process=False)
+    pairs = np.asarray(mesh.face_adjacency)
+    la, lb = labels[pairs[:, 0]], labels[pairs[:, 1]]
+    across = la != lb
+    n = mesh.face_normals
+    angle = np.degrees(np.arccos(np.clip(np.einsum("ij,ij->i", n[pairs[:, 0]], n[pairs[:, 1]]),
+                                         -1.0, 1.0)))  # fmt: skip
+    roll = float(params["roll.usable_width_mm"])
+    flagged = []
+    for a, b in {(min(x, y), max(x, y)) for x, y in zip(la[across], lb[across], strict=True)}:
+        pa, pb = panels[int(a)], panels[int(b)]
+        if pa["region"] != pb["region"]:
+            continue
+        sel = across & (((la == a) & (lb == b)) | ((la == b) & (lb == a)))
+        fold = float(np.median(angle[sel]))
+        ends = np.asarray(mesh.face_adjacency_edges)[sel]
+        seam = float(np.linalg.norm(pts[ends[:, 0]] - pts[ends[:, 1]], axis=1).sum())
+        wa, wb = float(pa["flat_width_mm"]), float(pb["flat_width_mm"])
+        # joined along their short sides the width stays; along their long sides they add up
+        joined = max(wa, wb) if seam <= max(wa, wb) * SHORT_SIDE else wa + wb
+        if fold <= limit and joined <= roll:
+            flagged.append(f"{pa['name']} / {pb['name']} ({fold:.0f} degrees)")
+    detail = ("seams where the pieces lie flat together (one piece with a fold): "
+              + ", ".join(flagged)) if flagged else (
+              f"no seam at a fold of {limit:g} degrees or less")  # fmt: skip
+    return [_check("gentle folds", not flagged, detail)]
 
 
 def plan_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
@@ -320,6 +368,7 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
         )
     )
     checks += sliver_checks(model_dir, params)
+    checks += fold_checks(model_dir, params)
     checks += plan_checks(model_dir, params)
     checks += drape_checks(model_dir, params)
     views(furniture, cover, bad, model_dir / AUDIT_PNG)

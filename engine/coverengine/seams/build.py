@@ -175,12 +175,30 @@ def _cut_cover(
     hull = load_model(hull_path)
     hull = trimesh.Trimesh(hull.vertices, hull.faces, process=True)
     drawn = _drawn_parts(model_dir, hull) if params["hull.top"] in ("given", "box") else None
+    crease_note: str | None = None
+    if (
+        drawn is None
+        and params["hull.top"] == "given"
+        and _p(params, "seams.given_crease_deg") > 0
+        and not _flat_faced(hull)  # flat faces: one piece each, as before (ADR-045)
+    ):
+        # a cover surface of its own (the customer's cover model): cut along its own creases,
+        # the lines its designer drew (Rens, 8 Oct 2026: "follow the original model's seams";
+        # ADR-100)
+        drawn = _crease_regions(hull, _p(params, "seams.given_crease_deg"))
+        if drawn is not None:
+            crease_note = (f"pieces follow the cover surface's own creases (sharper than "
+                           f"{_p(params, 'seams.given_crease_deg'):g} degrees)")  # fmt: skip
     if (
         drawn is not None
         or params["hull.top"] == "box"
         or (params["hull.top"] == "given" and _flat_faced(hull))
     ):
-        return _box_cut(model_dir, hull, params, drawn)
+        result = _box_cut(model_dir, hull, params, drawn)
+        if crease_note:
+            result.report["creases"] = crease_note
+            result.report.setdefault("joined", []).append(crease_note)
+        return result
     snap = _p(params, "seams.snap_mm")
     inset = _p(params, "seams.skirt_seam_inset_mm")
     line = auto.outline(hull)
@@ -383,6 +401,41 @@ def _flat_regions(hull: trimesh.Trimesh) -> NDArray[np.int64]:
     return _split_at_inside_corners(hull, label.ravel().astype(np.int64))
 
 
+def _crease_regions(hull: trimesh.Trimesh, crease_deg: float) -> NDArray[np.int64] | None:
+    """The surface's faces grouped into the pieces its creases (edges turning more than
+    crease_deg) enclose; scrap bits from meshing go to their neighbour. None when the creases
+    enclose fewer than two pieces (a smooth surface: the usual seams apply)."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    n = len(hull.faces)
+    pairs = np.asarray(hull.face_adjacency)
+    smooth = np.asarray(hull.face_adjacency_angles) < math.radians(crease_deg)
+    graph = coo_matrix((np.ones(int(smooth.sum())), (pairs[smooth, 0], pairs[smooth, 1])),
+                       shape=(n, n))  # fmt: skip
+    _, label = connected_components(graph, directed=False)
+    label = np.asarray(label, np.int64)
+    edge_len = np.linalg.norm(
+        np.diff(hull.vertices[hull.face_adjacency_edges], axis=1)[:, 0], axis=1
+    )
+    scrap = BOX_SCRAP_SHARE * float(hull.area)
+    for _ in range(n):
+        area = np.bincount(label, weights=hull.area_faces)
+        small = [r for r in np.flatnonzero(area) if area[r] < scrap]
+        if not small:
+            break
+        r = min(small, key=lambda q: area[q])
+        la, lb = label[pairs[:, 0]], label[pairs[:, 1]]
+        touch = ((la == r) & (lb != r)) | ((lb == r) & (la != r))
+        if not touch.any():
+            break
+        other = np.where(la[touch] == r, lb[touch], la[touch])
+        label[label == r] = int(np.argmax(np.bincount(other, weights=edge_len[touch])))
+    _, label = np.unique(label, return_inverse=True)
+    label = label.ravel().astype(np.int64)
+    return label if int(label.max()) >= 1 else None
+
+
 def _split_at_inside_corners(hull: trimesh.Trimesh, label: NDArray[np.int64]) -> NDArray[np.int64]:
     """A flat piece that turns a corner (an L-shaped strip) is split from its inside corner
     along the line halving that corner: the 45 degree seam of an L-shaped cover (ADR-045)."""
@@ -466,6 +519,7 @@ def _box_cut(
             roll,
             _p(params, "seams.max_skirt_panel_mm"),
             bool(params["seams.fold_merge"]),
+            _p(params, "seams.fold_join_max_deg"),
         )
         label = np.unique(label, return_inverse=True)[1].astype(np.int64)
     # the people's corrections at the Desk: join pieces, split a piece (ADR-082)

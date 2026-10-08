@@ -72,6 +72,14 @@ seams:
   min_piece_width_mm: 100        # to confirm (owner, 2026-10-02: to learn from our analyses);
                                  # a box cover's flat face narrower than this (a sliver) is
                                  # joined to its neighbour, with a fold (ADR-055)
+  fold_join_max_deg: 15          # to confirm; a box cover's neighbouring faces (both top or both
+                                 # skirt) that meet at a fold this gentle are one piece with a
+                                 # fold line in pen, if it fits the roll (Rens, 8 Oct 2026: gable
+                                 # tops of 10 degrees "can become one panel"; ADR-099); 0 = never
+  given_crease_deg: 20           # a cover surface of its own (hull.top: given): its creases
+                                 # sharper than this are the seams, the pieces are what they
+                                 # enclose (Rens, 8 Oct 2026: "follow the original model's
+                                 # seams"; ADR-100); 0 = the usual skirt and top seams
   fold_merge: false              # true (per model, on the owner's request, ADR-055): neighbouring
                                  # top faces that lie flat together on the roll are one piece,
                                  # a fold line in pen instead of a seam

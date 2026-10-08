@@ -28,5 +28,25 @@
     "check": "The audit's plan check (the cover within the pieces plus the clearance, seen from above) and the tests in engine/tests/test_arrange.py (an L gives an L with a sharp inner corner).",
     "applies_to": "box",
     "ai_model": "owner"
+  },
+  {
+    "time": 1791480000,
+    "model_id": "suns-bar-table-80x80-hpl",
+    "complaint": "Crossed-out panels can become one panel (Rens, 8 Oct 2026; also the bar chairs, Vittoria, the corners Aspen, Avero and Emar, Monte Vari, Sato).",
+    "cause": "A flat top is drained into a gable of two faces at the minimum slope (a 10 degree fold) and the box's face choice adds near-parallel faces (3 to 7 degrees); every flat face was its own piece.",
+    "rule": "Neighbouring box faces on the same side that meet at a fold of at most seams.fold_join_max_deg lie flat together: one piece with a fold line, the gentlest fold first, while it fits the roll.",
+    "check": "The audit's gentle folds check and engine/tests/test_facets.py (a gable top is one piece).",
+    "applies_to": "box",
+    "ai_model": "owner"
+  },
+  {
+    "time": 1791480001,
+    "model_id": "2026-07-cover-s53-rc-v1",
+    "complaint": "For the cut pieces please follow the lines of the original model (Rens, 8 Oct 2026; also S60).",
+    "cause": "A given cover surface got the usual level skirt seam and a roll split; its own creases (the top's front and back edges) were ignored.",
+    "rule": "A cover surface of its own is cut along its own creases sharper than seams.given_crease_deg; the pieces are what the creases enclose.",
+    "check": "engine/tests/test_given_creases.py (a given surface with creases is cut on them).",
+    "applies_to": "all",
+    "ai_model": "owner"
   }
 ]
