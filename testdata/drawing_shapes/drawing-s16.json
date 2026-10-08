@@ -1,0 +1,12 @@
+{
+ "shape": "sloped box",
+ "params": {
+  "length_cm": 114.0,
+  "depth_cm": 250.01,
+  "back_height_cm": 87.0,
+  "front_height_cm": 51.99,
+  "back_strip_cm": 0,
+  "front_strip_cm": 0
+ },
+ "read": "a wedge 250.01 x 114 cm from 87 to 51.99 cm; the top in one piece (114 cm fits the roll across; it was cut in two because the program measured only along the slope)."
+}

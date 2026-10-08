@@ -1,0 +1,74 @@
+{
+ "shape": "hip",
+ "params": {
+  "plan_cm": [
+   [
+    0,
+    0
+   ],
+   [
+    180,
+    0
+   ],
+   [
+    180,
+    215
+   ],
+   [
+    0,
+    215
+   ]
+  ],
+  "edges": [
+   "back",
+   "side",
+   "front",
+   "side"
+  ],
+  "profiles": {
+   "back": [
+    [
+     0,
+     62
+    ],
+    [
+     20,
+     87
+    ],
+    [
+     400,
+     87
+    ]
+   ],
+   "front": [
+    [
+     0,
+     40
+    ],
+    [
+     165,
+     87
+    ],
+    [
+     400,
+     87
+    ]
+   ],
+   "side": [
+    [
+     0,
+     40
+    ],
+    [
+     29.2,
+     87
+    ],
+    [
+     400,
+     87
+    ]
+   ]
+  }
+ },
+ "read": "top view 180 x 215 cm, top strip 121.6 cm wide (the ends lean in 29.2 cm from 40 to 87 cm); side view: back wall 62, chamfer 20 cm up to 87, flat 30 cm, slope over 165 cm to the 40 cm front. The back wall's top comes out 152.66 cm wide, as written."
+}

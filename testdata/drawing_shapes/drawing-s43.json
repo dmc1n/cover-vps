@@ -1,0 +1,38 @@
+{
+ "shape": "swept",
+ "params": {
+  "path": [
+   {
+    "line": 41.24
+   },
+   {
+    "arc": 167.1,
+    "angle": 61.835
+   }
+  ],
+  "profile": [
+   [
+    0,
+    88.01
+   ],
+   [
+    33.07,
+    88.01
+   ],
+   [
+    141.86,
+    40.64
+   ]
+  ],
+  "seams_cm": [
+   55.4,
+   110.8,
+   166.2
+  ],
+  "start_end": "square",
+  "end_end": "round",
+  "end_angle_deg": 0,
+  "skirt_cm": 40.64
+ },
+ "read": "the live S43 shape (Rens: the shape right, the skirt not level): the back edge a 41.24 cm line and a 167.1 cm radius arc over 61.8 deg, the profile 88.01 cm back, a 33.07 cm strip, a slope to the 40.64 cm front 141.86 cm from the back, the round nose; now with a level skirt seam at the 40.64 cm front height all round (Rens's picture, the domain rule 13)."
+}

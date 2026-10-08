@@ -269,7 +269,7 @@ STRIP_SHARE = 0.4  # param-ok: the back strip is narrower than this share of the
 STRIP_MIN_CM = 5.0  # param-ok: and wider than this
 HALF = 0.5  # param-ok: the middle of a line
 LABEL_REACH_PT = 120.0  # param-ok: a "Length" word sits beside its value
-CONCAVE = 0.85  # param-ok: a plan filling less of its convex hull is curved like a C or U
+CONCAVE = 0.95  # param-ok: a plan filling less of its convex hull is curved (a C, a U, a kidney)
 SEAM_END_CM = 4.0  # param-ok: a seam line ends this close to the back and the front edge
 SEAM_SHARE = 0.7  # param-ok: a seam line runs across most of the depth
 SEAM_INSIDE_CM = 10.0  # param-ok: its middle lies well inside the cover, not along its edge
@@ -302,7 +302,7 @@ def back_edge(plan: Any) -> Any:
     return shapely.LineString(pts[[(best[0] + i) % n for i in range(best[1])]])
 
 
-def _profile_from_text(pdf: Any) -> dict[str, float] | None:
+def _profile_from_text(pdf: Any, plan_cm: tuple[float, ...] = ()) -> dict[str, Any] | None:
     """Back height, front height, depth and the back strip from words on the drawing (C26,
     C27: "86.4cm Height", "38.1cm Front Height", "99.0cm Depth", a bare "20.3cm")."""
     import re
@@ -328,10 +328,73 @@ def _profile_from_text(pdf: Any) -> dict[str, float] | None:
                 got["back"] = max(v, got.get("back", 0.0))
     # "Front" and "Height" may be separate blocks: a height block next to a Front block
     if not {"back", "front", "depth"} <= set(got):
-        return None
+        return _profile_from_arrows(pdf, plan_cm)
     small = [s for s in written_cm(pdf) if STRIP_MIN_CM < s < STRIP_SHARE * got["depth"]]
     got["strip"] = min(small) if small else 0.0
     return got
+
+
+UPRIGHT_SIN = 0.99  # param-ok: text running up the page within ~8° is written beside a height
+ARROW_NEAR_PT = 150.0  # param-ok: the depth and strip are written this close to the heights
+SAME_CM = 1.0  # param-ok: a cm value and its inch partner agree within 1 cm
+
+
+def _sizes_on_page(page: Any) -> list[tuple[float, bool, float, float]]:
+    """(cm, upright, x, y) of every size written on the page; an inch value only where no cm
+    value is written beside it (S32 writes its back height as a bare "[86.4]" and "34in")."""
+    import re
+
+    from coverengine.drawing_views import IN_CM
+
+    cms: list[tuple[float, bool, float, float]] = []
+    inch: list[tuple[float, bool, float, float]] = []
+    for b in page.get_text("dict")["blocks"]:
+        for ln in b.get("lines", []):
+            t = " ".join(s["text"] for s in ln["spans"])
+            if re.search(r"order|product|fabric|note", t, re.I):
+                continue
+            up = abs(float(ln["dir"][1])) >= UPRIGHT_SIN
+            x, y = (ln["bbox"][0] + ln["bbox"][2]) / 2, (ln["bbox"][1] + ln["bbox"][3]) / 2
+            for v in re.findall(r"(\d+(?:[.,]\d+)?)\s*cm", t):
+                cms.append((float(v.replace(",", ".")), up, x, y))
+            for v in re.findall(r"(\d+(?:[.,]\d+)?)\s*(?:in\b|\")", t):
+                inch.append((float(v.replace(",", ".")) * IN_CM, up, x, y))
+    out = list(cms)
+    for v, up, x, y in inch:
+        if all(abs(v - c[0]) > SAME_CM for c in cms):
+            out.append((v, up, x, y))
+    return out
+
+
+def _profile_from_arrows(pdf: Any, plan_cm: tuple[float, ...] = ()) -> dict[str, Any] | None:
+    """The profile when the drawing does not name its sizes (C28, S32: the 3D view writes
+    "86.4cm", "38.1cm", "99.0cm", "20.3cm" without "Height" or "Depth", ADR-097 notes): the
+    sizes written upright beside vertical arrows are heights (the highest the back, the lowest
+    the front); of the slanted or level sizes written close to them, the largest is the depth
+    and the smallest the back strip. The plan's own "Length" sizes are far from the heights."""
+    import pymupdf
+
+    for page in pymupdf.open(pdf).pages():
+        # the top view's own width and depth are written upright too (S44's 192.4 cm): not heights
+        sizes = [s for s in _sizes_on_page(page)
+                 if not any(abs(s[0] - c) <= LENGTH_TOL * c for c in plan_cm)]  # fmt: skip
+        ups = [s for s in sizes if s[1]]
+        if len({round(s[0]) for s in ups}) < 2:  # param-ok: a back and a front height
+            continue
+        near = [
+            s for s in sizes
+            if not s[1] and min(math.dist(s[2:], u[2:]) for u in ups) < ARROW_NEAR_PT
+        ]  # fmt: skip
+        back, front = max(s[0] for s in ups), min(s[0] for s in ups)
+        if not near:
+            continue
+        depth = max(s[0] for s in near)
+        if depth <= front:
+            continue
+        small = [s[0] for s in near if STRIP_MIN_CM < s[0] < STRIP_SHARE * depth]
+        return {"back": back, "front": front, "depth": depth,
+                "strip": min(small) if small else 0.0, "from": "arrows"}  # fmt: skip
+    return None
 
 
 def _seam_lines(page: Any, plan_pt: Any) -> list[Any]:
@@ -404,7 +467,8 @@ def read_drawing(pdf: Any) -> dict[str, Any]:
     plan = shapely.Polygon(plan_v.outline * k).buffer(0).simplify(0.3)
     if plan.area / plan.convex_hull.area > CONCAVE:
         return {"error": "the top view is not curved like a C or U"}
-    prof = _profile_from_text(pdf)
+    x0, y0, x1, y1 = plan.bounds
+    prof = _profile_from_text(pdf, (x1 - x0, y1 - y0))
     if prof is None:
         return {"error": "no written back height, front height and depth"}
     back = back_edge(plan)

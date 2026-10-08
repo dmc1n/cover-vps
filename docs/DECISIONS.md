@@ -2752,3 +2752,81 @@ docs/plans/prices-costing.md; handbook: docs/handbook/prices.md.
   of the catalogue's 2-seaters, or any cover the owner picks. The maths did not change.
 - **Better later:** price per colour/quality in the configurator, separate workcenters, shipping
   per country and box size, duties per HS code, the B2B storefront.
+
+## ADR-099 — Drawing shapes Rens rejected: read by a person where the reader cannot, and four reader fixes
+
+Rens (approver) rejected 27 drawing covers on shape, size or pieces (7-8 Oct 2026, group G), and
+the SUNS Portofino daybed with roof as "no cover needed" (H). Most had been built in the first
+days from the AI's sizes (sloped box, L shape, swept); route A (ADR-081) said "needs a person"
+for half of them. Looking at each drawing next to its cover, the causes were few:
+
+- **An arm block** at one end with a ramp from the seat (S4/S5, S6/S7, S6, S19) and a **corner
+  seat** with its back along two sides (S35, built as a plain box): shapes no builder had.
+- **The Blocchi family** (D6, S26, S27): a back chamfer, a flat strip, a long slope and ends
+  that lean in. It is the **lowest of the edges' profiles** (a hip roof): each outline edge
+  carries a profile from it (rising, then level or falling, so it is the lowest of straight
+  lines), the top is their minimum, and each piece is where one plane is lowest, so every seam
+  is a straight line. The written sizes then come out by themselves (S26's back top 152.66 cm,
+  its strip 121.6 cm); the live covers had the back full width. `drawing_given.hip`.
+- **D1, D2**: an 18 cm skirt and side strips of even width: the sides are twisted quads (a
+  ruled patch, 0.13 % stretch); "faces" pieces.
+- **Level skirt** (Rens on S43: "keep the skirt height level all round"; the domain rule 13):
+  `skirt_cm` on any drawing shape cuts every upright wall at one height into one skirt band
+  and the upper parts. The band is cut where one wall meets the next (Rens's short vertical
+  lines on S43, at the nose and the inner corner), whole walls packed into runs no longer than
+  `seams.max_skirt_panel_mm`, at least two. A swept shape's own seams are joined first
+  (ADR-076), so the skirt seam stays.
+- **Mirrors**: S44 is S43 mirrored ("the side at the red circle should be round as on the
+  drawing"; both drawings have the same sizes, S43's top view reads 18 % small); "24 & 24B are
+  mirrored of each other". `"mirror": true` on any shape.
+
+**How (`coverengine/drawing_given.py`, `scripts/given_build.py`).** Where the reader cannot read
+a drawing, a person writes the shape once in the model's `drawing_shape.json`: the kind (any
+drawn.py shape, `plan-profile`, `hip`, `faces`, `revolve`), its sizes from the drawing, and
+`read`: how each size was read. `cover drawing-build` then builds it as reader "given", like any
+route-A cover (vents from the drawing's text, hull, cut, flatten, export). No drawing is a
+special case in the code. The 18 files are kept in `testdata/drawing_shapes/` (a test builds
+them all).
+
+**Reader fixes (general, with tests):**
+- **Heights without names** (C28, S32: "86.4cm", "38.1cm", "99.0cm", "20.3cm" with no
+  "Height"/"Depth"): sizes written upright beside vertical arrows are heights (the highest the
+  back, the lowest the front), the slanted or level ones close by give the depth (largest) and
+  the strip (smallest); the top view's own upright width and depth are left out (S44's 192.4).
+  C28 now builds by route A (plan-profile, the mirror of C27: 20 pieces, 0.54 %). A plan filling
+  up to 95 % of its hull (was 85 %) is tried as plan-profile, so a kidney (S32, 91 %) is too;
+  it is still only taken when its seams match the written lengths.
+- **The angle of an angled sofa** (S21, "now a 90 degree L, the wanted angle is 30"):
+  `drawing_vectors.back_angle` reads it from the two longest lines of the top view that meet.
+  S21's arms meet at 140 degrees (a 40-degree bend; Rens writes 30: to the owner, both built).
+  The shape is the new `angled` kind: each arm a hip shape on its own plan, open on the mitre,
+  so the arms meet at the same heights; the profile and hipped ends from the side view (59 /
+  84 / 59 / 40 cm, the front edge 149.78 cm as written). swept.py's sharp turn cannot do it:
+  with the front on the inside of the bend its stations next to the corner reach past the
+  mitre and the pieces fold over (the AI's 90-degree turn on the L1/L5 mirror). The audit
+  (`drawing_checks`) fails a drawing whose arms meet at 100-175 degrees but is built as a
+  90-degree L, and any drawing cover in more than 60 pieces (the 7,846-piece L1/L5 mirror).
+  Swept over the live drawing covers: only these two fail.
+- **A side view alone is round** (U2, "should be cylindrical; the drawing is a side view"):
+  drawing_views calls a lone picture the 3D view; when it has no 3D slant lines it is a side
+  view, and route A turns its outline about the axis (scaled by the largest written size, the
+  height; taken when its width is a written size too): a cylinder in two gores, the cone, the
+  rounding band, a top disc.
+- **A sloped top narrower than the roll across is one piece** (S16 was cut in two along its
+  250 cm slope although it is 114 cm across).
+
+**Results** (staging `out/rejections/G/`, compare sheets in `out/rejections/G/compare/`): 18
+covers rebuilt (and S21 twice, for the owner to choose), every one checked twice (`cover audit` ok; `scripts/fewer_check.py` PASS: roll,
+seam pairs within 1.7 mm except S32 2.5 mm, stretch at most 0.76 %, vents as drawn) and looked
+at against the drawing. The water check flags the flat strips as drawn, as on the live covers
+(ADR-094, `drawing.isofit_strip_fall_deg` is the owner's). Ten go to the owner: D5 (its sizes do
+not make one surface), S20 and S48 (following the seat between arms holds water, rule 12), S21
+(40 vs 30 degrees), S37 (the drawing contradicts itself), S38/S39 (the shape matches the drawing;
+only the drawstring opening at the front corner is missing: what does Rens mean?), S45 (one
+358 cm band is over the 300 cm skirt panel default), S47 (matches the drawing; what is wrong?),
+Portofino (no "retired" status yet). A half-plane in the hip builder was drawn too small when
+its line lay far from the origin (a never-binding side): fixed, with the S21 test.
+
+**Not done:** the vertical drawstring openings (D5, S38, S39) and U2's zippers and fibreglass
+pocket are not in the patterns; a reader for the arm-block and hip shapes (they are given by a
+person for now, the better alternative is to fit them to the 3D view like ADR-094).

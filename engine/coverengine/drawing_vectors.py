@@ -236,3 +236,49 @@ def vent_arrows(pdf: Path) -> int:
                             ends.add((round(z.x), round(z.y)))
             n += len(ends)
     return n
+
+
+CORNER_PT = 1.0  # param-ok: two drawn lines meet when their ends are this close (pt)
+LONG_SHARE = 0.9  # param-ok: the back's two arms are the longest lines drawn, within 10 %
+STRAIGHT_DEG = 1.0  # param-ok: lines meeting closer to 0 or 180 degrees are one line
+
+
+def back_angle(pdf: Path) -> dict[str, Any] | None:
+    """The angle between the two arms of a corner or angled sofa, read from the top view's own
+    lines (Rens on S21, 8 Oct 2026: "now a 90 degree L shape, the wanted angle is 30 degrees"):
+    of the longest straight lines on the first page, the two that meet at one end are the back
+    edges. Returns {"inside_deg": the angle between them, "bend_deg": 180 minus it (how far the
+    second arm turns from the first), "arm_pt": their lengths}, or None."""
+    import pymupdf
+
+    page = pymupdf.open(pdf)[0]
+    cut = page.rect.height * TITLE_BLOCK
+    segs = []
+    for d in page.get_drawings():
+        for it in d["items"]:
+            if it[0] == "l" and it[1].y < cut and it[2].y < cut:
+                a, b = (it[1].x, it[1].y), (it[2].x, it[2].y)
+                segs.append((math.dist(a, b), a, b))
+    segs.sort(key=lambda s: -s[0])
+    if len(segs) < 2:  # param-ok: two arms
+        return None
+    long = [s for s in segs if s[0] >= LONG_SHARE * segs[0][0]]
+    best: tuple[float, tuple[float, float], float] | None = None
+    for i, (la, a0, a1) in enumerate(long):
+        for lb, b0, b1 in long[i + 1 :]:
+            for p, q in ((a0, a1), (a1, a0)):
+                for r, s in ((b0, b1), (b1, b0)):
+                    if math.dist(p, r) > CORNER_PT:
+                        continue
+                    u = (q[0] - p[0], q[1] - p[1])
+                    v = (s[0] - r[0], s[1] - r[1])
+                    cos = (u[0] * v[0] + u[1] * v[1]) / (la * lb)
+                    ang = math.degrees(math.acos(max(-1.0, min(1.0, cos))))
+                    if STRAIGHT_DEG < ang < 180 - STRAIGHT_DEG and (
+                        best is None or la + lb > best[2]
+                    ):
+                        best = (ang, (la, lb), la + lb)
+    if best is None:
+        return None
+    return {"inside_deg": round(best[0], 1), "bend_deg": round(180.0 - best[0], 1),
+            "arm_pt": [round(x, 1) for x in best[1]]}  # fmt: skip
