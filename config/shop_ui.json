@@ -358,6 +358,78 @@
    "en": "The sizes come from the product page. Please check them: many pieces come in more than one size.",
    "de": "Die Maße stammen von der Produktseite. Bitte prüfen Sie sie: viele Möbel gibt es in mehreren Größen.",
    "fr": "Les dimensions viennent de la page du produit. Vérifiez-les : beaucoup de meubles existent en plusieurs tailles."
+  },
+  "returns": {
+   "nl": "Retourneren",
+   "en": "Returns",
+   "de": "Rückgabe",
+   "fr": "Retours"
+  },
+  "cookies": {
+   "nl": "Cookies",
+   "en": "Cookies",
+   "de": "Cookies",
+   "fr": "Cookies"
+  },
+  "contact": {
+   "nl": "Contact",
+   "en": "Contact",
+   "de": "Kontakt",
+   "fr": "Contact"
+  },
+  "home": {
+   "nl": "Naar de homepage",
+   "en": "To the home page",
+   "de": "Zur Startseite",
+   "fr": "Vers la page d'accueil"
+  },
+  "not_found": {
+   "nl": "Deze pagina bestaat niet",
+   "en": "This page does not exist",
+   "de": "Diese Seite gibt es nicht",
+   "fr": "Cette page n'existe pas"
+  },
+  "not_found_text": {
+   "nl": "Misschien is de link oud of verkeerd overgenomen.",
+   "en": "Perhaps the link is old or was copied wrongly.",
+   "de": "Vielleicht ist der Link alt oder falsch kopiert.",
+   "fr": "Le lien est peut-être ancien ou mal copié."
+  },
+  "cover": {
+   "nl": "Hoes",
+   "en": "Cover",
+   "de": "Schutzhülle",
+   "fr": "Housse"
+  },
+  "indicative_note": {
+   "nl": "onze prijzen worden nog vastgesteld. Je betaalt pas nadat wij je de definitieve prijs hebben bevestigd.",
+   "en": "our prices are still being set. You only pay after we have confirmed the final price to you.",
+   "de": "unsere Preise werden noch festgelegt. Du zahlst erst, nachdem wir dir den endgültigen Preis bestätigt haben.",
+   "fr": "nos prix sont encore en cours de fixation. Vous ne payez qu'après que nous vous avons confirmé le prix définitif."
+  },
+  "terms_stock": {
+   "nl": "Ik ga akkoord met de voorwaarden (hoes uit ons assortiment: 14 dagen bedenktijd)",
+   "en": "I accept the terms (a cover from our range: 14 days to change your mind)",
+   "de": "Ich akzeptiere die Bedingungen (Schutzhülle aus unserem Sortiment: 14 Tage Widerrufsrecht)",
+   "fr": "J'accepte les conditions (housse de notre gamme : 14 jours de rétractation)"
+  },
+  "test_payments": {
+   "nl": "Testbetalingen: er wordt geen geld afgeschreven.",
+   "en": "Test payments: no money is charged.",
+   "de": "Testzahlungen: es wird kein Geld abgebucht.",
+   "fr": "Paiements de test : aucun argent n'est débité."
+  },
+  "order_pay": {
+   "nl": "Bestellen en betalen",
+   "en": "Order and pay",
+   "de": "Zahlungspflichtig bestellen",
+   "fr": "Commander et payer"
+  },
+  "place_order": {
+   "nl": "Bestellen met betaalverplichting",
+   "en": "Order with obligation to pay",
+   "de": "Zahlungspflichtig bestellen",
+   "fr": "Commande avec obligation de paiement"
   }
  },
  "status": {

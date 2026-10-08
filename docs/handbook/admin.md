@@ -117,7 +117,7 @@ The rain on the designed surface (the **Rain** button) stays, to compare.
 The shop is at **/shop/**: the landing page, the configurator, checkout and the order status.
 Three tabs on the admin page belong to it.
 
-- **Shop settings:** everything the shop needs:
+- **Shop settings:** everything the shop needs (the public consumer shop: docs/handbook/webshop.md):
   - company data and domain;
   - prices: on the **Prices & costing** tab now (versioned, B2C and B2B; docs/handbook/prices.md);
   - delivery costs per country;

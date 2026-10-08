@@ -426,6 +426,9 @@ arrange:                         # furniture placed together, one cover over the
 
 suggest:                         # "start from a photo or a link" in the configurator (ADR-086)
   per_hour: 10                   # suggestions per visitor per hour (the AI costs a little each)
+  per_day: 20                    # to confirm: ... and per visitor per day (a public shop, ADR-103)
+  visitor_eur_day: 0.5           # to confirm: what one visitor's suggestions may cost the AI in a day
+                                 # (the ledger, spend.py; about 14 photo suggestions); then by hand only
   photo_max_bytes: 10485760      # a customer's photo, at most this large (10 MB)
   fetch_timeout_s: 8             # a webshop page or its image must arrive within this
   fetch_max_bytes: 2000000       # ... and be at most this large

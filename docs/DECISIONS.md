@@ -2935,3 +2935,83 @@ its line lay far from the origin (a never-binding side): fixed, with the S21 tes
 **Not done:** the vertical drawstring openings (D5, S38, S39) and U2's zippers and fibreglass
 pocket are not in the patterns; a reader for the arm-block and hip shapes (they are given by a
 person for now, the better alternative is to fit them to the 3D view like ADR-094).
+
+## ADR-103 — The consumer shop is public: legal drafts, SEO, limits and headers at the edge
+
+The owner (8 Oct 2026): two shops; the business shop (B2B) gets a login of its own under /b2b
+(built separately), the consumer shop (B2C) is public. Handbook: docs/handbook/webshop.md.
+
+- **What was public before** (checked on shop.s2dio.living, 8 Oct): every page already answered
+  without a login (no Cloudflare Access, no password; the studio's own `/shop/` sends a 301 to
+  the website and its API refuses the public, ADR-066); robots allowed `/` and disallowed
+  `/api/`; preview.s2dio.living is `noindex` with `Disallow: /`. But: the legal pages were empty
+  ("this text follows"), company details empty, no Mollie key (orders stay "awaiting payment"),
+  shipping prices not set (€ 0), the price set "indicative", `home_story` off; any unknown
+  address (`/studio`, `/index.html`) answered 200 with a copy of the home page; the security
+  headers came only from the studio; "indicative" was a few small words after the price; the
+  checkout total left out delivery.
+- **Legal pages** (`coverapi/shop_legal.py`, texts in `config/shop_legal.json`): terms
+  (algemene voorwaarden), privacy, returns (herroepingsrecht), cookies, contact (imprint) and
+  warranty, NL and EN. A page shows our draft, opening with **"CONCEPT — TER GOEDKEURING" /
+  "DRAFT — TO APPROVE"**, until the owner publishes his own text through the AI CMS
+  (`legal.<page>.<lang>`). Company details are placeholders filled from Shop settings → company,
+  "[nog in te vullen: KvK-nummer]" while empty. Written for Dutch law: prices incl. VAT; no right
+  of withdrawal for made-to-measure (art. 6:230p sub f BW); **but a cover from our standard range
+  (a stock model chosen by the match, ADR-064) is not made to the consumer's specification, so
+  it keeps the 14-day right**: the checkout's checkbox says which applies, and the returns page
+  has the model withdrawal form. The order button names the obligation to pay ("Bestellen met
+  betaalverplichting" / "Bestellen en betalen", art. 6:230v lid 3 BW).
+- **Prices:** the B2C channel of the published price set, incl. VAT, as before (ADR-098). While
+  the set is indicative, the configurator and the checkout show a plain note ("Indicatieve prijs
+  — onze prijzen worden nog vastgesteld; je betaalt pas na bevestiging"); the owner switches it
+  off by publishing a set without it. The checkout shows cover + delivery to the chosen country
+  = total, before the order (the server already charged delivery; the page now shows it).
+- **Search engines and sharing:** a title and a description per page and language
+  (`meta.pages`, content the CMS edits and translates); canonical and hreflang (with
+  x-default) per page; Open Graph (url, site_name, locale `nl_NL` + alternates, an image
+  1200×630 `/brand/og-shop.png` or the setting `og_image`) and a Twitter card. The sitemap lists
+  every public page in every language with `xhtml:link` alternates. The website's robots.txt
+  allows `/` and disallows `/api/`, `/b2b`, the customers' own pages (`/order/`, `/match/`,
+  `/fit/`, also under a language) and `?preview=`. An unknown address is a **real 404** with
+  `noindex` (the shop around it); an order's, match's or fit question's page is `noindex` and has
+  no canonical. `/b2b…` is left to the business shop.
+- **Limits:** each public endpoint counts per visitor (the Worker's `x-client-ip`) on its own:
+  quote and match 40/min, order and fit 10/min, Mollie's webhook 60/min (each call makes us ask
+  Mollie), an order's photo uploads 10/h; idle visitors are forgotten. Suggestions from a photo
+  or link: `suggest.per_hour` (10) and now `suggest.per_day` (20), and a **spend guard per
+  visitor per day** (`suggest.visitor_eur_day`, € 0.50): every paid call writes the visitor's
+  tag on its ledger line (`spend.for_visitor`, a SHA-256 of the day + address, never the
+  address; it is carried into the search threads), and `spend.guard_visitor` refuses the
+  visitor's next suggestion once today's sum reaches the cap ("please choose by hand"). The
+  month's budget (ADR-078) still stops everything.
+- **Bots:** no Turnstile key exists (deploy/.env), so a honeypot: a field `website` people never
+  see (off-screen, not focusable, no autofill) in the checkout and the match form, and accepted
+  by the order, match and suggest endpoints; filled means 400. With the rate limits that is
+  enough for now; Turnstile is a small step later (question 71).
+- **Security headers at the edge** (`apps/site/src/security.ts`): CSP (self only; Google Fonts
+  for styles and fonts; no frames; `upgrade-insecure-requests`), HSTS, nosniff,
+  X-Frame-Options, Referrer-Policy, Permissions-Policy (no camera, microphone, location,
+  payment API, USB), COOP; set on every answer the Worker gives (the studio's, the preview's own
+  files, its own 404s and redirects), keeping a header the studio already sent. In a module of
+  its own because a Worker's main module may export only handlers (wrangler refused an exported
+  constant). The Worker still answers 404 to every `/api/` path but the shop's, and pages only as
+  `/shop/<path>` on the studio, so no studio route is reachable through the shop's domain.
+  Tests: `apps/site/test/worker.test.ts` (node's test runner on the sources; `npm test`, and in
+  `make test` through `apps/api/tests/test_site_worker.py`).
+- **Cookies:** the shop sets none (the studio's session cookie is stripped by the Worker);
+  local storage keeps the language and the 3D view (functional). No consent banner is needed.
+  **But the fonts come from Google Fonts**, which shows Google the visitor's address; the
+  cookies page says so until they are self-hosted (to the design work, question 71).
+- **Mollie:** unchanged (no key on live: orders wait for payment by hand). The shop now tells
+  the mode from the key's prefix (`payment_mode`: none, test, live; never the key) and shows
+  "test payments: no money is charged" in test mode. Going live is the owner's (question 71).
+- **Checked in a real browser** (`apps/web/e2e/b2c.py`, the Worker under `wrangler dev` in front
+  of a scratch studio): 13 addresses on a desktop and at 390 px; all 200 (the unknown one 404),
+  titles per page, no sideways scrolling on the phone after the footer's six links wrap, the
+  price with the indicative note, the checkout with delivery. Pages load in 0.05–0.3 s locally;
+  the shop's own script is 170 kB (62 kB gzipped), the 3D (Scene, 758 kB / 204 kB) only where
+  the 3D is shown.
+- **Better later:** Turnstile on the order and suggest forms; the fonts self-hosted (then drop
+  Google from the CSP and the cookies page); Cloudflare's rate-limiting binding in the Worker
+  as a first line before the studio; a catalogue page of our standard covers (today they are
+  reached through the match in the configurator).

@@ -26,6 +26,7 @@ customer's own photo of their furniture, or from the page of a webshop that sell
 
 from __future__ import annotations
 
+import contextvars
 import http.client
 import io
 import ipaddress
@@ -44,9 +45,19 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 log = logging.getLogger(__name__)
+DAY_S = 86400.0
+
+
+def _carry(fn: Any) -> Any:
+    """fn for another thread, run in a copy of this thread's context: the visitor whose paid
+    calls these are (spend.for_visitor, ADR-103) goes along."""
+    ctx = contextvars.copy_context()
+    return lambda *a: ctx.copy().run(fn, *a)
+
 
 MAX_REDIRECTS = 3
 MAX_PHOTOS = 3
+MAX_SOURCE_UPLOADS = 10  # an order's photos: uploads per visitor per hour
 HOUR_S = 3600.0
 PAGE_TYPES = ("text/html", "application/xhtml+xml")
 IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp", "image/avif")  # many shops send AVIF
@@ -699,7 +710,7 @@ def find_comparable(
                            "candidates": []}  # fmt: skip
     with ThreadPoolExecutor(max_workers=2) as pool:
         # a real search by image beside the first look, when it is switched on (ADR-092)
-        rev = pool.submit(_reverse, params, png)
+        rev = pool.submit(_carry(_reverse), params, png)  # the visitor's spend goes along
         try:
             ident = identify(params, png)
         except CoverError:
@@ -712,7 +723,8 @@ def find_comparable(
     # look alone; their results taken in turns, after the pages showing the very picture
     focus = [True, False] if ident.get("brand") else [False]
     with ThreadPoolExecutor(max_workers=len(focus)) as pool:
-        runs = [reverse["pages"], *pool.map(lambda b: _search(params, png, ident, b), focus)]
+        search = _carry(_search)
+        runs = [reverse["pages"], *pool.map(lambda b: search(params, png, ident, b), focus)]
     pages, seen = [], set()
     for i in range(max(len(r) for r in runs)):
         for r in runs:
@@ -872,6 +884,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
     from coverapi.shop import link_ok, shop_params
 
     asked: dict[str, list[float]] = {}
+    uploads: dict[str, list[float]] = {}
     sources = data / "order_sources"
 
     def visitor(request: Request) -> str:
@@ -886,17 +899,30 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
         url: str = Form(""),  # noqa: B008
         lang: str = Form("nl"),  # noqa: B008
         photos: list[UploadFile] = File(default_factory=list),  # noqa: B008
+        website: str = Form(""),  # noqa: B008 - the honeypot: people never see it (ADR-103)
     ) -> dict[str, Any]:
         """Sizes suggested from a photo and/or a link (nothing is stored)."""
         from coverengine import match as mt
+        from coverengine import spend
         from coverengine.errors import CoverError
 
+        if website:
+            raise HTTPException(400, "this could not be sent")
         p = shop_params(auth)
         who, now = visitor(request), time.time()
-        times = [t for t in asked.get(who, []) if now - t < HOUR_S]
-        if len(times) >= int(p["suggest.per_hour"]):  # type: ignore[arg-type]
+        times = [t for t in asked.get(who, []) if now - t < DAY_S]
+        if sum(now - t < HOUR_S for t in times) >= int(p["suggest.per_hour"]):  # type: ignore[arg-type]
             raise HTTPException(429, "you asked many times this hour; please choose by hand")
+        if len(times) >= int(p["suggest.per_day"]):  # type: ignore[arg-type]
+            raise HTTPException(429, "you asked many times today; please choose by hand")
+        try:  # what this visitor's suggestions cost the AI today (ADR-103)
+            spend.guard_visitor(p, who)
+        except CoverError:
+            raise HTTPException(429, "you asked many times today; please choose by hand") from None
         asked[who] = [*times, now]
+        if len(asked) > 5000:  # noqa: PLR2004 - forget the visitors of yesterday
+            for k in [k for k, v in asked.items() if now - v[-1] >= DAY_S]:
+                del asked[k]
         if len(photos) > MAX_PHOTOS:
             raise HTTPException(400, f"at most {MAX_PHOTOS} photos")
         limit_bytes = int(p["suggest.photo_max_bytes"])  # type: ignore[arg-type]
@@ -908,9 +934,14 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
                 if len(raw) > limit_bytes:
                     raise SuggestError(f"a photo may be at most {limit_bytes // 1_000_000} MB")
                 pngs.append(photo_png(raw))
+
             # the web and the AI take up to a minute: off the event loop, so the rest of the
             # app keeps answering meanwhile
-            out, facts = await run_in_threadpool(read, p, pngs, url, lang)
+            def read_for_visitor() -> tuple[dict[str, Any], dict[str, Any] | None]:
+                with spend.for_visitor(who):  # every paid call on this visitor's line
+                    return read(p, pngs, url, lang)
+
+            out, facts = await run_in_threadpool(read_for_visitor)
         except SuggestError as exc:
             raise HTTPException(400, str(exc)) from None
         except CoverError as exc:  # the month's AI budget, or the AI did not answer
@@ -938,6 +969,11 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
         """The photos the customer started from, kept with their order for the workshop."""
         if not re.fullmatch(r"[A-Za-z0-9_-]{10,60}", token):
             raise HTTPException(404, "no such order")
+        who, now = visitor(request), time.time()
+        times = [t for t in uploads.get(who, []) if now - t < HOUR_S]
+        if len(times) >= MAX_SOURCE_UPLOADS:  # a public shop: no endless uploads (ADR-103)
+            raise HTTPException(429, "too many uploads; try again later")
+        uploads[who] = [*times, now]
         with sqlite3.connect(auth.path) as db:
             row = db.execute("SELECT id FROM orders WHERE token=?", (token,)).fetchone()
         if row is None:

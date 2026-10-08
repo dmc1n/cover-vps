@@ -43,3 +43,24 @@ def test_reasoning_counts_as_output_and_an_unknown_model_as_the_dearest(
     assert spend.record(p, "some-new-model", {"completion_tokens": 1_000_000}) == pytest.approx(
         12.0
     )
+
+
+def test_one_visitor_s_day_is_capped_and_kept_apart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-103: the public shop's AI suggestions are written down per visitor (a daily tag of
+    the address, never the address) and a visitor's day is capped (suggest.visitor_eur_day)."""
+    monkeypatch.setenv("COVER_DATA_DIR", str(tmp_path))
+    p = _params(**{"suggest.visitor_eur_day": 1.0})
+    one = {"prompt_tokens": 1_000_000, "completion_tokens": 100_000}  # €0.55
+    with spend.for_visitor("203.0.113.9") as tag:
+        spend.record(p, "gemini-3.8-flash", one)
+        spend.record_eur("search", 0.5)
+    spend.record(p, "gemini-3.8-flash", one)  # not a visitor's: the studio's own work
+    assert spend.visitor_eur("203.0.113.9") == pytest.approx(1.05)
+    assert spend.visitor_eur("198.51.100.7") == 0.0
+    ledger = next((tmp_path / "usage").glob("ai-*.jsonl")).read_text()
+    assert "203.0.113.9" not in ledger and tag in ledger
+    with pytest.raises(CoverError, match="today"):
+        spend.guard_visitor(p, "203.0.113.9")
+    spend.guard_visitor(p, "198.51.100.7")  # another visitor goes on

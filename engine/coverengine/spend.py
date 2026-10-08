@@ -16,9 +16,13 @@ The ledger is <data>/usage/ai-YYYY-MM.jsonl, one line per answer.
 
 from __future__ import annotations
 
+import contextvars
+import hashlib
 import json
 import os
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -30,6 +34,49 @@ PER_MILLION = 1e6  # param-ok: prices are per million tokens
 HOUR_S = 3600.0  # param-ok
 EUR_DIGITS = 5  # param-ok: the ledger keeps cents' fractions
 PERCENT = 100.0  # param-ok: a share as a percentage
+
+# ADR-103: the public shop's visitor whose request a paid call serves: a tag of the address
+# salted with the day (never the address itself), written on the ledger's line, so what one
+# visitor costs in a day can be capped
+_VISITOR: contextvars.ContextVar[str] = contextvars.ContextVar("spend_visitor", default="")
+
+
+def _day(when: float | None = None) -> str:
+    return datetime.fromtimestamp(when or time.time(), UTC).strftime("%Y-%m-%d")
+
+
+def visitor_tag(address: str, when: float | None = None) -> str:
+    """A visitor's address as a short one-way tag that changes every day (UTC)."""
+    return hashlib.sha256(f"{_day(when)}|{address}".encode()).hexdigest()[:16]
+
+
+@contextmanager
+def for_visitor(address: str) -> Iterator[str]:
+    """Every paid call inside is written down for this visitor (see visitor_eur). Threads
+    started inside must carry the context along (contextvars.copy_context)."""
+    token = _VISITOR.set(visitor_tag(address))
+    try:
+        yield _VISITOR.get()
+    finally:
+        _VISITOR.reset(token)
+
+
+def visitor_eur(address: str, now: float | None = None) -> float:
+    """What one visitor's requests cost the AI today (UTC), from the ledger."""
+    now = now or time.time()
+    tag, day = visitor_tag(address, now), _day(now)
+    return sum(
+        float(r.get("eur", 0))
+        for r in _rows(now)
+        if r.get("who") == tag and _day(float(r.get("t", 0))) == day
+    )
+
+
+def guard_visitor(params: EffectiveParams, address: str) -> None:
+    """Refuse a visitor whose suggestions cost more than suggest.visitor_eur_day today."""
+    cap = float(params["suggest.visitor_eur_day"])  # type: ignore[arg-type]
+    if cap > 0 and visitor_eur(address) >= cap:
+        raise CoverError("this visitor's AI budget for today is used up")
 
 
 def _dir() -> Path:
@@ -77,6 +124,8 @@ def record(params: EffectiveParams, model: str, usage: Any, what: str = "") -> f
         _dir().mkdir(parents=True, exist_ok=True)
         row = {"t": round(time.time(), 1), "model": model, "in": t_in, "out": t_out,
                "eur": round(eur, EUR_DIGITS), "what": what}  # fmt: skip
+        if _VISITOR.get():
+            row["who"] = _VISITOR.get()
         with _ledger().open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(row) + "\n")
     except OSError:
@@ -90,6 +139,8 @@ def record_eur(model: str, eur: float, what: str = "") -> None:
         _dir().mkdir(parents=True, exist_ok=True)
         row = {"t": round(time.time(), 1), "model": model, "in": 0, "out": 0,
                "eur": round(eur, EUR_DIGITS), "what": what}  # fmt: skip
+        if _VISITOR.get():
+            row["who"] = _VISITOR.get()
         with _ledger().open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(row) + "\n")
     except OSError:

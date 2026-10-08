@@ -14,6 +14,8 @@ export interface Env {
   MEDIA_TTL: string;
 }
 
+import { secure } from "./security.ts"; // .ts: node runs the tests on the sources
+
 const FILES = /^\/(assets|brand)\//; // the shop's build (hashed names: never change)
 const YEAR = 31536000;
 const API = /^\/(api\/shop\/|media\/)/;
@@ -52,6 +54,12 @@ function cacheFor(url: URL, method: string, env: Env): number {
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    return secure(await route(req, env, ctx)); // ADR-103: every answer with the headers
+  },
+} satisfies ExportedHandler<Env>;
+
+async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  {
     const url = new URL(req.url);
     if (url.protocol === "http:") {
       url.protocol = "https:";
@@ -126,5 +134,5 @@ export default {
       ctx.waitUntil(cache.put(key, out.clone()));
     }
     return out;
-  },
-} satisfies ExportedHandler<Env>;
+  }
+}

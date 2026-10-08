@@ -302,3 +302,38 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     covers in out/rejections/A go live; (b) keep ADR-093: the vents stay on the outer walls, the
     back walls get one each and the rest goes to the ends; (c) per cover only where Rens asked.
     Also see 66: R1–R3 staged with the vents at the top of the band (`features.vent_align: top`).
+
+73. **The consumer shop goes public** (ADR-103, docs/handbook/webshop.md; asked 8 Oct 2026).
+    The shop at shop.s2dio.living answers everyone already; before you announce it:
+    - **Legal texts:** terms, privacy, returns, cookies, contact and warranty are drafts marked
+      "CONCEPT — TER GOEDKEURING" (`config/shop_legal.json`). Please have them read (a lawyer or
+      a service such as Thuiswinkel/Juridisch Loket), then publish your own text per page in the
+      Website (AI) tab, e.g. "vervang legal.terms.nl door: …". Choices in them to confirm: the
+      delivery promise (30 days late → cancel), a warranty of your own on seams and fabric,
+      keeping order data 7 years, size requests 12 months.
+    - **Company details** (Shop settings → company; they fill the legal pages, the footer and
+      Google's data): trade name and legal name, address, KvK, VAT number, e-mail, phone.
+    - **Covers from the range:** a cover chosen from our standard range (the match) has, by law,
+      14 days to change one's mind (only made-to-measure is exempt); the checkout says so. Is that
+      acceptable, or should the shop sell only made-to-measure (every cover cut to the
+      customer's sizes)?
+    - **Delivery prices per country** (Shop settings → shipping): now unset, so the checkout adds
+      € 0. Which countries, and what does delivery cost incl. VAT? (The price set's B2C shipping
+      € 18.50 is a cost line inside the cover's price; the per-country delivery is charged on top.
+      Keep both, or one?)
+    - **Mollie live:** there is no Mollie key on the live studio, so orders wait for payment by
+      hand. To go live: finish the Mollie account (KvK, bank account, website
+      shop.s2dio.living, a few days' check), make a test order with the **test** key
+      (`test_…`, Shop settings → payment; the checkout then says "testbetalingen"), then replace
+      it with the **live** key (`live_…`). Also set the webhook-reachable domain (it is:
+      shop.s2dio.living). Bank transfer stays as the fallback: keep it?
+    - **Indicative prices:** the price set is still "indicative"; every price says so. Switch it
+      off by publishing a set without it (Prices & costing) when the prices are final.
+    - **Bot protection:** honeypot + rate limits now. Do you want Cloudflare Turnstile (free;
+      a site key and secret from the Cloudflare dashboard into deploy/.env as
+      `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`)?
+    - **Fonts:** they load from Google Fonts (Google sees the visitor's address; German courts
+      have fined this). Self-host them (recommended; no cost)?
+    - **Go-live date**, and whether `home_story` (the scroll story) goes on before or after it.
+    - **The sharing picture** (`/brand/og-shop.png`) is a simple placeholder; a photo of a real
+      cover (1200×630) can replace it (Shop settings → `og_image`).

@@ -295,3 +295,106 @@ def test_the_story_is_only_for_its_own_model(app: Any) -> None:
     assert info["settings"]["story_model"] == "suns-2-seater-kota"
     assert info["settings"]["home_story"] is False  # the live home stays until switched on
     assert len(info["content"]["story"]["chapters"]) == 6
+
+
+LEGAL_PAGES = ("terms", "privacy", "returns", "cookies", "contact", "warranty")
+
+
+def test_every_consumer_page_is_public_and_the_legal_drafts_say_so(app: Any) -> None:
+    """ADR-103: every consumer page answers without a login; a legal page without the owner's
+    own text shows our draft, marked "to approve", with the company's details filled in (or a
+    "to fill in" mark); the owner's own text replaces the draft."""
+    c = TestClient(app)  # no login (the served app requires one for the studio)
+    for page in ("", "configure", *LEGAL_PAGES, "en/", "de/configure", "en/returns"):
+        r = c.get(f"/shop/{page}")
+        assert r.status_code == 200, page
+    terms = c.get("/shop/terms").text
+    assert "CONCEPT — TER GOEDKEURING" in terms and "6:230p" in terms
+    assert "[nog in te vullen: KvK-nummer]" in terms
+    assert "<title>Algemene voorwaarden · " in terms
+    en = c.get("/shop/en/returns").text
+    assert "DRAFT — TO APPROVE" in en and "14 days" in en
+    admin = _login(app)
+    admin.put("/api/admin/shop/settings", json={"company": {"kvk": "12345678", "name": "Hoes BV"}})
+    assert "KvK 12345678" in c.get("/shop/terms").text
+    legal = c.get("/api/shop/info").json()["content"]["legal"]
+    assert set(LEGAL_PAGES) <= set(legal)
+    assert legal["privacy"]["nl"].startswith("CONCEPT") and "Hoes BV" in legal["privacy"]["nl"]
+    app.state.site.change([{"path": "legal.terms.nl", "value": "Onze eigen voorwaarden."}])
+    app.state.site.publish("rick")
+    terms = c.get("/shop/terms").text
+    assert "Onze eigen voorwaarden." in terms and "CONCEPT" not in terms
+
+
+def test_search_engines_see_each_page_once_and_never_a_customer_s_own(app: Any) -> None:
+    """ADR-103: a title, a description, a canonical address, hreflang and Open Graph per page;
+    an unknown address is a real 404; an order's own page is never indexed."""
+    c = TestClient(app)
+    html = c.get("/shop/en/privacy").text
+    assert "<title>Privacy statement · " in html
+    assert 'rel="canonical" href="http://testserver/shop/en/privacy"' in html
+    assert 'hreflang="de" href="http://testserver/shop/de/privacy"' in html
+    assert 'hreflang="x-default"' in html
+    assert 'property="og:image" content="http://testserver/brand/og-shop.png"' in html
+    assert 'property="og:locale" content="en_GB"' in html
+    assert 'name="twitter:card"' in html and 'name="robots"' not in html
+    missing = c.get("/shop/studio")
+    assert missing.status_code == 404 and 'name="robots" content="noindex"' in missing.text
+    assert c.get("/shop/de/index.html").status_code == 404
+    order = c.get("/shop/order/abcdefghijkl")
+    assert order.status_code == 200 and order.headers["x-robots-tag"] == "noindex"
+    assert 'rel="canonical"' not in order.text
+
+
+def test_the_website_s_robots_and_sitemap(app: Any) -> None:
+    """ADR-103: the website's robots.txt allows the shop and keeps the API, the business shop
+    and the customers' own pages out; the sitemap lists every public page in every language
+    with its alternates."""
+    admin = _login(app)
+    key = admin.post("/api/admin/shop/link-key").json()["key"]
+    admin.put("/api/admin/shop/settings", json={"domain": "hoezen.example"})
+    site = TestClient(app, headers={"x-link-key": key, "x-client-ip": "203.0.113.9"})
+    robots = site.get("/robots.txt").text
+    assert "Allow: /\n" in robots
+    for path in ("/api/", "/b2b", "/order/", "/*/order/", "/match/", "/fit/"):
+        assert f"Disallow: {path}\n" in robots
+    assert "Sitemap: https://hoezen.example/sitemap.xml" in robots
+    xml = site.get("/sitemap.xml").text
+    for page in LEGAL_PAGES:
+        assert f"<loc>https://hoezen.example/{page}</loc>" in xml
+        assert f"<loc>https://hoezen.example/fr/{page}</loc>" in xml
+    assert 'hreflang="de" href="https://hoezen.example/de/returns"' in xml
+    assert "order/" not in xml and "b2b" not in xml
+
+
+def test_the_public_endpoints_hold_their_limits_and_refuse_bots(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-103: the honeypot refuses a bot; the order, the quote and Mollie's webhook each have
+    a per-visitor limit (through the website: the visitor's own address)."""
+    from coverapi import mailer
+
+    monkeypatch.setattr(mailer, "configured", lambda auth: False)
+    c = TestClient(app)
+    q = c.post("/api/shop/quote", json={"product": "item"}).json()
+    order = {"quote_id": q["id"], "name": "Anna", "email": "anna@example.com",
+             "street": "Dorpsstraat 1", "postcode": "1234 AB", "city": "Utrecht",
+             "country": "NL", "terms": True}  # fmt: skip
+    assert c.post("/api/shop/order", json={**order, "website": "http://spam"}).status_code == 400
+    bot = c.post("/api/shop/match", json={"product": "item", "sizes": {}, "website": "x"})
+    assert bot.status_code == 400
+    codes = [c.post("/api/shop/order", json=order).status_code for _ in range(10)]
+    assert codes[-1] == 429 and codes[0] == 200  # 10 a minute, the bot's try counted too
+    hooks = [c.post("/api/shop/mollie", data={"id": "nonsense"}).status_code for _ in range(61)]
+    assert hooks[0] == 400 and hooks[-1] == 429
+    assert c.post("/api/shop/quote", json={"product": "item"}).status_code == 200  # its own count
+    info = c.get("/api/shop/info").json()["settings"]
+    assert info["payment_mode"] == "none" and info["indicative"] is True
+
+
+def test_the_mode_of_payments_follows_the_key_s_prefix() -> None:
+    from coverapi.shop import payment_mode
+
+    assert payment_mode({"payment": {"mollie_key": "test_abc"}}) == "test"
+    assert payment_mode({"payment": {"mollie_key": "live_abc"}}) == "live"
+    assert payment_mode({"payment": {"mollie_key": ""}}) == "none"
