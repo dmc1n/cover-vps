@@ -1,0 +1,352 @@
+# Afkeuringen van Rens, 8 oktober 2026: wat we geleerd en gedaan hebben
+
+136 afgekeurde hoezen bekeken (woorden en elk gemarkeerd plaatje, twee keer gelezen). **73 opgelost** en terug naar Rens in de 2e ronde; **62 wachten op een beslissing** (hieronder, met keuzes); op elke kaart in de Desk staat ons antwoord.
+
+| Groep | Opgelost | Twijfel |
+|---|---|---|
+| Panelen en naden | 9 | 8 |
+| Vents | 7 | 41 |
+| Ronde tafels | 18 | 0 |
+| Te ruime hoezen | 9 | 3 |
+| Omtrek volgen | 12 | 0 |
+| Tekeningen | 18 | 10 |
+
+## Regels die nu voor alle hoezen gelden
+
+- Panelen die alleen een flauwe knik maken (tot 15°) worden één paneel met een vouwlijn (ADR-099).
+- Een eigen hoesmodel wordt op zijn eigen vouwlijnen gesneden (ADR-100).
+- Vents eerst rondom: één per zijde, midden in elk paneel; nooit ondersteboven aan een bovenrand; een te lage band geeft zijn vent aan het paneel erboven (ADR-101).
+- Tekeningen: de hoek van een schuine bank wordt uit het bovenaanzicht gelezen; een tekening met alleen een zijaanzicht is een rond voorwerp; hoogtes zonder het woord 'Height' worden gelezen; wat het programma niet kan lezen wordt één keer per tekening door een mens vastgelegd (ADR-102).
+- Een tafel die van bovenaf rond is krijgt een ronde hoes met een kegeldak op de ballonnen (ongeveer 23 % minder stof) (ADR-107).
+- Stoelruimte alleen rond echte tafels, nooit rond een stoel, kruk, bank of bankje: eetstoelen waren 1 m diep in plaats van 60 cm (ADR-107).
+- Wanden volgen de echte vorm van bovenaf (ronde hoeken, maanvorm, inhammen) onder hetzelfde aflopende dak (ADR-107).
+
+## Opgelost (terug naar Rens)
+
+- **suns-dining-nova-dia-140** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-table-grado-120** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 2 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-table-grado-120-hpl** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 2 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-table-grado-150** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-table-grado-150-hpl** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-table-sorolo-160** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-table-sorolo-neolith-140** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-nova-dia-120** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 2 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-nova-dia-150** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-nova-dia-160** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-nova-dia-160-low** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-nova-dia-170** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-sorolo-dia-120** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 2 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-sorolo-dia-120-neolith** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 2 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-sorolo-dia-160-low** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-sorolo-dia-160-low-neolith** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-dining-sorolo-dia-90** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 2 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-low-dining-table-grado-170** — De hoes is nu rond in bovenaanzicht: een ronde rok en een ondiep kegeldak dat op de ballon(nen) rust, zodat het water rondom afloopt; het dak in 2 gelijke delen die op de rol passen, de rok in 4 stroken. Dit geldt voortaan voor elke tafel die van boven rond is.
+- **suns-antas-collection-2021-diningchair** — De stoel werd door het woord 'dining' in de naam als eettafel gezien en kreeg 33 cm stoelruimte voor en achter; die is eruit (voor alle stoelen), en de wanden volgen nu de omtrek van de stoel. De schuine kap van de voorkant van de zitting naar de bovenkant van de rug blijft, zodat er geen water op de zitting blijft staan.
+- **suns-dining-pemba-dining-chair** — De stoel werd door het woord 'dining' in de naam als eettafel gezien en kreeg 33 cm stoelruimte voor en achter; die is eruit (voor alle stoelen), en de wanden volgen nu de omtrek van de stoel. De schuine kap van de voorkant van de zitting naar de bovenkant van de rug blijft, zodat er geen water op de zitting blijft staan.
+- **suns-dining-santorini-dining-chair** — De stoel werd door het woord 'dining' in de naam als eettafel gezien en kreeg 33 cm stoelruimte voor en achter; die is eruit (voor alle stoelen), en de wanden volgen nu de omtrek van de stoel. De schuine kap van de voorkant van de zitting naar de bovenkant van de rug blijft, zodat er geen water op de zitting blijft staan.
+- **suns-dining-sato-dining-chair** — De stoel werd door het woord 'dining' in de naam als eettafel gezien en kreeg 33 cm stoelruimte voor en achter; die is eruit (voor alle stoelen), en de wanden volgen nu de omtrek van de stoel. De schuine kap van de voorkant van de zitting naar de bovenkant van de rug blijft, zodat er geen water op de zitting blijft staan.
+- **suns-dining-tosca-dining-chair** — De stoel werd door het woord 'dining' in de naam als eettafel gezien en kreeg 33 cm stoelruimte voor en achter; die is eruit (voor alle stoelen), en de wanden volgen nu de omtrek van de stoel. De schuine kap van de voorkant van de zitting naar de bovenkant van de rug blijft, zodat er geen water op de zitting blijft staan.
+- **suns-dining-vado-dining-chair** — De stoel werd door het woord 'dining' in de naam als eettafel gezien en kreeg 33 cm stoelruimte voor en achter; die is eruit (voor alle stoelen), en de wanden volgen nu de omtrek van de stoel. De schuine kap van de voorkant van de zitting naar de bovenkant van de rug blijft, zodat er geen water op de zitting blijft staan.
+- **suns-lounge-lucia-lounge-chair** — Achter het rugkussen loopt de hoes nu schuin naar beneden, zoals je getekend hebt (een extra dakdeel achter, links en rechts gelijk); het water loopt naar achter af.
+- **suns-picnic-table-ferla-250** — Het dak loopt nu vanaf de ballonnen schuin naar de buitenkant van de banken, langs je rode lijnen; daardoor 8 in plaats van 6 delen, maar 2 m2 minder stof.
+- **suns-picnic-table-ferla-300** — Het dak loopt nu vanaf de ballonnen schuin naar de buitenkant van de banken, langs je rode lijnen. Let op: 10 delen in plaats van 6 (de lange schuine vlakken in twee helften), 2,4 m2 minder stof.
+- **suns-lounge-casto-daybed** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **suns-lounge-feroli-chaise-longue** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **suns-lounge-feroli-corner** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken en de holle voorkant), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **suns-lounge-fiora-corner** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **suns-lounge-fiora-daybed** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **suns-lounge-pienza-moonshape-left** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken en de holle rug), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **suns-lounge-vento-hocker** — De hoes volgt nu de ronde kant van de hocker, en de twee bovendelen zijn één paneel met een vouwlijn (de doorgekruiste panelen). Nog 3 delen in plaats van 8.
+- **suns-lounge-vivaro-l-part** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **suns-lounge-aspen-rounded-side-table** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **suns-lounge-casto-sofa-bench** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **suns-lounge-pico-bended-2-seater** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken en de holle voorkant), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **suns-lounge-pico-corner** — De wanden volgen nu de omtrek van het meubel van bovenaf (ronde hoeken), in plaats van rechte zijden; het dak blijft hellen zodat water afloopt. Geldt voortaan voor elk meubel waar de rechte hoes meer dan 2,4 cm buiten de omtrek zou staan.
+- **drawing-c28** — C28 is nu gebouwd uit zijn eigen tekening (bovenaanzicht + hoogtes 86,4 / 38,1 cm, diepte 99 cm, strook 20,3 cm), in dezelfde stukken als C27 (gespiegeld). Het programma leest nu ook hoogtes die zonder het woord 'Height' op de tekening staan.
+- **drawing-cover-24-24b-s4-s5** — De hoes was een gewone schuine kist; nu zoals getekend met het armblok van 35 cm op volle hoogte aan de rechterkant en de schuine overgang van 75 cm van zitting naar arm. 24B is het spiegelbeeld: hetzelfde patroon, gespiegeld gesneden.
+- **drawing-cover-25-25b-s6-s7** — De hoes had lengte en diepte verwisseld. Nu 321 x 107 cm met het armblok van 35 cm rechts en de overgang van 72 cm, zoals het vooraanzicht. 25B is het spiegelbeeld (zelfde patroon gespiegeld).
+- **drawing-cover-39-46-l1-l5-mirror** — De hoes bestond uit 7.846 stukjes door een kapotte vorm. Opnieuw opgebouwd uit de tekening: de L met de korte arm als chaise die naar achteren afloopt tot 17,8 cm, in 11 panelen zoals gevraagd, 6 luchtgaten. Cover 46 is het spiegelbeeld (zelfde patroon gespiegeld).
+- **drawing-d1** — De vorm volgt nu de drie aanzichten: rondom een rand van 18 cm (naad op één hoogte), zijkanten die over de hele lengte 22 cm naar binnen lopen, een strook van 30 cm achter op 82 cm en één rechte helling naar 40 cm voor. De helling is in twee helften omdat 222 cm breder is dan de rol.
+- **drawing-d2** — Zelfde aanpak als D1 (230 x 204 cm, bovenkant 186 cm): rand van 18 cm rondom, zijkanten die 22 cm naar binnen lopen, strook 30 cm op 82 cm en één helling naar 40 cm voor.
+- **drawing-d6** — De Blocchi daybed volgt nu de tekening: achterwand 62 cm met een schuine rand naar 87 cm, vlakke strook van 30 cm (121,6 breed), één helling naar 40 cm voor en schuin aflopende zijkanten; de bovenrand achter is 152,66 cm zoals geschreven.
+- **drawing-s16** — Het bovenpaneel was in twee stukken geknipt terwijl het maar 114 cm breed is; nu één paneel. Dit is algemeen aangepast voor alle schuine kisten.
+- **drawing-s19** — De hoes miste het armblok. Nu zoals getekend: 380 x 110 cm met het blok van 35 cm op volle hoogte rechts en de schuine overgang van 75 cm van zitting naar arm.
+- **drawing-s26** — De Blocchi 2-zits volgt nu precies de maten: de schuine zijkanten lopen ook achter door, zodat de bovenrand achter 152,66 cm is zoals op de tekening (was over de volle breedte).
+- **drawing-s27** — De Blocchi 1-zits volgt nu de maten zoals S26 (strook 55,6 cm, bovenrand achter 86,66 cm).
+- **drawing-s32** — De hoes was een gebogen balk met rechte uiteinden; nu volgt hij het niervormige bovenaanzicht met ronde uiteinden en het profiel uit de 3D-tekening (86,4 / 20,3 / 38,1 cm), met de naden waar de tekening ze tekent.
+- **drawing-s35** — De hoes was een rechte kist; nu het hoekelement zoals getekend: rug aan twee kanten op 84 cm, de strook van 30 cm langs één rug, aflopend naar 40 cm op de voorhoek.
+- **drawing-s43** — De skirt heeft nu rondom dezelfde hoogte (40,6 cm) met de naden zoals op je afbeelding: horizontaal rondom en verticaal vanaf de rugstrook naar de skirt.
+- **drawing-s44** — De zijde bij de rode cirkel is nu rond zoals op de tekening: S44 is het spiegelbeeld van S43 (zelfde maten), ook met de skirt op één hoogte rondom.
+- **drawing-s6** — Het armblok ontbrak; nu zoals het vooraanzicht: 321 x 107 cm met het blok van 35 cm rechts en de overgang van 72 cm van zitting naar arm.
+- **drawing-s8** — De helling liep de verkeerde kant op. Het zijaanzicht (89,99 naar 73 cm) is 115 cm breed, dus de helling loopt nu over de korte zijde van 115 cm en de 140 cm zijde is waterpas.
+- **drawing-u2** — De hoes is nu rond: het zijaanzicht is rondgedraaid (60 cm doorsnee tot 180 cm, smaller wordend naar 47 cm bovenin op 244 cm). Het programma doet dit nu zelf bij een tekening met alleen een zijaanzicht. De glasvezelpocket en de 7 ritsen zitten niet in het patroon.
+- **drawing-d4** — De 4 vents staan nu één per zijde, in het midden van elke wand (eerst 2 voor en 2 achter, niets op de kopse kanten). De tekening tekent ze halverwege de wand; bij 35 cm hoogte is dat vrijwel gelijk aan 5 cm boven de zoom.
+- **drawing-s18** — Vents op de plekken van de cirkels: midden voor, midden achter en op beide kopse kanten; de kruisjes zijn weg. Het aantal (4) blijft.
+- **drawing-s22** — De vents staan nu één per zijde in het midden, ook op de twee kopse kanten waar je cirkels stonden; het aantal (4) blijft.
+- **suns-chaise-longue-evora-alu** — De twee vents staan op de plekken van de cirkels: de lage rand onderaan was te laag voor een vent, ze zitten nu net boven die rand in het zijpaneel.
+- **suns-chaise-lounge-kota** — Twee vents toegevoegd op de lange zijkant, op de plekken van de cirkels; die kant had er geen.
+- **suns-chaise-lounge-portofino** — Drie vents toegevoegd op de plekken van de cirkels (2 op de lange zijkant, 1 op de kopse kant), net boven de lage rand die te laag was voor een vent.
+- **suns-lounge-vivaro-lounge-chair** — De 4 vents zijn nu over de 4 zijden verdeeld, één per zijde in het midden. De vorm (bovenaanzicht) pakt de vorm-groep apart op.
+- **suns-bar-chair-virenze** — De twee bovenpanelen liggen samen plat (knik van 10 graden): nu één bovenpaneel met een vouwlijn. Dit is nu de regel voor alle hoezen.
+- **suns-bar-chair-fishbone-weaving-nappa** — De twee doorgekruiste panelen (knik van 4 graden) zijn nu één paneel met een vouwlijn. Geldt voortaan voor elke hoes.
+- **suns-bar-table-80x80-hpl** — Het blad was twee panelen (afwateringsnok van 10 graden); nu één paneel van 84 x 85 cm met een vouwlijn. Voortaan de regel.
+- **suns-bar-table-80x80-teak** — Het blad is nu één paneel met een vouwlijn in plaats van twee (knik van 10 graden). Voortaan de regel.
+- **suns-chair-vittoria** — De twee doorgekruiste panelen liggen bijna in één vlak (3 graden): nu één paneel. Voortaan de regel.
+- **suns-corner-aspen** — De twee doorgekruiste panelen (knik van 10 graden) zijn nu één paneel met een vouwlijn. Voortaan de regel.
+- **suns-corner-avero** — De doorgekruiste panelen zijn nu één bovenpaneel met een vouwlijn (knik van 10 graden). Voortaan de regel.
+- **suns-corner-emar** — De doorgekruiste panelen zijn nu één paneel; volgens dezelfde regel zijn ook twee smalle stroken onderaan (2-3 graden) bij hun zijpaneel gevoegd: 6 in plaats van 9 panelen.
+- **suns-dining-table-monte-vari-160x90-hpl** — Nu 2 panelen aan de top in plaats van 4: elke smalle strook zit aan zijn schuine vlak vast. Eén stuk over de nok zou 1,6 m breed worden, breder dan de rol, dus daar blijft een naad.
+
+## Beslissing nodig
+
+**Belangrijkste vraag (31 hoezen, C1–C31, S33, L4, L4/L8, Portofino-hoek):** vents op de voorkanten in de hoek van een L/U/C? Rens en de tekeningen zetten ze daar; sinds 7 oktober sloot een regel dat uit. a) mag daar (aanbevolen) · b) nooit · c) alleen waar Rens het markeerde.
+
+- **suns-lounge-vento-angled-2-seater-left** — Vento hoek-2-zits: Rens tekent een nok langs de rug en een schuine naad naar de voorhoek. Zo bouwen (meer delen) of de staging-hoes nemen?
+  - a) Naden zoals Rens tekent laten bouwen (met de naden-groep C)
+  - b) Staging nemen (omtrek gevolgd, geen nieuwe naden)
+  - c) Huidige live hoes houden
+- **suns-lounge-fiave-l-part-right** — Fiave L-deel: Rens wil dat het dak de kussens volgt (rode lijn van armleuning naar rug). Dan blijft er water op de zitting staan (regel 12). Wat doen we?
+  - a) Zo laten: rechte schuine kap over de zitting (water loopt af), alleen de kleine verbetering uit staging
+  - b) Kap volgen met een ondersteuning (bv. ballon) op de zitting
+  - c) Huidige live hoes houden
+- **suns-lounge-nuna-lounge-chair** — Nuna loungestoel (eivorm): de bovenaanzicht-omtrek volgt nu, maar Rens wil ook de ronde rug in zijaanzicht. Dat kan alleen met een gebolde hoes (geen kistvorm).
+  - a) Staging nemen (bovenaanzicht gevolgd, zijkant recht)
+  - b) Gebolde hoes laten bouwen (hull.top tensioned/draped, meer en gebogen delen)
+  - c) Huidige live hoes houden
+- **drawing-d5** — D5 (ronde voorkant): de helling uit het zijaanzicht en de ronde rand van 40 cm komen bij de zijkanten niet samen. Hoe moet het ronde deel lopen?
+  - a) Rond deel als kegel vanaf het midden (62,35 cm) naar de rand (40 cm); zijkanten lopen mee af naar 40 cm
+  - b) Eén rechte helling van de strook tot de voorrand, rand op wisselende hoogte
+  - c) Nieuwe of gecorrigeerde tekening van de klant vragen
+- **drawing-s20-bora-not-ordered** — S20 (Bora, 2-zits met armleuningen): de zitting volgen (zoals getekend, maar water blijft op de vlakke zitting staan) of overspannen?
+  - a) Zoals getekend: vlakke zitting tussen armen en rug volgen (water blijft staan)
+  - b) Armen volgen, zitting overspannen met één helling van de voorrand van de zitting (40 cm) naar de bovenkant van de rug (84 cm), zoals de Blocchi-referentie (aanbevolen)
+  - c) Alles overspannen: van de rug (84 cm) recht naar de voorkant op armhoogte (64 cm)
+- **drawing-s21** — S21 (Vento hoekbank): de lijnen van de tekening geven een knik van 40 graden (140 graden tussen de ruggen), Rens schrijft 30 graden. Beide zijn gebouwd. Welke gaat live?
+  - a) 40 graden, zoals de tekening (out/rejections/G/drawing-s21)
+  - b) 30 graden, zoals Rens schrijft (out/rejections/G/alt-30deg/drawing-s21)
+  - c) Klant om een gecorrigeerde tekening vragen
+- **drawing-s37** — S37: welke maat is juist: de totale diepte 102,1 cm of het rechte stuk van 53,3 cm (samen met de halve cirkel 104,75 cm)?
+  - a) Diepte 102,1 cm (recht stuk wordt 50,65 cm)
+  - b) Recht stuk 53,3 cm (diepte wordt 104,75 cm)
+  - c) Rens vragen welke maat hij bedoelt met 'size'
+- **drawing-s38** — S38/S39: de vorm komt overeen met de tekening; alleen de verticale trekkoord-opening op de voorhoek (40 cm) zit niet in het patroon. Wat bedoelt Rens met 'shape'?
+  - a) Trekkoord-opening van 40 cm op de voorhoek toevoegen (nieuwe functie)
+  - b) Rens vragen wat er niet klopt
+  - c) Laten zoals het is
+- **drawing-s39** — S39: zelfde vraag als S38 (vorm klopt, trekkoord-opening ontbreekt).
+  - a) Zoals besloten voor S38
+  - b) Rens vragen wat er niet klopt
+- **drawing-s45** — S45: de band rondom in één stuk van 358 cm (2 panelen) terwijl de standaard maximaal 300 cm per skirtpaneel is?
+  - a) Eén stuk voor S45 (alleen deze hoes)
+  - b) Standaard verhogen naar bv. 400 cm voor alle hoezen
+  - c) Twee stukken houden (zoals nu)
+- **drawing-s47** — S47 'size': de hoes heeft de maten van de tekening. Bedoelt Rens de gestippelde lijn (de hoes ruimer dan het meubel)?
+  - a) Hoes naar de gestippelde lijn (een paar cm ruimer rondom)
+  - b) Rens vragen wat hij bedoelt
+  - c) Laten zoals het is
+- **drawing-s48** — S48: armleuningen volgen zoals getekend (zitting loopt naar voren af, kuil tussen de armen) of de zitting overspannen tot armhoogte?
+  - a) Armen volgen zoals getekend
+  - b) Overspannen: van de rug recht naar de voorkant op armhoogte
+  - c) Gecorrigeerde tekening vragen
+- **suns-daybed-with-roof-portofino** — SUNS daybed met dak Portofino: Rens zegt 'geen hoes nodig'. Wat doen we met het model?
+  - a) Status 'retired' toevoegen: uit de catalogus, de shop en de Desk, bestanden blijven bewaard
+  - b) Laten staan maar markeren als 'geen hoes' (niet in de shop, niet op de Desk)
+  - c) Model verwijderen (na backup)
+  - d) Laten zoals het is
+- **arr-portofino-chaise-2seater** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c1** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c10** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c11** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c12** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c13** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c14** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c15** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c16** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c17** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c18** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c19** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c2** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c20** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c21** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c22** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c23** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c24** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c25** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c26** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c27** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c29** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c3** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c30** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c31** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c4** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c5** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c6** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c7** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c8** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-c9** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-cover-42-49-l4-l8-mirror** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-l4** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-r1** — R1-R3 zeggen "Air Pockets at Top" en Rens vindt de vents te laag. Wint de positie van de tekening over de regel 5 cm boven de zoom (vraag 66)?
+  - a) a) Ja, de tekening wint: bovenin (features.vent_align: top), klaargezet
+  - b) b) Halverwege de band (middle)
+  - c) c) Nee, 5 cm boven de zoom blijft
+- **drawing-r2** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-r3** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **drawing-s25** — S25: de vents zijn opgelost (onderaan, 5 stuks), maar Rens keurde ook de vorm en paneelverdeling af. Wie bouwt de vorm opnieuw?
+  - a) a) Vents nu live, vorm later via de tekening-route
+  - b) b) Alles wachten tot de vorm opnieuw is gebouwd
+- **drawing-s33** — Rens zet de vents op de voorkant (de binnenwanden van de L/U/C), maar op 7 okt (C23) was de regel: nooit een vent op een binnenwand (ADR-093). Wat geldt?
+  - a) a) Rens heeft gelijk: vents ook op de voorkant/binnenwanden, voor alle hoezen (features.vent_inner_walls: true); de klaargezette hoezen gaan live
+  - b) b) De regel van 7 okt blijft: alleen buitenwanden; niets verandert
+  - c) c) Alleen bij de hoezen waar Rens het vraagt
+- **suns-2-seater-portofino** — Rens wil 1 vent op de 2,15 m voor- en achterkant van de Portofino 2-zits; de regel is 1 per volle meter (dus 2). Wat geldt?
+  - a) a) Rens: 1 per zijde, midden (4 in totaal), klaargezet
+  - b) b) De regel: 2 per zijde voor/achter (6 in totaal)
+  - c) c) Voor deze hoes Rens, de regel blijft algemeen
+- **suns-daybed-portofino** — Daybed Portofino: de vents zijn goed (8, 2 per zijde), maar het bovenpaneel (1,85 m) past niet op de rol van 1,48 m, ook in de huidige hoes. Nu al live met de nieuwe vents?
+  - a) a) Ja, vents nu live; het bovenpaneel apart splitsen
+  - b) b) Wachten tot het bovenpaneel gesplitst is
+- **suns-longue-aspen** — Aspen: Rens tekent 1 vent op de lange zijkant van 2,17 m, de regel geeft 2 (zoals bij de Kota, waar Rens er ook 2 tekende). Welke?
+  - a) a) 2, volgens de regel (klaargezet)
+  - b) b) 1 in het midden, zoals Rens tekende
+- **suns-lounge-sato-2-5-seater-bench** — Rens kruiste de twee bovenhelften en (volgens één van de twee lezingen) ook de smalle strook van 10 cm erachter. De helften zijn samengevoegd (knik 3 graden). De strook zit op een knik van 28 graden: ook samenvoegen?
+  - a) A: zo laten (7 panelen, strook blijft apart)
+  - b) B: strook erbij, één bovenpaneel van ca. 94 cm breed met vouwlijn (per model seams.fold_join_max_deg = 30)
+  - c) C: de hele top in één stuk inclusief de achterhelling (seams.fold_merge: true)
+- **2026-07-cover-s53-rc-v1** — Rens wil de naden op de lijnen van het originele model. Die voorste lijn is niet waterpas (45-79 cm), terwijl onze regel 13 de rok op één hoogte afnaait. De nieuwe versie (staging) volgt de lijnen; de wand wordt één stuk van 4,7 m. Welke kiezen?
+  - a) A: lijnen van het model volgen (staging-versie), als regel voor alle eigen hoesmodellen
+  - b) B: alleen de bovennaad op de lijn, rok blijft op één hoogte
+  - c) C: zo laten
+- **2026-07-cover-s60-rc-v1** — Zelfde vraag als S53: naden op de lijnen van het model (voorste naad 31-72 cm hoog, niet waterpas, regel 13) of de rok op één hoogte houden?
+  - a) A: lijnen van het model volgen (staging-versie)
+  - b) B: alleen de bovennaad op de lijn, rok op één hoogte
+  - c) C: zo laten
+- **suns-daybed-vento** — Daybed Vento: (1) de doorgekruiste voorvlakken samen passen niet op de rol. (2) De rode lijn: de naad tussen achterblad en linker helling recht van bovenhoek naar linker onderhoek. Wat doen we?
+  - a) A: andere naadindeling: één voorvlak + smalle stroken aan de zijkant zodat het op de rol past
+  - b) B: alleen de rode lijn volgen (andere doosvorm, met de hand)
+  - c) C: zo laten, Rens uitleg geven over de rolbreedte
+- **suns-lounge-vento** — Vento lounge (2e ronde): bovenvlak schuiner naar voren laten lopen, hoeken bij de cirkels gladder, minder panelen. Hoe willen we deze vorm bouwen?
+  - a) A: box-hoes per element (zoals de SUNS-sets), vlakken schuin naar voren
+  - b) B: huidige gespannen hoes met meer gladmaken (hull.smoothing 1, bridge_gap groter) en minder naden
+  - c) C: overdragen aan de vorm-groep (F) met de Vento-outline
+- **suns-2-seater-open-sorrento** — SUNS-banken als doos: Rens wil de bovenrand van de lange wand recht (één lijn van hoek tot hoek) en de nok elders. Zullen we de doos zo laten bouwen dat elke wand een rechte bovenrand heeft (geen knik waar drie vlakken samenkomen)?
+  - a) A: ja, als regel voor alle box-hoezen (nieuwe doos-keuze, kost een avond werk)
+  - b) B: alleen voor deze modellen met de hand
+  - c) C: zo laten
+- **suns-2-seater-with-arm-avero** — Zelfde vraag als Sorrento 2-zits: box-hoezen met een rechte bovenrand per wand?
+  - a) A: ja, als regel voor alle box-hoezen
+  - b) B: alleen deze modellen met de hand
+  - c) C: zo laten
+- **suns-3-seater-with-corner-sorrento** — Sorrento 3-zits met hoek: Rens wil een extra deling langs de rode lijn. De nieuwe regel (zachte knik = één paneel) zou hier juist twee bovenvlakken samenvoegen. Per model uitzonderen (fold_join_max_deg = 0) en de deling met de hand maken?
+  - a) A: per model uitzonderen en de deling volgens Rens maken
+  - b) B: rechte bovenrand-regel (zie Sorrento 2-zits) ook hier
+  - c) C: zo laten
+
+## Geen wijziging
+
+- **suns-3-seater-open-sorrento** — Dit gaat over de naden (rode lijnen), niet over de vents; dat pakt de naden-groep op.
