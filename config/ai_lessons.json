@@ -58,5 +58,25 @@
     "check": "The audit's vents check (count, every side served, none high up a wall) and scripts/fewer_check.py.",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1791480000,
+    "model_id": "suns-dining-table-grado-150",
+    "complaint": "Make the cover round in top view, not square or octagonal; follow the (round, organic) outline of the furniture from the top view better (Rens at the Desk, 8 Oct 2026, on 18 round tables and 12 lounges).",
+    "cause": "The box cover is an intersection of flat half-spaces: its plan is a convex polygon of a few straight sides, so a round table (with the chair ring round it) got a square or an octagon, and a kidney- or moon-shaped sofa a polygon over empty floor and across its bays.",
+    "rule": "A box cover's plan comes from the furniture seen from above: when the footprint fills at least hull.round_fill of its smallest circle the cover is a round skirt with a cone on top resting on the support (water runs off, the skirt seam level, the top in equal sectors that fit the roll); when the box's straight sides stand more than hull.plan_follow_mm beyond the outline, the walls stand straight down on the outline (bays and inner corners rounded to hull.plan_round_mm) under the box's own top faces, which still span seats.",
+    "check": "The audit's outline check (a box built where round or follow is due fails) and engine/tests/test_outline.py (a round table gets a round cover, a kidney sofa keeps its bay).",
+    "applies_to": "box",
+    "ai_model": "owner"
+  },
+  {
+    "time": 1791480000,
+    "model_id": "suns-dining-pemba-dining-chair",
+    "complaint": "The marked part is empty space, make the cover smaller (Rens at the Desk, 8 Oct 2026, on six dining chairs).",
+    "cause": "The word 'dining' in a chair's name made it a dining table: chair space (33 cm deep, 87 cm high) was added in front of and behind the chair, so the cover was twice as deep as the chair.",
+    "rule": "Chair space only round a table: never round furniture named chair, stool, sofa or bench, and only when the table's top is at least hull.table_top_min_mm deep both ways (a chair's highest part is a backrest rail).",
+    "check": "The audit's chairs check and engine/tests/test_outline.py::test_a_chair_is_no_table.",
+    "applies_to": "box",
+    "ai_model": "owner"
   }
 ]

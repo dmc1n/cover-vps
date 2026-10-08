@@ -26,8 +26,10 @@ KINDS = ("dining", "low_dining", "low_bar")
 # The table top: the furniture within this distance of its highest point (mm).
 TOP_MM = 30.0  # param-ok: geometric tolerance
 MM_PER_CM = 10.0  # param-ok: unit conversion
-# Names of tables without chairs (lounge, side and coffee tables, fire pits, picnic tables).
-NO_CHAIRS = ("lounge", "side", "fire-pit", "picnic", "coffee")
+# Names of tables without chairs (lounge, side and coffee tables, fire pits, picnic tables),
+# and of furniture that is no table at all: a dining chair is "dining" too, and got chair space
+# behind and in front of it (Rens, 8 Oct 2026: "empty space, cover too roomy"; ADR-107).
+NO_CHAIRS = ("lounge", "side", "fire-pit", "picnic", "coffee", "chair", "stool", "sofa", "bench")
 
 
 # A table top is round when it is as wide as long (within ROUND_ASPECT) and fills its circle
@@ -81,6 +83,9 @@ def chair_space(
     hem = float(params["hull.hem_height_mm"])  # type: ignore[arg-type]
     top = v[v[:, 2] > height - TOP_MM]
     lo, hi = top[:, :2].min(axis=0), top[:, :2].max(axis=0)
+    # a table has a top to sit at: the highest part of a chair is its backrest, a rail
+    if float(np.min(hi - lo)) < float(params["hull.table_top_min_mm"]):  # type: ignore[arg-type]
+        return [], None
     if _round(top[:, :2]):  # chairs all round a round table (owner, 1 Oct 2026)
         centre = (lo + hi) / 2
         r_table = float(np.max(np.linalg.norm(top[:, :2] - centre, axis=1)))
