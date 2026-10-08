@@ -1,0 +1,317 @@
+/* The B2B shop (ADR-101): the consumer shop's house style (shop.css), calmer and denser for
+   people who order often: tabs, tables, a catalogue grid. */
+.b-app {
+  min-height: 100svh;
+}
+.b-app .b-head {
+  position: sticky;
+}
+.b-badge {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.b-main {
+  padding-bottom: 60px;
+}
+.b-main h1 {
+  font-size: clamp(32px, 5vw, 52px);
+}
+.b-main h2 {
+  font-size: clamp(26px, 3.5vw, 38px);
+}
+.b-narrow {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 48px 16px 0;
+}
+.b-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px clamp(16px, 4vw, 48px) 0;
+}
+.b-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.b-field input,
+.b-field select,
+.b-field textarea,
+.b-filters input {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  background: #fff;
+}
+.b-field textarea {
+  min-height: 70px;
+}
+.b-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  margin: 18px 0;
+}
+.b-box p {
+  margin: 6px 0;
+}
+.b-ok {
+  color: var(--ok);
+}
+.b-tabs {
+  position: sticky;
+  top: 58px;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 10px clamp(16px, 4vw, 48px);
+  background: rgba(241, 242, 242, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.b-tabs button {
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.b-tabs button.on {
+  background: var(--olive);
+  color: var(--cream);
+}
+.b-who {
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+.b-config {
+  padding-top: 0;
+  min-height: calc(100svh - 120px);
+}
+.b-config .s-config-panel {
+  max-height: calc(100svh - 120px);
+}
+.b-config .s-config-panel h2 {
+  font-size: 32px;
+}
+.b-cm {
+  width: 72px;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  text-align: right;
+}
+.b-pricebox strong {
+  font-size: 34px;
+}
+.b-qty {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 14px;
+}
+.b-qty input {
+  width: 72px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+}
+.b-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0 20px;
+}
+.b-filters input {
+  min-width: 220px;
+  flex: 1 1 220px;
+  max-width: 340px;
+}
+.b-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+.b-item {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.b-item.on {
+  grid-column: span 2;
+  border-color: var(--olive);
+}
+.b-item-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+  padding: 0 0 14px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.b-item-head > *:not(img):not(.b-noimg) {
+  padding: 0 14px;
+}
+.b-item img,
+.b-noimg {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: #ecebe4;
+  margin-bottom: 8px;
+}
+.b-noimg {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.b-fixed {
+  font-size: 13px;
+  color: var(--ok);
+}
+.b-item-body {
+  padding: 0 14px 14px;
+}
+.b-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border-radius: var(--r);
+  overflow: hidden;
+  font-size: 14px;
+}
+.b-table th,
+.b-table td {
+  text-align: left;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.b-table th {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 12px;
+}
+.b-checkout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: 28px;
+  margin-top: 24px;
+  align-items: start;
+}
+.b-totals {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 18px;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-variant-numeric: tabular-nums;
+}
+.b-totals dd {
+  margin: 0;
+  text-align: right;
+}
+.b-total {
+  font-weight: 600;
+  font-size: 18px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.b-account {
+  font-size: 14px;
+  color: var(--ok);
+}
+.b-order {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 14px 18px;
+  margin: 12px 0;
+}
+.b-order header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+.b-order header .s-btn {
+  margin-left: auto;
+}
+.b-order ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.b-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+}
+.b-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 32px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .b-checkout,
+  .b-two {
+    grid-template-columns: 1fr;
+  }
+  .b-item.on {
+    grid-column: auto;
+  }
+  .b-table th:nth-child(2),
+  .b-table td:nth-child(2) {
+    display: none;
+  }
+  .b-tabs {
+    top: 54px;
+  }
+  .b-who {
+    flex-basis: 100%;
+  }
+}
+.b-grid {
+  align-items: start;
+}
+.b-config .s-range b {
+  white-space: nowrap;
+}

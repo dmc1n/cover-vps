@@ -145,6 +145,9 @@ def create_app(
     from coverapi import prices
 
     prices.install(app, auth, store)  # prices and costing, versioned (ADR-098)
+    from coverapi import b2b
+
+    b2b.install(app, auth, store.root, store)  # the B2B shop: logins, own prices (ADR-101)
 
     def model_or_404(model_id: str) -> Path:
         try:
@@ -514,6 +517,8 @@ def create_app(
         except KeyError:
             raise HTTPException(404, f"no job {job_id!r}") from None
 
+    if web_dir is not None and (web_dir / "b2b.html").is_file():
+        b2b.install_pages(app, web_dir)  # /shop/b2b/..., before the shop's own pages
     if web_dir is not None and (web_dir / "shop.html").is_file():
         from coverapi.shop import install_pages
 

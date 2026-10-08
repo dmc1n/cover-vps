@@ -292,3 +292,22 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     - **Odoo (step 2):** the URL and database name, an API user + key, the Odoo version
       (Community/Enterprise), the installed apps (Sales, Purchase, MRP, Inventory, Accounting,
       multi-currency) and the company currency.
+72. **The B2B shop** (ADR-101, docs/handbook/b2b.md; asked 8 Oct 2026). It is built at `/b2b`
+    with logins, prices ex VAT from the B2B price list and orders on account. Please tell us:
+    - **Payment terms:** how many days for the invoice (now 30)? The same for every company or
+      per company? Who sends the invoices (Odoo)?
+    - **Who may order:** may everyone with a login at a dealer order, or do some only look at
+      prices (a "buyer" and a "viewer" role)?
+    - **Minimum order:** is there one (now none), per order or per year?
+    - **Delivery costs for B2B:** in the price (the B2B channel's shipping, € 9.50 per cover now)
+      or a line per order on top (B2B settings, now € 0)? Free from some amount?
+    - **Configurator for dealers:** may they order custom sizes, or only the fixed catalogue
+      covers? Should a custom cover wait for our approval before production?
+    - **Into production:** an order on account goes into production at once now (like a paid
+      consumer order). Or only after a colleague confirms it?
+    - **VAT:** which companies get reverse charge? Check VAT numbers in VIES automatically?
+    - **The address:** `/b2b` on the shop's domain (now) or its own domain (e.g.
+      trade.s2dio.living)?
+    - **Online payment for B2B:** wanted later (Mollie), or always on account?
+    - **Prices:** the B2B markup (45 %); one list for all dealers, or fixed prices per dealer
+      (both possible now)?

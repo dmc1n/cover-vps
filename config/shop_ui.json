@@ -491,5 +491,457 @@
    "nl": "Stoel, bijzettafel, hocker",
    "en": "Chair, side table, hocker"
   }
+ },
+ "b2b": {
+  "title": {
+   "nl": "Zakelijk bestellen",
+   "en": "Trade orders",
+   "de": "Geschäftskunden",
+   "fr": "Espace professionnel"
+  },
+  "login_title": {
+   "nl": "Inloggen voor zakelijke klanten",
+   "en": "Log in for business customers",
+   "de": "Anmelden für Geschäftskunden",
+   "fr": "Connexion clients professionnels"
+  },
+  "login_text": {
+   "nl": "Voor dealers en zakelijke klanten: je eigen prijzen excl. btw, bestellen op rekening.",
+   "en": "For dealers and business customers: your own prices ex VAT, ordering on account.",
+   "de": "Für Händler und Geschäftskunden: deine eigenen Preise zzgl. MwSt., Bestellung auf Rechnung.",
+   "fr": "Pour les revendeurs et clients professionnels : vos propres prix HT, commande sur facture."
+  },
+  "password": {
+   "nl": "Wachtwoord",
+   "en": "Password",
+   "de": "Passwort",
+   "fr": "Mot de passe"
+  },
+  "login": {
+   "nl": "Inloggen",
+   "en": "Log in",
+   "de": "Anmelden",
+   "fr": "Se connecter"
+  },
+  "logout": {
+   "nl": "Uitloggen",
+   "en": "Log out",
+   "de": "Abmelden",
+   "fr": "Se déconnecter"
+  },
+  "forgot": {
+   "nl": "Wachtwoord vergeten?",
+   "en": "Forgot your password?",
+   "de": "Passwort vergessen?",
+   "fr": "Mot de passe oublié ?"
+  },
+  "forgot_text": {
+   "nl": "Vul je e-mailadres in; je krijgt een link om een nieuw wachtwoord te kiezen.",
+   "en": "Enter your e-mail address; we send you a link to choose a new password.",
+   "de": "Gib deine E-Mail-Adresse ein; wir schicken dir einen Link für ein neues Passwort.",
+   "fr": "Indiquez votre adresse e-mail ; nous vous envoyons un lien pour choisir un nouveau mot de passe."
+  },
+  "forgot_sent": {
+   "nl": "Als dit adres bij ons bekend is, is er een mail onderweg.",
+   "en": "If we know this address, a mail is on its way.",
+   "de": "Wenn wir diese Adresse kennen, ist eine E-Mail unterwegs.",
+   "fr": "Si nous connaissons cette adresse, un e-mail est en route."
+  },
+  "send_link": {
+   "nl": "Stuur de link",
+   "en": "Send the link",
+   "de": "Link senden",
+   "fr": "Envoyer le lien"
+  },
+  "back_login": {
+   "nl": "Terug naar inloggen",
+   "en": "Back to log in",
+   "de": "Zurück zur Anmeldung",
+   "fr": "Retour à la connexion"
+  },
+  "set_password": {
+   "nl": "Kies je wachtwoord",
+   "en": "Choose your password",
+   "de": "Wähle dein Passwort",
+   "fr": "Choisissez votre mot de passe"
+  },
+  "password_rule": {
+   "nl": "Minstens 12 tekens, niet je naam.",
+   "en": "At least 12 characters, not your name.",
+   "de": "Mindestens 12 Zeichen, nicht dein Name.",
+   "fr": "Au moins 12 caractères, pas votre nom."
+  },
+  "save_password": {
+   "nl": "Opslaan en inloggen",
+   "en": "Save and log in",
+   "de": "Speichern und anmelden",
+   "fr": "Enregistrer et se connecter"
+  },
+  "no_account": {
+   "nl": "Nog geen zakelijk account?",
+   "en": "No business account yet?",
+   "de": "Noch kein Geschäftskonto?",
+   "fr": "Pas encore de compte professionnel ?"
+  },
+  "request": {
+   "nl": "Account aanvragen",
+   "en": "Request an account",
+   "de": "Konto anfragen",
+   "fr": "Demander un compte"
+  },
+  "request_text": {
+   "nl": "We bekijken je aanvraag en sturen je een uitnodiging per mail.",
+   "en": "We review your request and send you an invitation by mail.",
+   "de": "Wir prüfen deine Anfrage und schicken dir eine Einladung per E-Mail.",
+   "fr": "Nous examinons votre demande et vous envoyons une invitation par e-mail."
+  },
+  "request_sent": {
+   "nl": "Bedankt! We bekijken je aanvraag en nemen contact met je op.",
+   "en": "Thank you! We review your request and will be in touch.",
+   "de": "Danke! Wir prüfen deine Anfrage und melden uns bei dir.",
+   "fr": "Merci ! Nous examinons votre demande et vous contacterons."
+  },
+  "company": {
+   "nl": "Bedrijf",
+   "en": "Company",
+   "de": "Firma",
+   "fr": "Entreprise"
+  },
+  "vat_number": {
+   "nl": "Btw-nummer",
+   "en": "VAT number",
+   "de": "USt-IdNr.",
+   "fr": "Numéro de TVA"
+  },
+  "contact": {
+   "nl": "Contactpersoon",
+   "en": "Contact person",
+   "de": "Ansprechpartner",
+   "fr": "Personne de contact"
+  },
+  "message": {
+   "nl": "Bericht (optioneel)",
+   "en": "Message (optional)",
+   "de": "Nachricht (optional)",
+   "fr": "Message (facultatif)"
+  },
+  "send": {
+   "nl": "Versturen",
+   "en": "Send",
+   "de": "Senden",
+   "fr": "Envoyer"
+  },
+  "tab_configure": {
+   "nl": "Op maat",
+   "en": "Made to measure",
+   "de": "Nach Maß",
+   "fr": "Sur mesure"
+  },
+  "tab_catalogue": {
+   "nl": "Collectie",
+   "en": "Catalogue",
+   "de": "Katalog",
+   "fr": "Catalogue"
+  },
+  "tab_cart": {
+   "nl": "Bestellijst",
+   "en": "Order list",
+   "de": "Bestellliste",
+   "fr": "Liste de commande"
+  },
+  "tab_orders": {
+   "nl": "Eerdere bestellingen",
+   "en": "Previous orders",
+   "de": "Frühere Bestellungen",
+   "fr": "Commandes précédentes"
+  },
+  "tab_addresses": {
+   "nl": "Afleveradressen",
+   "en": "Delivery addresses",
+   "de": "Lieferadressen",
+   "fr": "Adresses de livraison"
+  },
+  "tab_account": {
+   "nl": "Account",
+   "en": "Account",
+   "de": "Konto",
+   "fr": "Compte"
+  },
+  "ex_vat": {
+   "nl": "excl. btw",
+   "en": "ex VAT",
+   "de": "zzgl. MwSt.",
+   "fr": "HT"
+  },
+  "vat": {
+   "nl": "Btw",
+   "en": "VAT",
+   "de": "MwSt.",
+   "fr": "TVA"
+  },
+  "subtotal": {
+   "nl": "Subtotaal excl. btw",
+   "en": "Subtotal ex VAT",
+   "de": "Zwischensumme zzgl. MwSt.",
+   "fr": "Sous-total HT"
+  },
+  "shipping": {
+   "nl": "Verzendkosten",
+   "en": "Shipping",
+   "de": "Versand",
+   "fr": "Livraison"
+  },
+  "incl_vat": {
+   "nl": "Totaal incl. btw",
+   "en": "Total incl. VAT",
+   "de": "Gesamt inkl. MwSt.",
+   "fr": "Total TTC"
+  },
+  "reverse_charge": {
+   "nl": "Btw verlegd",
+   "en": "VAT reverse-charged",
+   "de": "Steuerschuldnerschaft des Leistungsempfängers",
+   "fr": "Autoliquidation de la TVA"
+  },
+  "unit_price": {
+   "nl": "Stukprijs",
+   "en": "Unit price",
+   "de": "Stückpreis",
+   "fr": "Prix unitaire"
+  },
+  "qty": {
+   "nl": "Aantal",
+   "en": "Quantity",
+   "de": "Menge",
+   "fr": "Quantité"
+  },
+  "add": {
+   "nl": "Op de bestellijst",
+   "en": "Add to the order list",
+   "de": "Auf die Bestellliste",
+   "fr": "Ajouter à la liste"
+  },
+  "added": {
+   "nl": "Op de bestellijst gezet",
+   "en": "Added to the order list",
+   "de": "Zur Bestellliste hinzugefügt",
+   "fr": "Ajouté à la liste"
+  },
+  "remove": {
+   "nl": "Verwijderen",
+   "en": "Remove",
+   "de": "Entfernen",
+   "fr": "Supprimer"
+  },
+  "cart_empty": {
+   "nl": "Je bestellijst is leeg.",
+   "en": "Your order list is empty.",
+   "de": "Deine Bestellliste ist leer.",
+   "fr": "Votre liste de commande est vide."
+  },
+  "po": {
+   "nl": "Jullie ordernummer (inkoopnummer)",
+   "en": "Your order reference (PO number)",
+   "de": "Eure Bestellnummer (PO)",
+   "fr": "Votre référence de commande (bon de commande)"
+  },
+  "note": {
+   "nl": "Opmerking (optioneel)",
+   "en": "Note (optional)",
+   "de": "Anmerkung (optional)",
+   "fr": "Remarque (facultatif)"
+  },
+  "deliver_to": {
+   "nl": "Afleveren op",
+   "en": "Deliver to",
+   "de": "Liefern an",
+   "fr": "Livrer à"
+  },
+  "invoice_address": {
+   "nl": "Factuuradres",
+   "en": "Invoice address",
+   "de": "Rechnungsadresse",
+   "fr": "Adresse de facturation"
+  },
+  "on_account": {
+   "nl": "Op rekening: je ontvangt een factuur",
+   "en": "On account: you receive an invoice",
+   "de": "Auf Rechnung: du erhältst eine Rechnung",
+   "fr": "Sur facture : vous recevez une facture"
+  },
+  "place_order": {
+   "nl": "Bestelling plaatsen",
+   "en": "Place the order",
+   "de": "Bestellung aufgeben",
+   "fr": "Passer la commande"
+  },
+  "min_order": {
+   "nl": "Minimale bestelling: {eur} excl. btw",
+   "en": "Minimum order: {eur} ex VAT",
+   "de": "Mindestbestellwert: {eur} zzgl. MwSt.",
+   "fr": "Commande minimum : {eur} HT"
+  },
+  "ordered": {
+   "nl": "Bedankt, je bestelling {n} is ontvangen.",
+   "en": "Thank you, your order {n} has been received.",
+   "de": "Danke, deine Bestellung {n} ist eingegangen.",
+   "fr": "Merci, votre commande {n} a bien été reçue."
+  },
+  "ordered_text": {
+   "nl": "Je krijgt een bevestiging per mail; de factuur volgt.",
+   "en": "You receive a confirmation by mail; the invoice follows.",
+   "de": "Du erhältst eine Bestätigung per E-Mail; die Rechnung folgt.",
+   "fr": "Vous recevez une confirmation par e-mail ; la facture suit."
+  },
+  "reorder": {
+   "nl": "Opnieuw bestellen",
+   "en": "Order again",
+   "de": "Erneut bestellen",
+   "fr": "Commander à nouveau"
+  },
+  "reordered": {
+   "nl": "Op de bestellijst gezet, tegen de prijzen van vandaag.",
+   "en": "Added to the order list, at today's prices.",
+   "de": "Zur Bestellliste hinzugefügt, zu den heutigen Preisen.",
+   "fr": "Ajouté à la liste, aux prix du jour."
+  },
+  "no_orders": {
+   "nl": "Nog geen bestellingen.",
+   "en": "No orders yet.",
+   "de": "Noch keine Bestellungen.",
+   "fr": "Pas encore de commandes."
+  },
+  "order_n": {
+   "nl": "Bestelling {n}",
+   "en": "Order {n}",
+   "de": "Bestellung {n}",
+   "fr": "Commande {n}"
+  },
+  "add_address": {
+   "nl": "Adres toevoegen",
+   "en": "Add an address",
+   "de": "Adresse hinzufügen",
+   "fr": "Ajouter une adresse"
+  },
+  "address_label": {
+   "nl": "Naam van het adres (bijv. winkel Utrecht)",
+   "en": "Name of the address (e.g. the Utrecht store)",
+   "de": "Name der Adresse (z. B. Filiale Köln)",
+   "fr": "Nom de l'adresse (p. ex. magasin de Lyon)"
+  },
+  "save": {
+   "nl": "Opslaan",
+   "en": "Save",
+   "de": "Speichern",
+   "fr": "Enregistrer"
+  },
+  "saved": {
+   "nl": "Opgeslagen",
+   "en": "Saved",
+   "de": "Gespeichert",
+   "fr": "Enregistré"
+  },
+  "search": {
+   "nl": "Zoeken",
+   "en": "Search",
+   "de": "Suchen",
+   "fr": "Rechercher"
+  },
+  "all": {
+   "nl": "Alles",
+   "en": "All",
+   "de": "Alle",
+   "fr": "Tout"
+  },
+  "fixed_price": {
+   "nl": "Jullie vaste prijs",
+   "en": "Your fixed price",
+   "de": "Euer Festpreis",
+   "fr": "Votre prix fixe"
+  },
+  "show_price": {
+   "nl": "Prijs tonen",
+   "en": "Show the price",
+   "de": "Preis anzeigen",
+   "fr": "Afficher le prix"
+  },
+  "prices_note": {
+   "nl": "Alle prijzen excl. btw, volgens jullie zakelijke prijslijst.",
+   "en": "All prices ex VAT, from your business price list.",
+   "de": "Alle Preise zzgl. MwSt., nach eurer Geschäftspreisliste.",
+   "fr": "Tous les prix HT, selon votre tarif professionnel."
+  },
+  "catalogue_text": {
+   "nl": "Hoezen uit onze collectie, gesneden naar hun eigen geteste patroon.",
+   "en": "Covers from our range, cut from their own tested pattern.",
+   "de": "Schutzhüllen aus unserer Kollektion, nach ihrem eigenen geprüften Schnitt.",
+   "fr": "Housses de notre collection, coupées selon leur propre patron testé."
+  },
+  "welcome": {
+   "nl": "Welkom, {name}",
+   "en": "Welcome, {name}",
+   "de": "Willkommen, {name}",
+   "fr": "Bienvenue, {name}"
+  },
+  "change_password": {
+   "nl": "Wachtwoord wijzigen",
+   "en": "Change your password",
+   "de": "Passwort ändern",
+   "fr": "Changer le mot de passe"
+  },
+  "old_password": {
+   "nl": "Huidig wachtwoord",
+   "en": "Current password",
+   "de": "Aktuelles Passwort",
+   "fr": "Mot de passe actuel"
+  },
+  "new_password": {
+   "nl": "Nieuw wachtwoord",
+   "en": "New password",
+   "de": "Neues Passwort",
+   "fr": "Nouveau mot de passe"
+  },
+  "status_on_account": {
+   "nl": "Ontvangen, op rekening",
+   "en": "Received, on account",
+   "de": "Eingegangen, auf Rechnung",
+   "fr": "Reçue, sur facture"
+  },
+  "consumer_shop": {
+   "nl": "Naar de winkel voor particulieren",
+   "en": "To the shop for consumers",
+   "de": "Zum Shop für Privatkunden",
+   "fr": "Vers la boutique pour particuliers"
+  },
+  "mail_order_subject": {
+   "nl": "Bestelling {n} ontvangen",
+   "en": "Order {n} received",
+   "de": "Bestellung {n} eingegangen",
+   "fr": "Commande {n} reçue"
+  },
+  "mail_invite_subject": {
+   "nl": "Je zakelijke account",
+   "en": "Your business account",
+   "de": "Dein Geschäftskonto",
+   "fr": "Votre compte professionnel"
+  },
+  "mail_invite_text": {
+   "nl": "Je bent uitgenodigd om zakelijk bij ons te bestellen. Kies je wachtwoord via deze link (7 dagen geldig):",
+   "en": "You are invited to order from us as a business customer. Choose your password with this link (valid for 7 days):",
+   "de": "Du bist eingeladen, als Geschäftskunde bei uns zu bestellen. Wähle dein Passwort über diesen Link (7 Tage gültig):",
+   "fr": "Vous êtes invité à commander chez nous en tant que client professionnel. Choisissez votre mot de passe avec ce lien (valable 7 jours) :"
+  },
+  "mail_reset_subject": {
+   "nl": "Een nieuw wachtwoord",
+   "en": "A new password",
+   "de": "Ein neues Passwort",
+   "fr": "Un nouveau mot de passe"
+  },
+  "mail_reset_text": {
+   "nl": "Kies een nieuw wachtwoord via deze link (2 uur geldig). Heb je dit niet gevraagd, dan kun je deze mail negeren.",
+   "en": "Choose a new password with this link (valid for 2 hours). If you did not ask for it, you can ignore this mail.",
+   "de": "Wähle über diesen Link ein neues Passwort (2 Stunden gültig). Hast du das nicht angefragt, kannst du diese E-Mail ignorieren.",
+   "fr": "Choisissez un nouveau mot de passe avec ce lien (valable 2 heures). Si vous ne l'avez pas demandé, ignorez cet e-mail."
+  }
  }
 }

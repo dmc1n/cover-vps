@@ -223,6 +223,8 @@ make e2e        the web app flow in a real browser (Playwright in Docker)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
 apps/web/e2e/prices.py                      Prices & costing in a real browser (ADR-098; usage in its docstring)
 Admin → Prices & costing (#/prices)         price set per channel, versioned in app.db; costing per cover (ADR-098)
+<website>/b2b, Admin → B2B customers        the B2B shop: business logins, own prices ex VAT, orders on account (ADR-101)
+apps/web/e2e/b2b.py                         the B2B shop in a real browser (ADR-101; usage in its docstring)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/

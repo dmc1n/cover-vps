@@ -629,6 +629,8 @@ export interface ShopOrder {
   data: {
     customer: Record<string, string | boolean>;
     shipping_eur: number;
+    /** a line of a B2B order on account (ADR-101) */
+    b2b?: { order: number; po: string; qty: number; company: string };
     quote: {
       input: { support: string };
       quote: {

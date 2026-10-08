@@ -45,6 +45,7 @@ OPEN_PATHS = (
     "/api/auth/invite/",
     "/api/public/",  # the webshop's API: its own key check and limits (webshop.py, ADR-061)
     "/api/shop/",  # the cover webshop: its own limits; payments only through Mollie (ADR-062)
+    "/api/b2b/",  # the B2B shop: its own logins, sessions and CSRF (b2b.py, ADR-101)
 )
 TWO_FACTOR_KEY = "two_factor"  # a code by mail after the password (owner, 2 Oct 2026)
 CHANGING = ("POST", "PUT", "PATCH", "DELETE")
@@ -168,7 +169,7 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
                 if user is None and not path.startswith(OPEN_PATHS):
                     return JSONResponse({"detail": "please log in"}, status_code=401)
                 if request.method in CHANGING and not path.startswith(
-                    ("/api/public/", "/api/shop/")
+                    ("/api/public/", "/api/shop/", "/api/b2b/")
                 ):
                     origin = request.headers.get("origin")
                     host = request.headers.get("x-forwarded-host") or request.headers.get("host")

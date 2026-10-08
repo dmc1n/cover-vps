@@ -11,11 +11,13 @@ import {
   User,
   WebshopSettings,
 } from "./api";
+import { B2BCustomers } from "./B2BCustomers";
 import { Prices } from "./Prices";
 
 type Tab =
   | "users"
   | "orders"
+  | "b2b"
   | "matches"
   | "shop"
   | "prices"
@@ -45,6 +47,7 @@ export function Admin() {
           [
             "users",
             "orders",
+            "b2b",
             "matches",
             "shop",
             "prices",
@@ -65,6 +68,7 @@ export function Admin() {
               {
                 users: "Users",
                 orders: "Orders",
+                b2b: "B2B customers",
                 matches: "Matches",
                 shop: "Shop settings",
                 prices: "Prices & costing",
@@ -87,6 +91,7 @@ export function Admin() {
         {tab === "system" && <System />}
         {tab === "webshop" && <Webshop />}
         {tab === "orders" && <Orders />}
+        {tab === "b2b" && <B2BCustomers />}
         {tab === "matches" && <Matches />}
         {tab === "shop" && <ShopSettings />}
         {tab === "prices" && <Prices canEdit />}
@@ -1004,6 +1009,12 @@ function Orders() {
                 <td>{o.id}</td>
                 <td>{when(o.created)}</td>
                 <td>
+                  {o.data.b2b && (
+                    <span className="b2b-status active">
+                      B2B {o.data.b2b.order}
+                      {o.data.b2b.po ? ` · PO ${o.data.b2b.po}` : ""}
+                    </span>
+                  )}{" "}
                   {String(c.name)}
                   <br />
                   <span className="muted">
@@ -1021,7 +1032,11 @@ function Orders() {
                       .join(", ")}
                   </span>
                 </td>
-                <td>€ {o.total_eur.toFixed(2)}</td>
+                <td>
+                  {o.data.b2b ? `${o.data.b2b.qty} × ` : ""}€{" "}
+                  {o.total_eur.toFixed(2)}
+                  {o.data.b2b ? " ex VAT, on account" : ""}
+                </td>
                 <td>
                   <select
                     value={o.status}

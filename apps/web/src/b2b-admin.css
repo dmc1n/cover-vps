@@ -1,0 +1,28 @@
+/* Admin → B2B customers (ADR-101): the status of a business account at a glance. */
+.b2b-status {
+  display: inline-block;
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e8ebe6;
+  color: #3c443c;
+}
+.b2b-status.active {
+  background: #dcebd3;
+  color: #2f5a1f;
+}
+.b2b-status.invited,
+.b2b-status.requested {
+  background: #f3ead2;
+  color: #6b5216;
+}
+.b2b-status.blocked,
+.b2b-status.rejected {
+  background: #f3d9d4;
+  color: #8a2a1a;
+}
+.b2b-fields > button {
+  align-self: end;
+  height: auto;
+  border-radius: 999px;
+}

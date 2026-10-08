@@ -2752,3 +2752,63 @@ docs/plans/prices-costing.md; handbook: docs/handbook/prices.md.
   of the catalogue's 2-seaters, or any cover the owner picks. The maths did not change.
 - **Better later:** price per colour/quality in the configurator, separate workcenters, shipping
   per country and box size, duties per HS code, the B2B storefront.
+
+## ADR-101 — The B2B shop: business accounts with their own login, prices ex VAT, orders on account
+
+The owner (8 October 2026): "two separate shops: the B2B shop gets a login; the consumer shop
+is public." Handbook: docs/handbook/b2b.md; open questions: QUESTIONS 72.
+
+- **Where:** `/b2b` on the website's domain (shop.s2dio.living/b2b), served by the same Worker
+  (`apps/site/src/b2b.ts`); on the studio `/shop/b2b/` (the colleagues' preview). Its own page
+  (`apps/web/b2b.html`, `src/shop/b2b/`), never indexed, never cached at the edge.
+- **Business accounts are not studio users** (`coverapi/b2b.py`, tables `b2b_companies`,
+  `b2b_users`, `b2b_sessions`, `b2b_tokens`, `b2b_failures`, `b2b_orders` in app.db): a company
+  (name, VAT number, contact, invoice address, delivery addresses, price list, its own fixed
+  prices, reverse charge yes/no, status requested → invited → active, or blocked / rejected)
+  with one or more people who log in.
+  - **Admin → B2B customers:** invite a company (a mailed link to choose a password, 7 days;
+    the link is shown when no mail server is set), approve or reject a request, block (every
+    session ends at once), add people, a new password link, its orders, the B2B settings.
+  - **No self sign-up:** "request an account" lands there, and the alert address is mailed.
+- **Logins follow the studio's standard** (auth.py, security.py): scrypt hashes, the same
+  password rule, a lock after 5 wrong passwords per person (15 min) and 10 per address, one-time
+  links for the first password (7 days) and for a reset by mail (2 hours; the same answer for
+  an unknown address), every login, failure and change in the audit log as `b2b:<e-mail>`.
+  - **Its own cookie,** `b2b_session`: HttpOnly, SameSite=Strict, Secure over https, path
+    `/api/b2b/` only. A studio session opens nothing in the B2B shop, and a B2B session opens
+    nothing in the studio. `/api/b2b/` is open in the studio's front door and does its own
+    checks.
+  - **CSRF:** every change needs the session's token (an HMAC of the session secret, given by
+    the login and `/api/b2b/me`) in `x-b2b-csrf`, and an Origin from our own hosts (the
+    website's domain, its preview, the studio). The studio's own Origin check cannot serve
+    here: behind Caddy the forwarded host is the studio's, not the website's.
+  - **The Worker** passes only `b2b_*` cookies, both ways; the studio's cookies never pass, as
+    before (ADR-066). Tested with `wrangler dev --local` against a scratch studio.
+  - With the website link closed, `/api/b2b/` answers only the website and colleagues.
+- **Prices** (ADR-098): the company's price list (`b2b` by default; any channel of the
+  published set), always ex VAT, from the same costing as the consumer price. For a catalogue
+  cover a fixed price in the list wins, and the company's own fixed price (ex VAT; a catalogue
+  cover, balloon or frame) wins over both. VAT is the list's rate, 0 when reverse-charged.
+- **The same configurator and catalogue:** the configurator (sizes, colours, vents, the rain
+  check with the support advice at the company's price) and the SUNS catalogue covers (size
+  card, photo, "show the price"), with quantities and an order list.
+- **Orders on account:** a PO number, a delivery address (the invoice address or one the
+  company manages itself), a note; a minimum order and a shipping line per order (B2B settings,
+  both 0 now).
+  - Each line becomes an order of the studio's own (`orders`, status `on_account`, flagged
+    `data.b2b` with PO, quantity and unit price ex VAT): Admin → Orders shows it, and it goes
+    into production at once through the same `produce()` as a paid consumer order (a setting).
+  - The B2B order (`b2b_orders`) is what "previous orders" shows, with each line's status;
+    "order again" prices every line anew at today's prices.
+  - A confirmation goes to the buyer (in their language), the company's e-mail and the alert
+    address.
+- **Online payment for B2B:** a switch is kept (`b2b.online_payment`, off); the order API
+  refuses "online" until it is built (one Mollie payment for several order rows needs a
+  webhook that handles a group).
+- **Languages:** the new words are in `config/shop_ui.json` under `b2b` (NL, EN, DE, FR), part of
+  the site's content, so the AI CMS edits and translates them. Server errors stay English, as in
+  the shop.
+- **Tests:** `apps/api/tests/test_b2b.py`; browser: `apps/web/e2e/b2b.py` (19 screens).
+- **Better later:** a mailed login code (as the studio's), roles within a company (who may
+  order), PDF invoices and Odoo invoicing, per-company payment terms, VIES checks of VAT
+  numbers, B2B online payment.
