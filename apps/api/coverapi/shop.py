@@ -12,6 +12,7 @@ settings show as placeholders in the shop, and payments work as soon as a Mollie
 from __future__ import annotations
 
 import copy
+import gzip
 import json
 import re
 import secrets
@@ -31,6 +32,19 @@ SHOP_SETTING = "shop"
 PREVIEW_SETTING = "shop_preview_token"
 MOLLIE_API = "https://api.mollie.com/v2"
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
+GZIP_FROM_BYTES = 1024  # smaller files are not worth packing
+GZIP_LEVEL = 6
+
+
+def model_response(request: Request, data: bytes, media_type: str, cache: str) -> Response:
+    """A 3D file (a GLB, the story's points) packed with gzip when the browser takes it
+    (ADR-101). Meshes shrink to about a third, and the edge does not pack model types itself."""
+    headers = {"Cache-Control": cache, "Vary": "Accept-Encoding"}
+    if len(data) > GZIP_FROM_BYTES and "gzip" in request.headers.get("accept-encoding", ""):
+        data = gzip.compress(data, compresslevel=GZIP_LEVEL, mtime=0)
+        headers["Content-Encoding"] = "gzip"
+    return Response(data, media_type=media_type, headers=headers)
+
 
 # Every setting the shop needs; empty means "still to fill in" (the admin page shows them).
 SHOP_DEFAULTS: dict[str, Any] = {
@@ -877,13 +891,14 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         return _quote(req)
 
     @app.get("/api/shop/scene/{qid}.glb")
-    def shop_scene(qid: str) -> Response:
+    def shop_scene(qid: str, request: Request) -> Response:
         if (
             not re.fullmatch(r"[0-9a-f]{16}(-(none|balloons|frame))?", qid)
             or not (quotes / f"{qid}.glb").is_file()
         ):
             raise HTTPException(404, "no such scene")
-        return Response((quotes / f"{qid}.glb").read_bytes(), media_type="model/gltf-binary")
+        return model_response(request, (quotes / f"{qid}.glb").read_bytes(),
+                              "model/gltf-binary", "public, max-age=86400")  # fmt: skip
 
     def mollie(method: str, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
         key = settings()["payment"].get("mollie_key") or ""
@@ -1158,16 +1173,14 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                         headers={"Cache-Control": "public, max-age=3600"})  # fmt: skip
 
     @app.get("/api/shop/story/{model}.bin")
-    def story_bin(model: str) -> Response:
-        return Response((_story(model) / "story.bin").read_bytes(),
-                        media_type="application/octet-stream",
-                        headers={"Cache-Control": "public, max-age=3600"})  # fmt: skip
+    def story_bin(model: str, request: Request) -> Response:
+        return model_response(request, (_story(model) / "story.bin").read_bytes(),
+                              "application/octet-stream", "public, max-age=3600")  # fmt: skip
 
     @app.get("/api/shop/story/{model}-furniture.glb")
-    def story_furniture(model: str) -> Response:
-        return Response((_story(model) / "furniture.glb").read_bytes(),
-                        media_type="model/gltf-binary",
-                        headers={"Cache-Control": "public, max-age=3600"})  # fmt: skip
+    def story_furniture(model: str, request: Request) -> Response:
+        return model_response(request, (_story(model) / "furniture.glb").read_bytes(),
+                              "model/gltf-binary", "public, max-age=3600")  # fmt: skip
 
     # ---- the fit question after delivery -----------------------------------------------------
     def fit_mails() -> int:
@@ -1538,15 +1551,13 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
     @app.get("/api/shop/demo.glb", include_in_schema=False)
-    def demo_scene() -> Response:
+    def demo_scene(request: Request) -> Response:
         """The landing page's 3D: a dining set under its cover with balloons, turning."""
         p = shop_params(auth)
         glb = q.scene_glb(
             "dining_set", {"table_length_cm": 220, "chairs": True}, p, "balloons"
         )  # param-ok
-        return Response(
-            glb, media_type="model/gltf-binary", headers={"Cache-Control": "max-age=3600"}
-        )
+        return model_response(request, glb, "model/gltf-binary", "max-age=3600")
 
     @app.get("/robots.txt", include_in_schema=False)
     def robots(request: Request) -> PlainTextResponse:

@@ -5,12 +5,33 @@
 // site's content in as many languages as the shop is set to (the AI CMS translates); a language
 // other than the first lives under /shop/<lang>/. The server puts the same text in the HTML for
 // search engines; this replaces it once loaded.
-import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  StrictMode,
+  Suspense,
+  lazy,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Suggest, type Suggestion } from "./Suggest";
 import { createRoot } from "react-dom/client";
 import "./shop.css";
-import { Scene } from "./Scene";
-import { Story, StoryContent } from "./Story";
+import type { StoryContent } from "./Story";
+
+// three.js (the 3D) and GSAP/Lenis (the scroll story) load only on the pages that show them
+// (ADR-101): the first screen of every other page waits for neither.
+const loadScene = () => import("./Scene");
+const LazyScene = lazy(() => loadScene().then((m) => ({ default: m.Scene })));
+const Story = lazy(() => import("./Story").then((m) => ({ default: m.Story })));
+// the box the 3D will fill, shown at once and the same size, so nothing shifts when it arrives
+function Scene(props: Parameters<typeof LazyScene>[0]) {
+  return (
+    <Suspense fallback={<div className="s-scene" data-state="loading" />}>
+      <LazyScene {...props} />
+    </Suspense>
+  );
+}
 
 type T = Record<string, string>;
 interface Content {
@@ -257,30 +278,38 @@ function Home({ info, tx }: { info: Info; tx: Tx }) {
     info.settings.home_story || window.location.hostname.startsWith("preview.");
   if (story && c.story && info.settings.story_model)
     return (
-      <Story
-        t={t}
-        hero={c.hero}
-        story={c.story}
-        media={{
-          ...info.settings.story_media,
-          hero: info.settings.story_media?.hero || info.settings.film_url,
-        }}
-        model={info.settings.story_model}
-        cta={t(c.hero.cta)}
-        configure={tx.href("configure")}
-      >
-        <section className="s-section" id="faq">
-          <h2>{w("faq")}</h2>
-          <div className="s-faq">
-            {c.faq.map((f, i) => (
-              <details key={i}>
-                <summary>{t(f.q)}</summary>
-                <p>{t(f.a)}</p>
-              </details>
-            ))}
+      <Suspense
+        fallback={
+          <div className="st">
+            <section className="st-hero" />
           </div>
-        </section>
-      </Story>
+        }
+      >
+        <Story
+          t={t}
+          hero={c.hero}
+          story={c.story}
+          media={{
+            ...info.settings.story_media,
+            hero: info.settings.story_media?.hero || info.settings.film_url,
+          }}
+          model={info.settings.story_model}
+          cta={t(c.hero.cta)}
+          configure={tx.href("configure")}
+        >
+          <section className="s-section" id="faq">
+            <h2>{w("faq")}</h2>
+            <div className="s-faq">
+              {c.faq.map((f, i) => (
+                <details key={i}>
+                  <summary>{t(f.q)}</summary>
+                  <p>{t(f.a)}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+        </Story>
+      </Suspense>
     );
   return (
     <>
@@ -1115,16 +1144,8 @@ function Footer({ info, tx }: { info: Info; tx: Tx }) {
   );
 }
 
-function App() {
-  const [info, setInfo] = useState<Info | null>(null);
-  useEffect(() => {
-    const preview = new URLSearchParams(window.location.search).get("preview");
-    fetch(
-      `/api/shop/info${preview ? `?preview=${encodeURIComponent(preview)}` : ""}`,
-    )
-      .then((r) => r.json())
-      .then(setInfo);
-  }, []);
+function App({ loaded }: { loaded: Info }) {
+  const info: Info | null = loaded;
   const langs = useMemo(() => info?.settings.languages ?? ["nl"], [info]);
   const parts = window.location.pathname
     .replace(/\/+$/, "")
@@ -1182,8 +1203,27 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("shop")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+// The server already put the page's text into the HTML. React takes over only once the shop's
+// info is here, so the first screen never goes blank in between (ADR-101). The 3D's code is
+// fetched as soon as a visitor points at a link to the configurator.
+const preview = new URLSearchParams(window.location.search).get("preview");
+fetch(
+  `/api/shop/info${preview ? `?preview=${encodeURIComponent(preview)}` : ""}`,
+)
+  .then((r) => r.json() as Promise<Info>)
+  .then((info) =>
+    createRoot(document.getElementById("shop")!).render(
+      <StrictMode>
+        <App loaded={info} />
+      </StrictMode>,
+    ),
+  );
+// the configurator always shows the 3D: its code comes alongside the info, not after it
+if (/\/configure\/?$/.test(window.location.pathname))
+  loadScene().catch(() => undefined);
+const warm = (e: Event) => {
+  if ((e.target as Element | null)?.closest?.('a[href*="configure"]'))
+    loadScene().catch(() => undefined);
+};
+document.addEventListener("pointerover", warm, { passive: true });
+document.addEventListener("touchstart", warm, { passive: true });

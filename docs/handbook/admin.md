@@ -179,6 +179,21 @@ covers comes from this studio (ADR-066).
 4. **Check the website.** Then set `website_link.closed` on: the studio's `/shop/` is then
    only a preview for colleagues, and visitors go to the website.
 
+### Is the website fast, and does the rain fall? (ADR-101)
+
+Three browser checks look at the website's pages the way a visitor's browser does. They run
+against the preview, or against a fresh build on this machine (`make web-build`, then
+`node apps/web/e2e/site_serve.mjs --port 18300`, which shows this build with the preview's data):
+
+- `apps/web/e2e/site_rain.py`: in the rain chapter of the scroll story the rain keeps falling,
+  also after standing still, scrolling back and forth, another tab, and on a phone;
+- `apps/web/e2e/site_3d.py`: the 3D's code (three.js) loads only on the pages that show 3D, the
+  configurator's model fades in without the page jumping, and a new size never empties the view;
+- `apps/web/e2e/site_perf.py`: load times, sizes and frame rate on a desktop and on a mid-range
+  phone over slow 4G, with a screenshot of each page.
+
+How to start each is at the top of the file. The pictures go to `out/sitepolish/`.
+
 ## Your reference: compare the program with your own drawing or model
 
 On a model's page, tab **Your reference**, upload what you know is right:

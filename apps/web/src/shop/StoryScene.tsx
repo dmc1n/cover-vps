@@ -51,7 +51,10 @@ export function StoryScene({
     scene.fog = new THREE.Fog(BG, 14, 34);
     const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 80);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // a phone draws at most 1.5 pixels per CSS pixel (ADR-101)
+    const phone =
+      window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 820;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, phone ? 1.5 : 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;

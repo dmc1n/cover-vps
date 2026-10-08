@@ -295,3 +295,21 @@ def test_the_story_is_only_for_its_own_model(app: Any) -> None:
     assert info["settings"]["story_model"] == "suns-2-seater-kota"
     assert info["settings"]["home_story"] is False  # the live home stays until switched on
     assert len(info["content"]["story"]["chapters"]) == 6
+
+
+def test_the_3d_files_travel_packed(app: Any) -> None:
+    """ADR-101: a GLB goes gzip-packed to a browser that takes it (the edge does not pack model
+    types), and as it is to one that does not; the edge and the browser may keep it."""
+    import gzip
+
+    c = TestClient(app)
+    packed = c.get("/api/shop/demo.glb", headers={"accept-encoding": "gzip"})
+    assert packed.headers["content-encoding"] == "gzip"
+    assert "Accept-Encoding" in packed.headers["vary"]
+    plain = c.get("/api/shop/demo.glb", headers={"accept-encoding": "identity"})
+    assert "content-encoding" not in plain.headers
+    assert plain.content[:4] == b"glTF" and packed.content == plain.content  # unpacked by httpx
+    assert len(gzip.compress(plain.content)) < len(plain.content) / 2
+    q = c.post("/api/shop/quote", json={"product": "dining_set", "sizes": {}}).json()
+    scene = c.get(q["scene"], headers={"accept-encoding": "gzip"})
+    assert scene.content[:4] == b"glTF" and "max-age" in scene.headers["cache-control"]

@@ -17,6 +17,8 @@ export interface Env {
 const FILES = /^\/(assets|brand)\//; // the shop's build (hashed names: never change)
 const YEAR = 31536000;
 const API = /^\/(api\/shop\/|media\/)/;
+const MODELS =
+  /^\/api\/shop\/(demo\.glb|story\/[\w-]+\.(bin|json|glb)|scene\/[0-9a-f]{16}(-\w+)?\.glb)$/;
 const FEEDS = new Set(["/robots.txt", "/sitemap.xml", "/llms.txt"]);
 const HOP = ["cookie", "host", "x-link-key", "x-client-ip", "cf-connecting-ip"];
 
@@ -44,8 +46,9 @@ function studio(req: Request, url: URL, env: Env, path: string): Promise<Respons
 function cacheFor(url: URL, method: string, env: Env): number {
   if (method !== "GET" || url.searchParams.has("preview")) return 0;
   if (FILES.test(url.pathname)) return YEAR;
-  if (url.pathname.startsWith("/media/") || url.pathname === "/api/shop/demo.glb")
-    return Number(env.MEDIA_TTL);
+  // the media and the 3D files (ADR-101): the demo, the story's model, a quote's scene (named by
+  // its hash), kept at the edge like the media
+  if (url.pathname.startsWith("/media/") || MODELS.test(url.pathname)) return Number(env.MEDIA_TTL);
   if (API.test(url.pathname)) return 0; // quotes, matches, orders: always fresh
   return Number(env.PAGE_TTL); // the pages and the feeds
 }
@@ -71,8 +74,8 @@ export default {
       if (url.pathname === "/api/shop/info") {
         const [live, extra] = await Promise.all([
           studio(req, url, env, "/api/shop/info").then((r) => r.json() as Promise<Info>),
-          env.ASSETS.fetch(new Request(new URL("/preview/overlay.json", url))).then(
-            (r) => (r.ok ? (r.json() as Promise<Info>) : { content: {}, settings: {} }),
+          env.ASSETS.fetch(new Request(new URL("/preview/overlay.json", url))).then((r) =>
+            r.ok ? (r.json() as Promise<Info>) : { content: {}, settings: {} },
           ),
         ]);
         live.content = { ...extra.content, ...live.content };
@@ -84,6 +87,9 @@ export default {
         const res = await env.ASSETS.fetch(new Request(new URL(asset, url), req));
         const out = new Response(res.body, res);
         out.headers.set("x-robots-tag", "noindex, nofollow");
+        // the build's files are named by their content: the browser keeps them (ADR-101)
+        if (url.pathname.startsWith("/assets/") && res.ok)
+          out.headers.set("cache-control", `public, max-age=${YEAR}, immutable`);
         return out;
       }
     }

@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--SSR-HEAD-->
+    <!-- the shop's info, asked for while the scripts load (ADR-101) -->
+    <link rel="preload" href="/api/shop/info" as="fetch" crossorigin />
     <link rel="icon" href="/brand/s2dio/only-color.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
