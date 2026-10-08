@@ -1,0 +1,39 @@
+{
+ "shape": "swept",
+ "params": {
+  "path": [
+   {
+    "line": 41.24
+   },
+   {
+    "arc": 167.1,
+    "angle": 61.835
+   }
+  ],
+  "profile": [
+   [
+    0,
+    88.01
+   ],
+   [
+    33.07,
+    88.01
+   ],
+   [
+    141.86,
+    40.64
+   ]
+  ],
+  "seams_cm": [
+   55.4,
+   110.8,
+   166.2
+  ],
+  "start_end": "square",
+  "end_end": "round",
+  "end_angle_deg": 0,
+  "skirt_cm": 40.64
+ },
+ "mirror": true,
+ "read": "S44 is S43 mirrored (both drawings: 196.95/197.0 x 192.63/192.4 cm, 88 cm back, 33 cm strip, 141.9 cm slope to 40.6 cm): the round nose at the red circle as on the drawing, and a level skirt seam at 40.6 cm all round as on S43."
+}

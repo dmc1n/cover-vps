@@ -1,0 +1,45 @@
+{
+ "shape": "angled",
+ "params": {
+  "arm_a_cm": 188.0,
+  "arm_b_cm": 188.0,
+  "bend_deg": 40.0,
+  "profile": [
+   [
+    0,
+    59.0
+   ],
+   [
+    10,
+    84.0
+   ],
+   [
+    30,
+    84.0
+   ],
+   [
+    95,
+    59.0
+   ],
+   [
+    105,
+    40.01
+   ]
+  ],
+  "end_profile": [
+   [
+    0,
+    59.0
+   ],
+   [
+    10,
+    84.0
+   ],
+   [
+    400,
+    84.0
+   ]
+  ]
+ },
+ "read": "S21 (Vento angled 4-seater): the back edges 188 cm each meeting at 140 degrees, as the top view lines measure (each arm 20 degrees off straight: a 40-degree bend; drawing_vectors.back_angle), the arm ends hipped: the top (84 cm) stops 10 cm short of each end and falls to the 59 cm end wall (the 10 cm on the top view; the 174.36 and 167.08 cm lines are 10 cm short at the ends); the profile from the side view and the top view lines: back wall 59 cm, a 10 cm chamfer up to 84 cm, a 20 cm flat strip, the slope to 59 cm at 95 cm (the 95 cm on the drawing), a 10 cm chamfer down to the 40.01 cm front at 105 cm (the 105 cm)."
+}

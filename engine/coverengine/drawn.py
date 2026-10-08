@@ -83,6 +83,8 @@ def conform(pieces: list[Piece], tol: float = 0.01) -> list[Piece]:  # param-ok:
                 pa, pb = np.array(a), np.array(b)
                 d = pb - pa
                 L2 = float(d @ d)
+                if L2 < 1e-12:  # param-ok: a corner given twice is no edge
+                    continue
                 t = (pts - pa) @ d / L2
                 near = np.linalg.norm(pa + np.outer(t, d) - pts, axis=1) < tol
                 on = near & (t > 1e-6) & (t < 1 - 1e-6)  # param-ok: strictly inside the edge
@@ -121,8 +123,9 @@ def _bands(name: str, quad: Face, roll: float) -> list[Piece]:
     quad[3..2]) split into bands along its length, seams parallel to the back."""
     q = np.array(quad, dtype=np.float64)
     width = float(np.linalg.norm((q[0] + q[1]) / 2 - (q[3] + q[2]) / 2))
+    along = max(float(np.linalg.norm(q[1] - q[0])), float(np.linalg.norm(q[2] - q[3])))
     n = max(1, math.ceil(width / roll))
-    if n == 1:
+    if n == 1 or along <= roll:  # narrower than the roll the other way: one piece (S16, 8 Oct)
         return [Piece(name, [quad])]
     out = []
     for k in range(n):
@@ -233,18 +236,23 @@ def l_shape(p: dict[str, Any], roll: float = math.inf) -> list[Piece]:
 
     Sloping arm ends (end_length_cm, as the owner's C2): over the last e of each arm the top
     comes down to end_back_height_cm at the back and end_front_height_cm at the front; the strip
-    and the slope each get an end piece, the end wall is lower."""
+    and the slope each get an end piece, the end wall is lower. One arm alone may slope
+    (x_end_length_cm / y_end_length_cm, the owner's L1: the short arm a chaise that comes down
+    over its free length); end_length_cm sets both."""
     X, Y = _cm(p, "x_length_cm"), _cm(p, "y_length_cm")
     dA, dB = _cm(p, "x_arm_depth_cm"), _cm(p, "y_arm_depth_cm")
     sA, sB = _cm(p, "x_back_strip_cm", 0.0), _cm(p, "y_back_strip_cm", 0.0)
     hb, hf = _cm(p, "back_height_cm"), _cm(p, "front_height_cm")
     e = _cm(p, "end_length_cm", 0.0)
+    ex, ey = _cm(p, "x_end_length_cm", e / MM), _cm(p, "y_end_length_cm", e / MM)
     ebh, efh = _cm(p, "end_back_height_cm", hb / MM), _cm(p, "end_front_height_cm", hf / MM)
     if not (sA < dA <= Y and sB < dB <= X):  # an arm as long as the other is deep: a corner
         raise CoverError("the L shape's sizes do not fit together")  # end only (the owner's S18)
-    if e and not (e < X - dB and e < Y - dA):
+    if ex > X - dB or ey > Y - dA:
         raise CoverError("the sloping arm ends are longer than the arms")
-    Xe, Ye = X - e, Y - e  # where the arm ends start to slope
+    Xe, Ye = X - ex, Y - ey  # where the arm ends start to slope
+    ebx, efx = (ebh, efh) if ex else (hb, hf)  # the x arm's end heights
+    eby, efy = (ebh, efh) if ey else (hb, hf)
     pieces = []
     corner = str(p.get("strip_corner") or "mitre")  # mitre | x (x strip runs on) | y
     if sA > 0 or sB > 0:
@@ -260,29 +268,32 @@ def l_shape(p: dict[str, Any], roll: float = math.inf) -> list[Piece]:
         pieces += [Piece("top-x strip", [x_strip]), Piece("top-y strip", [y_strip])]
     pieces += _bands("top-x slope", [(sB, sA, hb), (Xe, sA, hb), (Xe, dA, hf), (dB, dA, hf)], roll)
     pieces += _bands("top-y slope", [(sB, Ye, hb), (sB, sA, hb), (dB, dA, hf), (dB, Ye, hf)], roll)
-    if e:
-        if sA > 0:
-            pieces.append(Piece("top-x end strip", [[(Xe, 0, hb), (X, 0, ebh), (X, sA, ebh),
-                                                     (Xe, sA, hb)]]))  # fmt: skip
-        if sB > 0:
-            pieces.append(Piece("top-y end strip", [[(0, Ye, hb), (sB, Ye, hb), (sB, Y, ebh),
-                                                     (0, Y, ebh)]]))  # fmt: skip
-        pieces += [
-            _twisted("top-x end slope", [(Xe, sA, hb), (X, sA, ebh), (X, dA, efh), (Xe, dA, hf)]),
-            _twisted("top-y end slope", [(sB, Ye, hb), (dB, Ye, hf), (dB, Y, efh), (sB, Y, ebh)]),
-        ]
-    bx = [(0, 0, 0), (X, 0, 0), (X, 0, ebh), (Xe, 0, hb), (0, 0, hb)]
-    by = [(0, 0, 0), (0, 0, hb), (0, Ye, hb), (0, Y, ebh), (0, Y, 0)]
-    fx = [(dB, dA, 0), (dB, dA, hf), (Xe, dA, hf), (X, dA, efh), (X, dA, 0)]
-    fy = [(dB, dA, 0), (dB, Y, 0), (dB, Y, efh), (dB, Ye, hf), (dB, dA, hf)]
+    if ex and sA > 0:
+        pieces.append(Piece("top-x end strip", [[(Xe, 0, hb), (X, 0, ebx), (X, sA, ebx),
+                                                 (Xe, sA, hb)]]))  # fmt: skip
+    if ey and sB > 0:
+        pieces.append(Piece("top-y end strip", [[(0, Ye, hb), (sB, Ye, hb), (sB, Y, eby),
+                                                 (0, Y, eby)]]))  # fmt: skip
+    if ex:
+        pieces.append(
+            _twisted("top-x end slope", [(Xe, sA, hb), (X, sA, ebx), (X, dA, efx), (Xe, dA, hf)])
+        )
+    if ey:
+        pieces.append(
+            _twisted("top-y end slope", [(sB, Ye, hb), (dB, Ye, hf), (dB, Y, efy), (sB, Y, eby)])
+        )
+    bx = [(0, 0, 0), (X, 0, 0), (X, 0, ebx), (Xe, 0, hb), (0, 0, hb)]
+    by = [(0, 0, 0), (0, 0, hb), (0, Ye, hb), (0, Y, eby), (0, Y, 0)]
+    fx = [(dB, dA, 0), (dB, dA, hf), (Xe, dA, hf), (X, dA, efx), (X, dA, 0)]
+    fy = [(dB, dA, 0), (dB, Y, 0), (dB, Y, efy), (dB, Ye, hf), (dB, dA, hf)]
     pieces += [
         Piece("back-x", [_dedupe(bx)]),
         Piece("back-y", [_dedupe(by)]),
         Piece("front-x", [_dedupe(fx)]),
         Piece("front-y", [_dedupe(fy)]),
     ]
-    end_x = [(X, 0, 0), (X, dA, 0), (X, dA, efh), (X, sA, ebh), (X, 0, ebh)]
-    end_y = [(0, Y, 0), (0, Y, ebh), (sB, Y, ebh), (dB, Y, efh), (dB, Y, 0)]
+    end_x = [(X, 0, 0), (X, dA, 0), (X, dA, efx), (X, sA, ebx), (X, 0, ebx)]
+    end_y = [(0, Y, 0), (0, Y, eby), (sB, Y, eby), (dB, Y, efy), (dB, Y, 0)]
     pieces += [Piece("end-x", [_dedupe(end_x)]), Piece("end-y", [_dedupe(end_y)])]
     return _solid(pieces)
 

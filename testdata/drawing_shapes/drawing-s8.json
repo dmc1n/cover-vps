@@ -1,0 +1,12 @@
+{
+ "shape": "sloped box",
+ "params": {
+  "length_cm": 140.0,
+  "depth_cm": 115.01,
+  "back_height_cm": 89.99,
+  "front_height_cm": 73.0,
+  "back_strip_cm": 0,
+  "front_strip_cm": 0
+ },
+ "read": "140 x 115.01 cm; the side view (89.99 to 73 cm) is 115 cm wide at its own scale, so the top slopes across the 115.01 cm side and the 140 cm side is level (the live cover had them swapped)."
+}

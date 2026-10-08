@@ -192,6 +192,21 @@ def _isofit(
     return best
 
 
+SIDE_AGREE = 0.03  # param-ok: a side view's width agrees with a written size within 3 %
+
+
+def _side_view(views: dict[str, Any]) -> Any:
+    """The drawing's only picture when it is a side view (no slant lines of a 3D view), else
+    None. drawing_views calls a lone picture the 3D view; its iso_share says otherwise."""
+    from coverengine.drawing_views import ISO_SHARE
+
+    vs = views.get("views") or []
+    if len(vs) != 1 or not views.get("sizes_cm"):
+        return None
+    v = vs[0]
+    return v if float(v.meta.get("iso_share", 1.0)) < ISO_SHARE and "scale" in v.meta else None
+
+
 def read(
     pdf: Path, params: EffectiveParams, corrections: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
@@ -252,6 +267,26 @@ def read(
                     "pieces": pieces, "info": info, "reasons": []}  # fmt: skip
         reasons.append(f"a C or U shape: only {lengths['matched']} of {lengths['of']} lengths "
                        "along the back match the drawing")  # fmt: skip
+
+    # b2. one side view alone (U2, a parasol cover; Rens: "should be cylindrical, the drawing is
+    #     a side view"): a single picture with no 3D slant lines draws a round object from the
+    #     side; scaled by its largest written size (the height), taken when its width is a
+    #     written size too
+    side = _side_view(views) if views is not None else None
+    if side is not None:
+        from coverengine import drawing_given
+
+        tall = max(views["sizes_cm"])  # type: ignore[index]
+        prof = drawing_given.side_profile(side.outline * float(side.meta["scale"]), tall)
+        wide = 2 * max(r for r, _ in prof)
+        hit = [s for s in views["sizes_cm"] if abs(s - wide) <= SIDE_AGREE * s]  # type: ignore[index]
+        info["side_view"] = {"profile_cm": prof, "height_cm": tall, "width_cm": round(wide, 1),
+                             "width_written": bool(hit)}  # fmt: skip
+        if hit:
+            return {"status": "built", "reader": "side view", "shape": "revolve",
+                    "pieces": drawing_given.revolve({"profile": prof}, roll), "info": info,
+                    "reasons": []}  # fmt: skip
+        reasons.append(f"one side view: its width {wide:.1f} cm is no written size")
 
     # c. the views: the plan cut by the elevations, checked against the 3D view
     if views is not None:
@@ -344,6 +379,7 @@ def build(
     """Read the drawing and, when sure, build and calculate its cover in `model_dir` (a new
     model, or a new revision of an existing drawing cover). Never deletes the model's
     reference/, desk.json or revisions/."""
+    from coverengine import drawing_given
     from coverengine.catalogue import set_info
     from coverengine.cli import main as cover
     from coverengine.drawing_vectors import features
@@ -358,7 +394,17 @@ def build(
     _write(model_dir / "drawing_features.json", feats)
     fixes = model_dir / "drawing_corrections.json"
     corrections = json.loads(fixes.read_text()).get("sizes") if fixes.is_file() else None
-    res = ai_read(ref, params, code) if ai else read(ref, params, corrections)
+    given = None if ai else drawing_given.load(model_dir)
+    res: dict[str, Any]
+    if given is not None:  # a person read the shape from the drawing (drawing_shape.json)
+        join = (float(params["drawn.merge_fold_deg"]), float(params["drawn.merge_max_stretch_pct"]))  # type: ignore[arg-type]
+        res = {"status": "built", "reader": "given", "shape": "given",
+               "pieces": drawing_given.build(given, roll_mm(params),
+                                             float(params["seams.max_skirt_panel_mm"]), join),  # type: ignore[arg-type]
+               "info": {"given": {k: given.get(k) for k in ("shape", "mirror", "read")}},
+               "reasons": []}  # fmt: skip
+    else:
+        res = ai_read(ref, params, code) if ai else read(ref, params, corrections)
     doc: dict[str, Any] = {
         "code": code, "time": time.time(), "status": res["status"], "reader": res["reader"],
         "reasons": res["reasons"], "features": feats, **res["info"],
@@ -399,6 +445,11 @@ def build(
             f"Drawing {code}: read by the AI as advice (ADR-083), "
             f"{res['info']['ai'].get('matched')} written sizes found; approve at the Desk."
         )
+    elif given is not None:
+        tags.discard("ai-read")
+        note = (f"Drawing {code}: shape read by a person from the drawing's sizes "
+                f"({given.get('shape')}{', mirrored' if given.get('mirror') else ''}): "
+                f"{given.get('read') or ''}")  # fmt: skip
     else:
         tags.discard("ai-read")
         note = (f"Drawing {code}: read by the program itself (ADR-081): {res['reader']}, "

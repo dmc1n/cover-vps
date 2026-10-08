@@ -317,6 +317,43 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     return [_check("vents", not problems, detail)]
 
 
+ANGLED_DEG = (100.0, 175.0)  # param-ok: two back arms meeting between these angles: an angled sofa
+MANY_PIECES = 60  # param-ok: a drawing cover in more pieces than this is a broken shape (7,846)
+
+
+def drawing_checks(model_dir: Path) -> list[dict[str, Any]]:
+    """Rens's shape rejections (8 Oct 2026) as checks on a drawing cover: an angled sofa
+    (the top view's back arms meet at 140 degrees, S21) must not be built as a 90 degree L, and
+    a drawing cover in thousands of pieces is a broken shape (the L1/L5 mirror)."""
+    ref = model_dir / "reference.pdf"
+    out: list[dict[str, Any]] = []
+    fin = model_dir / "finished.json"
+    if fin.is_file():
+        n = sum(1 for p in json.loads(fin.read_text(encoding="utf-8"))["pieces"]
+                if not str(p["name"]).startswith("vent-"))  # fmt: skip
+        out.append(_check("piece count", n <= MANY_PIECES, f"{n} pieces"
+                          + ("" if n <= MANY_PIECES else " (a broken shape?)")))  # fmt: skip
+    if not ref.is_file():
+        return out
+    from coverengine.drawing_vectors import back_angle
+
+    try:
+        ang = back_angle(ref)
+    except Exception:  # noqa: BLE001 - a drawing whose lines cannot be read: no check
+        return out
+    if ang is None or not ANGLED_DEG[0] < ang["inside_deg"] < ANGLED_DEG[1]:
+        return out
+    cj = model_dir / "cover.json"
+    notes = json.loads(cj.read_text(encoding="utf-8")).get("notes", "") if cj.is_file() else ""
+    given = model_dir / "drawing_shape.json"
+    shape = json.loads(given.read_text(encoding="utf-8")).get("shape") if given.is_file() else ""
+    square = shape == "L shape" or (not shape and ": L shape," in str(notes))
+    out.append(_check("angle", not square,
+                      f"the drawing's back arms meet at {ang['inside_deg']:g} degrees"
+                      + (": built as a 90 degree L" if square else "")))  # fmt: skip
+    return out
+
+
 def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     """The program's checks for one model."""
     from coverengine.hull.box import Box
@@ -429,6 +466,8 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     checks += fold_checks(model_dir, params)
     checks += plan_checks(model_dir, params)
     checks += vent_checks(model_dir, params)
+
+    checks += drawing_checks(model_dir)
     checks += drape_checks(model_dir, params)
     views(furniture, cover, bad, model_dir / AUDIT_PNG)
     return {
