@@ -11,6 +11,7 @@ import { createRoot } from "react-dom/client";
 import "./shop.css";
 import { Scene } from "./Scene";
 import { Story, StoryContent } from "./Story";
+import { Icon } from "./Icons";
 
 type T = Record<string, string>;
 interface Content {
@@ -126,6 +127,11 @@ const SWATCH: Record<string, string> = {
 // On the website (its own domain, ADR-066) the shop is the whole site; on the studio it lives
 // under /shop/ (the colleagues' preview).
 const ROOT = window.location.pathname.startsWith("/shop") ? "/shop/" : "/";
+// how far a slider is filled, for its track (ADR-105)
+const fill = (v: number, min: number, max: number) =>
+  ({
+    "--p": `${max > min ? Math.round(((v - min) / (max - min)) * 1000) / 10 : 0}%`,
+  }) as React.CSSProperties;
 const euro = (n: number, lang: string) =>
   new Intl.NumberFormat(lang, { style: "currency", currency: "EUR" }).format(n);
 
@@ -193,15 +199,20 @@ function Header({ info, tx, page }: { info: Info; tx: Tx; page: string }) {
   const langs = info.settings.languages;
   // over the film the header is clear with light type; further down it turns light
   const [light, setLight] = useState(page !== "");
+  // scrolled a little but still over the film: a dark glass, so the header never sits on text
+  const [moved, setMoved] = useState(false);
   useEffect(() => {
     if (page !== "") return;
-    const on = () => setLight(window.scrollY > window.innerHeight * 0.8);
+    const on = () => {
+      setLight(window.scrollY > window.innerHeight * 0.8);
+      setMoved(window.scrollY > 24);
+    };
     on();
     window.addEventListener("scroll", on, { passive: true });
     return () => window.removeEventListener("scroll", on);
   }, [page]);
   return (
-    <header className={`s-head ${light ? "light" : ""}`}>
+    <header className={`s-head ${light ? "light" : moved ? "moved" : ""}`}>
       <a href={tx.href("")} className="s-logo">
         {info.settings.logo_url ? (
           <img
@@ -324,7 +335,7 @@ function Home({ info, tx }: { info: Info; tx: Tx }) {
         <div className="s-steps">
           {c.steps.map((s, i) => (
             <Reveal key={i} className="s-step">
-              <span className="s-num">{i + 1}</span>
+              <span className="s-num">{String(i + 1).padStart(2, "0")}</span>
               <h3>{t(s.title)}</h3>
               <p>{t(s.text)}</p>
             </Reveal>
@@ -655,6 +666,7 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
             max={1}
             step={0.01}
             value={solid}
+            style={fill(solid, 0.15, 1)}
             onChange={(e) => {
               const v = Number(e.target.value);
               setSolid(v);
@@ -682,7 +694,8 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
             ))}
             {rain.advice?.support === "balloons" && support === "none" && (
               <p className="s-advice">
-                💧 {w("advice_flat", { m2: rain.options.none.flat_m2 })}{" "}
+                <Icon name="drop" />{" "}
+                {w("advice_flat", { m2: rain.options.none.flat_m2 })}{" "}
                 {w("advice_balloons", { n: rain.advice.count })}{" "}
                 <button
                   className="s-btn small"
@@ -779,6 +792,11 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
                         min={f.min}
                         max={f.max ?? undefined}
                         value={Number(sizes[f.key] ?? f.default)}
+                        style={fill(
+                          Number(sizes[f.key] ?? f.default),
+                          f.min,
+                          f.max ?? 100,
+                        )}
                         onChange={(e) => {
                           setSizes({
                             ...sizes,
@@ -965,21 +983,53 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   );
 }
 
+// While a page's data loads: its shape, softly; when the link leads nowhere: say so (ADR-105).
+function Loading({ tx }: { tx: Tx }) {
+  return (
+    <section className="s-section s-status" aria-busy="true">
+      <div className="s-skeleton" role="status" aria-label={tx.w("loading")}>
+        <span />
+        <span />
+        <span />
+      </div>
+    </section>
+  );
+}
+function NotFound({ tx, title }: { tx: Tx; title: string }) {
+  return (
+    <section className="s-section s-status">
+      <h1>{title}</h1>
+      <div className="s-state">
+        <p>{tx.w("not_found")}</p>
+        <a className="s-btn" href={tx.href("configure")}>
+          {tx.w("configure")} →
+        </a>
+      </div>
+    </section>
+  );
+}
+
 function OrderStatus({ token, tx }: { token: string; tx: Tx }) {
-  const [o, setO] = useState<{
-    order: number;
-    status: string;
-    total_eur: number;
-    product: string;
-    colour: string;
-  } | null>(null);
+  // null while loading, false when there is no such order
+  const [o, setO] = useState<
+    | {
+        order: number;
+        status: string;
+        total_eur: number;
+        product: string;
+        colour: string;
+      }
+    | null
+    | false
+  >(null);
   useEffect(() => {
     fetch(`/api/shop/order/${token}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : false))
       .then(setO)
-      .catch(() => setO(null));
+      .catch(() => setO(false));
   }, [token]);
-  if (!o) return <section className="s-section">…</section>;
+  if (o === null) return <Loading tx={tx} />;
+  if (!o) return <NotFound tx={tx} title={tx.w("status")} />;
   const steps = [
     "awaiting_payment",
     "paid",
@@ -1010,21 +1060,26 @@ function OrderStatus({ token, tx }: { token: string; tx: Tx }) {
 
 // The answer to a match request (learning mode): the cover a colleague chose, or custom.
 function MatchAnswer({ token, tx }: { token: string; tx: Tx }) {
-  const [a, setA] = useState<{
-    status: string;
-    product?: string;
-    sizes?: Record<string, number | boolean>;
-    decision?: string;
-    match?: Match | null;
-    note?: string | null;
-  } | null>(null);
+  const [a, setA] = useState<
+    | {
+        status: string;
+        product?: string;
+        sizes?: Record<string, number | boolean>;
+        decision?: string;
+        match?: Match | null;
+        note?: string | null;
+      }
+    | null
+    | false
+  >(null);
   useEffect(() => {
     fetch(`/api/shop/match/${token}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : false))
       .then(setA)
-      .catch(() => setA(null));
+      .catch(() => setA(false));
   }, [token]);
-  if (!a) return <section className="s-section">…</section>;
+  if (a === null) return <Loading tx={tx} />;
+  if (!a) return <NotFound tx={tx} title={tx.w("proposal")} />;
   const q = (extra: Record<string, string>) =>
     `${tx.href("configure")}?${new URLSearchParams({
       product: a.product ?? "",
@@ -1223,13 +1278,22 @@ function NotFound({ tx }: { tx: Tx }) {
 
 function Footer({ info, tx }: { info: Info; tx: Tx }) {
   const c = info.settings.company;
+  const logo = info.settings.logo_url;
   return (
     <footer className="s-foot">
       <div>
-        <strong>{c.name || "Covers"}</strong>
+        {logo && (
+          <img className="s-foot-logo" src={logo} alt={c.name || "S2DIO"} />
+        )}
+        {(c.name || !logo) && <strong>{c.name || "Covers"}</strong>}
         <p className="s-muted">
-          {[c.city, c.country].filter(Boolean).join(", ")}{" "}
-          {c.email && `· ${c.email}`} {c.phone && `· ${c.phone}`}
+          {[
+            c.city && c.country ? `${c.city}, ${c.country}` : c.city,
+            c.email,
+            c.phone,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       </div>
       <nav>
@@ -1239,6 +1303,11 @@ function Footer({ info, tx }: { info: Info; tx: Tx }) {
           </a>
         ))}
       </nav>
+      {c.name && (
+        <p className="s-foot-base">
+          © {new Date().getFullYear()} {c.name}
+        </p>
+      )}
     </footer>
   );
 }

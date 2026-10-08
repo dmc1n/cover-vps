@@ -179,6 +179,14 @@ covers comes from this studio (ADR-066).
 4. **Check the website.** Then set `website_link.closed` on: the studio's `/shop/` is then
    only a preview for colleagues, and visitors go to the website.
 
+## The website's look
+
+The website has one design system (ADR-105): warm paper, sand and a warm ink, Work Sans.
+Colours, sizes and spacing are set once, at the top of `apps/web/src/shop/shop.css`
+(`--paper`, `--sand`, `--ink`, `--fs-h1`, `--gutter`, ...); change a value there and every page
+follows. Texts are not in that file: they stay in the AI CMS (Website (AI)). The font is
+served by our own site, so no visitor's browser asks Google for it.
+
 ## Your reference: compare the program with your own drawing or model
 
 On a model's page, tab **Your reference**, upload what you know is right:

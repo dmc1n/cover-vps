@@ -1,6 +1,7 @@
 // "Have a photo or a link to your furniture?" (ADR-086): the customer's photo(s) or a webshop
 // page, read by the AI into the configurator's product and sizes, to check before ordering.
 import { useState } from "react";
+import { Icon } from "./Icons";
 
 export interface Suggestion {
   product: string;
@@ -66,7 +67,7 @@ export function Suggest({
   if (!open)
     return (
       <button className="s-suggest-open" onClick={() => setOpen(true)}>
-        📷 {w("suggest_open")}
+        <Icon name="camera" /> {w("suggest_open")}
       </button>
     );
   return (
@@ -83,6 +84,7 @@ export function Suggest({
             setPhotos(Array.from(e.target.files ?? []).slice(0, MAX_PHOTOS))
           }
         />
+        <Icon name="camera" />
         <span>
           {photos.length
             ? w("suggest_photos", { n: photos.length })

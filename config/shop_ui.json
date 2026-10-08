@@ -129,6 +129,18 @@
    "nl": "Deze tekst volgt nog.",
    "en": "This text follows."
   },
+  "not_found": {
+   "nl": "We vinden deze pagina niet. Misschien is de link niet helemaal meegekomen; kijk in je e-mail, of ontwerp je hoes opnieuw.",
+   "en": "We cannot find this page. The link may not have come through in full; check your e-mail, or design your cover again.",
+   "de": "Wir finden diese Seite nicht. Vielleicht ist der Link nicht vollständig angekommen; schau in deine E-Mail oder entwirf deine Hülle neu.",
+   "fr": "Nous ne trouvons pas cette page. Le lien n'est peut-être pas arrivé en entier ; consultez votre e-mail ou concevez à nouveau votre housse."
+  },
+  "loading": {
+   "nl": "Laden…",
+   "en": "Loading…",
+   "de": "Wird geladen…",
+   "fr": "Chargement…"
+  },
   "show_water": {
    "nl": "Toon het water",
    "en": "Show the water"

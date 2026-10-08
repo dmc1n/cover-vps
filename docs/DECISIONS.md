@@ -3075,3 +3075,52 @@ is public." Handbook: docs/handbook/b2b.md; open questions: QUESTIONS 72.
 - **Better later:** a mailed login code (as the studio's), roles within a company (who may
   order), PDF invoices and Odoo invoicing, per-company payment terms, VIES checks of VAT
   numbers, B2B online payment.
+
+## ADR-105 — The website's look: one design system in sand and warm ink, Work Sans self-hosted
+
+The owner (8 October 2026): "the website may get a professionalising touch so it looks slicker",
+in all calm. Only the look of the consumer pages changed; content, languages and structure did
+not, and `home_story` stays as it is (off on the live site).
+
+- **One set of tokens** at the top of `apps/web/src/shop/shop.css`; every rule is built from them.
+  - Colour, from the covers themselves rather than the greens: a warm paper ground `#F3F1EC`
+    (the brand's off white, warmed), stone `#EBE7DF`, sand `#C8B593` (the sand canvas) with a
+    deeper sand for numbers and accents, and a warm ink `#26241F` for type and the primary
+    buttons. Dark sections (the classic hero, "how green we work", the workshop clips) are a
+    warm near-black `#1F1D1A`; they swap the same tokens, so a button or a list looks right on
+    either. The logo keeps its own colour on paper and turns white over the film.
+  - Contrast: body text ≥ 7:1, secondary text 5:1 on paper, 8:1 on the dark ground. The rain
+    chapter's scrim keeps the tone of the rendered frames, so the captions do not show a seam.
+  - Type: Work Sans throughout (the brand book's face), the variable font, so the display can
+    be lighter (250–300) and the labels exactly 450–600. One fluid scale: display, h1, h2, h3,
+    lead, body 16 px, small, and a spaced small-caps label for eyebrows ("Total incl. VAT",
+    "Rain test", the panel's questions). Numerals tabular wherever they change.
+  - Space on a 4-point scale; one side gutter (20 px on a phone, up to 96); radii 10/14/22 and
+    the pill; two soft shadows; the arch for media.
+- **Components**: one button (ink on paper, light on dark; 52 px, 38 px small), inputs of 50 px
+  at 16 px (phones do not zoom) with a sand focus ring, a drawn chevron for selects, drawn
+  check boxes, sliders whose track fills up to the value (`--p`, set by the page), chips with a
+  dry/wet dot, product cards with a radio mark, swatches with a ring, a price card, the match
+  card, an order track as dots on a line (vertical on a phone, the present step ringed), a FAQ
+  as a hairline list with a turning plus, a richer footer. Emoji replaced by line icons
+  (`Icons.tsx`).
+- **States**: a skeleton while an order or a proposal loads; "we cannot find this page" with a
+  way back when a link leads nowhere (it showed "€NaN" before); a thin running line on the 3D
+  stage while the quote is recalculated. New words `not_found` and `loading` in
+  `config/shop_ui.json`, in all four languages.
+- **The configurator on a phone**: the 3D on top, the rain test under it (it covered the cover),
+  then the panel. On a wide screen the stage and the panel stay in place while the panel scrolls.
+- **Motion**: only transform and opacity; 160/280/700 ms on one easing; reveals staggered
+  80 ms; the header turns to dark glass as soon as the page moves over the film, to paper
+  below it. `prefers-reduced-motion` turns every transition and animation off.
+- **No layout shift from the font**: Work Sans is self-hosted from the build
+  (`@fontsource-variable/work-sans`, OFL), the Latin file preloaded (a small Vite plugin), and
+  the fallback has Work Sans's metrics. No request to Google Fonts any more: one less third
+  party for the privacy statement. The studio's CSP may drop `fonts.googleapis.com` /
+  `fonts.gstatic.com` for the shop.
+- **The server-rendered copy** (for search engines) no longer flashes unstyled before the page
+  draws: it fades in only when the script is late (after 1.5 s) or missing.
+- **Checked** at 1440 and 390 px in a real browser: `out/sitedesign/before|after/` (not in git).
+- **Better later**: labels above the checkout fields instead of placeholders only (the
+  checkout's logic, another agent's area this week); the full wordmark in the header once the
+  website's name is settled; a sticky price bar on a phone.

@@ -45,5 +45,6 @@ Note column.
 | Component | Licence | Used for |
 |-----------|---------|----------|
 | React, Vite, Three.js | MIT | web app (M6) |
+| Work Sans (`@fontsource-variable/work-sans`) | OFL-1.1 | the website's typeface, self-hosted (ADR-105) |
 | cloudflared | Apache-2.0 | Cloudflare Tunnel (M6) |
 | Single-stroke pen font (`coverengine/export/strokefont.py`) | ours | pen text |
