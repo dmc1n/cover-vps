@@ -3,7 +3,7 @@
 // B2B session cookie (b2b_*) goes through in both directions, and nothing else does (the studio's
 // own cookies never pass). Nothing here is cached at the edge or indexed.
 
-import type { Env } from "./worker";
+import type { Env } from "./worker.ts";
 
 export const B2B = /^\/(b2b(\/|$)|api\/b2b\/)/;
 const OURS = /^b2b_[a-z_]+=/i;

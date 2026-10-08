@@ -5,7 +5,7 @@
 // 3D and the film for a while, so a busy day does not reach the studio; quotes, matches and
 // orders always do.
 
-import { B2B, b2b } from "./b2b";
+import { B2B, b2b } from "./b2b.ts"; // .ts: node runs the tests on the sources
 
 export interface Env {
   ASSETS?: Fetcher; // the preview only: its own fresh build of the shop
