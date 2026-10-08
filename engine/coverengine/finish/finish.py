@@ -264,7 +264,7 @@ def per_side(
     """Vents per side of the cover: one per full metre of that side, at least one (owner, 1 Oct
     2026: each side separately; 2.10 m: 2, 2.90 m: 2, 3.10 m: 3, 1.40 m: 1). A number written
     on the drawing (`features.vents_total`) always wins: one on every side first, then the
-    longest sides get more (Rens, 8 Oct 2026; ADR-099)."""
+    longest sides get more (Rens, 8 Oct 2026; ADR-101)."""
     total = int(params["features.vents_total"])
     if total <= 0 or not lengths:
         return {k: vent_count(v, params) for k, v in lengths.items()}

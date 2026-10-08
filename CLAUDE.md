@@ -51,7 +51,7 @@ one-line edit there.
   edge 5 cm above the lower end of the cover, one per full metre of hem length, spread evenly,
   at least one, only on the outside of the cover, never on an inner wall of an L, U or C shape (owner, 2026-10-07;
   Rens asks for them on the front walls too: QUESTIONS 71, `features.vent_inner_walls`). Round every side first,
-  one in the middle of each piece, the drawing's count kept, never on a free top edge (Rens, 2026-10-08, ADR-099). Built as a cut opening with a hood of extra fabric holding a plastic insert
+  one in the middle of each piece, the drawing's count kept, never on a free top edge (Rens, 2026-10-08, ADR-101). Built as a cut opening with a hood of extra fabric holding a plastic insert
   that keeps it open, and a membrane inside against dirt (`features.vent_*`, pieces in M5).
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
   or needs stroked lines, arc support). Learned in M0 by cutting a test sheet.
