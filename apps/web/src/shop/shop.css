@@ -2298,3 +2298,29 @@ p {
   flex-wrap: wrap; /* six legal pages: they wrap on a phone */
   row-gap: 8px;
 }
+
+/* the 3D's box while its code and its model load (ADR-106): neutral, the same size as the 3D,
+   so nothing shifts when it fades in */
+.s-scene[data-state="loading"] {
+  background: linear-gradient(
+      100deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.28) 50%,
+      transparent 70%
+    )
+    0 0 / 250% 100%;
+  animation: s-scene-wait 1.6s ease-in-out infinite;
+}
+@keyframes s-scene-wait {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .s-scene[data-state="loading"] {
+    animation: none;
+  }
+}

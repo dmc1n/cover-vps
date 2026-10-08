@@ -8,6 +8,8 @@
     />
     <meta name="theme-color" content="#f3f1ec" />
     <!--SSR-HEAD-->
+    <!-- the shop's info, asked for while the scripts load (ADR-106) -->
+    <link rel="preload" href="/api/shop/info" as="fetch" crossorigin />
     <link rel="icon" href="/brand/s2dio/only-color.svg" />
     <!-- Work Sans is self-hosted (ADR-105): no font request leaves for another company -->
   </head>

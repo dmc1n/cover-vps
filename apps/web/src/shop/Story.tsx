@@ -4,12 +4,24 @@
 // the rain); then the workshop in arch-framed clips sliding sideways; true numbers; the FAQ.
 // Smooth scrolling (Lenis) and scrubbed motion (GSAP ScrollTrigger); visitors who asked their
 // device for less motion get the same story without the motion.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
-import { StoryScene } from "./StoryScene";
 import { StoryFrames } from "./StoryFrames";
+
+// the live 3D (three.js) only when the rendered frames are missing (ADR-106)
+const StoryScene = lazy(() =>
+  import("./StoryScene").then((m) => ({ default: m.StoryScene })),
+);
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -197,7 +209,9 @@ export function Story({
               onMissing={noFrames}
             />
           ) : (
-            <StoryScene model={model} progress={progress} />
+            <Suspense fallback={<div className="st-scene" />}>
+              <StoryScene model={model} progress={progress} />
+            </Suspense>
           )}
           <ol className="st-captions">
             {story.chapters.map((c, i) => (
@@ -239,14 +253,7 @@ export function Story({
             <figure key={w.clip} className="st-card">
               <div className="st-arch">
                 {clip(w.clip) ? (
-                  <video
-                    src={clip(w.clip)}
-                    autoPlay={!calm}
-                    muted
-                    loop
-                    playsInline
-                    preload="metadata"
-                  />
+                  <NearVideo src={clip(w.clip)} play={!calm} />
                 ) : (
                   <div className="st-arch-empty" />
                 )}
@@ -281,5 +288,39 @@ export function Story({
       </section>
       {children}
     </div>
+  );
+}
+
+// a clip further down the page: fetched only when it comes near the screen, and paused while it
+// is out of sight, so it never takes the line from the first screen (ADR-106)
+function NearVideo({ src, play }: { src: string; play: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (!("IntersectionObserver" in window)) return setNear(true);
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) setNear(true);
+        if (!play || !v.currentSrc) return;
+        if (e.isIntersecting) v.play().catch(() => undefined);
+        else v.pause();
+      },
+      { rootMargin: "50% 100%" },
+    );
+    io.observe(v);
+    return () => io.disconnect();
+  }, [play]);
+  return (
+    <video
+      ref={ref}
+      src={near ? src : undefined}
+      autoPlay={play}
+      muted
+      loop
+      playsInline
+      preload={near ? "auto" : "none"}
+    />
   );
 }

@@ -3124,3 +3124,68 @@ not, and `home_story` stays as it is (off on the live site).
 - **Better later**: labels above the checkout fields instead of placeholders only (the
   checkout's logic, another agent's area this week); the full wordmark in the header once the
   website's name is settled; a sticky price bar on a phone.
+
+## ADR-106 — The website's 3D loads lean, and the rain on the scroll page keeps falling
+
+The owner (8 October 2026): "the 3D model loads slowly; the rain on the scroll page stops
+moving". Measured first, in a real browser (Playwright, software WebGL) on a desktop and on a
+mid-range phone (390 px, CPU 4x slower, slow 4G: 150 ms, 1.6 Mbit/s), against this build served
+locally with the preview's data (`apps/web/e2e/site_serve.mjs`, `site_perf.py`).
+
+- **Why the 3D was slow.**
+  - Every shop page fetched and parsed three.js and React as one 758 kB chunk (204 kB packed),
+    preloaded from the HTML, also the scroll story, which shows no live 3D at all.
+  - React drew nothing until `/api/shop/info` came back, and that request started only after
+    all the scripts had run: the server's text in the HTML vanished in between.
+  - The view was rebuilt (a new WebGL context) for every new size in the configurator, drew
+    every frame even when nothing moved, and drew 3 pixels per CSS pixel on a phone.
+  - The story page fetched every workshop clip (14 MB) and all 360 frames at once.
+  - The models travel unpacked: the edge packs no model types (demo 131 kB, packed 39 kB).
+  - The configurator's model waits for the quote, which is mostly the rain check (0.7 s of
+    0.8 s on this machine, 2.6 s through the edge).
+- **What changed.**
+  - three.js and React each in their own chunk (`vite.config.ts`); the 3D view, the story's
+    live 3D and the scroll story (GSAP, Lenis) are loaded only on the page that shows them.
+    The configurator asks for three.js at once, alongside the info; a link to it warms it.
+  - The info is asked for from the HTML (`<link rel=preload>`), and React takes over only once
+    it is there, so the server's text stays on screen until then.
+  - `Scene.tsx`: one renderer per view; a new model swaps in it (the camera keeps the angle the
+    visitor turned to); a frame is drawn only when something moved; nothing while off screen;
+    at most 1.5 pixels per CSS pixel on a phone; the canvas fades in on the first model. Until
+    then the box is there at its final size (`data-state="loading"`, a neutral shimmer the
+    design can restyle), so nothing shifts.
+  - The story's workshop clips load when they come near and pause out of sight; the frames
+    after the first coarse set load once the visitor scrolls.
+  - The studio sends the 3D files gzip-packed when the browser takes it (`model_response`):
+    the demo 131 → 39 kB, the story's furniture 488 → 147 kB and points 835 → 391 kB. The edge
+    keeps the demo, the story's files and a quote's scene (named by a random id) for a day
+    (`MEDIA_TTL`); the preview Worker tells the browser to keep `/assets/` for a year.
+- **Measured** (two runs each; the machine was shared, so the spread is wide):
+
+  | page, profile | first paint | first 3D / frame | JS | other |
+  |---|---|---|---|---|
+  | scroll story, phone | 2.4–2.5 s → 0.9–1.0 s | 4.4–5.1 s → 2.3 s | 238 → 101 kB | |
+  | scroll story, desktop | | | 238 → 101 kB | 378 requests, 24–27 MB → 59, 6–11 MB |
+  | landing with 3D, phone | 2.6–2.9 s → 1.0 s | 3.9 s → 3.3–3.7 s | 238 → 189 kB | |
+  | configurator, phone | 2.3–2.5 s → 0.9 s | 6.4 s → 5.5–5.7 s | 238 → 189 kB | idle frame rate 3 → 49 fps |
+  | configurator, desktop | | 4.1–4.5 s → 4.2–4.3 s | | idle frame rate 3 → 35 fps |
+
+  Layout shift stayed at 0 to 0.01. The configurator's first 3D is now bound by the quote.
+- **The rain.** The rain chapter is rendered frames (ADR-071) with the rain baked into each
+  picture, and a picture changes only when the scroll does: standing still, the rain stood
+  still (and scrolling up, it rose). `RainLayer.tsx` draws rain over that chapter in time, not
+  with the scroll: three depths of thin streaks in the look of the rendered ones (leaning with
+  the wind, steeper further down), small splashes where they land, from a fixed pool, fading in
+  with the chapter. It runs only while on screen and the page is visible, and restarts its
+  clock after any pause, so it neither stops nor jumps. Less motion asked: the frames' own still
+  rain. `apps/web/e2e/site_rain.py` checks it (before: 0.00 % of the pixels moved in every case;
+  after: 0.7–0.8 % on a desktop and 2.9–3.0 % on a phone, after standing still 8 s, scrolling
+  back and forth and a background tab).
+- **Better later:**
+  - the quote in two steps (the scene first, the rain check after it), which brings the
+    configurator's 3D about a second sooner;
+  - Work Sans served from our own domain: the Google Fonts stylesheet blocks the first paint,
+    and once took 5 s in these measurements;
+  - the opening clip (5 MB, `preload="auto"`) as a smaller first take, which is the landing
+    animation's own work;
+  - meshopt-packed GLBs, when the models grow.

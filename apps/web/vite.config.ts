@@ -37,10 +37,20 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
     chunkSizeWarningLimit: 1500,
+    modulePreload: { polyfill: false }, // every browser the shop supports preloads modules itself
     // two front doors: Cover Studio (index.html) and the cover webshop (shop.html, ADR-062)
-    // and the B2B shop for business customers (b2b.html, ADR-104)
     rollupOptions: {
+      // and the B2B shop for business customers (b2b.html, ADR-104)
       input: { main: "index.html", shop: "shop.html", b2b: "b2b.html" },
+      // three.js and React in chunks of their own (ADR-106): the shop's pages load three.js only
+      // where they show 3D, and both front doors share one cached copy of each
+      output: {
+        manualChunks(id) {
+          if (/node_modules\/three\//.test(id)) return "three";
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id))
+            return "react";
+        },
+      },
     },
   },
 });

@@ -2,13 +2,21 @@
 // same story (scripts/film/render_story.py, Blender Cycles), one per step of the scroll, drawn on a
 // canvas. Every 8th frame loads first so the whole story scrubs at once, the rest fill in. When
 // the first frame cannot be had, `onMissing` lets the page fall back to the live 3D scene.
-import { useEffect, useRef } from "react";
+//
+// ADR-106: the rest of the frames load only once the story comes near the screen, so they do
+// not share the line with the first screen; and the rain chapter gets rain that keeps falling
+// (RainLayer), because the rain in the pictures moves only while the visitor scrolls.
+import { useCallback, useEffect, useRef } from "react";
+import { RainLayer } from "./RainLayer";
 
 export const FRAMES = 360;
 const COARSE = 8; // load every 8th frame first
 const name = (base: string, n: number) =>
   `${base}${String(n).padStart(3, "0")}.webp`;
 const FOCUS = 0.6; // where the cover sits across the picture (the render frames it right of centre)
+// where the rain begins and is in full in the rendered timeline (frames 306 to 316 of 360)
+const RAIN_FROM = 0.845;
+const RAIN_FULL = 0.875;
 
 export function StoryFrames({
   base,
@@ -44,15 +52,37 @@ export function StoryFrames({
     // the order: frame 1, every 8th, then the rest, a few at a time
     const order: number[] = [];
     for (let n = 1; n <= FRAMES; n += COARSE) order.push(n);
+    const coarse = order.length;
     for (let n = 1; n <= FRAMES; n++) if (!order.includes(n)) order.push(n);
+    // the rest of the frames once the visitor scrolls (or the story is on screen, for a page
+    // opened further down): until then the opening clip has the line to itself
+    const watch: IntersectionObserver[] = [];
+    let onScroll = () => {};
+    const near = new Promise<void>((ready) => {
+      if (!("IntersectionObserver" in window)) return ready();
+      onScroll = () => ready();
+      window.addEventListener("scroll", onScroll, {
+        passive: true,
+        once: true,
+      });
+      const io = new IntersectionObserver(([e]) => {
+        if (e.isIntersecting) ready();
+      });
+      io.observe(el);
+      watch.push(io);
+    });
+    const batch = (from: number, to: number) => async () => {
+      for (let i = from; i < to && alive; i += 6)
+        await Promise.all(order.slice(i, Math.min(i + 6, to)).map(load));
+    };
     (async () => {
       if (!(await load(order[0]))) {
         if (alive) onMissing();
         return;
       }
-      for (let i = 1; i < order.length && alive; i += 6) {
-        await Promise.all(order.slice(i, i + 6).map(load));
-      }
+      await batch(1, coarse)();
+      await near;
+      await batch(coarse, order.length)();
     })();
 
     const nearest = (n: number) => {
@@ -96,12 +126,23 @@ export function StoryFrames({
     requestAnimationFrame(draw);
     return () => {
       alive = false;
+      for (const io of watch) io.disconnect();
+      window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", resize);
     };
   }, [base, progress, onMissing]);
+  // how hard it rains: nothing before the rain chapter, in full within a few frames of its start
+  const rain = useCallback(() => {
+    const x = Math.min(
+      1,
+      Math.max(0, (progress.current - RAIN_FROM) / (RAIN_FULL - RAIN_FROM)),
+    );
+    return x * x * (3 - 2 * x);
+  }, [progress]);
   return (
     <div className="st-scene">
       <canvas ref={canvas} style={{ width: "100%", height: "100%" }} />
+      <RainLayer amount={rain} />
     </div>
   );
 }
