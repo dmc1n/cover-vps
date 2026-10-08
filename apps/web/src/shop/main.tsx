@@ -14,7 +14,11 @@ import { Story, StoryContent } from "./Story";
 
 type T = Record<string, string>;
 interface Content {
-  meta: { title: T; description: T };
+  meta: {
+    title: T;
+    description: T;
+    pages?: Record<string, { title: T; description: T }>;
+  };
   hero: { title: T; subtitle: T; cta: T };
   steps: { title: T; text: T }[];
   green: { title: T; points: T[] };
@@ -44,6 +48,8 @@ interface Info {
     company: Record<string, string>;
     shipping: { country: string; name: string; eur: number }[];
     payment: boolean;
+    /** Mollie's mode from the key's prefix (ADR-099): test payments move no money */
+    payment_mode?: "test" | "live" | "none";
     film_url: string;
     film_poster: string;
     logo_url: string;
@@ -361,6 +367,31 @@ function Home({ info, tx }: { info: Info; tx: Tx }) {
 }
 
 // How one existing cover fits, size by size ("2 cm roomier in length").
+// While the published price set is "indicative" (Admin → Prices & costing), every price says so
+// plainly; the owner switches it off by publishing a set without it (ADR-098, ADR-099).
+function Indicative({ tx }: { tx: Tx }) {
+  return (
+    <p className="s-indicative" role="note">
+      <strong>{tx.w("indicative")}</strong> — {tx.w("indicative_note")}
+    </p>
+  );
+}
+
+// A field people never see or reach; a bot that fills every field is refused (ADR-099).
+function Trap({ value, set }: { value: string; set: (v: string) => void }) {
+  return (
+    <input
+      className="s-trap"
+      name="website"
+      tabIndex={-1}
+      autoComplete="off"
+      aria-hidden="true"
+      value={value}
+      onChange={(e) => set(e.target.value)}
+    />
+  );
+}
+
 function FitLines({ m, tx }: { m: Match; tx: Tx }) {
   return (
     <ul className="s-fit">
@@ -407,6 +438,7 @@ function MatchCard({
   const [name, setName] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const [trap, setTrap] = useState("");
   useEffect(() => {
     setSent(false);
     if (!auto || !Object.keys(sizes).length) return;
@@ -442,6 +474,7 @@ function MatchCard({
                   email,
                   name,
                   lang: tx.lang,
+                  website: trap,
                 }),
               });
               const d = await r.json();
@@ -462,6 +495,7 @@ function MatchCard({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+            <Trap value={trap} set={setTrap} />
             <button className="s-btn small">{tx.w("match_ask")} →</button>
             {error && <p className="s-error">{error}</p>}
           </form>
@@ -532,12 +566,16 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
     country: "NL",
     note: "",
     terms: false,
+    website: "", // the honeypot (ADR-099): people never see it
   });
   const [done, setDone] = useState<{
     status_url: string;
     checkout_url: string | null;
   } | null>(null);
   const first = useRef(true);
+  // the delivery cost to the chosen country, shown before ordering (prices incl. VAT)
+  const shipping =
+    info.settings.shipping.find((s) => s.country === form.country)?.eur ?? 0;
 
   useEffect(() => {
     const d: Record<string, number | boolean> = {};
@@ -795,8 +833,8 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
                   {quote.price.support_eur
                     ? ` · ${w(quote.support)} ${euro(quote.price.support_eur, lang)}`
                     : ""}
-                  {quote.price.indicative ? ` · ${w("indicative")}` : ""}
                 </small>
+                {quote.price.indicative && <Indicative tx={tx} />}
                 <button
                   className="s-btn wide"
                   onClick={() => setStep("checkout")}
@@ -880,19 +918,35 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
                 onChange={(e) => setForm({ ...form, terms: e.target.checked })}
               />{" "}
               <span>
-                {w("terms")} (
+                {w(quote.stock ? "terms_stock" : "terms")} (
                 <a href={tx.href("terms")} target="_blank">
                   {w("terms_page")}
+                </a>
+                {", "}
+                <a href={tx.href("returns")} target="_blank">
+                  {pageTitle(info, tx, "returns")}
                 </a>
                 )
               </span>
             </label>
+            <Trap
+              value={form.website}
+              set={(v) => setForm({ ...form, website: v })}
+            />
             <div className="s-price">
+              <small>
+                {w("cover")} {euro(quote.price.total_eur, lang)} ·{" "}
+                {w("shipping")} {euro(shipping, lang)}
+              </small>
               <span>{w("total")}</span>
-              <strong>{euro(quote.price.total_eur, lang)}</strong>
+              <strong>{euro(quote.price.total_eur + shipping, lang)}</strong>
+              {quote.price.indicative && <Indicative tx={tx} />}
             </div>
+            {info.settings.payment_mode === "test" && (
+              <p className="s-note">{w("test_payments")}</p>
+            )}
             <button className="s-btn wide" disabled={!form.terms}>
-              {info.settings.payment ? w("pay") : w("place")} →
+              {info.settings.payment ? w("order_pay") : w("place_order")} →
             </button>
             {error && <p className="s-error">{error}</p>}
           </form>
@@ -1081,16 +1135,88 @@ function FitQuestion({ token, tx }: { token: string; tx: Tx }) {
   );
 }
 
+// The legal pages (ADR-099): terms, privacy, returns, cookies, contact and warranty. The server
+// gives the owner's own text, or our draft marked "draft — to approve", with the company's
+// details filled in. "## " is a heading, "- " a list item, a blank line a paragraph.
+const LEGAL = ["terms", "privacy", "returns", "cookies", "contact", "warranty"];
+const DRAFT = /^(CONCEPT|DRAFT) — /;
+
+function LegalBlocks({ text }: { text: string }) {
+  return (
+    <>
+      {text
+        .split(/\n\n+/)
+        .map((b) => b.trim())
+        .filter(Boolean)
+        .map((block, i) => {
+          const lines = block.split("\n");
+          if (DRAFT.test(block))
+            return (
+              <p key={i} className="s-draft">
+                <strong>{block}</strong>
+              </p>
+            );
+          if (block.startsWith("## "))
+            return (
+              <div key={i}>
+                <h2>{lines[0].slice(3)}</h2>
+                {lines.length > 1 && (
+                  <LegalBlocks text={lines.slice(1).join("\n")} />
+                )}
+              </div>
+            );
+          if (lines.every((l) => l.startsWith("- ")))
+            return (
+              <ul key={i}>
+                {lines.map((l, j) => (
+                  <li key={j}>{l.slice(2)}</li>
+                ))}
+              </ul>
+            );
+          return (
+            <p key={i}>
+              {lines.map((l, j) => (
+                <span key={j}>
+                  {j > 0 && <br />}
+                  {l}
+                </span>
+              ))}
+            </p>
+          );
+        })}
+    </>
+  );
+}
+
+function pageTitle(info: Info, tx: Tx, page: string): string {
+  const own = info.content.meta.pages?.[page];
+  return own ? tx.t(own.title) : tx.w(page === "terms" ? "terms_page" : page);
+}
+
 function Legal({ info, tx, page }: { info: Info; tx: Tx; page: string }) {
   const text = tx.t(info.content.legal[page]);
   return (
     <section className="s-section s-legal">
-      <h1>{tx.w(page === "terms" ? "terms_page" : page)}</h1>
+      <h1>{pageTitle(info, tx, page)}</h1>
       {text ? (
-        text.split(/\n\n+/).map((p, i) => <p key={i}>{p}</p>)
+        <LegalBlocks text={text} />
       ) : (
         <p className="s-muted">{tx.w("empty")}</p>
       )}
+    </section>
+  );
+}
+
+function NotFound({ tx }: { tx: Tx }) {
+  return (
+    <section className="s-section s-legal">
+      <h1>{tx.w("not_found")}</h1>
+      <p>{tx.w("not_found_text")}</p>
+      <p>
+        <a className="s-btn" href={tx.href("")}>
+          {tx.w("home")} →
+        </a>
+      </p>
     </section>
   );
 }
@@ -1107,9 +1233,11 @@ function Footer({ info, tx }: { info: Info; tx: Tx }) {
         </p>
       </div>
       <nav>
-        <a href={tx.href("terms")}>{tx.w("terms_page")}</a>
-        <a href={tx.href("privacy")}>{tx.w("privacy")}</a>
-        <a href={tx.href("warranty")}>{tx.w("warranty")}</a>
+        {LEGAL.map((p) => (
+          <a key={p} href={tx.href(p)}>
+            {pageTitle(info, tx, p)}
+          </a>
+        ))}
       </nav>
     </footer>
   );
@@ -1151,13 +1279,30 @@ function App() {
   const tx = useMemo(() => (info ? makeTx(info, lang) : null), [info, lang]);
   useEffect(() => {
     document.documentElement.lang = lang;
-    if (info && tx) document.title = tx.t(info.content.meta.title);
-  }, [lang, info, tx]);
+    if (!info || !tx) return;
+    // the page's own title, as the server wrote it (ADR-099)
+    const site = tx.t(info.content.meta.title);
+    const own = info.content.meta.pages?.[page];
+    const shopPage =
+      page === "" ||
+      /^(configure|order\/.+|match\/.+|fit\/.+|b2b(\/.*)?)$/.test(page) ||
+      LEGAL.includes(page);
+    document.title = own
+      ? `${tx.t(own.title)} · ${site}`
+      : shopPage
+        ? site
+        : `${tx.w("not_found")} · ${site}`;
+  }, [lang, info, tx, page]);
   if (!info || !tx) return null;
   const order = page.match(/^order\/([A-Za-z0-9_-]+)$/);
   const match = page.match(/^match\/([A-Za-z0-9_-]+)$/);
   const fit = page.match(/^fit\/([A-Za-z0-9_-]+)$/);
-  const legal = page.match(/^(terms|privacy|warranty)$/);
+  const legal = LEGAL.includes(page) ? [page, page] : null;
+  // an address the shop does not know (the server answers 404 too); the business shop's own
+  // pages (/b2b) are not this shop's
+  const known =
+    page === "" || page === "configure" || order || match || fit || legal;
+  const missing = !known && !/^b2b(\/|$)/.test(page);
   return (
     <div className="s-app">
       {info.preview && <div className="s-preview">{tx.w("preview")}</div>}
@@ -1173,6 +1318,8 @@ function App() {
           <FitQuestion token={fit[1]} tx={tx} />
         ) : legal ? (
           <Legal info={info} tx={tx} page={legal[1]} />
+        ) : missing ? (
+          <NotFound tx={tx} />
         ) : (
           <Home info={info} tx={tx} />
         )}

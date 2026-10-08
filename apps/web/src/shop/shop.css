@@ -1188,3 +1188,44 @@ select.s-lang option {
 .s-estimate input[type="range"] {
   accent-color: #c47f2c;
 }
+
+/* ADR-099, the public consumer shop: the honeypot (never seen), the "indicative" price note,
+   the "draft — to approve" line of the legal drafts, and short notes at checkout */
+.s-trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.s-indicative,
+.s-note {
+  margin: 0.6rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border-left: 3px solid var(--sage);
+  background: var(--cream);
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.s-price .s-indicative strong,
+.s-indicative strong {
+  display: inline;
+  font-size: inherit;
+  font-weight: 600;
+  line-height: inherit;
+}
+.s-draft {
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--bad);
+  color: var(--bad);
+  background: var(--card);
+}
+.s-legal h2 {
+  margin-top: 1.6rem;
+}
+.s-foot nav {
+  flex-wrap: wrap; /* six legal pages: they wrap on a phone */
+  row-gap: 8px;
+}

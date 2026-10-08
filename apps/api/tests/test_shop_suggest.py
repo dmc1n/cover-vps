@@ -486,3 +486,55 @@ def test_a_cut_out_picture_gets_a_white_background() -> None:
     out = Image.open(io.BytesIO(photo_png(buf.getvalue()))).convert("RGB")
     assert out.getpixel((1, 1)) == (255, 255, 255)
     assert out.getpixel((20, 20)) == (200, 30, 30)
+
+
+def test_a_public_shop_caps_each_visitor_s_day_and_refuses_bots(
+    app: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """ADR-099: the honeypot refuses a bot; what one visitor's suggestions cost the AI in a day
+    is capped (the ledger, per visitor); other visitors go on."""
+    from coverengine import spend
+
+    monkeypatch.setenv("COVER_DATA_DIR", str(tmp_path / "ledger"))
+    monkeypatch.setattr(sg, "ask", lambda *a, **k: {
+        "product": "item", "fields": {"length_cm": {"value": 60, "source": "photo",
+                                                    "confidence": 0.5}}})  # fmt: skip
+    c = TestClient(app)
+    photo = [("photos", ("a.png", _png(), "image/png"))]
+    assert c.post("/api/shop/suggest", files=photo, data={"website": "x"}).status_code == 400
+    assert c.post("/api/shop/suggest", files=photo).status_code == 200
+    with spend.for_visitor("testclient"):  # this visitor's earlier suggestions today
+        spend.record_eur("gemini search", 5.0, "suggest")
+    r = c.post("/api/shop/suggest", files=photo)
+    assert r.status_code == 429 and "by hand" in r.json()["detail"]
+    with spend.for_visitor("198.51.100.7"):
+        assert spend.visitor_eur("testclient") == pytest.approx(5.0)  # not someone else's
+
+
+def test_the_paid_calls_of_a_photo_carry_the_visitor_into_their_threads(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The searches run in threads of their own; their cost still lands on the visitor."""
+    from coverengine import spend
+    from coverengine.params import Registry
+
+    monkeypatch.setenv("COVER_DATA_DIR", str(tmp_path))
+    p = Registry.load(None).resolve()
+    seen: list[str] = []
+
+    def search(*a: Any, **k: Any) -> list[Any]:
+        spend.record_eur("search", 0.01)
+        seen.append("search")
+        return []
+
+    def reverse(*a: Any, **k: Any) -> dict[str, Any]:
+        spend.record_eur("vision", 0.02)
+        return {"pages": [], "labels": []}
+
+    monkeypatch.setattr(sg, "_search", search)
+    monkeypatch.setattr(sg, "_reverse", reverse)
+    monkeypatch.setattr(sg, "identify", lambda *a, **k: {"brand": "X", "queries": ["x"]})
+    with spend.for_visitor("203.0.113.9"):
+        sg.find_comparable(p, _png(), 5, 1000, 1000)
+    assert seen == ["search", "search"]
+    assert spend.visitor_eur("203.0.113.9") == pytest.approx(0.04)

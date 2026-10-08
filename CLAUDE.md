@@ -222,6 +222,7 @@ COVER_DATA_DIR=~/cover-data uv run python scripts/learned_check.py [--recalc]   
 make e2e        the web app flow in a real browser (Playwright in Docker)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
 apps/web/e2e/prices.py                      Prices & costing in a real browser (ADR-098; usage in its docstring)
+apps/web/e2e/b2c.py                         the public consumer shop, desktop and 390 px, through the Worker (ADR-099)
 Admin → Prices & costing (#/prices)         price set per channel, versioned in app.db; costing per cover (ADR-098)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
@@ -238,6 +239,7 @@ scripts/rollback.sh [v1.2.3 | --list]       back to the release before (or a cho
 sudo systemctl restart cover-web            the app as a service (runs ~/releases/current); Caddy serves https://covers.suns.nu
 make backup     push the data directory to R2 with rclone
 cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build
+cd apps/site && npm test | npm run check     the Worker's tests (security headers, no studio routes) and typecheck (ADR-099)
 ```
 
 ## How to work in this repo (instructions for Claude Code)

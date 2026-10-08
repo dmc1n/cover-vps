@@ -6,6 +6,7 @@
     "dev": "wrangler dev --local",
     "deploy": "wrangler deploy",
     "check": "tsc --noEmit",
+    "test": "node --test test/worker.test.ts",
     "deploy:preview": "mkdir -p ../web/dist/preview && cp preview-overlay.json ../web/dist/preview/overlay.json && wrangler deploy --env preview"
   },
   "devDependencies": {

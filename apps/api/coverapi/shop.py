@@ -27,10 +27,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from coverapi import shop_legal
+
 SHOP_SETTING = "shop"
 PREVIEW_SETTING = "shop_preview_token"
 MOLLIE_API = "https://api.mollie.com/v2"
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
+SITEMAP_PAGES = ("", "configure", "terms", "privacy", "returns", "cookies", "contact", "warranty")
 
 # Every setting the shop needs; empty means "still to fill in" (the admin page shows them).
 SHOP_DEFAULTS: dict[str, Any] = {
@@ -73,6 +76,7 @@ SHOP_DEFAULTS: dict[str, Any] = {
     "film_url": "",
     "film_poster": "",
     "logo_url": "",
+    "og_image": "",  # the picture when the shop is shared (1200x630); empty: /brand/og-shop.png
     "home_story": False,  # the scroll story as the home page (on: live; preview.<domain> always)
     "story_model": "suns-2-seater-kota",  # the catalogue model the scroll story shows (ADR-067)
     "story_media": {"hero": "", "rain": "", "measure": "", "cut": "", "sew": "", "pack": ""},
@@ -214,8 +218,56 @@ CONTENT_DEFAULTS: dict[str, Any] = {
         "terms": {"nl": "", "en": ""},
         "privacy": {"nl": "", "en": ""},
         "warranty": {"nl": "", "en": ""},
+        # ADR-099: empty shows the draft of config/shop_legal.json, marked "to approve"
+        "returns": {"nl": "", "en": ""},
+        "cookies": {"nl": "", "en": ""},
+        "contact": {"nl": "", "en": ""},
     },
 }
+# ADR-099: a title and a description per page, for search engines and for sharing
+CONTENT_DEFAULTS["meta"]["pages"] = {
+    "configure": {
+        "title": {"nl": "Ontwerp je hoes op maat", "en": "Design your made-to-measure cover"},
+        "description": {
+            "nl": "Geef de maten van je tuinmeubel, zie je hoes in 3D met de regen erop, en zie "
+            "direct de prijs incl. btw.",
+            "en": "Give the sizes of your garden furniture, see your cover in 3D with the rain on "
+            "it, and see the price incl. VAT at once.",
+        },
+    },
+    "terms": {
+        "title": {"nl": "Algemene voorwaarden", "en": "Terms and conditions"},
+        "description": {"nl": "De voorwaarden van onze webwinkel voor hoezen op maat.",
+                        "en": "The terms of our web shop for made-to-measure covers."},
+    },
+    "privacy": {
+        "title": {"nl": "Privacyverklaring", "en": "Privacy statement"},
+        "description": {"nl": "Welke gegevens we gebruiken, waarom, en je rechten.",
+                        "en": "Which data we use, why, and your rights."},
+    },
+    "returns": {
+        "title": {"nl": "Retourneren en herroepingsrecht", "en": "Returns and withdrawal"},
+        "description": {"nl": "Maatwerk en het herroepingsrecht, en hoe je een hoes uit ons "
+                              "assortiment terugstuurt.",
+                        "en": "Made to measure and the right of withdrawal, and how to return a "
+                              "cover from our range."},
+    },
+    "cookies": {
+        "title": {"nl": "Cookies", "en": "Cookies"},
+        "description": {"nl": "Deze site gebruikt geen tracking- of advertentiecookies.",
+                        "en": "This site uses no tracking or advertising cookies."},
+    },
+    "contact": {
+        "title": {"nl": "Contact en bedrijfsgegevens", "en": "Contact and company details"},
+        "description": {"nl": "Zo bereik je ons, en onze bedrijfsgegevens.",
+                        "en": "How to reach us, and our company details."},
+    },
+    "warranty": {
+        "title": {"nl": "Garantie", "en": "Warranty"},
+        "description": {"nl": "De garantie op je hoes, en wat we doen als hij niet past.",
+                        "en": "The warranty on your cover, and what we do if it does not fit."},
+    },
+}  # fmt: skip
 CONTENT_DEFAULTS["story"] = {
     "chapters": [
         {"title": {"nl": "Jouw meubel", "en": "Your furniture"},
@@ -352,6 +404,7 @@ class MatchIn(BaseModel):
     email: str | None = Field(default=None, max_length=254)
     name: str | None = Field(default=None, max_length=120)
     lang: str = Field(default="nl", pattern=r"^[a-z]{2}$")
+    website: str | None = Field(default=None, max_length=200)  # the honeypot (ADR-099)
 
 
 class MatchAnswer(BaseModel):
@@ -379,6 +432,7 @@ class OrderIn(BaseModel):
     # started from a photo or a link (ADR-086): kept with the order for the workshop
     source_url: str | None = Field(default=None, max_length=2000)
     source_summary: str | None = Field(default=None, max_length=600)
+    website: str | None = Field(default=None, max_length=200)  # the honeypot (ADR-099)
 
 
 ORDERS_TABLE = """
@@ -599,6 +653,12 @@ def translate(site: Site, params: Any, langs: list[str], only: str | None = None
     return {"translated": done, "texts": len(todo), "languages": langs}
 
 
+def payment_mode(s: dict[str, Any]) -> str:
+    """Mollie's mode from the key's own prefix (never the key): "test", "live" or "none"."""
+    key = str(s["payment"].get("mollie_key") or "")
+    return "live" if key.startswith("live_") else "test" if key else "none"
+
+
 def shop_params(auth: Any) -> Any:
     """The engine's parameters with the owner's shop prices on top (when set)."""
     from coverengine.params import Registry
@@ -649,10 +709,19 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         a, now = _address(request), time.time()
         if link_ok(auth, request):  # through the website: its visitor's own address
             a = request.headers.get("x-client-ip") or a
-        times = [t for t in recent.get(a, []) if now - t < 60]  # noqa: PLR2004 - a minute
+        key = f"{request.url.path.split('/')[3]}:{a}"  # each endpoint its own count
+        times = [t for t in recent.get(key, []) if now - t < 60]  # noqa: PLR2004 - a minute
         if len(times) >= per_minute:
             raise HTTPException(429, "too many requests; try again in a minute")
-        recent[a] = [*times, now]
+        recent[key] = [*times, now]
+        if len(recent) > 5000:  # noqa: PLR2004 - a public shop: forget the idle visitors
+            for k in [k for k, v in recent.items() if now - v[-1] >= 60]:  # noqa: PLR2004
+                del recent[k]
+
+    def no_bots(trap: str | None) -> None:
+        """The honeypot (ADR-099): a field people never see; a bot that fills it is refused."""
+        if trap:
+            raise HTTPException(400, "this could not be sent")
 
     def settings() -> dict[str, Any]:
         return merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
@@ -794,6 +863,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             "shipping": [x for x in s["shipping"] if x.get("eur") is not None]
             or [{"country": x["country"], "name": x["name"], "eur": 0} for x in s["shipping"]],
             "payment": bool(s["payment"].get("mollie_key")),
+            "payment_mode": payment_mode(s),
             "film_url": s["film_url"],
             "film_poster": s["film_poster"],
             "logo_url": s["logo_url"],
@@ -811,7 +881,9 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     def shop_info(request: Request) -> dict[str, Any]:
         token = request.query_params.get("preview")
         draft = token and secrets.compare_digest(token, auth.setting(PREVIEW_SETTING, "") or "x")
-        return {"content": site.read("draft" if draft else "live"), "preview": bool(draft),
+        content = site.read("draft" if draft else "live")
+        content["legal"] = shop_legal.texts(content, settings()["company"])  # drafts (ADR-099)
+        return {"content": content, "preview": bool(draft),
                 "settings": public_settings(), "options": q.options(shop_params(auth))}  # fmt: skip
 
     def _stock(model_id: str, product: str) -> dict[str, Any]:
@@ -897,6 +969,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     @app.post("/api/shop/order")
     def shop_order(req: OrderIn, request: Request) -> dict[str, Any]:
         limit(request, per_minute=10)
+        no_bots(req.website)
         if not req.terms:
             raise HTTPException(400, "please accept the terms")
         if not EMAIL.match(req.email.strip()):
@@ -958,6 +1031,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
 
     @app.post("/api/shop/mollie")
     async def mollie_webhook(request: Request) -> dict[str, Any]:
+        limit(request, per_minute=60)  # each call makes us ask Mollie
         form = await request.form()
         pid = str(form.get("id") or "")
         if not re.fullmatch(r"tr_[A-Za-z0-9]{4,40}", pid):
@@ -992,6 +1066,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         from coverengine import match as mt
 
         limit(request)
+        no_bots(req.website)
         p = shop_params(auth)
         mode = str(p["match.mode"])
         email = (req.email or "").strip()
@@ -1367,6 +1442,32 @@ def _esc(s: Any) -> str:
     return html.escape(str(s or ""), quote=True)
 
 
+OG_LOCALES = {"nl": "nl_NL", "en": "en_GB", "de": "de_DE", "fr": "fr_FR", "es": "es_ES",
+              "it": "it_IT", "da": "da_DK", "sv": "sv_SE", "no": "nb_NO", "pl": "pl_PL",
+              "pt": "pt_PT"}  # fmt: skip
+
+
+def legal_html(text: str) -> str:
+    """A legal text as HTML: "## " a heading, "- " list items, a blank line a paragraph; the
+    "draft — to approve" line stands out (ADR-099)."""
+    out = []
+    for block in (b.strip() for b in text.split("\n\n")):
+        if not block:
+            continue
+        lines = block.split("\n")
+        if shop_legal.is_draft(block):
+            out.append(f'<p class="s-draft"><strong>{_esc(block)}</strong></p>')
+        elif block.startswith("## "):
+            out.append(f"<h2>{_esc(lines[0][3:])}</h2>")
+            if lines[1:]:
+                out.append(legal_html("\n".join(lines[1:])))
+        elif all(x.startswith("- ") for x in lines):
+            out.append("<ul>" + "".join(f"<li>{_esc(x[2:])}</li>" for x in lines) + "</ul>")
+        else:
+            out.append("<p>" + "<br />".join(_esc(x) for x in lines) + "</p>")
+    return "".join(out)
+
+
 def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
     """/shop/... : shop.html with the content already in it (title, description, JSON-LD, the
     text), so search engines and AI assistants read the site without running JavaScript; plus
@@ -1414,13 +1515,21 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
 
         url = url_in(lang)
         w = c["ui"]["words"]
-        title = tr(c["meta"]["title"], lang)
-        if page in ("terms", "privacy", "warranty"):
-            name = tr(w["terms_page" if page == "terms" else page], lang)
-            title = f"{name} · {title}"
-        elif page == "configure":
-            title = f"{tr(c['hero']['cta'], lang)} · {title}"
+        site_title = title = tr(c["meta"]["title"], lang)
         desc = tr(c["meta"]["description"], lang)
+        own = (c["meta"].get("pages") or {}).get(page)  # ADR-099: per page, per language
+        if own:
+            title = f"{tr(own['title'], lang)} · {site_title}"
+            desc = tr(own.get("description"), lang) or desc
+        private = page.startswith(("order/", "match/", "fit/"))  # a customer's own link
+        missing = page == "404"
+        if missing:
+            title = f"{tr(w.get('not_found'), lang) or 'Not found'} · {site_title}"
+        image = str(s.get("og_image") or "") or "/brand/og-shop.png"
+        if image.startswith("/"):
+            image = shop_root(auth, request).rstrip("/") + image
+            if image.startswith("http") and "/shop/" in image:  # the studio's own /shop/
+                image = image.replace("/shop/", "/", 1)
         ld: list[dict[str, Any]] = [
             {"@context": "https://schema.org", "@type": "Organization",
              "name": company["name"] or "Covers", "url": shop_root(auth, request),
@@ -1450,16 +1559,27 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
             )
             + f'<link rel="alternate" hreflang="x-default" href="{_esc(url_in(langs[0]))}" />\n'
         )
+        hidden = draft or private or missing
         head = (
             f"<title>{_esc(title)}</title>\n"
             f'<meta name="description" content="{_esc(desc)}" />\n'
-            f'<link rel="canonical" href="{_esc(url)}" />\n'
-            + alternates
+            + ("" if hidden else f'<link rel="canonical" href="{_esc(url)}" />\n' + alternates)
             + f'<meta property="og:title" content="{_esc(title)}" />\n'
             f'<meta property="og:description" content="{_esc(desc)}" />\n'
-            f'<meta property="og:locale" content="{_esc(lang)}" />\n'
-            f'<meta property="og:type" content="website" />\n'
-            + ('<meta name="robots" content="noindex" />\n' if draft else "")
+            f'<meta property="og:locale" content="{_esc(OG_LOCALES.get(lang, lang))}" />\n'
+            + "".join(
+                f'<meta property="og:locale:alternate" content="{_esc(OG_LOCALES.get(x, x))}" />\n'
+                for x in langs
+                if x != lang
+            )
+            + f'<meta property="og:type" content="website" />\n'
+            f'<meta property="og:url" content="{_esc(url)}" />\n'
+            f'<meta property="og:site_name" content="{_esc(company["name"] or site_title)}" />\n'
+            f'<meta property="og:image" content="{_esc(image)}" />\n'
+            '<meta property="og:image:width" content="1200" />\n'
+            '<meta property="og:image:height" content="630" />\n'
+            '<meta name="twitter:card" content="summary_large_image" />\n'
+            + ('<meta name="robots" content="noindex" />\n' if hidden else "")
             + "".join(
                 '<script type="application/ld+json">'
                 + json.dumps(x, ensure_ascii=False).replace("</", "<\\/")
@@ -1467,10 +1587,11 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
                 for x in ld
             )
         )
-        if page in ("terms", "privacy", "warranty"):
-            body_html = f"<h1>{_esc(title.split(' · ')[0])}</h1>" + "".join(
-                f"<p>{_esc(x)}</p>" for x in tr(c["legal"][page], lang).split("\n\n") if x
-            )
+        if page in shop_legal.PAGES:
+            legal = shop_legal.texts(c, company)[page]
+            body_html = f"<h1>{_esc(title.split(' · ')[0])}</h1>" + legal_html(tr(legal, lang))
+        elif missing or private:
+            body_html = f"<h1>{_esc(title.split(' · ')[0])}</h1>"
         else:
             body_html = (
                 f"<h1>{_esc(tr(c['hero']['title'], lang))}</h1>"
@@ -1503,7 +1624,10 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
             .replace("<!--SSR-BODY-->", f'<main class="ssr">{body_html}</main>')
             .replace('<html lang="nl">', f'<html lang="{lang}">')
         )
-        return HTMLResponse(html, headers={"Cache-Control": "no-cache"} if draft else {})
+        headers = {"Cache-Control": "no-cache"} if draft else {}
+        if hidden:
+            headers["X-Robots-Tag"] = "noindex"
+        return HTMLResponse(html, status_code=404 if missing else 200, headers=headers)
 
     @app.get("/shop", include_in_schema=False)
     @app.get("/shop/", include_in_schema=False)
@@ -1518,10 +1642,15 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
             prefix = parts[0]
             page = parts[1] if len(parts) > 1 else ""
         page = page.strip("/")
-        known = page in ("configure", "terms", "privacy", "warranty") or page.startswith(
-            ("order/", "match/", "fit/")
+        known = (
+            page in ("", "configure", *shop_legal.PAGES)
+            or re.fullmatch(r"(order|match|fit)/[A-Za-z0-9_-]{1,80}", page) is not None
         )
-        return render(request, page if known else "home", prefix)
+        if not known and (page == "b2b" or page.startswith("b2b/")):
+            return render(request, "home", prefix)  # the business shop's pages (not ours)
+        # ADR-099: an unknown address is a real 404 (no soft copy of the home page for search
+        # engines), with the shop around it
+        return render(request, (page or "home") if known else "404", prefix)
 
     media = Path(app.state.store.root) / "media"
 
@@ -1553,10 +1682,16 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
         if s["website_link"].get("closed") and not link_ok(auth, request):
             return PlainTextResponse("User-agent: *\nDisallow: /\n")  # the studio itself
-        if link_ok(auth, request):  # the website: the shop is the whole site
+        if link_ok(auth, request):  # the website: the shop is the whole site (ADR-099)
+            private = "".join(
+                f"Disallow: {p}\n"
+                for p in ("/api/", "/b2b", "/*/b2b", "/order/", "/*/order/", "/match/",
+                          "/*/match/", "/fit/", "/*/fit/", "/*?preview=")
+            )  # fmt: skip
             return PlainTextResponse(
-                "User-agent: *\nAllow: /\nDisallow: /api/\n"
-                f"Sitemap: {shop_root(auth, request)}sitemap.xml\n"
+                "User-agent: *\nAllow: /\n"
+                + private
+                + f"Sitemap: {shop_root(auth, request)}sitemap.xml\n"
             )
         return PlainTextResponse(
             "User-agent: *\nAllow: /shop/\nDisallow: /api/\nDisallow: /#/\n"
@@ -1565,15 +1700,26 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
 
     @app.get("/sitemap.xml", include_in_schema=False)
     def sitemap(request: Request) -> Response:
+        """Every public page in every language, each with its alternates (hreflang)."""
         root = shop_root(auth, request)
         langs = site_languages(auth)
+
+        def loc(x: str, p: str) -> str:
+            return _esc(f"{root}{'' if x == langs[0] else x + '/'}{p}")
+
         urls = "".join(
-            f"<url><loc>{root}{'' if x == langs[0] else x + '/'}{p}</loc></url>"
+            f"<url><loc>{loc(x, p)}</loc>"
+            + "".join(
+                f'<xhtml:link rel="alternate" hreflang="{y}" href="{loc(y, p)}"/>' for y in langs
+            )
+            + f'<xhtml:link rel="alternate" hreflang="x-default" href="{loc(langs[0], p)}"/>'
+            + "</url>"
             for x in langs
-            for p in ("", "configure", "terms", "privacy", "warranty")
+            for p in SITEMAP_PAGES
         )
         xml = ('<?xml version="1.0" encoding="UTF-8"?>'
-               f'<urlset xmlns="{SITEMAP_NS}">{urls}</urlset>')  # fmt: skip
+               f'<urlset xmlns="{SITEMAP_NS}" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+               f'{urls}</urlset>')  # fmt: skip
         return Response(xml, media_type="application/xml")
 
     @app.get("/llms.txt", include_in_schema=False)
@@ -1592,7 +1738,8 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         ]
         lines += ["", "## Pages", f"- [Design your cover]({b}configure)",
                   f"- [Terms]({b}terms)", f"- [Privacy]({b}privacy)",
-                  f"- [Warranty]({b}warranty)", "",
+                  f"- [Returns]({b}returns)", f"- [Cookies]({b}cookies)",
+                  f"- [Contact]({b}contact)", f"- [Warranty]({b}warranty)", "",
                   "## Languages",
                   "The shop is in " + ", ".join(site_languages(auth)) + "."]  # fmt: skip
         return PlainTextResponse("\n".join(lines) + "\n")
