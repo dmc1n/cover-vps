@@ -2340,3 +2340,123 @@ p {
     animation: none;
   }
 }
+
+/* While a photo or link is looked up (20-60 s): the photo being scanned, the steps it goes
+   through, a running bar and the seconds waited, so the customer knows to wait (owner, 9 Oct
+   2026). The steps follow typical timings; the answer may come sooner. */
+.s-wait {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.s-wait-photo {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  max-height: 180px;
+  background: var(--paper-2);
+}
+.s-wait-photo img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+}
+.s-wait-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 30%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(200, 181, 147, 0.55),
+    transparent
+  );
+  animation: s-wait-scan 2.2s ease-in-out infinite;
+}
+@keyframes s-wait-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(340%);
+  }
+}
+.s-wait-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.s-wait-steps li {
+  position: relative;
+  padding-left: 26px;
+  color: var(--muted);
+}
+.s-wait-steps li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 0.35em;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+}
+.s-wait-steps li.now {
+  color: var(--ink);
+  font-weight: 500;
+}
+.s-wait-steps li.now::before {
+  border-color: var(--sand-deep);
+  border-top-color: transparent;
+  animation: s-wait-spin 0.9s linear infinite;
+}
+.s-wait-steps li.done {
+  color: var(--ink-2);
+}
+.s-wait-steps li.done::before {
+  background: var(--sand-deep);
+  border-color: var(--sand-deep);
+}
+@keyframes s-wait-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.s-wait-bar {
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--paper-2);
+}
+.s-wait-bar span {
+  display: block;
+  height: 100%;
+  width: 35%;
+  border-radius: 2px;
+  background: var(--sand-deep);
+  animation: s-wait-run 1.6s ease-in-out infinite;
+}
+@keyframes s-wait-run {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .s-wait-scan,
+  .s-wait-bar span,
+  .s-wait-steps li.now::before {
+    animation: none;
+  }
+}

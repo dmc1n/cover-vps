@@ -130,10 +130,10 @@
    "en": "This text follows."
   },
   "not_found": {
-   "nl": "We vinden deze pagina niet. Misschien is de link niet helemaal meegekomen; kijk in je e-mail, of ontwerp je hoes opnieuw.",
-   "en": "We cannot find this page. The link may not have come through in full; check your e-mail, or design your cover again.",
-   "de": "Wir finden diese Seite nicht. Vielleicht ist der Link nicht vollständig angekommen; schau in deine E-Mail oder entwirf deine Hülle neu.",
-   "fr": "Nous ne trouvons pas cette page. Le lien n'est peut-être pas arrivé en entier ; consultez votre e-mail ou concevez à nouveau votre housse."
+   "nl": "Deze pagina bestaat niet",
+   "en": "This page does not exist",
+   "de": "Diese Seite gibt es nicht",
+   "fr": "Cette page n'existe pas"
   },
   "loading": {
    "nl": "Laden…",
@@ -395,12 +395,6 @@
    "de": "Zur Startseite",
    "fr": "Vers la page d'accueil"
   },
-  "not_found": {
-   "nl": "Deze pagina bestaat niet",
-   "en": "This page does not exist",
-   "de": "Diese Seite gibt es nicht",
-   "fr": "Cette page n'existe pas"
-  },
   "not_found_text": {
    "nl": "Misschien is de link oud of verkeerd overgenomen.",
    "en": "Perhaps the link is old or was copied wrongly.",
@@ -442,6 +436,36 @@
    "en": "Order with obligation to pay",
    "de": "Zahlungspflichtig bestellen",
    "fr": "Commande avec obligation de paiement"
+  },
+  "suggest_step_look": {
+   "nl": "Je foto bekijken",
+   "en": "Looking at your photo",
+   "de": "Ihr Foto ansehen",
+   "fr": "Analyse de votre photo"
+  },
+  "suggest_step_search": {
+   "nl": "Zoeken naar je meubel op internet",
+   "en": "Searching the web for your furniture",
+   "de": "Ihr Möbel im Internet suchen",
+   "fr": "Recherche de votre meuble en ligne"
+  },
+  "suggest_step_compare": {
+   "nl": "Gevonden meubels vergelijken met je foto",
+   "en": "Comparing what we found with your photo",
+   "de": "Gefundene Möbel mit Ihrem Foto vergleichen",
+   "fr": "Comparaison avec votre photo"
+  },
+  "suggest_step_propose": {
+   "nl": "Maten en voorstel maken",
+   "en": "Working out sizes and a proposal",
+   "de": "Maße und Vorschlag erstellen",
+   "fr": "Calcul des dimensions et proposition"
+  },
+  "suggest_waited": {
+   "nl": "{n} s — meestal klaar binnen een minuut",
+   "en": "{n} s — usually done within a minute",
+   "de": "{n} s — meist in einer Minute fertig",
+   "fr": "{n} s — généralement prêt en une minute"
   }
  },
  "status": {
