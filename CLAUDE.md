@@ -224,6 +224,8 @@ uv run python scripts/vents_compare.py OUT.png --old DIR --new DIR [--pics ...] 
 uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--staged DIR]   covers with inner walls rebuilt in staging, vents on the front walls, checked twice (ADR-110)
 uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--only a,b]   drawing covers from a shape a person read
                                              (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102)
+COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py [--out out/matchcards]   approved drawing covers as existing covers:
+                                             kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114)
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
 COVER_DATA_DIR=~/cover-data uv run python scripts/learned_check.py [--recalc]   do the Desk's corrections still hold? (ADR-082)
 uv run python scripts/film/hero_data.py MODEL_DIR OUT   the home film's data: cover.npz, seams.png, pieces.json (ADR-108)

@@ -1519,7 +1519,7 @@ function Matches() {
                         Custom
                       </button>
                       <input
-                        placeholder="other: suns-…"
+                        placeholder="other: suns-… or drawing-…"
                         value={other[r.id] ?? ""}
                         onChange={(e) =>
                           setOther({ ...other, [r.id]: e.target.value })

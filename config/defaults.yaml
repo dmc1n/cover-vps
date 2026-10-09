@@ -495,3 +495,5 @@ match:                           # the customer's sizes against the covers we al
   threshold_pct: 90              # from this match on we offer the existing cover (the owner, 2026-10-05)
   choice_pct: 80                 # from this on the customer chooses: existing or custom; below: custom
   mode: shadow                   # shadow: a colleague confirms every proposal first; auto: above the threshold directly
+  drawing_statuses: "approved,produced"  # drawing covers with this Desk status are offered as existing covers (owner, 2026-10-09, ADR-114)
+  drawing_size_tol_cm: 3.2       # a drawing cover's sizes and the price list's agree within this (else: doubtful, ADR-114)

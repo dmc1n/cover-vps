@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -65,9 +66,28 @@ def kind_of(model_id: str, category: str, size_cm: list[float]) -> str | None:
     return None
 
 
-def card(model_dir: Path, kinds: dict[str, str] | None = None) -> dict[str, Any] | None:
+def _defaults() -> EffectiveParams:
+    if "defaults" not in _CACHE:
+        from coverengine.params import Registry
+
+        _CACHE["defaults"] = Registry.load(None).resolve()
+    out: EffectiveParams = _CACHE["defaults"]
+    return out
+
+
+def card(
+    model_dir: Path,
+    kinds: dict[str, str] | None = None,
+    listing: Mapping[str, Any] | None = None,
+    p: EffectiveParams | None = None,
+    shared: Mapping[str, list[str]] | None = None,
+) -> dict[str, Any] | None:
     """A catalogue cover's size card: kind, the furniture's size (length ≥ width, height), the
-    side of an L, whether it covers chairs, and how its drape went."""
+    side of an L, whether it covers chairs, and how its drape went. A drawing cover has one only
+    while it is offered: approved or produced at the Desk, its kind known and not in doubt
+    (match_drawings, ADR-114)."""
+    if model_dir.name.startswith("drawing-"):
+        return drawing_card(model_dir, listing, p, shared)
     try:
         cover = json.loads((model_dir / "cover.json").read_text())
         size = json.loads((model_dir / "model.json").read_text())["size_mm"]
@@ -107,14 +127,79 @@ def card(model_dir: Path, kinds: dict[str, str] | None = None) -> dict[str, Any]
 _CACHE: dict[str, Any] = {}
 
 
-def cards(models: Path, kinds: dict[str, str] | None = None) -> list[dict[str, Any]]:
-    """All catalogue covers' size cards (the SUNS models), cached until a model folder changes."""
+def drawing_card(
+    model_dir: Path,
+    listing: Mapping[str, Any] | None = None,
+    p: EffectiveParams | None = None,
+    shared: Mapping[str, list[str]] | None = None,
+) -> dict[str, Any] | None:
+    """An offered drawing cover's size card (None: not offered, ADR-114)."""
+    from coverengine import match_drawings as md
+
+    params = p if p is not None else _defaults()
+    if shared is None:
+        shared = md.owners(model_dir.parent, params)
+    r = md.review(model_dir, params, listing, shared)
+    if r is None or not r["offered"]:
+        return None
+    return {
+        "model_id": r["model_id"],
+        "name": r["name"],
+        "category": r["category"],
+        "kind": r["kind"],
+        "size_cm": r["size_cm"],
+        "side": r["side"],
+        "chairs": r["chairs"],
+        "height_max": r["height_max"],
+        "families": r["families"],
+        "photo": False,
+        "drape": None,
+        "source": "drawing",
+    }
+
+
+def _drawing_stamp(dirs: list[Path]) -> float:
+    """The newest change to what decides a drawing cover's card (a Desk decision, a person's
+    match.kind, the product list, the model)."""
+    newest = 0.0
+    for d in dirs:
+        for f in ("desk.json", "cover.json", "products.json", "model.json"):
+            try:
+                newest = max(newest, (d / f).stat().st_mtime)
+            except OSError:
+                pass
+    return newest
+
+
+def cards(
+    models: Path,
+    kinds: dict[str, str] | None = None,
+    listing: Mapping[str, Any] | None = None,
+    p: EffectiveParams | None = None,
+) -> list[dict[str, Any]]:
+    """All catalogue covers' size cards: the SUNS models and the offered drawing covers, cached
+    until a model folder, a drawing cover's Desk status or the price list changes. The drawing
+    covers carry the SUNS models of their families with their own kind (`suits`)."""
+    from coverengine import match_drawings as md
+
     dirs = sorted(models.glob("suns-*"))
+    drawings = sorted(models.glob("drawing-*"))
     stamp = (str(models), len(dirs), max((d.stat().st_mtime for d in dirs), default=0.0),
-             json.dumps(kinds or {}, sort_keys=True))  # fmt: skip
+             len(drawings), _drawing_stamp(drawings), str((listing or {}).get("stamp")),
+             json.dumps(kinds or {}, sort_keys=True),
+             None if p is None else (str(p["match.drawing_statuses"]),
+                                     float(p["match.drawing_size_tol_cm"]),
+                                     float(p["hull.clearance_mm"])))  # fmt: skip
     if _CACHE.get("stamp") != stamp:
+        params = p if p is not None else _defaults()
+        shared = md.owners(models, params)
+        suns = [c for d in dirs if (c := card(d, kinds)) is not None]
+        drawn = [c for d in drawings if (c := drawing_card(d, listing, params, shared))]
+        for c in drawn:
+            c["suits"] = [s["model_id"] for s in suns if s["kind"] == c["kind"] and any(
+                f in s["model_id"].split("-") for f in c["families"])]  # fmt: skip
         _CACHE["stamp"] = stamp
-        _CACHE["cards"] = [c for d in dirs if (c := card(d, kinds)) is not None]
+        _CACHE["cards"] = suns + drawn
     out: list[dict[str, Any]] = _CACHE["cards"]
     return out
 
@@ -135,6 +220,8 @@ def score(target: list[float], c: dict[str, Any], p: EffectiveParams) -> dict[st
     diffs, logsum, wsum = [], 0.0, 0.0
     for name, want, have, w in zip(DIMS, target, c["size_cm"], weights, strict=True):
         d = have - want
+        if name == "height" and c.get("height_max") and d >= 0:
+            d = 0.0  # a cover over table and chairs: any table lower than it fits under it
         s = size_score(d, p)
         verdict = ("exact" if s >= 1 and abs(d) <= float(p["match.tight_cm"]) else
                    "roomier" if d > 0 else "tighter")  # fmt: skip
@@ -155,9 +242,13 @@ def match(
     p: EffectiveParams,
     top: int = 3,
     kinds: dict[str, str] | None = None,
+    listing: Mapping[str, Any] | None = None,
+    hint: str | None = None,
 ) -> dict[str, Any]:
     """The best existing covers for the customer's furniture, and what to offer: the existing
-    cover (≥ match.threshold_pct), a choice (≥ match.choice_pct), or a custom cover."""
+    cover (≥ match.threshold_pct), a choice (≥ match.choice_pct), or a custom cover. A `hint`
+    (the product's name, from a photo or a link) puts a drawing cover made for that family first
+    among equal scores: a Kota corner set gets the Kota/Aspen/Evora cover (ADR-114)."""
     from coverengine.quote import PRODUCTS, _bbox_cm
 
     if product not in PRODUCTS:
@@ -165,8 +256,9 @@ def match(
     target = _bbox_cm(product, given)
     side = given.get("side") if given.get("side") in ("left", "right") else None
     chairs = given.get("chairs")
+    words = set(re.findall(r"[a-z]{3,}", (hint or "").lower()))
     out = []
-    for c in cards(models, kinds):
+    for c in cards(models, kinds, listing, p):
         if c["kind"] != product:
             continue
         if side and c["side"] and c["side"] != side:
@@ -174,8 +266,9 @@ def match(
         if isinstance(chairs, bool) and c["chairs"] is not None and c["chairs"] != chairs:
             continue
         out.append({**{k: c[k] for k in ("model_id", "name", "size_cm", "side", "photo", "drape")},
+                    "family": bool(words & set(c.get("families") or [])),
                     **score(target, c, p)})  # fmt: skip
-    out.sort(key=lambda r: (-float(r["score_pct"]), r["model_id"]))
+    out.sort(key=lambda r: (-float(r["score_pct"]), not r["family"], r["model_id"]))
     best = float(out[0]["score_pct"]) if out else 0.0
     decision = ("existing" if best >= float(p["match.threshold_pct"]) else
                 "choice" if best >= float(p["match.choice_pct"]) else "custom")  # fmt: skip
@@ -191,22 +284,35 @@ def match(
 
 def fields_for(product: str, size_cm: list[float]) -> dict[str, int]:
     """A catalogue cover's sizes as the configurator's fields (to price that cover)."""
+    from coverengine.quote import PRODUCTS
+
     length, width, height = (round(x) for x in size_cm)
-    return {
+    fields: dict[str, int] = {
         "dining_set": {"table_length_cm": length, "table_width_cm": width,
                        "table_height_cm": height},
         "round_set": {"table_diameter_cm": length, "table_height_cm": height},
         "sofa": {"length_cm": length, "depth_cm": width, "back_height_cm": height},
         "corner_sofa": {"long_side_cm": length, "short_side_cm": width, "back_height_cm": height},
     }.get(product, {"length_cm": length, "width_cm": width, "height_cm": height})  # fmt: skip
+    spec = PRODUCTS.get(product, {}).get("fields", {})
+    for k, v in fields.items():  # within what the configurator builds (a 420 cm table: 400)
+        if k in spec and spec[k][1] is not None:
+            fields[k] = int(min(max(v, spec[k][1]), spec[k][2]))
+    return fields
 
 
-def entry(models: Path, model_id: str, product: str, given: dict[str, Any],
-          p: EffectiveParams) -> dict[str, Any] | None:  # fmt: skip
+def entry(
+    models: Path,
+    model_id: str,
+    product: str,
+    given: dict[str, Any],
+    p: EffectiveParams,
+    listing: Mapping[str, Any] | None = None,
+) -> dict[str, Any] | None:
     """One named cover scored against the customer's sizes (a colleague's own choice)."""
     from coverengine.quote import _bbox_cm
 
-    c = card(models / model_id)
+    c = card(models / model_id, None, listing, p)
     if c is None:
         return None
     keep = ("model_id", "name", "size_cm", "side", "photo", "drape")

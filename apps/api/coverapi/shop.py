@@ -29,6 +29,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from coverapi import shop_legal
+from coverapi.match_list import STOCK_MODEL
 
 SHOP_SETTING = "shop"
 PREVIEW_SETTING = "shop_preview_token"
@@ -411,7 +412,7 @@ class ShopQuote(BaseModel):
     colour: str | None = Field(default=None, max_length=40)
     vents: bool = True
     support: str = Field(default="none", pattern=r"^(none|balloons|frame)$")
-    stock_model: str | None = Field(default=None, pattern=r"^suns-[a-z0-9-]{1,120}$")
+    stock_model: str | None = Field(default=None, pattern=STOCK_MODEL)  # SUNS or drawing (ADR-114)
     match_token: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{10,40}$")
 
 
@@ -425,7 +426,7 @@ class MatchIn(BaseModel):
 
 
 class MatchAnswer(BaseModel):
-    chosen: str = Field(pattern=r"^(custom|suns-[a-z0-9-]{1,120})$")
+    chosen: str = Field(pattern=r"^(custom|(suns|drawing)-[a-z0-9-]{1,120})$")
     note: str | None = Field(default=None, max_length=2000)
 
 
@@ -704,7 +705,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     from coverengine import quote as q
     from coverengine.errors import CoverError
 
-    from coverapi import mailer, prices
+    from coverapi import mailer, match_list, prices
     from coverapi.security import _address, require
 
     site = Site(data / "site")
@@ -905,10 +906,12 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         return {"content": content, "preview": bool(draft),
                 "settings": public_settings(), "options": q.options(shop_params(auth))}  # fmt: skip
 
-    def _stock(model_id: str, product: str) -> dict[str, Any]:
+    def _stock(model_id: str, product: str, p: Any) -> dict[str, Any]:
+        """A cover of our range for this furniture: a SUNS cover, or a drawing cover while it is
+        approved or produced at the Desk and its kind is sure (ADR-114)."""
         from coverengine import match as mt
 
-        c = mt.card(store.models / model_id)
+        c = mt.card(store.models / model_id, None, match_list.for_data(data), p)
         if c is None or c["kind"] != product:
             raise HTTPException(400, "this cover is not in our range for this furniture")
         return c
@@ -918,7 +921,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
 
         p = shop_params(auth)
         ps = prices.current(auth)  # the published price set (ADR-098)
-        stock = _stock(req.stock_model, req.product) if req.stock_model else None
+        stock = _stock(req.stock_model, req.product, p) if req.stock_model else None
         sizes = (
             {**req.sizes, **mt.fields_for(req.product, stock["size_cm"])} if stock else req.sizes
         )
@@ -1096,7 +1099,14 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         if mode == "shadow" and not EMAIL.match(email):
             raise HTTPException(400, "please give your e-mail address: we answer within a day")
         try:
-            r = mt.match(req.product, req.sizes, store.models, p, top=8)  # param-ok: candidates
+            r = mt.match(
+                req.product,
+                req.sizes,
+                store.models,
+                p,
+                top=8,  # param-ok: candidates
+                listing=match_list.for_data(data),
+            )
         except (ValueError, CoverError) as exc:
             raise HTTPException(400, str(exc)) from None
         best = r["matches"][0] if r["matches"] else None
@@ -1175,7 +1185,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         )
         if req.chosen != "custom" and not any(m["model_id"] == req.chosen for m in r["matches"]):
             e = mt.entry(store.models, req.chosen, row["product"], json.loads(row["given"]),
-                         shop_params(auth))  # fmt: skip
+                         shop_params(auth), match_list.for_data(data))  # fmt: skip
             if e is None:
                 raise HTTPException(400, f"no cover {req.chosen}")
             r["chosen_entry"] = e
