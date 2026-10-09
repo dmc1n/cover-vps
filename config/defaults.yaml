@@ -172,12 +172,11 @@ features:                        # per-cover defaults, overridden per model
   vents_total: 0                 # the number of vents written on the drawing ("4 Air Pocket"); it
                                  # always wins over the rule above (owner, 5 Oct 2026); 0 = rule.
                                  # Spread over the sides by their length.
-  vent_inner_mm: 300             # never an air vent on an inner wall (owner, 7 Oct 2026: only on
-                                 # the outside): a skirt piece whose middle lies this far inside
+  vent_inner_mm: 300             # an inner wall: a skirt piece whose middle lies this far inside
                                  # the footprint's convex hull (an L/U/C shape's open corner)
-  vent_inner_walls: false        # to confirm (ADR-101): true puts vents on the front (inner) walls of
-                                 # an L, U or C too, as Rens marked on 30 covers (8 Oct 2026);
-                                 # false keeps the owner's rule of 7 Oct (ADR-093)
+  vent_inner_walls: true         # owner, 9 Oct 2026 (QUESTIONS 71, ADR-109): vents go on the front
+                                 # (inner) walls of an L, U or C too, as Rens marked (8 Oct 2026);
+                                 # false skips them (the old reading of 7 Oct, ADR-093)
   vent_wall_angle_deg: 45        # pieces facing within this angle of each other face the same side:
                                  # the vents go round all sides first, longest piece first (ADR-101)
   vent_align: bottom             # bottom | middle | top   where on the skirt: bottom edge

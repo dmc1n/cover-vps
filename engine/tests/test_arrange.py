@@ -154,14 +154,15 @@ def test_an_l_arrangement_gets_an_l_cover_with_a_sharp_inner_corner(models: Path
     up = np.asarray(mesh.face_normals)[:, 1]  # glTF: Y up
     slope = np.sin(np.radians(float(params["hull.min_slope_deg"])))  # type: ignore[arg-type]
     assert np.all((np.abs(up) < 1e-6) | (up >= slope - 1e-6))
-    # every piece fits the roll; vents only on the outer walls (ADR-093)
+    # every piece fits the roll; the inner corner's walls are found (vents go there too by
+    # default, ADR-109; switched off they stay on the outer walls, ADR-093)
     fin = json.loads((d / "finished.json").read_text())
     usable = float(params["roll.usable_width_mm"])  # type: ignore[arg-type]
     assert all(min(p["size_mm"]) <= usable for p in fin["pieces"])
     inner = inner_skirts(d, params)
     assert len(inner) == 2  # the two walls of the inner corner
     vents = vents_3d(d, json.loads((d / "pattern.json").read_text()), params)["vents"]
-    assert vents and not any(v["piece"] in inner for v in vents)
+    assert vents
 
     # the same input gives the same cover (rule 10)
     first = (d / "hull.glb").read_bytes(), (d / "hull_parts.npy").read_bytes()

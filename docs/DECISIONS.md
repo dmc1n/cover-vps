@@ -2434,6 +2434,12 @@ really a good idea"; show it to the customer.
 
 ## ADR-093 — Air vents only on the outside, never on an inner wall
 
+> **Superseded by the owner's answer of 9 Oct 2026** (QUESTIONS 71, ADR-109): on 7 Oct he
+> meant vents drawn *inside the fabric* (the 3D display bug, ADR-088), not the inner walls of an
+> L. Vents now go round every side, the front walls in the inner corner of L, U and C covers
+> included (`features.vent_inner_walls: true`). The inner-wall test below stays: it finds those
+> walls for the switch and for the checks.
+
 Owner, 7 Oct 2026 (C23): "er horen nooit airvents aan de binnenkant te zitten, alleen aan de
 buitenkant". The drawing of C23 points two of its six vents at the inner walls of the L; the
 owner's rule wins over the drawing's positions, the drawing's number still wins (ADR-075), so
@@ -2841,9 +2847,9 @@ twice by the vision model, and by eye against the covers' own vents.json):
   daybed, 2-seater) hands its vents to the piece above, placed over the seam
   (`features.vent_above_low_skirt`, default on); before, those sides had none (the warning
   "no air vent on the back: lower than 16.5 cm").
-- **Front (inner) walls** (`features.vent_inner_walls`, default **false** = ADR-093 stands):
-  Rens's circles on 30 covers are exactly the walls the owner excluded on 7 Oct (C23). That
-  is the owner's call (docs/QUESTIONS.md 71); the staged covers set it per cover.
+- **Front (inner) walls** (`features.vent_inner_walls`): Rens's circles on 30 covers are
+  exactly the walls excluded on 7 Oct (C23). The owner answered on 9 Oct 2026 (QUESTIONS 71):
+  **yes**, vents go there too; the default is now **true** (ADR-109, ADR-093 superseded).
 - **By hand** (`features.vent_positions`, "piece@fraction, ..."): where a person's marks differ
   from the rule; wins over the count.
 - **Height on the skirt** (`features.vent_align` bottom | middle | top, `vent_below_top_mm`):
@@ -3329,3 +3335,22 @@ asks for it.
   a few seconds of real workshop footage would lift it most (ADR-065's list still holds).
 - **Rejected:** Veo/Sora takes (not our cover, paid); the dark green set of ADR-065 (it hid the
   sand colour).
+
+## ADR-109 — Air vents on the front walls in the inner corner of L, U and C covers (owner, 9 Oct 2026)
+
+The owner's answer to QUESTIONS 71 ("may vents go on the front walls in the inner corner of L, U
+and C covers?"): **yes**. His remark of 7 Oct on C23 ("never vents on the inside, only on the
+outside") was about vents drawn *inside the fabric* (a 3D display bug, ADR-088), not about the
+inner walls of an L; ADR-093 misread it.
+
+- `features.vent_inner_walls: true` is the company default (config/defaults.yaml). The vents go
+  round every side (ADR-101), the front (inner) walls included; the drawing's count is kept.
+- The switch stays: false skips the inner walls (ADR-093's rule) for a cover that needs it.
+  `features.vent_inner_mm` still says what an inner wall is.
+- `cover audit` (vents check) and `scripts/fewer_check.py` accept vents on the inner walls
+  whenever the cover's effective switch is on; fewer_check reads it through `resolve_model`
+  (defaults, preset, cover.json), no longer only from cover.json.
+- The AI lesson of 8 Oct (config/ai_lessons.json) and CLAUDE.md say the same. Tests:
+  test_finish.py `test_vents_on_an_inner_wall_by_the_switch` (off: none, on/default: vents).
+- Swept: every cover with inner walls rebuilt in staging (out/innerwalls/), with the per-cover
+  `vent_positions` from Rens's circles carried over where the vents agent had set them.
