@@ -3421,3 +3421,80 @@ read on the server; answers came back by mail or by word of mouth.
   - the studio has no form to write a new question; it comes from the CLI or the API;
   - a picture uploaded for an answer that is never sent stays unlinked, as at the Desk;
   - docs/QUESTIONS.md is not updated from the answers by itself; the daily processing does that.
+
+## ADR-111 — A photo alone: read Google's search by image properly; the photo box stays in its panel
+
+The owner (9 October 2026): "Google Vision recognises the photo I upload badly, while with
+Google image search (Lens) I get a 100 % match. Also the box for uploading photos sticks out of
+the browser." The ledger shows his run at 09:57: the image search ran, then identify, one
+search (by look only: no brand recognised) and the comparison.
+
+- **The cause, measured** (15 photos: 5 SUNS cut-outs and 6 mood pictures from hello-suns.com,
+  4 "phone" photos made from them: cropped, tilted, mirrored, re-coloured; raw Vision answers in
+  five variants, about 90 Vision calls, €0.28):
+  - we asked Vision for `maxResults = suggest.search_pages` = 5. Google lists the pages about
+    its best-guess label first ("studio couch", "club chair", "swimming pool", "tree": Pinterest,
+    YouTube; none shows the photo) and only after them the pages that really show it. With 5
+    we got only the label's pages: in **0 of 15** photos did anything we used name the
+    product;
+  - that label was put first among the search queries ("swimming pool", "tree", "patio");
+  - what Vision did find was thrown away: its matching pictures (`fullMatchingImages`,
+    `partialMatchingImages`) carry the product in their file names
+    ("Marolo-SUNS-Daybed-BZ-CR-PDB-Free-26.png", "suns-tuinmeubelen-suns-basta-lage-bar-tafel")
+    in **12 of 15** photos, already with 5 results; with 50 the pages showing them come too.
+  - `webEntities` rarely name the model (a shop name, once a wrong product);
+    `visuallySimilarImages` are generic (other sofas): both kept for the diagnostics only.
+  - Variants: PNG 1600 px or JPEG 2048 px, `includeGeoResults`: the same answers. **Cropping to
+    the furniture first** (OBJECT_LOCALIZATION, then web detection) is worse: 7 of 15 instead of
+    12 (the crop is no longer the picture on the web, and phone photos gained nothing). Not
+    built.
+  - **Lens** searches Google's product index as well as the web's pictures; Cloud Vision only
+    the latter. Photos that exist online are found by both; a photo taken at home only when a
+    similar picture is online (1 of the 4 phone photos). That gap is a service question
+    (QUESTIONS 74).
+- **Now** (`shop_suggest.py`):
+  1. the search by image runs **first** (a second or two), with `suggest.reverse_max` (50,
+     same fee) and the photo as JPEG; `read_web_detection` keeps only pages that show the photo,
+     full matches first, and collects the **names** of the matching pictures (file names made
+     readable by `image_name`) and pages;
+  2. those names go to the **identification** ("a name that recurs is very likely this
+     product's brand and model"): it now says "SUNS Marolo" with 0.95 where it said "Talenti
+     Cliff" or "Tribù Mood";
+  3. the best-guess label is **no query** any more;
+  4. the image search's pages that name the recognised model go first among the candidates;
+     when one does, the search by look is skipped (one search fee less);
+  5. a candidate whose only picture is the one the image search matched (a category page shows
+     it too) counts as "recognised" only when its title or address names the model;
+  6. a picture's address is no product page: a search result that is a .jpg is dropped (it was
+     shown to the customer as the recognised link);
+  7. a recognised name loses the shop's suffix ("Marolo daybed - SUNS Outdoor Lifestyle" →
+     "SUNS Marolo daybed").
+- **Measured** on the 15 photos, whole flow (before → after):
+  - the right SUNS product recognised: **2 → 8–11** (two runs; Gemini's same/not-same for a
+    set in a mood picture varies); plus 2 recognised as another SUNS piece in the same mood
+    picture (the Nova table with Dolce chairs, the Fiavè stool at the Basta table) and 2 offered
+    as a "comparable" of the same collection; a wrong brand recognised: **1 → 0**;
+  - the 4 phone photos: 0 → 1 (Marolo); the others stay on the photo's own estimates;
+  - time: median 28 → 25 s; **cost**: €0.028 → €0.026 per photo for the search part, about
+    €0.028 per suggestion with the final answer (ledger, 15 photos each).
+- **Admin → Photo test** (`POST /api/admin/shop/photo-test`, admins only; `PhotoTest.tsx`):
+  the customer's flow with every step's own result (Vision's labels, entities, names, pages,
+  pictures and similar ones; the identification; the searches; each candidate's picture as a
+  small thumbnail with its score; the pick; the final answer), the time and the cost. Nothing
+  is kept: the photo lives only for the request, the result goes only to the admin's browser;
+  the ledger gets the cost on a line of its own.
+- **The box that stuck out:** while the customer waits (30–60 s) the button says "We zoeken je
+  meubel op… (dit kan een minuut duren)". Buttons do not wrap (`.s-btn { white-space: nowrap }`)
+  and the box was a grid whose one column grew to that line: the photo field, the link field
+  and the button stretched past the panel and the screen at 1440, 1024 and 390 px, in
+  Chromium, WebKit and Firefox (at 820 the line fits). Now the box's column is
+  `minmax(0, 1fr)`, its button wraps, its answer card breaks long links, and the invisible
+  file field lies over the photo box instead of beside it. `apps/web/e2e/suggest_layout.py`
+  checks the three moments (photo chosen, waiting, answer) in the three engines at four widths;
+  screenshots before/after in out/suggestfix/.
+- **Tests** (no paid call): reading a raw web detection answer, picture file names, the order
+  and the skipped search, a category page that only shows the photo, a picture as a page, the
+  request (maxResults, JPEG) and its fee, the photo test's rights, steps and that no photo is
+  written.
+- **Not done:** Lens-quality matching of home photos needs another service; options with costs
+  in QUESTIONS 74 (Vision Product Search over our own catalogue recommended to try first).

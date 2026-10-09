@@ -357,3 +357,24 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     - **Online payment for B2B:** wanted later (Mollie), or always on account?
     - **Prices:** the B2B markup (45 %); one list for all dealers, or fixed prices per dealer
       (both possible now)?
+
+74. **"Google Vision recognises my photo badly, Lens finds it 100 %"** (ADR-111; asked 9 Oct
+    2026). Fixed for photos that are on the web (shop pictures, mood pictures: 12 of 15 test
+    photos now find the right SUNS product, was 2; no wrong brand any more). A photo taken at
+    home is still found only when a similar picture is online (1 of 4), because Cloud Vision
+    searches the web's pictures, while Lens also searches Google's *product* index. Options for
+    Lens quality (nothing signed up; the photo test in Admin shows which step fails):
+    - **A. Keep it as it is** (€0.03 a suggestion; the customer checks the sizes anyway).
+    - **B. Google Vision Product Search over our own catalogue** (recommended to try first): we
+      upload the product photos of the furniture we make covers for (SUNS first, ~300 products,
+      a few photos each) once; a customer's photo is then matched against *our* products, with
+      their name and our own sizes. Cost (to confirm on Google's price page): a few dollars per
+      1000 queries (≈ €0.004 a photo) plus a small monthly fee for the stored product photos.
+      About a day's work. Note: Google lists Product Search as legacy (no
+      new features); it still runs. Shall we build it?
+    - **C. SerpAPI's Google Lens** (the real Lens results, product index included): about $75 a
+      month for 5000 searches (to confirm). Third party between us and Google;
+      the customer's photo goes to them too (privacy text to adapt).
+    - **D. Our own matching**: an image embedding (e.g. CLIP / SigLIP on our server) of our
+      catalogue photos, nearest neighbour for the customer's photo; no fee per photo, a few
+      days' work, quality to measure.

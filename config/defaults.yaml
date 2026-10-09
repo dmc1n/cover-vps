@@ -480,6 +480,9 @@ suggest:                         # "start from a photo or a link" in the configu
   reverse_search: true           # a real search by image (Google Cloud Vision web detection, as Google Lens):
                                  # on since 7 Oct 2026 (owner gave the key, GOOGLE_VISION_API_KEY; QUESTIONS 68)
   reverse_eur: 0.0033            # to confirm: its fee per photo ($3.50 per 1000 after the first 1000 a month)
+  reverse_max: 50                # results of each kind asked from the search by image (same fee): Google lists
+                                 # the pages about its label first, the pages showing the photo after them;
+                                 # with 5 only the label's pages came back (ADR-111)
 
 match:                           # the customer's sizes against the covers we already make (ADR-064)
   tight_cm: 1.25                 # to confirm (Q57): an existing cover may be this much smaller and still count as exact

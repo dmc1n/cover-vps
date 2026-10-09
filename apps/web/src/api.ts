@@ -493,7 +493,75 @@ export interface WebshopSettings {
   request_email: string;
 }
 
+/** One web picture the photo test held against the photo (ADR-111). */
+export interface PhotoTestCandidate {
+  url: string;
+  title: string;
+  from: string;
+  match: string;
+  picture: string;
+  thumb: string;
+  similarity: number | null;
+  same: boolean | null;
+  why: string;
+  sizes: Record<string, string>;
+  sizes_text: string[];
+}
+
+/** The admin's photo test (ADR-111): each step of a suggestion, nothing kept. */
+export interface PhotoTest {
+  proposal: {
+    product: string;
+    label: string;
+    sizes: Record<string, number | boolean>;
+    check: string[];
+    summary: string;
+    recognised?: { url: string; name: string } | null;
+    comparable?: { url: string; title: string } | null;
+  } | null;
+  error: string | null;
+  seconds: number;
+  cost_eur: number;
+  settings: Record<string, unknown>;
+  trace: {
+    image_search?: {
+      off?: boolean;
+      error?: string;
+      labels: string[];
+      names: string[];
+      entities: { name: string; score: number }[];
+      pages: {
+        url: string;
+        title: string;
+        image: string;
+        match: string;
+      }[];
+      images: { full: string[]; partial: string[] };
+      similar: string[];
+      other_pages: number;
+    };
+    identify?: Record<string, unknown>;
+    identify_error?: string;
+    searches?: Record<string, { url: string; title: string; same?: boolean }[]>;
+    candidates?: PhotoTestCandidate[];
+    page?: Record<string, unknown>;
+    answer?: Record<string, unknown>;
+    basis?: Record<string, unknown>;
+    search_error?: string;
+  };
+}
+
 export const shopAdmin = {
+  photoTest: (photos: File[], url: string, lang: string) => {
+    const form = new FormData();
+    for (const p of photos) form.append("photos", p);
+    form.append("url", url);
+    form.append("lang", lang);
+    return fetch("/api/admin/shop/photo-test", {
+      method: "POST",
+      body: form,
+    }).then((r) => json<PhotoTest>(r));
+  },
   settings: () =>
     fetch("/api/admin/shop/settings").then((r) =>
       json<{ settings: Record<string, unknown>; missing: string[] }>(r),

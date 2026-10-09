@@ -12,6 +12,7 @@ import {
   WebshopSettings,
 } from "./api";
 import { B2BCustomers } from "./B2BCustomers";
+import { PhotoTest } from "./PhotoTest";
 import { Prices } from "./Prices";
 
 type Tab =
@@ -20,6 +21,7 @@ type Tab =
   | "b2b"
   | "matches"
   | "shop"
+  | "phototest"
   | "prices"
   | "website"
   | "webshop"
@@ -50,6 +52,7 @@ export function Admin() {
             "b2b",
             "matches",
             "shop",
+            "phototest",
             "prices",
             "website",
             "webshop",
@@ -71,6 +74,7 @@ export function Admin() {
                 b2b: "B2B customers",
                 matches: "Matches",
                 shop: "Shop settings",
+                phototest: "Photo test",
                 prices: "Prices & costing",
                 website: "Website (AI)",
                 webshop: "Requests",
@@ -94,6 +98,7 @@ export function Admin() {
         {tab === "b2b" && <B2BCustomers />}
         {tab === "matches" && <Matches />}
         {tab === "shop" && <ShopSettings />}
+        {tab === "phototest" && <PhotoTest />}
         {tab === "prices" && <Prices canEdit />}
         {tab === "website" && <Website />}
       </section>
