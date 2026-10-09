@@ -104,6 +104,20 @@ td.ok { color: var(--ok); } td.bad { color: var(--bad); }
 .viewer .layers input { accent-color: var(--olive); }
 .viewer .canvas { height: 70vh; min-height: 360px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .viewer .gl-error { margin: 0; padding: 24px; color: #8a2e1f; line-height: 1.5; }
+/* Measure and the vents' sizes under the 3D view (ADR-110) */
+.viewer .canvas canvas { touch-action: none; }
+.measure { font-size: 14px; }
+.measure-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.measure-snap { padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); font-size: 12px; }
+.measure-clear { margin-left: auto; }
+.measure-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
+.measure-list li { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.measure-n { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 50%; background: #d4472e; color: #fff; font-size: 12px; }
+.measure-from { font-size: 12px; }
+.measure-x { margin-left: auto; padding: 0 8px; }
+.vent-table { margin-top: 8px; font-size: 13px; }
+.vent-table td, .vent-table th { white-space: nowrap; }
+@media (max-width: 700px) { .vent-table { display: block; overflow-x: auto; } }
 .svgbox { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; overflow: auto; max-height: 70vh; margin-bottom: 12px; }
 .svgbox img { width: 100%; height: auto; }
 iframe.pdf { width: 100%; height: 80vh; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }

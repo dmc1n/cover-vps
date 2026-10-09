@@ -381,3 +381,58 @@ def proposals(models: Path, base: Path, learn_after: int) -> list[dict[str, Any]
         out.append({"group": group, "key": key, "value": values[(group, key, vj)],
                     "covers": sorted(names), "count": len(names)})  # fmt: skip
     return out
+
+
+# ---- measured on sewn covers (ADR-110) ------------------------------------------------------
+
+
+def measure_kind(key: str) -> str:
+    """A check-list key without its cover's own names: vent.3.above_hem -> vent.above_hem,
+    skirt.skirt-left -> skirt, piece.top-1.hem -> piece.hem, seam.a/b -> seam."""
+    parts = key.split(".")
+    if parts[0] == "vent" and len(parts) == 3:  # param-ok: vent.<n>.<what>
+        return f"vent.{parts[2]}"
+    if parts[0] == "piece" and len(parts) >= 3:  # param-ok: piece.<name>.<what>
+        return f"piece.{parts[-1]}"
+    if parts[0] in ("skirt", "seam"):
+        return parts[0]
+    return key
+
+
+def measured_deviations(
+    models: Path, tolerance_mm: float, learn_after: int
+) -> list[dict[str, Any]]:
+    """What sewn covers measured against their check lists (the Desk's fit, ADR-110), per group
+    and kind of size: how many values on how many covers, the mean and the largest difference
+    (measured - calculated, mm). `systematic` when the mean is off by more than `tolerance_mm`
+    on at least `learn_after` covers: then the program is off, not one cover."""
+    found: dict[tuple[str, str], list[tuple[str, float]]] = {}
+    for d in sorted(p for p in models.iterdir() if (p / "desk.json").is_file()):
+        try:
+            fit = json.loads((d / "desk.json").read_text(encoding="utf-8")).get("fit") or {}
+        except (OSError, json.JSONDecodeError):
+            continue
+        group = group_of(d) or "other"
+        for row in fit.get("measured") or []:
+            if _num(row.get("diff_mm")):
+                found.setdefault((group, measure_kind(str(row["key"]))), []).append(
+                    (d.name, float(row["diff_mm"]))
+                )
+    out = []
+    for (group, kind), values in sorted(found.items()):
+        diffs = [v for _, v in values]
+        covers = sorted({c for c, _ in values})
+        mean = sum(diffs) / len(diffs)
+        worst = float(sorted(diffs, key=lambda x: -abs(x))[0])
+        out.append(
+            {
+                "group": group,
+                "kind": kind,
+                "values": len(diffs),
+                "covers": covers,
+                "mean_mm": round(mean, 1),
+                "max_mm": round(worst, 1),
+                "systematic": abs(mean) > tolerance_mm and len(covers) >= learn_after,
+            }
+        )
+    return out

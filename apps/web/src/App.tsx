@@ -885,6 +885,10 @@ function CutPieces({ model, stamp }: { model: ModelDetail; stamp: number }) {
           rel="noreferrer"
         >
           cutting list (PDF)
+        </a>{" "}
+        ·{" "}
+        <a href={fileUrl(model.id, "checklist.pdf")}>
+          check list for the sewn cover (PDF)
         </a>
       </p>
       <div className="svgbox">
@@ -948,6 +952,8 @@ const FILE_HELP: Record<string, string> = {
   "cut.dxf": "for the cutting table: pieces with allowances",
   "cut.svg": "the cut pieces, to view or print",
   "cutting-list.pdf": "every piece and the fabric needed",
+  "checklist.pdf":
+    "the workshop's check list: sizes to measure on the sewn cover",
   "sizes.pdf": "size drawing, seam to seam",
   "pattern.dxf": "flat pieces seam to seam (no allowances)",
   "pattern.svg": "flat pieces, to view or print",

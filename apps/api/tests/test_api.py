@@ -66,6 +66,44 @@ def test_model_summary_and_files(chair: dict[str, Any]) -> None:
     assert c.get("/api/models/../etc/files/model.json").status_code == 404
 
 
+def test_measure_vent_sizes_check_list_and_measured_fit(chair: dict[str, Any]) -> None:
+    """ADR-110: the Measure tool's snap lines, the distance along the fabric, the vents' sizes
+    (the cutting file's numbers), the check list, and a fit with measured values."""
+    c: TestClient = chair["client"]
+    mid = chair["id"]
+    snaps = c.get(f"/api/models/{mid}/measure.json").json()
+    assert snaps["seams"] and snaps["edges"] and snaps["vents"]
+    v = snaps["vents"][0]
+    assert {"above_hem_mm", "sides", "height_line_mm", "number"} <= set(v)
+    a, b = v["corners_mm"][0], v["corners_mm"][1]  # the opening's bottom edge
+    g = c.post(f"/api/models/{mid}/measure/geodesic", json={"a": a, "b": b}).json()
+    assert g["straight_mm"] == pytest.approx(v["size_mm"][0], abs=1.0)
+    assert g["surface_mm"] == pytest.approx(v["size_mm"][0], rel=0.03)
+    bad = c.post(f"/api/models/{mid}/measure/geodesic", json={"a": [0, 0], "b": b})
+    assert bad.status_code == 422
+    assert c.get("/api/models/nope/measure.json").status_code == 404
+    pts = c.get(f"/api/models/{mid}/checkpoints").json()["points"]
+    keys = {p["key"]: p for p in pts}
+    assert keys["vent.1.above_hem"]["mm"] == snaps["vents"][0]["above_hem_mm"]
+    m = c.get(f"/api/models/{mid}").json()
+    assert "checklist.pdf" in m["files"]
+    r = c.get(f"/api/models/{mid}/files/checklist.pdf")
+    assert r.status_code == 200 and r.content.startswith(b"%PDF")
+    assert f"{mid}-checklist.pdf" in r.headers["content-disposition"]
+    # after sewing: measured against the check list, the differences kept on the Desk
+    measured = {"vent.1.above_hem": keys["vent.1.above_hem"]["mm"] + 7, "size.height": 1, "x": 2}
+    r = c.post(f"/api/desk/{mid}", json={"action": "fit", "fits": False, "measured": measured})
+    assert r.status_code == 200, r.text
+    rows = r.json()["fit"]["measured"]
+    assert [x["key"] for x in rows] == ["vent.1.above_hem", "size.height"]
+    assert rows[0]["diff_mm"] == pytest.approx(7.0)
+    assert r.json()["history"][-1]["measured"] == rows
+    learned = c.get("/api/desk-rules").json()["measured"]
+    assert any(x["kind"] == "vent.above_hem" and x["mean_mm"] == 7.0 for x in learned)
+    nothing = c.post(f"/api/desk/{mid}", json={"action": "fit", "measured": {"x": 1}})
+    assert nothing.status_code == 400
+
+
 def test_parameters_save_to_cover_json(chair: dict[str, Any]) -> None:
     c: TestClient = chair["client"]
     specs = c.get("/api/parameters").json()

@@ -28,6 +28,9 @@
     a drop or a paste (Ctrl+V), marked with red arrows, circles and lines (ADR-096). The
     history shows them as thumbnails; click one to enlarge it.
   - **Produced** (`p`): the cover was really made; the catalogue status becomes "production".
+  - **Measured…** next to Fits / Does not fit: enter what was measured on the sewn cover
+    against the check list (PDF link above the 3D view); the differences are kept for the
+    learning step. See [measuring.md](measuring.md) (ADR-110).
   - **Fits / does not fit:** after sewing, with a note.
   - **Undo** (`u`) takes back the last step. Use `j` and `k` to go to the next or previous
     cover.
