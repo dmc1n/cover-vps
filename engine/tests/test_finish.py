@@ -106,7 +106,7 @@ def test_vents_spread_and_clear_of_seams() -> None:
 
 def test_vents_on_an_inner_wall_by_the_switch(tmp_path: Path) -> None:
     """`features.vent_inner_walls`: on (the company default, owner 9 Oct 2026, QUESTIONS 71,
-    ADR-109) the front (inner) walls of an L get vents too; off, none (the old reading of 7 Oct,
+    ADR-110) the front (inner) walls of an L get vents too; off, none (the old reading of 7 Oct,
     ADR-093)."""
     import json
 
@@ -283,7 +283,7 @@ def test_a_skirt_too_low_hands_its_vents_to_the_piece_above() -> None:
 
 
 def test_inner_walls_on_request_and_positions_by_hand() -> None:
-    """The front (inner) walls get vents by default as Rens marked (ADR-109); off, ADR-093's
+    """The front (inner) walls get vents by default as Rens marked (ADR-110); off, ADR-093's
     outer walls only; `features.vent_positions` places them where the rule cannot reach."""
     d = doc(wall("skirt-front-2", 2000, 400), wall("skirt-back", 3000, 800))
     inner = frozenset({"skirt-front-2"})

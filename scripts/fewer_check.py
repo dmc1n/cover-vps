@@ -13,7 +13,7 @@ It does not trust the engine's own summary; it measures again:
 - the net area of each flat piece against its 3D area (flattening keeps area).
 - the openings: as many as the drawing says; on a piece standing more than
   features.vent_inner_mm inside the footprint's convex hull (an inner wall) only when the
-  cover's `features.vent_inner_walls` allows it (on by default: owner, 9 Oct 2026, ADR-109).
+  cover's `features.vent_inner_walls` allows it (on by default: owner, 9 Oct 2026, ADR-110).
 
 Prints one line per cover, `PASS` or `FAIL` with the reasons.
 """
@@ -210,7 +210,7 @@ def check(model: Path, vents_expected: int | None) -> dict[str, Any]:
         feats = (
             json.loads((model / "cover.json").read_text()).get("parameters", {}).get("features", {})
         )
-    try:  # the cover's own switch, else the company default (owner, 9 Oct 2026: on; ADR-109)
+    try:  # the cover's own switch, else the company default (owner, 9 Oct 2026: on; ADR-110)
         from coverengine.params.registry import resolve_model
 
         inner_ok = bool(resolve_model(model)["features.vent_inner_walls"])

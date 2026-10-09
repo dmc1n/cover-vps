@@ -180,7 +180,7 @@ def vent_walls(model_dir: Any, params: EffectiveParams) -> Walls:
     """For every piece, from `panels.npz`: whether its bottom lies on an inner wall (an L, U or
     C shape's walls facing its own open corner: half of its bottom edge or more lies
     `features.vent_inner_mm` or more inside the footprint's convex hull; ADR-093, they get vents
-    unless `features.vent_inner_walls` is off, ADR-109), and which way
+    unless `features.vent_inner_walls` is off, ADR-110), and which way
     its lower part faces (ADR-101: the vents go round all sides of the cover)."""
     import json
     from pathlib import Path
@@ -341,7 +341,7 @@ def vent_bases(
     over a skirt too low for a vent, the seam on top of it (`features.vent_above_low_skirt`;
     a box cover's 12 cm band, Rens 8 Oct 2026). Without them (an older pattern.json): the skirt
     pieces' hems, as before. `skip`: pieces that never get one (the inner walls, only with
-    `features.vent_inner_walls` off; ADR-109)."""
+    `features.vent_inner_walls` off; ADR-110)."""
     warnings: list[str] = []
     need = (
         _p(params, "features.vent_above_hem_mm")

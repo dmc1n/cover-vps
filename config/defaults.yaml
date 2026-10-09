@@ -174,7 +174,7 @@ features:                        # per-cover defaults, overridden per model
                                  # Spread over the sides by their length.
   vent_inner_mm: 300             # an inner wall: a skirt piece whose middle lies this far inside
                                  # the footprint's convex hull (an L/U/C shape's open corner)
-  vent_inner_walls: true         # owner, 9 Oct 2026 (QUESTIONS 71, ADR-109): vents go on the front
+  vent_inner_walls: true         # owner, 9 Oct 2026 (QUESTIONS 71, ADR-110): vents go on the front
                                  # (inner) walls of an L, U or C too, as Rens marked (8 Oct 2026);
                                  # false skips them (the old reading of 7 Oct, ADR-093)
   vent_wall_angle_deg: 45        # pieces facing within this angle of each other face the same side:

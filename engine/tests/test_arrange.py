@@ -155,7 +155,7 @@ def test_an_l_arrangement_gets_an_l_cover_with_a_sharp_inner_corner(models: Path
     slope = np.sin(np.radians(float(params["hull.min_slope_deg"])))  # type: ignore[arg-type]
     assert np.all((np.abs(up) < 1e-6) | (up >= slope - 1e-6))
     # every piece fits the roll; the inner corner's walls are found (vents go there too by
-    # default, ADR-109; switched off they stay on the outer walls, ADR-093)
+    # default, ADR-110; switched off they stay on the outer walls, ADR-093)
     fin = json.loads((d / "finished.json").read_text())
     usable = float(params["roll.usable_width_mm"])  # type: ignore[arg-type]
     assert all(min(p["size_mm"]) <= usable for p in fin["pieces"])

@@ -1,4 +1,4 @@
-"""Rebuild the covers with inner walls in staging with vents on the front walls (ADR-109).
+"""Rebuild the covers with inner walls in staging with vents on the front walls (ADR-110).
 
     uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--models models]
         [--staged DIR] [--only a,b]
