@@ -3624,3 +3624,68 @@ upload this Excel somewhere so you set these prices as fixed prices for the curr
   page); `min-width: 0` lets their tables scroll inside.
 - **Better later:** a per-row confirmation memory (aliases learned from hand picks), the
   supplier's article numbers once the covers carry them, price lists per colour or quality.
+
+## ADR-114 — Approved drawing covers offered as existing covers
+
+The owner (9 Oct 2026), option a: every drawing cover whose Desk status is approved (or
+produced) is also offered by the configurator as "we already make a cover that fits", with the
+kind of furniture from the product list. Later the same day: the retail price list he uploaded
+(Import prices, ADR-113; sheet "SUNS Covers", column "Type nr." = our drawing code) is the main
+source for the kind, before products.json and the shape.
+
+- **Which covers:** drawing-* folders with Desk status in `match.drawing_statuses`
+  (default `approved,produced`). A cover rejected later drops out at once: the card cache
+  (`match.cards`) is stamped with the newest change of every drawing cover's desk.json,
+  cover.json, products.json and model.json, and with the price list's file and time.
+- **The kind, first that says something** (`engine/coverengine/match_drawings.py`):
+  1. a person's word: `"match": {"kind": ..., "side": ..., "chairs": ...}` in the cover's
+     cover.json (`"none"` keeps it out); it also confirms a doubtful cover;
+  2. the price list (`apps/api/coverapi/match_list.py`): the newest kept list in
+     `prices/imports/` with a drawing-code column. One-cell rows are headings: a section
+     ("Corner sets", "Dining tables": words like sets/tables/items) or a family ("Kota / Aspen/
+     Evora"); a one-cell row with a colon continues the row above's "Suitable for". `#VALUE!`
+     cells are ignored. The kind comes from the item name ("corner set left", "loungechair",
+     "2-seater sofa bench", "Ibiza style", "dining tables" + Ø → round), else from "Suitable
+     for" and the section;
+  3. the product names linked from the uploaded product list (products.json labels, ADR-091);
+  4. the shape: an L is a corner sofa, a round one a round set, a sloped box a sofa (a chair
+     below 150 cm), a flat box at chair height as wide as a table with chairs a dining set.
+  Nothing says it: unknown, not offered. The category in the live cover.json is not touched;
+  the derived kind lives in the card and the review list.
+- **Doubtful, not offered until confirmed:** sources that disagree (price list, product names,
+  a clear shape); the price list's sizes that are not the cover's (that row is then not used:
+  the list's D6 is the Blocchi hocker, drawing-d6 the Blocchi daybed); left/right disagreeing
+  between the item name, the product names and the plan; a U/C shape (Rios) or a curved/free
+  shape for a sofa; Ibiza style (a corner and a sofa in one row); one code on two approved
+  covers (S10 box and plain, L4).
+- **Sizes as the SUNS cards (the furniture, not the cover):** the drawing's cover minus
+  `hull.clearance_mm` on each side and on top. A dining or round cover over table and chairs
+  gets the table's own size (from the list's "Tables 340 x 100 cm" / "Ø 170" or the product
+  name, else the cover minus `hull.chair_room_mm` per side) and its height is a ceiling
+  (`height_max`): any table lower than the cover fits under it (no score lost on height). The
+  price list's size check allows `match.drawing_size_tol_cm` (3.2) and, for tables, a table
+  size smaller than the cover by the chair room.
+- **Left and right:** the item name ("corner set left"), else the product names, else the plan:
+  every drawing named left is longer along x (C12, C15, C18, C21, C25 …). "Suitable for" is not
+  used for the hand (it names the modules' hands). Left and right in one folder (a mirrored
+  pair) fits either hand.
+- **Families:** "Suitable for"'s families (Kota, Aspen, Evora) are on the card, with the SUNS
+  models of those families and the same kind (`suits`). `match.match(hint=...)` puts a drawing
+  cover of the named family first among equal scores; the photo/link suggestion passes the
+  recognised product's name.
+- **Shop:** `stock_model` is `^(suns|drawing)-…` (shop and B2B; the admin's Matches choice too).
+  The customer sees the price list's name ("SUNS cover corner set left – Savona with arms /
+  Siena : …"), else the product list's name, never the folder name. Price: the published B2C
+  fixed price for that model when set, otherwise the configurator's price for its sizes minus
+  `stock_discount_pct`, as SUNS covers. The configurator's sizes for pricing are clamped to its
+  field ranges (a 420 cm table is priced as 400). The B2B catalogue lists offered drawing covers
+  too.
+- **Review list:** `scripts/matchcards.py` writes `out/matchcards/review.json`, `review.csv`
+  (model, kind, how it was decided, sizes, side, chairs, doubts) and `listing.json` (the price
+  list as read, and the rows it could not place: no cover, not approved, other sizes,
+  umbrellas). Read-only.
+- **First run (9 Oct, live data read-only):** 76 approved, 62 offered: 20 corner sofas, 13
+  sofas, 12 chairs/side tables/hockers, 7 dining sets, 7 round sets, 3 loungers. 14 doubtful.
+- **Better later:** the customer's own hand for Ibiza-style and U-shaped sets in the
+  configurator; a family question in the configurator itself; the customer-facing name per
+  language (the list is in English).

@@ -1081,6 +1081,8 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
         from coverengine import spend
         from coverengine.errors import CoverError
 
+        from coverapi import match_list
+
         if website:
             raise HTTPException(400, "this could not be sent")
         p = shop_params(auth)
@@ -1131,7 +1133,18 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
                          "title": facts["title"] if facts else None,
                          "photos": len(photos)}  # fmt: skip
         try:  # an existing cover that fits these sizes (ADR-064)
-            r = mt.match(out["product"], out["sizes"], store.models, p, top=1)
+            rec = out.get("recognised") or {}
+            hint = " ".join(str(x or "") for x in (out["source"]["title"], rec.get("name"),
+                                                     rec.get("title")))  # fmt: skip
+            r = mt.match(
+                out["product"],
+                out["sizes"],
+                store.models,
+                p,
+                top=1,
+                listing=match_list.for_data(data),
+                hint=hint,
+            )
             best = r["matches"][0] if r["matches"] else None
             out["match"] = best if best and r["decision"] != "custom" else None
         except (ValueError, CoverError, KeyError):

@@ -156,7 +156,7 @@ Three tabs on the admin page belong to it.
   - **Learning mode** (Shop settings, matching, mode `shadow`; the default): the customer leaves
     an e-mail address. You get a mail, and the request appears in the admin tab **Matches**
     with the best covers, their percentage and the difference per size in cm (+ is roomier).
-  - Press **Take N %** for the proposal, **Custom**, or type another cover (`suns-…`) and press
+  - Press **Take N %** for the proposal, **Custom**, or type another cover (`suns-…` or `drawing-…`) and press
     **Choose**. A note for the customer is optional.
   - The customer gets a link to the proposal, in their own language, and can order the existing
     cover or a custom one.
@@ -164,6 +164,20 @@ Three tabs on the admin page belong to it.
   how often the proposal was changed, the fit answers of customers (1–5) and the returns.
   When a band fits well, set the threshold (Shop settings, matching, `threshold_pct`) and,
   when you trust it, mode `auto`: customers then see the match at once.
+- **Drawing covers are offered too** (ADR-114): every drawing cover approved or produced at the
+  Desk, as the kind of furniture the price list says (Import prices keeps your list; its
+  column "Type nr." is the drawing code), else the product list's name, else its shape. The
+  customer sees the price list's name, never "drawing-t1"; it sells at its fixed B2C price, or
+  at the configurator's price minus the stock discount. Reject a cover at the Desk and it is no
+  longer offered.
+  - **The review list:** `COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py`
+    writes `out/matchcards/review.csv`: every drawing cover, its kind, how that was decided,
+    the sizes, left or right, and why a cover is held back.
+  - **Doubtful covers are held back** (sources disagree, the list's sizes differ, a U or curved
+    shape, Ibiza style, one code on two covers). To confirm or correct one, add to its
+    cover.json `"match": {"kind": "corner_sofa", "side": "left"}` (kinds: dining_set,
+    round_set, sofa, corner_sofa, lounger, item; `"none"` keeps it out; `"chairs": true` for
+    tables).
 - **The fit question:** Shop settings, `fit_mail`. Switch it on and set the days. It needs the
   domain and the mail server. A shipped order then gets one question by mail; the answers
   appear under Matches.
