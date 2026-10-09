@@ -130,6 +130,15 @@ Three tabs on the admin page belong to it.
     `/media` files for a day. How the film is made: ADR-108 (`scripts/film/`).
 
   The empty fields are listed at the top.
+- **Photo test** (ADR-112): try the shop's "start from a photo or a link" yourself and see
+  every step: what Google's search by image found (its best guess, the pages that show your
+  photo, the names of the matching pictures), what Gemini recognised (brand, model, sizes),
+  the web searches, each found picture held against your photo with its score, which one was
+  picked and the final answer, plus the time and the cost (about €0.03). Nothing is kept: the
+  photo is only used for the test and the result only shows on your screen. Use it when a
+  customer says a photo was read wrongly: try the same kind of photo and read where it went
+  wrong. A photo found on the web (a shop's picture) is recognised almost always; a photo
+  taken at home is found by Google's search by image only when a similar picture is online.
 - **Website (AI):** type what should change on the site, in plain words, for example "add a
   question about delivery time: about three weeks". The AI changes the draft in Dutch and
   English. Open the preview, then **Publish** (or **Discard**). Earlier versions can be

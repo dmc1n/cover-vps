@@ -16,7 +16,9 @@ customer's own photo of their furniture, or from the page of a webshop that sell
   brand and model and, beside it, for the look alone; each result's own picture is held against
   the photo. The very product is "recognised" (shown by name), a similar enough one is a
   "comparable" start, anything less is dropped and the photo's estimates are asked to measure.
-  A real search by image (Cloud Vision web detection) is ready but off until there is a key.
+  A real search by image (Cloud Vision web detection, ADR-112) runs first: its pages that show
+  the photo become candidates and the names of its matching pictures help the identification.
+- The admin's photo test (Admin, Shop settings) runs the same flow and shows every step.
 - The sizes are checked against config/quote_products.json (clipped to the range, flagged), and
   the proposal carries the existing cover that fits (coverengine.match), if any.
 - Per visitor (the Worker's x-client-ip) at most `suggest.per_hour` suggestions an hour. Nothing
@@ -66,6 +68,9 @@ SNIPPET_CHARS = 220
 SNIPPETS_MAX = 10
 FACTS_MAX_CHARS = 4000
 CHECK_BELOW = 0.6  # a size the AI is less sure of than this must be checked
+NAMES_MAX = 15  # names of matching web pictures and pages given to the identification (ADR-112)
+TRACE_THUMB_PX = 160  # the photo test shows each compared web picture this small
+PICTURE_URL = re.compile(r"\.(jpe?g|png|webp|avif|gif)$", re.I)
 DIMENSION_WORDS = re.compile(
     r"afmeting|dimension|maße|masse|abmessung|größe|grootte|taille|lengte|breedte|hoogte|"
     r"length|width|height|depth|diepte|länge|breite|höhe|tiefe|longueur|largeur|hauteur|\bcm\b",
@@ -458,14 +463,25 @@ shape, distinctive features and materials (e.g. 'outdoor lounge sofa teak frame 
 the most specific first, one in Dutch and one in German"]}"""
 
 
-def identify(params: Any, png: bytes) -> dict[str, Any]:
+HINTS = """
+A search by image found web pictures and pages that show this very photo (or part of it). Their
+file names and titles (shops name product pictures after the product; a name that recurs is very
+likely this product's brand and model, a single odd one may be a mismatch):
+__NAMES__
+Use them for brand and model when they fit what you see (then brand_confidence may be high)."""
+
+
+def identify(params: Any, png: bytes, names: list[str] | None = None) -> dict[str, Any]:
     """What the photo shows (ADR-092): product type, brand and model when recognisable,
-    materials, distinctive features, estimated sizes and the queries to search with."""
+    materials, distinctive features, estimated sizes and the queries to search with. `names`:
+    what the search by image's matching pictures and pages are called (ADR-112)."""
     from coverengine.quote import PRODUCTS
 
     n = int(params["suggest.queries"])  # type: ignore[arg-type]
     keys = "; ".join(f"{k} ({v['label']})" for k, v in PRODUCTS.items())
     prompt = IDENTIFY.replace("__PRODUCTS__", keys).replace("__N__", str(n))
+    if names:
+        prompt += HINTS.replace("__NAMES__", "\n".join(f"- {x}" for x in names[:NAMES_MAX]))
     timeout = float(params["suggest.ai_timeout_s"])  # type: ignore[arg-type]
     doc = _json_in(gemini(params, [_png_part(png), {"text": prompt}], "suggest identify",
                           timeout)["text"])  # fmt: skip
@@ -521,7 +537,9 @@ def search_comparable(
     got = gemini(params, [_png_part(png), {"text": prompt}], "suggest search", timeout, True)
     pages: list[dict[str, Any]] = []
     for pg in _json_in(got["text"]).get("pages") or []:
-        if isinstance(pg, dict) and str(pg.get("url", "")).startswith("http"):
+        # a picture's address is no product page (it became the customer's "recognised" link)
+        if (isinstance(pg, dict) and str(pg.get("url", "")).startswith("http")
+                and not PICTURE_URL.search(urlsplit(str(pg["url"])).path)):  # fmt: skip
             raw = pg.get("sizes_cm")
             sizes: dict[str, Any] = raw if isinstance(raw, dict) else {}
             kept = {k: v for k, v in sizes.items() if isinstance(v, int | float) and v > 0}
@@ -539,11 +557,84 @@ def search_comparable(
     return out
 
 
+_NAME_NOISE = re.compile(r"^(\d+|\d+x\d*|x\d+|[0-9a-f]{8,}|[a-z]?\d{5,}[a-z\d]*|cdn|shop|files|"
+                         r"products?|images?|uploads?|media|catalog|cache|large|thumb|img|"
+                         r"jpe?g|png|webp|avif|v)$", re.I)  # fmt: skip
+
+
+def image_name(url: str) -> str:
+    """The words in a web picture's file name ("Marolo-SUNS-Daybed-BZ-Free-26-2500_1.jpg" ->
+    "Marolo SUNS Daybed BZ Free"): shops name their product pictures after the product, so a
+    picture that matches the photo often says what it is (ADR-112). Empty when it says nothing
+    (a hash, numbers)."""
+    from urllib.parse import unquote
+
+    last = unquote(urlsplit(url).path.rsplit("/", 1)[-1])
+    last = re.sub(r"\.[a-z0-9]{2,5}$", "", last, flags=re.I)
+    words = [w for w in re.split(r"[-_+.,~\s()]+", last) if w and not _NAME_NOISE.match(w)]
+    letters = [w for w in words if re.search(r"[a-z]{3}", w, re.I)]
+    return " ".join(words)[:100] if len(letters) >= 2 else ""
+
+
+def read_web_detection(web: dict[str, Any]) -> dict[str, Any]:
+    """Cloud Vision's web detection made useful (ADR-112). Measured on 15 photos: Google lists
+    first the pages about its best-guess label ("studio couch", "swimming pool": no matching
+    picture at all) and only then the pages that really show the photo; the pictures that match
+    usually carry the product's name in their file name. So:
+    - "pages": only the pages with a matching picture, full matches first;
+    - "names": what those pictures and pages are called (the hints for the identification);
+    - "entities", "labels", "images" and "similar" as Google gives them (for the diagnostics;
+      the label and the similar pictures are too generic to search with)."""
+    pages: list[dict[str, Any]] = []
+    other = 0
+    for pg in web.get("pagesWithMatchingImages") or []:
+        url = str(pg.get("url") or "")
+        full, part = pg.get("fullMatchingImages") or [], pg.get("partialMatchingImages") or []
+        if not url.startswith("http"):
+            continue
+        if not (full or part):
+            other += 1  # a page about the label, not about this picture
+            continue
+        title = re.sub(r"<[^>]+>", "", str(pg.get("pageTitle") or ""))  # it marks the match
+        img = str((full or part)[0].get("url") or "")
+        pages.append({"url": url, "title": " ".join(title.split()), "image": img,
+                      "same": bool(full), "match": "full" if full else "partial",
+                      "from": "image search"})  # fmt: skip
+    pages.sort(key=lambda p: not p["same"])  # full matches first, Google's order kept within
+    imgs = {k: [str(x.get("url")) for x in web.get(f"{k}MatchingImages") or [] if x.get("url")]
+            for k in ("full", "partial")}  # fmt: skip
+    names: list[str] = []
+    for u in [*imgs["full"], *(p["image"] for p in pages if p["same"]), *imgs["partial"],
+              *(p["image"] for p in pages if not p["same"])]:  # fmt: skip
+        names.append(image_name(str(u)))
+    names += [str(p["title"])[:100] for p in pages]
+    names = list(dict.fromkeys(n for n in names if n))
+    ents = [{"name": str(e.get("description")), "score": round(float(e.get("score") or 0), 2)}
+            for e in web.get("webEntities") or [] if e.get("description")]  # fmt: skip
+    return {
+        "pages": pages, "labels": [str(x.get("label")) for x in web.get("bestGuessLabels") or []
+                                   if x.get("label")],
+        "names": names[:NAMES_MAX], "entities": ents, "images": imgs,
+        "similar": [str(x.get("url")) for x in web.get("visuallySimilarImages") or []
+                    if x.get("url")],
+        "other_pages": other,
+    }  # fmt: skip
+
+
+def _jpeg(png: bytes) -> bytes:
+    """The photo as a JPEG for the image search: the same picture, a fraction of the bytes."""
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.open(io.BytesIO(png)).convert("RGB").save(out, "JPEG", quality=90)
+    return out.getvalue()
+
+
 def reverse_search(params: Any, png: bytes) -> dict[str, Any]:
-    """A real search by image (ADR-092), off until the owner gives a key (docs/QUESTIONS.md):
-    Google Cloud Vision's web detection, the engine behind Google Lens's "visual matches". The
-    pages that show this very picture (or one almost alike) and Google's best guess of what it
-    is. Its fee goes into the month's ledger."""
+    """A real search by image (ADR-092, ADR-112): Google Cloud Vision's web detection, the web
+    index behind Google Lens's exact matches (not Lens's product index). Asks for
+    `suggest.reverse_max` results of each kind (with 5, only the label's pages came back) and
+    returns read_web_detection's reading. Its fee goes into the month's ledger."""
     import base64
     import urllib.error
     import urllib.request
@@ -553,8 +644,8 @@ def reverse_search(params: Any, png: bytes) -> dict[str, Any]:
     from coverengine.errors import CoverError
 
     spend.guard(params)
-    n = int(params["suggest.search_pages"])  # type: ignore[arg-type]
-    body = {"requests": [{"image": {"content": base64.b64encode(png).decode()},
+    n = int(params["suggest.reverse_max"])  # type: ignore[arg-type]
+    body = {"requests": [{"image": {"content": base64.b64encode(_jpeg(png)).decode()},
                           "features": [{"type": "WEB_DETECTION", "maxResults": n}]}]}  # fmt: skip
     req = urllib.request.Request(
         "https://vision.googleapis.com/v1/images:annotate", data=json.dumps(body).encode(),
@@ -570,17 +661,7 @@ def reverse_search(params: Any, png: bytes) -> dict[str, Any]:
         raise CoverError(f"the image search did not answer: {type(exc).__name__}") from None
     spend.record_eur("google vision web", float(params["suggest.reverse_eur"]),  # type: ignore[arg-type]
                      "suggest reverse")  # fmt: skip
-    web = ((reply.get("responses") or [{}])[0]).get("webDetection") or {}
-    pages = []
-    for pg in web.get("pagesWithMatchingImages") or []:
-        url = str(pg.get("url") or "")
-        if url.startswith("http"):
-            title = re.sub(r"<[^>]+>", "", str(pg.get("pageTitle") or ""))  # it marks the match
-            img = (pg.get("fullMatchingImages") or pg.get("partialMatchingImages") or [{}])[0]
-            pages.append({"url": url, "title": title, "image": str(img.get("url") or ""),
-                          "same": bool(pg.get("fullMatchingImages"))})  # fmt: skip
-    labels = [str(x.get("label")) for x in web.get("bestGuessLabels") or [] if x.get("label")]
-    return {"pages": pages[:n], "labels": labels}
+    return read_web_detection(((reply.get("responses") or [{}])[0]).get("webDetection") or {})
 
 
 COMPARE = """Picture 0 is a customer's photo of their outdoor furniture. The other pictures are
@@ -655,6 +736,10 @@ def _candidate(pg: dict[str, Any], timeout: float, page_max: int, img_max: int,
         try:
             _, raw = fetch(str(img), IMAGE_TYPES, timeout, img_max)
             c["png"] = _small_png(raw, edge)
+            # the page's own picture, or the one the search by image matched to the photo (which
+            # says nothing about what the page sells: a category page shows it too)
+            c["pic"] = "page" if img == f.get("image") else (
+                "match" if pg.get("from") == "image search" else "search")  # fmt: skip
             break
         except (SuggestError, OSError, ValueError):
             continue
@@ -672,59 +757,108 @@ def _search(params: Any, png: bytes, ident: dict[str, Any], brand: bool) -> list
         return []
 
 
+NOTHING_BY_IMAGE: dict[str, Any] = {"pages": [], "labels": [], "names": [], "entities": [],
+                                    "images": {"full": [], "partial": []}, "similar": [],
+                                    "other_pages": 0}  # fmt: skip
+
+
 def _reverse(params: Any, png: bytes) -> dict[str, Any]:
     """The search by image when it is on; off, or failing, it finds nothing."""
     from coverengine.errors import CoverError
 
     if not bool(params["suggest.reverse_search"]):
-        return {"pages": [], "labels": []}
+        return {**NOTHING_BY_IMAGE, "off": True}
     try:
-        return reverse_search(params, png)
+        return {**NOTHING_BY_IMAGE, **reverse_search(params, png)}
     except (CoverError, OSError, ValueError) as exc:
         log.warning("suggest reverse search: %s", exc)
-        return {"pages": [], "labels": []}
+        return {**NOTHING_BY_IMAGE, "error": str(exc)[:200]}
 
 
 def _named(ident: dict[str, Any], title: str) -> bool:
     """The page's name carries the recognised brand and model."""
-    t = title.casefold()
-    b, m = str(ident.get("brand") or ""), str(ident.get("model") or "")
-    return bool(b and m) and b.casefold() in t and m.casefold() in t
+    b = str(ident.get("brand") or "")
+    return bool(b) and b.casefold() in title.casefold() and _says_model(ident, title)
+
+
+def _says_model(ident: dict[str, Any], *texts: str) -> bool:
+    """One of the texts (a page's title, its address) names the recognised model (or one of
+    them: "Dolce / Nova" is a chair at a table)."""
+
+    def words(t: str) -> str:
+        return " " + re.sub(r"[^a-z0-9]+", " ", t.casefold()).strip() + " "
+
+    models = [words(m) for m in re.split(r"[/,&+]", str(ident.get("model") or ""))]
+    models = [m for m in models if m.strip()]
+    return any(m in words(t) for m in models for t in texts)
+
+
+def _short_name(title: str, ident: dict[str, Any]) -> str:
+    """A page's title without the shop's name: "Marolo daybed - SUNS Outdoor Lifestyle" ->
+    "Marolo daybed" (the part that names the model, else the first)."""
+    parts = [p.strip() for p in re.split(r"\s+[|–—-]\s+", title) if p.strip()] or [title]
+    return next((p for p in parts if _says_model(ident, p)), parts[0])
+
+
+def _by_image_first(pages: list[dict[str, Any]], ident: dict[str, Any]) -> list[dict[str, Any]]:
+    """The search by image's pages: those naming the recognised model first, then the full
+    matches (a page showing the very picture), else in Google's order (ADR-112)."""
+
+    def key(i: int) -> tuple[bool, bool, int]:
+        return (not _says_model(ident, pages[i]["title"], pages[i]["url"]),
+                not pages[i]["same"], i)  # fmt: skip
+
+    return [pages[i] for i in sorted(range(len(pages)), key=key)]
 
 
 def find_comparable(
-    params: Any, png: bytes, timeout: float, page_max: int, img_max: int
-) -> dict[str, Any]:
-    """A photo alone (ADR-087, ADR-092): identify the furniture (brand and model when it can),
-    search the web with targeted queries, hold each result's picture against the photo, and keep
+    params: Any, png: bytes, timeout: float, page_max: int, img_max: int,
+    trace: dict[str, Any] | None = None,
+) -> dict[str, Any]:  # fmt: skip
+    """A photo alone (ADR-087, ADR-092, ADR-112): search by image, identify the furniture (brand
+    and model when it can, helped by the names of the pictures that match), search the web with
+    targeted queries, hold each result's picture against the photo, and keep
     - "recognised": the very same product (the comparison says so, or its page carries the
       brand and model the photo was recognised as with high confidence);
     - else "comparable": the most similar product with written sizes, when similar enough;
     - else nothing (the photo's own estimates; better than a product that makes no sense).
-    Returns {"ident", "facts", "recognised", "comparable", "candidates"}."""
+    Returns {"ident", "facts", "recognised", "comparable", "candidates"}; `trace` (the admin's
+    photo test) gets each step's own result."""
     from concurrent.futures import ThreadPoolExecutor
 
     from coverengine.errors import CoverError
 
+    trace = trace if trace is not None else {}
     out: dict[str, Any] = {"ident": {}, "facts": None, "recognised": None, "comparable": None,
                            "candidates": []}  # fmt: skip
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        # a real search by image beside the first look, when it is switched on (ADR-092)
-        rev = pool.submit(_carry(_reverse), params, png)  # the visitor's spend goes along
-        try:
-            ident = identify(params, png)
-        except CoverError:
-            ident = {}  # the search still sees the photo
-        reverse = rev.result()
-    if reverse["labels"]:  # Google's own guess of what the picture shows: the best query
-        ident = {**ident, "queries": [*reverse["labels"], *(ident.get("queries") or [])]}
-    out["ident"] = ident
+    # the search by image first (a second or two): the names of the pictures that match the
+    # photo are the best hint of its brand and model there is (ADR-112)
+    reverse = {**NOTHING_BY_IMAGE, **_reverse(params, png)}
+    trace["image_search"] = reverse
+    try:
+        ident = identify(params, png, reverse["names"])
+    except CoverError as exc:
+        ident = {}  # the search still sees the photo
+        trace["identify_error"] = str(exc)
+    # Google's best-guess label ("studio couch", "swimming pool") is no query any more: on 15
+    # photos it never named the product and steered the search away (ADR-112)
+    out["ident"] = trace["identify"] = ident
     # two searches side by side: the recognised brand and model (when there is a guess) and the
-    # look alone; their results taken in turns, after the pages showing the very picture
-    focus = [True, False] if ident.get("brand") else [False]
+    # look alone; their results taken in turns, after the pages showing the very picture. When
+    # the search by image already shows a page of the recognised model, the search by look
+    # (for a similar product) is not needed: one search fee less (ADR-112)
+    sure = ident.get("brand_confidence", 0) >= float(params["suggest.brand_min"]) and any(  # type: ignore[arg-type]
+        _says_model(ident, p["title"], p["url"]) for p in reverse["pages"]
+    )
+    focus = (
+        [True] if sure and ident.get("brand") else [True, False] if ident.get("brand") else [False]
+    )
     with ThreadPoolExecutor(max_workers=len(focus)) as pool:
         search = _carry(_search)
-        runs = [reverse["pages"], *pool.map(lambda b: search(params, png, ident, b), focus)]
+        found = list(pool.map(lambda b: search(params, png, ident, b), focus))
+    trace["searches"] = {("brand and model" if b else "look"): r
+                         for b, r in zip(focus, found, strict=True)}  # fmt: skip
+    runs = [_by_image_first(reverse["pages"], ident), *found]
     pages, seen = [], set()
     for i in range(max(len(r) for r in runs)):
         for r in runs:
@@ -748,13 +882,21 @@ def find_comparable(
         s = scores.get(i)
         c["similarity"] = s["similarity"] if s else None
         c["why"] = s["why"] if s else ""
-        if s:  # seen side by side: the comparison decides
+        if s and c.get("pic") == "match":  # the picture the search by image matched, not the
+            # page's own: it is the photo itself, so the page counts only when it names the model
+            c["same"] = (
+                s["same"]
+                and s["similarity"] >= same_min
+                and _says_model(ident, c["title"], c["url"])
+            )
+        elif s:  # seen side by side: the comparison decides
             c["same"] = s["same"] and s["similarity"] >= same_min
         else:  # no picture to compare: only the recognised name on the page counts
             c["same"] = (bool(pg.get("same")) and ident.get("brand_confidence", 0) >= brand_min
                          and _named(ident, c["title"]))  # fmt: skip
     out["candidates"] = [{k: v for k, v in c.items() if k not in ("png", "facts")} | {
         "sizes": bool(c["facts"])} for c in cands]  # fmt: skip
+    trace["candidates"] = [_traced(c, pg) for c, pg in zip(cands, pages, strict=True)]
     rank = sorted(range(len(cands)), key=lambda i: -(cands[i]["similarity"] or 0))
     # the very product: the one with written sizes first, then the most alike
     same = sorted((i for i in rank if cands[i]["same"]), key=lambda i: not cands[i]["facts"])
@@ -764,7 +906,7 @@ def find_comparable(
         # the name as the page gives it (the photo's own guess may have been another brand)
         brand = str(pg.get("brand") or "") or (ident.get("brand") if _named(ident, c["title"])
                                                else "")  # fmt: skip
-        name = str(pg.get("title") or c["title"]).split(" | ")[0].strip()
+        name = _short_name(str(pg.get("title") or c["title"]), ident)
         if brand and brand.casefold() not in name.casefold():
             name = f"{brand} {name}"
         out["recognised"] = {"url": c["url"], "title": c["title"], "name": name,
@@ -776,6 +918,28 @@ def find_comparable(
         out["comparable"] = {"url": c["url"], "title": c["title"], "similarity": c["similarity"]}
         out["facts"] = {**c["facts"], "relation": "a SIMILAR product, not the customer's own"}
     return out
+
+
+def _traced(c: dict[str, Any], pg: dict[str, Any]) -> dict[str, Any]:
+    """One candidate as the photo test shows it: where it came from, the picture compared (a
+    small JPEG of the web's picture, never the customer's photo), the score and the sizes read."""
+    import base64
+
+    from PIL import Image
+
+    thumb = ""
+    if c.get("png"):
+        im = Image.open(io.BytesIO(c["png"])).convert("RGB")
+        im.thumbnail((TRACE_THUMB_PX, TRACE_THUMB_PX))
+        b = io.BytesIO()
+        im.save(b, "JPEG", quality=80)
+        thumb = "data:image/jpeg;base64," + base64.b64encode(b.getvalue()).decode()
+    f = c.get("facts") or {}
+    return {"url": c["url"], "title": c["title"], "from": pg.get("from") or "web search",
+            "match": pg.get("match") or "", "picture": c.get("pic") or "", "thumb": thumb,
+            "similarity": c.get("similarity"), "same": c.get("same"), "why": c.get("why", ""),
+            "sizes": (f.get("product") or {}).get("sizes") or {},
+            "sizes_text": (f.get("sizes_text") or [])[:3]}  # fmt: skip
 
 
 def proposal(ans: dict[str, Any]) -> dict[str, Any]:
@@ -830,9 +994,10 @@ def proposal(ans: dict[str, Any]) -> dict[str, Any]:
 
 
 def read(
-    p: Any, pngs: list[bytes], url: str, lang: str
+    p: Any, pngs: list[bytes], url: str, lang: str, trace: dict[str, Any] | None = None
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
-    """The suggestion for these photos and/or this link: (the proposal, the page's facts)."""
+    """The suggestion for these photos and/or this link: (the proposal, the page's facts).
+    `trace` (the admin's photo test, ADR-112) gets each step's own result."""
     from coverengine.errors import CoverError
 
     limit_bytes = int(p["suggest.photo_max_bytes"])  # type: ignore[arg-type]
@@ -845,6 +1010,8 @@ def read(
             url = "https://" + url
         final, html = fetch(url, PAGE_TYPES, timeout, page_max)
         facts = page_facts(html, final)
+        if trace is not None:
+            trace["page"] = facts
         if facts["image"] and len(pngs) < MAX_PHOTOS:
             try:
                 _, img = fetch(facts["image"], IMAGE_TYPES, timeout, limit_bytes)
@@ -856,12 +1023,20 @@ def read(
         # a photo alone: recognise it, or start from a similar product's written sizes
         # (ADR-087, ADR-092)
         try:
-            found = find_comparable(p, pngs[0], timeout, page_max, limit_bytes)
+            found = find_comparable(p, pngs[0], timeout, page_max, limit_bytes, trace)
             facts = found["facts"]
         except (CoverError, OSError, ValueError) as exc:
             log.warning("suggest search: %s", exc)
             found = {}  # the photo alone, as before
+            if trace is not None:
+                trace["search_error"] = str(exc)[:200]
     ans = ask(p, pngs, facts, lang, hint=found.get("ident") or None)
+    if trace is not None:
+        trace["answer"] = ans
+        trace["basis"] = {k: found.get(k) for k in ("recognised", "comparable")} | {
+            "relation": (facts or {}).get("relation"),
+            "url": (facts or {}).get("url"),
+        }
     out = proposal(ans)
     out["recognised"] = found.get("recognised")
     out["comparable"] = found.get("comparable")
@@ -962,6 +1137,56 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
         except (ValueError, CoverError, KeyError):
             out["match"] = None
         return out
+
+    @app.post("/api/admin/shop/photo-test")
+    async def photo_test(
+        request: Request,
+        url: str = Form(""),  # noqa: B008
+        lang: str = Form("nl"),  # noqa: B008
+        photos: list[UploadFile] = File(default_factory=list),  # noqa: B008
+    ) -> dict[str, Any]:
+        """The admin's photo test (ADR-112): the customer's flow on a photo and/or a link, with
+        each step's own result (image search, identification, searches, comparison, the AI's
+        answer, the proposal) and what it cost. Nothing is kept: the photo lives only for this
+        request, the answer goes back to the admin's browser alone; the ledger gets the cost."""
+        import secrets
+
+        from coverengine import spend
+        from coverengine.errors import CoverError
+
+        from coverapi.security import require
+
+        require(request, "admin")
+        if len(photos) > MAX_PHOTOS:
+            raise HTTPException(400, f"at most {MAX_PHOTOS} photos")
+        p = shop_params(auth)
+        limit_bytes = int(p["suggest.photo_max_bytes"])  # type: ignore[arg-type]
+        lang = lang if re.fullmatch(r"[a-z]{2}", lang or "") else "nl"
+        trace: dict[str, Any] = {}
+        tag = f"photo-test-{secrets.token_hex(8)}"  # this test's own line in the ledger
+        t0 = time.time()
+        try:
+            pngs = []
+            for ph in photos:
+                raw = await ph.read(limit_bytes + 1)
+                if len(raw) > limit_bytes:
+                    raise SuggestError(f"a photo may be at most {limit_bytes // 1_000_000} MB")
+                pngs.append(photo_png(raw))
+
+            def run() -> tuple[dict[str, Any], dict[str, Any] | None]:
+                with spend.for_visitor(tag):
+                    return read(p, pngs, url, lang, trace)
+
+            out, _facts = await run_in_threadpool(run)
+            error = None
+        except (SuggestError, CoverError) as exc:
+            out, error = None, str(exc)
+        return {"proposal": out, "error": error, "trace": trace,
+                "seconds": round(time.time() - t0, 1),
+                "cost_eur": round(spend.visitor_eur(tag), 4),
+                "settings": {k: p[f"suggest.{k}"] for k in (
+                    "reverse_search", "reverse_max", "search_pages", "same_min",
+                    "similar_min", "brand_min")}}  # fmt: skip
 
     @app.post("/api/shop/order/{token}/source")
     async def order_source(token: str, request: Request,
