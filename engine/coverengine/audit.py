@@ -299,8 +299,9 @@ def plan_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
 
 def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
     """The air vents (Rens, 8 Oct 2026; ADR-101): the drawing's number; round every side of the
-    cover (no side without one while another side has two); none high up a wall (a vent hung
-    from a free top edge, upside down, C24)."""
+    cover (no side without one while another side has two), the front (inner) walls of an L, U or
+    C included unless `features.vent_inner_walls` is off (owner, 9 Oct 2026, ADR-110); none high
+    up a wall (a vent hung from a free top edge, upside down, C24)."""
     import math
 
     from coverengine.finish.finish import vent_bases, vent_walls

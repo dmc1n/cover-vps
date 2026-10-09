@@ -49,8 +49,8 @@ one-line edit there.
 - Standard features: drawcord hem, wind straps with buckles, handles: which are standard,
   which optional per model? Air vents are standard (owner, 2026-09-30): 25 x 22 cm (W x H), bottom
   edge 5 cm above the lower end of the cover, one per full metre of hem length, spread evenly,
-  at least one, only on the outside of the cover, never on an inner wall of an L, U or C shape (owner, 2026-10-07;
-  Rens asks for them on the front walls too: QUESTIONS 73, `features.vent_inner_walls`). Round every side first,
+  at least one, round every side of the cover including the front walls in the inner corner of L, U and C
+  shapes (owner, 2026-10-09, QUESTIONS 71, ADR-110; `features.vent_inner_walls`, default on). Round every side first,
   one in the middle of each piece, the drawing's count kept, never on a free top edge (Rens, 2026-10-08, ADR-101). Built as a cut opening with a hood of extra fabric holding a plastic insert
   that keeps it open, and a membrane inside against dirt (`features.vent_*`, pieces in M5).
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
@@ -221,6 +221,7 @@ uv run python scripts/fewer_check.py DIR ...   re-measure a built cover from its
 uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT   the Desk picture's red marks mapped onto the cover's panels and 3D (camera fitted, ADR-100)
 uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   drawing, old and new cover side by side
 uv run python scripts/vents_compare.py OUT.png --old DIR --new DIR [--pics ...]   a cover's vents before/after, with the Desk's marked pictures (ADR-101)
+uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--staged DIR]   covers with inner walls rebuilt in staging, vents on the front walls, checked twice (ADR-110)
 uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--only a,b]   drawing covers from a shape a person read
                                              (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102)
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)

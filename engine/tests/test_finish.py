@@ -104,9 +104,10 @@ def test_vents_spread_and_clear_of_seams() -> None:
         assert np.ptp(r[:, 0]) == pytest.approx(250.0) and np.ptp(r[:, 1]) == pytest.approx(220.0)
 
 
-def test_no_vent_on_an_inner_wall(tmp_path: Path) -> None:
-    """Owner, 7 Oct 2026 (C23): air vents only on the outside, never on the inner walls of an
-    L shape; the drawing's number goes to the outer walls."""
+def test_vents_on_an_inner_wall_by_the_switch(tmp_path: Path) -> None:
+    """`features.vent_inner_walls`: on (the company default, owner 9 Oct 2026, QUESTIONS 71,
+    ADR-110) the front (inner) walls of an L get vents too; off, none (the old reading of 7 Oct,
+    ADR-093)."""
     import json
 
     from coverengine.finish.finish import inner_skirts
@@ -127,7 +128,10 @@ def test_no_vent_on_an_inner_wall(tmp_path: Path) -> None:
     inner = inner_skirts(tmp_path, params())
     assert inner == {"skirt-front-2", "skirt-right-2"}
     d = doc(square("skirt-front-2", 2000, ["hem", "seam", "seam", "seam"], [False] * 4))
+    assert Registry.load().resolve()["features.vent_inner_walls"] is True  # the default
     vents, _ = place_vents(d["panels"], params(), inner)
+    assert sorted(vents) == ["skirt-front-2"] and len(vents["skirt-front-2"]) == 2  # 1 per m
+    vents, _ = place_vents(d["panels"], params(**{"features.vent_inner_walls": False}), inner)
     assert not vents
 
 
@@ -279,17 +283,17 @@ def test_a_skirt_too_low_hands_its_vents_to_the_piece_above() -> None:
 
 
 def test_inner_walls_on_request_and_positions_by_hand() -> None:
-    """ADR-093 by default; `features.vent_inner_walls` puts them on the front (inner) walls as
-    Rens marked; `features.vent_positions` places them where the rule cannot reach."""
+    """The front (inner) walls get vents by default as Rens marked (ADR-110); off, ADR-093's
+    outer walls only; `features.vent_positions` places them where the rule cannot reach."""
     d = doc(wall("skirt-front-2", 2000, 400), wall("skirt-back", 3000, 800))
     inner = frozenset({"skirt-front-2"})
-    vents, _ = place_vents(d["panels"], params(**{"features.vents_total": 2}), inner)
-    assert sorted(vents) == ["skirt-back"]
     vents, _ = place_vents(
         d["panels"],
-        params(**{"features.vents_total": 2, "features.vent_inner_walls": True}),
+        params(**{"features.vents_total": 2, "features.vent_inner_walls": False}),
         inner,
     )
+    assert sorted(vents) == ["skirt-back"]
+    vents, _ = place_vents(d["panels"], params(**{"features.vents_total": 2}), inner)
     assert sorted(vents) == ["skirt-back", "skirt-front-2"]
     by_hand = params(**{"features.vent_positions": "skirt-back@0.25, skirt-back@0.75, nope@1"})
     vents, warnings = place_vents(d["panels"], by_hand, inner)

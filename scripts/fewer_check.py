@@ -11,8 +11,9 @@ It does not trust the engine's own summary; it measures again:
   points, against each other (seams.seam_tolerance_mm, or the ease the engine recorded) and
   against the seam's length on the 3D surface (panels.npz seam edges).
 - the net area of each flat piece against its 3D area (flattening keeps area).
-- the openings: as many as the drawing says, none on a piece standing more than
-  features.vent_inner_mm inside the footprint's convex hull (ADR-093).
+- the openings: as many as the drawing says; on a piece standing more than
+  features.vent_inner_mm inside the footprint's convex hull (an inner wall) only when the
+  cover's `features.vent_inner_walls` allows it (on by default: owner, 9 Oct 2026, ADR-110).
 
 Prints one line per cover, `PASS` or `FAIL` with the reasons.
 """
@@ -183,7 +184,7 @@ def check(model: Path, vents_expected: int | None) -> dict[str, Any]:
     if worst_stretch > limit:
         bad.append(f"{worst_name} stretches {worst_stretch:.2f} % (ARAP; limit {limit:g} %)")
 
-    # --- vents: the count, and not on an inner wall
+    # --- vents: the count, and on an inner wall only where the cover allows it
     hull_xy = shapely.MultiPoint(vtx[:, :2]).convex_hull.exterior
     names = [p["name"] for p in cut["panels"]]
     on_inner = []
@@ -209,8 +210,14 @@ def check(model: Path, vents_expected: int | None) -> dict[str, Any]:
         feats = (
             json.loads((model / "cover.json").read_text()).get("parameters", {}).get("features", {})
         )
-    if on_inner and feats.get("vent_inner_walls"):  # asked for on this cover (ADR-101)
-        notes.append("vents on the front (inner) walls, as set: " + ", ".join(on_inner))
+    try:  # the cover's own switch, else the company default (owner, 9 Oct 2026: on; ADR-110)
+        from coverengine.params.registry import resolve_model
+
+        inner_ok = bool(resolve_model(model)["features.vent_inner_walls"])
+    except Exception:  # noqa: BLE001 - a staged folder without a readable cover.json
+        inner_ok = bool(feats.get("vent_inner_walls", params["features.vent_inner_walls"]))
+    if on_inner and inner_ok:
+        notes.append("vents on the front (inner) walls: " + ", ".join(on_inner))
     elif on_inner:
         bad.append("vents on an inner wall: " + ", ".join(on_inner))
     # no vent hangs high up a wall (C24: from a free top edge, upside down; ADR-101)
