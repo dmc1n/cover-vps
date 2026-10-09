@@ -54,3 +54,37 @@ website can show it, and it is honest.
 - **Gemini Veo 3.1 Fast** for the people and workshop clips (8 s each).
 - **Modal GPU (L4)** for the heavy renders: the film, later scroll sequences rendered in Blender
   instead of live 3D where that looks better.
+
+## Storyboard 2: everything our own render (9 October 2026, ADR-114)
+
+The owner (9 Oct): "only when scrolling we still have the static rain; the animation is much
+better — make the animations further down yourself too, so everything is based on our own
+material; then we can also make animations for the scroll steps." Later the same day: one more
+film, the cover at a villa on Ibiza over the sea.
+
+The look is the start film's (ADR-108): the SUNS Kota 2-seater, its real cover in sand
+Coverlast with the stitching baked from the flat pieces, the stone terrace against lime plaster,
+a low hazy sun; the workshop's felt cutting table. `scripts/film/render_reel.py`, one shot a call.
+
+**The six scroll chapters** (60 pictures each, scrubbed; the cover right of centre, the captions
+on the calm left; each chapter ends at rest, its last picture is the still for less motion):
+
+| # | Caption | What the pictures show | Our data |
+|---|---|---|---|
+| 1 | Your furniture | the bare sofa on the terrace, a slow arc; its length, depth and height draw themselves in as dimension lines, to the centimetre | model.glb's size |
+| 2 | We calculate the cover | the designed cover surface rises around the sofa from the stone up, a thin line of light where it is being computed, a fine grid while it is still computed; then it turns into fabric with its stitching | the designed surface (cover.npz `design`) |
+| 3 | Seams and pieces | the cover steps apart into its seven real pieces, the top ones lifting; the seams between them show | the cut (`piece`) |
+| 4 | Flat, on the roll | the workshop: the pieces fly to the table and lie down flat, each on its own place in a nest on the 152 cm roll; the pen writes cut.dxf's labels and lines, the knife cuts the outlines, the vent hoods and membranes too | the flat patterns (`uv`), cut.dxf on the roll (`reel.json`) |
+| 5 | Cut, sewn, fitted | close along the double-stitched corner seam; then the cover is lowered over the sofa and settles | seams.png, fall.npz → Style3D drape |
+| 6 | Tested in the rain | the sun goes in, the stone darkens, beads form on the coating and the water runs down the paths our rain check computed and gathers at the hem; the falling rain is drawn by the page in time (RainLayer), never baked into a picture | drape_rain.json |
+
+**The workshop cards** ("How we work", 4:5 loops of 4–5 s, AV1 + H.264 + poster, loaded when
+near): cutting (the knife along a piece's edge, the pen labels beside it), sewing (along the
+double-stitched corner seam from the hem up), the air vent (hood, insert, membrane), made to
+measure (the cover lowered), rain (beads and runoff, falling rain), our range (other covers from
+the catalogue on the terrace). The Veo clips (measuring, cutting, sewing, packing) and the Veo
+rain clip go.
+
+**The closing film**: the cover on a whitewashed villa terrace on Ibiza, terracotta tiles, a
+wooden pergola's slatted shade, the sea to the horizon and a rock island in the haze, low golden
+sun; a slow dolly; with the last call to action.

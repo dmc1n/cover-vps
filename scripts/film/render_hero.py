@@ -905,4 +905,5 @@ def main() -> None:
         print("rendered", path.name, flush=True)
 
 
-main()
+if __name__ == "__main__":  # render_reel.py imports the scene parts
+    main()

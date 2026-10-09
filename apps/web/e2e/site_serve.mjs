@@ -4,9 +4,11 @@
 //
 //   node apps/web/e2e/site_serve.mjs [--dist apps/web/dist] [--port 18300] [--upstream URL]
 //                                    [--settings '{"home_story": false}']
+//                                    [--media DIR]
 //
 // --settings is laid over the shop settings in /api/shop/info, to look at a page the way the live
-// website shows it (for example the landing page without the scroll story).
+// website shows it (for example the landing page without the scroll story). --media serves
+// /media/<file> from a local folder first (renders not yet on the website, ADR-114).
 //
 // Used by apps/web/e2e/site_perf.py and site_rain.py.
 import { createServer } from "node:http";
@@ -23,6 +25,7 @@ const DIST = resolve(arg("dist", "apps/web/dist"));
 const PORT = Number(arg("port", "18300"));
 const UPSTREAM = arg("upstream", "https://preview.s2dio.living");
 const SETTINGS = JSON.parse(arg("settings", "{}"));
+const MEDIA = arg("media", "") ? resolve(arg("media", "")) : "";
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
@@ -35,6 +38,7 @@ const TYPES = {
   ".glb": "model/gltf-binary",
   ".bin": "application/octet-stream",
   ".wasm": "application/wasm",
+  ".mp4": "video/mp4",
 };
 
 // text is sent brotli-compressed, as the edge does, so the measured sizes are the real ones
@@ -77,9 +81,41 @@ async function file(req, res, path, cache) {
   );
 }
 
+// a local media file, with byte ranges (video seeks and Safari ask for them)
+async function media(req, res, path, size) {
+  const type = TYPES[extname(path)] ?? "application/octet-stream";
+  const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
+  const body = await readFile(path);
+  if (m) {
+    const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+    const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+    res.writeHead(206, {
+      "content-type": type,
+      "content-range": `bytes ${start}-${end}/${size}`,
+      "content-length": end - start + 1,
+      "accept-ranges": "bytes",
+      "cache-control": "public, max-age=0",
+    });
+    return res.end(body.subarray(start, end + 1));
+  }
+  res.writeHead(200, {
+    "content-type": type,
+    "content-length": size,
+    "accept-ranges": "bytes",
+    "cache-control": "public, max-age=0",
+  });
+  res.end(req.method === "HEAD" ? undefined : body);
+}
+
 createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   try {
+    // media rendered here and not yet on the website (ADR-114): served from --media first
+    if (MEDIA && /^\/media\/[a-z0-9_-]+\.[a-z0-9]+$/.test(url.pathname)) {
+      const local = join(MEDIA, url.pathname.slice(7));
+      const s = await stat(local).catch(() => null);
+      if (s?.isFile()) return await media(req, res, local, s.size);
+    }
     if (/^\/(api|media)\//.test(url.pathname)) {
       const headers = {};
       for (const h of ["range", "accept", "content-type"])

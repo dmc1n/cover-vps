@@ -22,8 +22,14 @@ TEXTURES = {
     "large_grey_tiles": ("2k", ["Diffuse", "nor_gl", "Rough"]),
     "white_plaster_02": ("2k", ["Diffuse", "nor_gl", "Rough"]),
     "concrete_floor_02": ("2k", ["Diffuse", "nor_gl", "Rough"]),
+    # the villa on Ibiza (render_reel.py, ADR-114)
+    "terracotta_floor_tiles": ("2k", ["Diffuse", "nor_gl", "Rough"]),
+    "white_stucco": ("2k", ["Diffuse", "nor_gl", "Rough"]),
+    "rough_wood": ("2k", ["Diffuse", "nor_gl", "Rough"]),
 }
-MODELS = {"potted_plant_04": "2k"}
+MODELS = {"potted_plant_04": "2k", "potted_plant_01": "2k", "island_tree_02": "2k"}
+# the dimension lines' type (OFL, Google Fonts; render_reel.py)
+FONT = "https://github.com/google/fonts/raw/main/ofl/worksans/WorkSans%5Bwght%5D.ttf"
 UA = {"User-Agent": "cover-studio-film/1.0"}
 
 
@@ -41,6 +47,7 @@ def save(url: str, path: Path) -> None:
 
 
 def main(out: Path) -> None:
+    save(FONT, out / "WorkSans.ttf")
     for name, res in HDRIS.items():
         files = json.loads(get(API + name))
         save(files["hdri"][res]["hdr"]["url"], out / f"{name}_{res}.hdr")

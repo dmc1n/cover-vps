@@ -44,6 +44,11 @@ def args() -> argparse.Namespace:
     ap.add_argument("--gpu", action="store_true")
     ap.add_argument("--count", type=int, default=360, help="pictures over the whole story")
     ap.add_argument("--quality", type=int, default=80)
+    ap.add_argument(
+        "--no-drops",
+        action="store_true",
+        help="no falling rain in the pictures: the page draws it in time (ADR-114)",
+    )
     return ap.parse_args(sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else [])
 
 
@@ -546,6 +551,9 @@ def main() -> None:
     def when(i: int) -> float:  # picture i of --count along the 240-frame timeline
         return 1 + (i - 1) * (LAST - 1) / max(a.count - 1, 1)
 
+    if a.no_drops:  # the wet look stays (it follows the scroll); the falling rain goes
+        for o in [o for o in sc.objects if o.particle_systems]:
+            bpy.data.objects.remove(o)
     if any(o.particle_systems for o in sc.objects) and when(last) > 5 * CH:
         sc.frame_set(1)
         bpy.ops.ptcache.bake_all(bake=True)
@@ -556,7 +564,8 @@ def main() -> None:
             continue
         t = when(i)
         sc.frame_set(int(t), subframe=t - int(t))
-        sc.render.use_motion_blur = t > 5 * CH + 2  # the rain streaks; the rest stays crisp
+        # the rain streaks; the rest stays crisp
+        sc.render.use_motion_blur = t > 5 * CH + 2 and not a.no_drops
         sc.render.filepath = str(path)
         bpy.ops.render.render(write_still=True)
 

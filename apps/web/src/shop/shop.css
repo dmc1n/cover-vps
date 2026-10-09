@@ -1965,6 +1965,7 @@ p {
   background: var(--dark-2);
 }
 .st-arch video,
+.st-arch .hf,
 .st-arch-empty {
   width: 100%;
   height: 100%;
@@ -1986,6 +1987,69 @@ p {
 .st-card p {
   margin: 0;
   color: var(--on-dark-muted);
+}
+/* the clips are framed for the arch: the subject in the middle */
+.st-arch .hf {
+  object-position: 50% 50%;
+}
+
+/* the closing film (ADR-114): the cover at a villa over the sea, full width, the words on the
+   calm left over a soft shade */
+.st-villa {
+  position: relative;
+  height: min(92vh, 62vw);
+  min-height: 460px;
+  overflow: hidden;
+  background: var(--dark-2);
+  color: var(--on-dark);
+}
+.st-villa-film {
+  position: absolute;
+  inset: 0;
+}
+.st-villa-film .hf {
+  object-position: 62% 50%;
+}
+.st-villa::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(30, 34, 30, 0.55) 0%,
+    rgba(30, 34, 30, 0.28) 32%,
+    rgba(30, 34, 30, 0) 55%
+  );
+}
+.st-villa-text {
+  position: absolute;
+  z-index: 2;
+  left: var(--gutter);
+  bottom: clamp(40px, 9vh, 96px);
+  width: min(460px, 80vw);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-4);
+}
+.st-villa-text h2 {
+  font-size: var(--fs-h2);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  margin: 0;
+  color: #fff;
+}
+.st-villa-text p {
+  font-size: var(--fs-lead);
+  line-height: 1.55;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.86);
+}
+.st-villa-text .st-btn {
+  background: var(--paper);
+  color: var(--ink);
 }
 
 .st-numbers {

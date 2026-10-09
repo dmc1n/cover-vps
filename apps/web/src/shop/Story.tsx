@@ -1,7 +1,9 @@
 // The home page as one scrolling story (docs/plans/scroll-site.md, ADR-067), in the S2DIO house
 // style. The film (HeroFilm, ADR-108) shrinks into the arch of the logo; then one pinned 3D scene in which scrolling
 // morphs our own data (the furniture, the cover, its pieces, flat on the roll, sewn and fitted,
-// the rain); then the workshop in arch-framed clips sliding sideways; true numbers; the FAQ.
+// the rain); then the workshop in arch-framed clips sliding sideways; true numbers; the cover at
+// a villa over the sea; the FAQ. Every picture is our own render of our own data (ADR-108, 109):
+// the clips and the closing film load only when they come near the screen.
 // Smooth scrolling (Lenis) and scrubbed motion (GSAP ScrollTrigger); visitors who asked their
 // device for less motion get the same story without the motion.
 import {
@@ -31,6 +33,8 @@ export interface StoryContent {
   chapters: { title: T; text: T }[];
   work: { title: T; items: { clip: string; title: T; text: T }[] };
   numbers: { title: T; items: { value: number; suffix: string; label: T }[] };
+  /** the closing film (ADR-114): the cover at home, in the sun */
+  villa?: { title: T; text: T };
 }
 
 export function Story({
@@ -206,6 +210,7 @@ export function Story({
               base={media.frames || "/media/story4-"}
               progress={progress}
               onMissing={noFrames}
+              calm={calm}
             />
           ) : (
             <Suspense fallback={<div className="st-scene" />}>
@@ -251,8 +256,15 @@ export function Story({
           {story.work.items.map((w) => (
             <figure key={w.clip} className="st-card">
               <div className="st-arch">
-                {clip(w.clip) ? (
-                  <NearVideo src={clip(w.clip)} play={!calm} />
+                {clip(w.clip) || clip(`${w.clip}_av1`) ? (
+                  <HeroFilm
+                    lazy
+                    media={{
+                      h264: clip(w.clip),
+                      av1: clip(`${w.clip}_av1`),
+                      poster: clip(`${w.clip}_poster`),
+                    }}
+                  />
                 ) : (
                   <div className="st-arch-empty" />
                 )}
@@ -285,41 +297,31 @@ export function Story({
           {cta} →
         </a>
       </section>
+
+      {(clip("villa") || clip("villa_av1")) && (
+        <section className="st-villa">
+          <div className="st-villa-film">
+            <HeroFilm
+              lazy
+              media={{
+                h264: clip("villa"),
+                av1: clip("villa_av1"),
+                poster: clip("villa_poster"),
+              }}
+            />
+          </div>
+          {story.villa && (
+            <div className="st-villa-text st-rise">
+              <h2>{t(story.villa.title)}</h2>
+              <p>{t(story.villa.text)}</p>
+              <a className="st-btn" href={configure}>
+                {cta} →
+              </a>
+            </div>
+          )}
+        </section>
+      )}
       {children}
     </div>
-  );
-}
-
-// a clip further down the page: fetched only when it comes near the screen, and paused while it
-// is out of sight, so it never takes the line from the first screen (ADR-106)
-function NearVideo({ src, play }: { src: string; play: boolean }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const [near, setNear] = useState(false);
-  useEffect(() => {
-    const v = ref.current;
-    if (!v) return;
-    if (!("IntersectionObserver" in window)) return setNear(true);
-    const io = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) setNear(true);
-        if (!play || !v.currentSrc) return;
-        if (e.isIntersecting) v.play().catch(() => undefined);
-        else v.pause();
-      },
-      { rootMargin: "50% 100%" },
-    );
-    io.observe(v);
-    return () => io.disconnect();
-  }, [play]);
-  return (
-    <video
-      ref={ref}
-      src={near ? src : undefined}
-      autoPlay={play}
-      muted
-      loop
-      playsInline
-      preload={near ? "auto" : "none"}
-    />
   );
 }

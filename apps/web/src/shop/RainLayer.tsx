@@ -1,26 +1,55 @@
-// Rain that keeps falling over the story's rain chapter (ADR-106). The rendered frames (ADR-071)
-// carry the rain as streaks baked into each picture, and a picture changes only when the visitor
-// scrolls: standing still, the rain stood still (the owner, 8 Oct 2026: "the rain on the scroll
-// page stops moving"). This layer draws streaks that fall in time, not with the scroll, in the
-// look of the rendered ones (thin, light, leaning with the wind, steeper further down), with a
-// small splash where a drop lands.
+// All the falling rain over the story's rain chapter, drawn in time (ADR-106, ADR-114).
 //
-// It runs only while it can be seen: the chapter is on screen, the rain has started and the page
-// is visible. The clock restarts after a pause (a background tab, scrolling away), so the drops
-// never jump or stop. A fixed pool of drops is recycled, nothing is allocated per frame. Visitors
-// who asked for less motion see the frames' own, still rain.
+// The rendered frames (ADR-071) are scrubbed by the scroll, so anything baked into them moves
+// only when the visitor scrolls: baked drops stood still while reading and rose when scrolling
+// up (the owner, 9 Oct 2026: "when scrolling we still have the static rain"). The frames now
+// carry only what may follow the scroll (the canvas darkening, beads on the coating, the runs
+// down the computed paths, the wet stone); every falling drop is drawn here, by the clock, so it
+// falls the same whether the visitor stands still, scrolls down or scrolls up.
+//
+// The look is the start film's rain (render_hero.py): near-upright streaks as a camera's shutter
+// draws them, light against the scene, in three depths (far ones short and faint, near ones
+// long, wide and soft as if out of focus), each streak brightest at its head. Streaks are drawn
+// from three small pre-rendered sprites, so a frame is a few hundred drawImage calls.
+//
+// It runs only while it can be seen: on screen, rain under way, the page visible. The clock
+// restarts after a pause (a background tab, scrolling away), so the drops never jump or stop.
+// A fixed pool of drops is recycled; nothing is allocated per frame. Visitors who asked for less
+// motion get no falling rain (the frames show the wet scene).
 import { useEffect, useRef } from "react";
 
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 
-// three depths of drops: far ones short, faint and slow, near ones long and fast (px at 900 px high)
-const LAYERS = [
-  { count: 150, len: [10, 18], speed: 950, alpha: 0.22, width: 0.8 },
-  { count: 90, len: [20, 32], speed: 1450, alpha: 0.32, width: 1.1 },
-  { count: 26, len: [42, 70], speed: 2300, alpha: 0.26, width: 1.6 },
+// three depths, sizes in px at a 900 px high picture: the streak's length (the distance a drop
+// falls while the shutter is open, 1/48 s), its width and brightness
+export const LAYERS = [
+  { count: 110, len: [34, 62], width: 1.0, alpha: 0.2, blur: 0 },
+  { count: 70, len: [70, 120], width: 1.4, alpha: 0.27, blur: 0 },
+  { count: 16, len: [150, 230], width: 3.2, alpha: 0.16, blur: 1.6 },
 ];
-const SPLASHES = 48;
-const SPLASH_S = 0.16; // how long a splash shows
+const SHUTTER = 48; // a streak is what the drop travels in 1/48 s: speed = length × 48 per s
+const SLANT = 0.045; // the start film's light wind: a few degrees from upright
+const SPLASHES = 40;
+const SPLASH_S = 0.14; // how long a splash shows
+const COLOUR = "226, 232, 230";
+
+function sprite(width: number, blur: number, k: number): HTMLCanvasElement {
+  // one streak, 64 px long (scaled to each drop's length): faint tail, bright head
+  const pad = Math.ceil((blur + 1) * 2 * k);
+  const c = document.createElement("canvas");
+  c.width = Math.ceil(width * k) + 2 * pad;
+  c.height = 64 + 2 * pad;
+  const x = c.getContext("2d")!;
+  const g = x.createLinearGradient(0, pad, 0, pad + 64);
+  g.addColorStop(0, `rgba(${COLOUR}, 0)`);
+  g.addColorStop(0.55, `rgba(${COLOUR}, 0.55)`);
+  g.addColorStop(0.92, `rgba(${COLOUR}, 1)`);
+  g.addColorStop(1, `rgba(${COLOUR}, 0.3)`);
+  if (blur) x.filter = `blur(${blur * k}px)`;
+  x.fillStyle = g;
+  x.fillRect(pad, pad, Math.ceil(width * k), 64);
+  return c;
+}
 
 export function RainLayer({
   amount,
@@ -35,17 +64,17 @@ export function RainLayer({
     if (!el || !ctx) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    // drops: x, y (0..1 of the box), length and depth; seeded so every visit looks alike
+    // drops: x, y (0..1 of the box, y the head), length; seeded so every visit looks alike
     let seed = 7;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
     const drops = LAYERS.flatMap((l, depth) =>
       Array.from({ length: l.count }, () => ({
-        x: rnd() * 1.2 - 0.1,
-        y: rnd(),
+        x: rnd() * 1.1 - 0.05,
+        y: rnd() * 1.4 - 0.2,
         len: l.len[0] + rnd() * (l.len[1] - l.len[0]),
         depth,
-        // where this drop meets the ground (lower part of the picture), for its splash
-        land: 0.62 + rnd() * 0.38,
+        // where this drop meets the ground (the lower part of the picture), for its splash
+        land: 0.7 + rnd() * 0.3,
       })),
     );
     const splash = Array.from({ length: SPLASHES }, () => ({
@@ -58,11 +87,13 @@ export function RainLayer({
     let W = 0;
     let H = 0;
     let k = 1;
+    let sprites: HTMLCanvasElement[] = [];
     const resize = () => {
       const r = el.getBoundingClientRect();
       k = Math.min(window.devicePixelRatio || 1, 1.5);
       W = el.width = Math.max(1, Math.round(r.width * k));
       H = el.height = Math.max(1, Math.round(r.height * k));
+      sprites = LAYERS.map((l) => sprite(l.width, l.blur, k));
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -75,7 +106,8 @@ export function RainLayer({
     const frame = (t: number) => {
       raf = 0;
       // a pause (another tab, the chapter off screen) never makes the drops jump
-      const dt = last ? Math.min((t - last) / 1000, 1 / 20) : 0;
+      // (never backwards: a clock that steps back must not lift the drops)
+      const dt = last ? clamp((t - last) / 1000, 0, 1 / 20) : 0;
       last = t;
       const a = clamp(amount());
       if (a <= 0.001) {
@@ -84,49 +116,53 @@ export function RainLayer({
       } else {
         drawn = true;
         ctx.clearRect(0, 0, W, H);
-        const scale = H / (900 * k); // the speeds and lengths are for a 900 px high picture
-        ctx.lineCap = "round";
+        const px = H / 900; // the sizes are for a 900 px high picture
         for (let depth = 0; depth < LAYERS.length; depth++) {
           const L = LAYERS[depth];
-          ctx.strokeStyle = `rgba(226, 232, 229, ${L.alpha * a})`;
-          ctx.lineWidth = L.width * k;
-          ctx.beginPath();
+          const img = sprites[depth];
+          const pad = (img.width - Math.ceil(L.width * k)) / 2;
           // fewer drops while the rain begins
-          const shown = Math.ceil(L.count * (0.35 + 0.65 * a));
+          const shown = Math.ceil(L.count * (0.3 + 0.7 * a));
           let n = 0;
           for (const d of drops) {
             if (d.depth !== depth) continue;
-            if (n++ >= shown) continue;
-            d.y += (L.speed * scale * dt * k) / H;
-            const slant = 0.36 - 0.26 * clamp(d.y); // leaning with the wind, steeper below
-            d.x += (L.speed * scale * dt * k * slant) / W;
-            if (d.y > (depth === 0 ? 1.05 : d.land)) {
-              if (depth > 0 && a > 0.3) {
+            const on = n++ < shown;
+            const len = d.len * px;
+            const fall = len * SHUTTER * dt; // px this frame (always down)
+            d.y += fall / H;
+            d.x += (fall * SLANT) / W;
+            if (d.y > (depth === 0 ? 1.0 + len / H : d.land)) {
+              if (on && depth > 0 && a > 0.3) {
                 const s = splash[nextSplash];
                 nextSplash = (nextSplash + 1) % SPLASHES;
                 s.x = d.x * W;
                 s.y = d.land * H;
                 s.age = 0;
               }
-              d.y -= depth === 0 ? 1.1 : d.land + 0.05;
-              d.x = rnd() * 1.2 - 0.15;
+              d.y = -rnd() * 0.25 - len / H;
+              d.x = rnd() * 1.1 - 0.05;
             }
-            const len = d.len * scale * k;
-            const x = d.x * W;
-            const y = d.y * H;
-            ctx.moveTo(x, y);
-            ctx.lineTo(x - len * slant, y - len);
+            if (!on) continue;
+            ctx.globalAlpha = L.alpha * (0.35 + 0.65 * a);
+            const scale = len / 64;
+            ctx.drawImage(
+              img,
+              d.x * W - pad,
+              d.y * H - len - pad * scale,
+              img.width,
+              img.height * scale,
+            );
           }
-          ctx.stroke();
         }
         // splashes: a small crown that widens and fades
+        ctx.globalAlpha = 1;
         ctx.lineWidth = 0.9 * k;
         for (const s of splash) {
           if (s.age >= SPLASH_S) continue;
           s.age += dt;
           const f = clamp(s.age / SPLASH_S);
-          const r = (2 + 7 * f) * scale * k;
-          ctx.strokeStyle = `rgba(226, 232, 229, ${0.35 * (1 - f) * a})`;
+          const r = (2 + 6 * f) * px;
+          ctx.strokeStyle = `rgba(${COLOUR}, ${0.3 * (1 - f) * a})`;
           ctx.beginPath();
           ctx.ellipse(s.x, s.y, r, r * 0.3, 0, Math.PI, 2 * Math.PI);
           ctx.stroke();

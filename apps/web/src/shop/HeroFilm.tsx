@@ -32,18 +32,37 @@ function stillOnly(): boolean {
 export function HeroFilm({
   media,
   className = "",
+  lazy = false,
 }: {
   media: HeroMedia;
   className?: string;
+  /** fetch nothing, not even the poster, until the film comes near the screen (ADR-114) */
+  lazy?: boolean;
 }) {
   const film = Boolean(media.h264 || media.av1);
   const calm = useMemo(stillOnly, []);
   const [still, setStill] = useState(calm || !film);
+  const [near, setNear] = useState(!lazy);
   const ref = useRef<HTMLVideoElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = box.current;
+    if (near || !el) return;
+    if (!("IntersectionObserver" in window)) return setNear(true);
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) setNear(true);
+      },
+      { rootMargin: "60% 60%" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near]);
 
   useEffect(() => {
     const v = ref.current;
-    if (still || !v) return;
+    if (still || !near || !v) return;
     // iOS plays inline only when muted is set before play (React sets the property late)
     v.muted = true;
     v.defaultMuted = true;
@@ -67,8 +86,9 @@ export function HeroFilm({
       io.disconnect();
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [still]);
+  }, [still, near]);
 
+  if (!near) return <div ref={box} className={`hf hf-wait ${className}`} />;
   if (still)
     return media.poster ? (
       <img className={`hf ${className}`} src={media.poster} alt="" />

@@ -3329,3 +3329,43 @@ asks for it.
   a few seconds of real workshop footage would lift it most (ADR-065's list still holds).
 - **Rejected:** Veo/Sora takes (not our cover, paid); the dark green set of ADR-065 (it hid the
   sand colour).
+
+## ADR-114 — The scroll page all our own: rain drawn in time, the chapters and clips rendered from our data
+
+The owner (9 October 2026): "the website looks much better, only when scrolling we still have
+the static rain; the animation is much better — please make the animations further down
+yourself too, so everything is based on our own material; then we can also make animations for
+the scroll steps." Later that day: one more film, the cover at a villa on Ibiza over the sea.
+(Numbered 114: 109–113 were taken on main the same day.)
+
+- **The static rain, the cause.** The rain chapter is rendered pictures (ADR-071) that the
+  scroll scrubs. Its falling drops were baked into the pictures (a particle system with motion
+  blur), so they moved only with the scroll: standing still they froze, scrolling up they rose.
+  RainLayer (ADR-106) only added rain on top, so the baked rain still showed under it.
+- **The fix.** Nothing that falls is baked any more:
+  - `render_story.py --no-drops` renders the chapter's pictures 300–360 again without the
+    particles and without motion blur; the wet look stays (the canvas darkening in patches,
+    beads on the coating, the backdrop turning green), because it follows the scroll plausibly.
+    `story_frames.py` makes the set `story5-` from `story4-` with those 61 pictures replaced
+    (the others byte for byte), plus `story5m-`: the upright 600 × 900 cut a phone shows.
+  - `RainLayer.tsx` draws all the falling rain, by the clock, in the start film's look: near
+    upright streaks the length a drop falls while a 1/48 s shutter is open, brightest at the
+    head, three depths (the near one wide and soft, as out of focus), from three pre-rendered
+    sprites; never backwards (a clock that steps back cannot lift a drop).
+  - `site_rain.py` checks it in a real browser: no streaks in the pictures (a thin-bright-line
+    detector: the old pictures 0.2–0.3 %, the new under 0.1 %), the rain moving while standing
+    still, after scrolling away, after a background tab and on a phone, and — on a clock the
+    test steps 16 ms at a time — each short streak's head found lower a frame later while
+    scrolling up and while scrolling down (about 110 lower, 9–12 higher from meeting a
+    neighbour's head; a rising rain would turn that round). Green against `story5`.
+- **Storyboard 2** (docs/plans/scroll-site.md): the six chapters, the workshop cards and the
+  closing film, all from the start film's scene parts (render_hero.py) and our data;
+  `scripts/film/render_reel.py --shot NAME`, one shot a call, through `scripts/film/blender.sh`
+  (Blender in the Playwright image, nice 19, a memory cap, a named container).
+  - `reel_data.py` lays cut.dxf's pieces on the 152 cm roll (a bottom-left nest) and matches
+    each sewn piece's flat pattern to its cut outline by the label inside it and by shape, so the
+    pieces land exactly where the knife then cuts round them; it carries the vents onto the
+    draped cover and reads the furniture's size for the dimension lines.
+  - Memory: Blender's exact limit surface on the sewn cover took 5.4 GB per cover
+    (OpenSubdiv's patch tables); without it (`lean()`) 0.8 GB, the look the same. Wide shots
+    use the stitching picture at half size.

@@ -96,6 +96,8 @@ SHOP_DEFAULTS: dict[str, Any] = {
     "og_image": "",  # the picture when the shop is shared (1200x630); empty: /brand/og-shop.png
     "home_story": False,  # the scroll story as the home page (on: live; preview.<domain> always)
     "story_model": "suns-2-seater-kota",  # the catalogue model the scroll story shows (ADR-067)
+    # the scroll story's media (/media/<file>): the film, the frames, a clip per work item (and
+    # <clip>_av1, <clip>_poster), the closing villa film (ADR-114)
     "story_media": {"hero": "", "rain": "", "measure": "", "cut": "", "sew": "", "pack": ""},
     "notify_email": "",
     "languages": "nl,en,de,fr",
@@ -318,19 +320,36 @@ CONTENT_DEFAULTS["story"] = {
     ],
     "work": {
         "title": {"nl": "Zo werken we", "en": "How we work"},
+        # ADR-114: every clip our own render of our own data (scripts/film/render_reel.py)
         "items": [
-            {"clip": "measure", "title": {"nl": "Meten", "en": "Measuring"},
-             "text": {"nl": "Een paar maten zijn genoeg.", "en": "A few sizes are enough."}},
             {"clip": "cut", "title": {"nl": "Snijden", "en": "Cutting"},
-             "text": {"nl": "Op de snijtafel, met weinig afval.", "en": "On the cutting table, "
-                      "with little waste."}},
+             "text": {"nl": "De snijtafel snijdt de stukken die onze software tekende, en schrijft "
+                            "op elk waar het hoort.",
+                      "en": "The table cuts the pieces our software drew, and writes on each "
+                            "where it goes."}},
             {"clip": "sew", "title": {"nl": "Naaien", "en": "Sewing"},
              "text": {"nl": "Dubbel gestikt, in onze werkplaats.", "en": "Double stitched, in "
                       "our workshop."}},
-            {"clip": "pack", "title": {"nl": "Bezorgen", "en": "Delivering"},
-             "text": {"nl": "Netjes gevouwen, bij jou thuis.", "en": "Neatly folded, at your "
-                      "home."}},
+            {"clip": "vent", "title": {"nl": "Ventilatie", "en": "Air vents"},
+             "text": {"nl": "Een kap over elke opening: de lucht kan erdoor, de regen niet.",
+                      "en": "A hood over every opening: the air gets through, the rain does "
+                            "not."}},
+            {"clip": "fit", "title": {"nl": "Op maat", "en": "Made to measure"},
+             "text": {"nl": "Hij valt over je meubel en ligt meteen goed.",
+                      "en": "It goes over your furniture and sits right at once."}},
+            {"clip": "runoff", "title": {"nl": "Regen", "en": "Rain"},
+             "text": {"nl": "Het water parelt en loopt af, nergens blijft het staan.",
+                      "en": "The water beads and runs off; nowhere does it stay."}},
+            {"clip": "range", "title": {"nl": "Ons assortiment", "en": "Our range"},
+             "text": {"nl": "Banken, ligbedden, eettafels: meer dan driehonderd modellen.",
+                      "en": "Sofas, loungers, dining sets: more than three hundred models."}},
         ],
+    },
+    "villa": {
+        "title": {"nl": "Gemaakt voor jouw plek in de zon", "en": "Made for your place in the sun"},
+        "text": {"nl": "Strakke, rustige lijnen in de kleur van je terras. Op maat, op bestelling.",
+                 "en": "Calm, tight lines in the colour of your terrace. Made to measure, made "
+                       "to order."},
     },
     "numbers": {
         "title": {"nl": "Op bestelling, niet op voorraad", "en": "Made to order, not for stock"},

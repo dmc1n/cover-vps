@@ -10,7 +10,9 @@
 - `strip.jpg`: one picture per second, to look at the film at a glance.
 
     uv run python scripts/film/hero_encode.py FRAMES OUT [--name hero-kota1] [--ffmpeg PATH]
-        [--max-mb 3.8]
+        [--max-mb 3.8] [--pattern 'cut-*.png' --av1-size 720:900 --h264-size 720:900]
+
+A clip of render_reel.py (ADR-114) is one shot: --pattern picks its frames.
 
 NAME is new for every render: the website's edge keeps /media files for a day (ADR-071), and
 the studio serves only names of letters, digits, - and _ (no second dot).
@@ -35,8 +37,8 @@ DISSOLVE = 10  # frames each dissolve takes
 Step = tuple[Path, Path, float]  # picture a, picture b, how far into b (0: a alone)
 
 
-def frames_in_order(src: Path) -> list[Path]:
-    files = sorted(src.glob("hero-*.png"))
+def frames_in_order(src: Path, pattern: str = "hero-*.png") -> list[Path]:
+    files = sorted(src.glob(pattern))
     if not files:
         raise SystemExit(f"no frames in {src}")
     return files
@@ -103,9 +105,16 @@ def main() -> None:
     ap.add_argument("--name", default="hero-kota1")
     ap.add_argument("--av1-size", default="1920:1080")
     ap.add_argument("--h264-size", default="1600:900")
+    ap.add_argument("--pattern", default="hero-*.png", help="the frames (render_reel: SHOT-*.png)")
     a = ap.parse_args()
-    shots = [tuple(s) for s in json.loads((a.frames / "shots.json").read_text())]
-    film = edit(frames_in_order(a.frames), shots)  # type: ignore[arg-type]
+    frames = frames_in_order(a.frames, a.pattern)
+    shots_file = a.frames / "shots.json"
+    shots = (
+        [tuple(s) for s in json.loads(shots_file.read_text())]
+        if a.pattern == "hero-*.png"
+        else [(a.pattern, len(frames))]
+    )  # a clip: one shot, its end dissolving into its start
+    film = edit(frames, shots)  # type: ignore[arg-type]
     seconds = len(film) / FPS
     a.out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as t:
