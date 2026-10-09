@@ -3446,3 +3446,46 @@ inner walls of an L; ADR-093 misread it.
   test_finish.py `test_vents_on_an_inner_wall_by_the_switch` (off: none, on/default: vents).
 - Swept: every cover with inner walls rebuilt in staging (out/innerwalls/), with the per-cover
   `vent_positions` from Rens's circles carried over where the vents agent had set them.
+
+## ADR-111 — Measuring on the 3D cover, the vents' sizes and a check list for the sewn cover
+
+The owner (9 October 2026): "for the system we need a measuring tool on the 3D model; we have
+sewn some covers, and for checking it's easier if we have sizes in the 3D part, for example the
+height of the air vents and their placement."
+
+- **Measure** (3D view, studio and Desk card): click or tap two points; a point snaps (14 px,
+  26 px for a finger) to a vent corner or a seam's end first, then a mesh vertex, then a point on
+  a seam or the hem, else the surface; a snap point hidden behind the cover is skipped. Shown:
+  the straight distance, the height difference and the distance **along the fabric**, in cm
+  with one decimal. The fabric distance is the exact shortest path on the cover's triangle mesh
+  (geometry-central's edge-flip geodesics via potpourri3d, `POST .../measure/geodesic`); the
+  cover is first made a manifold, oriented surface for it (vertices split per fan, faces glued
+  only along consistently oriented two-face edges; lengths unchanged) and the two points are
+  inserted as vertices. Measurements live in the 3D scene, so turning and zooming keep them;
+  labels are screen-constant sprites. Several stay; remove one or all; Esc drops a first point.
+  The snap lines come from `GET .../measure.json` (seams and free edges from panels.npz, the
+  vents).
+- **Vent sizes** (toggle beside "Show air vents"): per vent, from `vents.json` (format 2), which
+  takes the numbers off the flat piece the opening is cut in, as `place_vents` cut it: the
+  opening W × H; its bottom edge above the hem (the lift on the flat piece; over a skirt too low
+  for a vent the skirt's height is added); the distance along the piece's bottom edge from each
+  side of the opening to the seam there, or to a corner of the cover inside the piece (the
+  bottom edge turns ≥ 45° within 100 mm), left and right as seen from outside; the piece; the
+  bottom's height above the ground. Drawn as dimension lines on the cover and listed under it.
+  An older vents.json (no `format`) is made again on the next request.
+- **Check list** (`checklist.pdf`, made when opened like sizes.pdf, `coverengine/export/
+  checklist.py`): page 1 landscape: front, back, left and right at one scale (two by two for a
+  long low cover) with numbered vents; overall L × D × H, the hem all round (the free edges at
+  the lowest point only, not a drawing cover's open inner edges), skirt heights, every vent's
+  numbers, each with a box for the measured value and an OK box. Then the pieces (hem seam to
+  seam, flat size) and every seam's length. Links: viewer toolbar, Desk card, Cut pieces,
+  Downloads.
+- **Measured after sewing** (Desk, "Measured…" beside Fits / Does not fit): the check list's
+  points as cm fields; the fit stores per point expected, measured and the difference in
+  desk.json (`fit.measured` and the history entry, so learning/desk.jsonl too).
+  `learned.measured_deviations` groups them per cover group and kind of size (vent.above_hem,
+  skirt, seam, ...); a mean beyond `tolerance.cover_mm` on `desk.learn_after` covers is marked
+  systematic (`/api/desk-rules` → `measured`). Turning a systematic deviation into a parameter
+  change stays a person's decision, as the other learned rules.
+- **Not done (simpler first):** measuring on the draped (Style3D) cover; snapping to the
+  furniture's own features; the check list in the PDF reader's form fields.

@@ -243,6 +243,8 @@ apps/web/e2e/site_rain.py | site_3d.py | site_perf.py   the website: rain keeps 
 Admin → Prices & costing (#/prices)         price set per channel, versioned in app.db; costing per cover (ADR-098)
 <website>/b2b, Admin → B2B customers        the B2B shop: business logins, own prices ex VAT, orders on account (ADR-104)
 apps/web/e2e/b2b.py                         the B2B shop in a real browser (ADR-104; usage in its docstring)
+apps/web/e2e/measure.py                     Measure, Vent sizes, the check list and measured fits in a real browser (ADR-111)
+3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/

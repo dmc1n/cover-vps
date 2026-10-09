@@ -67,6 +67,8 @@ class Action(BaseModel):
     note: str = ""
     n: int | None = None
     pictures: list[str] = []  # names returned by POST /api/desk/{id}/pictures (ADR-096)
+    # with a fit: what was measured on the sewn cover, mm per check-list key (ADR-111)
+    measured: dict[str, float] = {}
 
 
 # ---- state ----------------------------------------------------------------------------------
@@ -329,6 +331,8 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
         if a.action not in WITH_PICTURES:
             raise HTTPException(400, f"pictures go with {', '.join(WITH_PICTURES)}")
         pictures = check_pictures(d, a.pictures, _settings())
+    # outside the lock: the check list's points take a moment
+    rows = measured_rows(d, a.measured) if a.action == "fit" and a.measured else []
     with _lock:
         st = state(d)
         before = {k: v for k, v in st.items() if k != "history"}
@@ -366,6 +370,9 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
         elif a.action == "fit":
             st["fit"] = {"fits": a.fits, "note": a.note, "by": who, "time": now}
             entry |= {"fits": a.fits, "note": a.note}
+            if rows:  # measured against the check list: the differences are kept
+                st["fit"]["measured"] = rows
+                entry["measured"] = rows
         elif a.action == "prefer":
             numbers = [r["number"] for r in revisions(d)]
             if a.n not in numbers:
@@ -401,6 +408,19 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
             _catalogue(d, st["status"], set_info)
         _log(learning, d, entry)
     return state(d)
+
+
+def measured_rows(d: Path, measured: dict[str, float]) -> list[dict[str, Any]]:
+    """Measured values (mm) against the check list's points (ADR-111): expected, measured and
+    the difference per key, for the learning step to find systematic deviations."""
+    from coverengine.measure import check_points, deviations
+
+    if not (d / "pattern.json").is_file() or not (d / "panels.npz").is_file():
+        raise HTTPException(409, "no calculated cover to measure against")
+    rows = deviations(check_points(d)["points"], measured)
+    if not rows:
+        raise HTTPException(400, "none of the measured values belongs to the check list")
+    return rows
 
 
 def _catalogue(d: Path, status: str, set_info: Any) -> None:
@@ -775,11 +795,14 @@ def install(app: FastAPI, store: Any) -> None:
                 for c in f.get("chips") or []:
                     shapes.setdefault(g, {})[c] = shapes.setdefault(g, {}).get(c, 0) + 1
         after = int(params["desk.learn_after"])  # type: ignore[arg-type]
+        tol = float(params["tolerance.cover_mm"])  # type: ignore[arg-type]
         return {
             "rules": {g: learned.rules(g, store.root) for g in groups},
             "proposals": learned.proposals(models, store.root, after),
             "shape_problems": shapes,
             "learn_after": after,
+            # sewn covers measured against their check lists (ADR-111)
+            "measured": learned.measured_deviations(models, tol, after),
         }
 
     @app.post("/api/desk-rules")

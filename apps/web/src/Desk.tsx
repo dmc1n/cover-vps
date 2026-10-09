@@ -8,6 +8,11 @@ import { api, type ModelDetail } from "./api";
 import { Viewer } from "./Viewer";
 import { Corrections, RulesBar } from "./DeskCorrect";
 import {
+  MeasuredForm,
+  MeasuredSummary,
+  type MeasuredRow,
+} from "./DeskMeasured";
+import {
   ProductsPanel,
   ProductsUpload,
   type ProductList,
@@ -75,6 +80,7 @@ interface Hist {
   n?: number;
   undid?: string;
   pictures?: string[];
+  measured?: MeasuredRow[]; // with a fit: measured on the sewn cover (ADR-111)
 }
 interface Card extends Item {
   desk: {
@@ -526,6 +532,9 @@ function CardView({
   const [why, setWhy] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [fitNote, setFitNote] = useState("");
+  // after sewing: the sizes measured against the check list (ADR-111)
+  const [measuring, setMeasuring] = useState(false);
+  const [measured, setMeasured] = useState<Record<string, number>>({});
   const [msg, setMsg] = useState("");
   const [allDiffs, setAllDiffs] = useState(false);
   const [allRevs, setAllRevs] = useState(false);
@@ -546,6 +555,10 @@ function CardView({
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    setMeasuring(false);
+    setMeasured({});
+  }, [id]);
   useEffect(() => {
     setAiJob(null);
     setAiNote("");
@@ -793,7 +806,18 @@ function CardView({
           )}
         </figure>
         <figure className="d-3d">
-          <figcaption>Our cover</figcaption>
+          <figcaption>
+            Our cover
+            {model?.files.includes("checklist.pdf") && (
+              <a
+                className="d-link"
+                href={`/api/models/${card.id}/files/checklist.pdf`}
+                title="The workshop's check list: every size to measure on the sewn cover"
+              >
+                Check list (PDF)
+              </a>
+            )}
+          </figcaption>
           {model ? (
             <Viewer
               id={card.id}
@@ -945,6 +969,12 @@ function CardView({
           picturesMax={picturesMax}
           paste={!dialog}
         />
+        {measuring && (
+          <section className="d-panel d-wide">
+            <h3>Measured on the sewn cover</h3>
+            <MeasuredForm id={card.id} onChange={setMeasured} />
+          </section>
+        )}
         <section className="d-panel d-wide">
           <h3>History</h3>
           <ol className="d-timeline">
@@ -965,6 +995,9 @@ function CardView({
                     {" "}
                     · {h.fits ? "fits" : "does not fit"} {h.note}
                   </em>
+                )}
+                {h.measured && h.measured.length > 0 && (
+                  <MeasuredSummary rows={h.measured} />
                 )}
                 {h.done != null && (
                   <em> · {h.done ? "produced" : "not produced"}</em>
@@ -1036,24 +1069,30 @@ function CardView({
                 onChange={(e) => setFitNote(e.target.value)}
               />
               <button
-                className="d-btn d-ghost"
-                onClick={() =>
-                  act({ action: "fit", fits: true, note: fitNote }, "Fit saved")
-                }
+                className={`d-btn d-ghost ${measuring ? "on" : ""}`}
+                data-testid="measured-toggle"
+                title="Enter what you measured on the sewn cover against the check list; it is saved with Fits or Does not fit"
+                onClick={() => setMeasuring(!measuring)}
               >
-                Fits
+                Measured…
               </button>
-              <button
-                className="d-btn d-ghost"
-                onClick={() =>
-                  act(
-                    { action: "fit", fits: false, note: fitNote },
-                    "Fit saved",
-                  )
-                }
-              >
-                Does not fit
-              </button>
+              {[true, false].map((fits) => (
+                <button
+                  key={String(fits)}
+                  className="d-btn d-ghost"
+                  onClick={async () => {
+                    const values = measuring ? measured : {};
+                    const n = Object.keys(values).length;
+                    const ok = await act(
+                      { action: "fit", fits, note: fitNote, measured: values },
+                      n ? `Fit saved, with ${n} measured sizes` : "Fit saved",
+                    );
+                    if (ok && n) setMeasuring(false);
+                  }}
+                >
+                  {fits ? "Fits" : "Does not fit"}
+                </button>
+              ))}
             </span>
             {st.history.length > 0 && (
               <button
