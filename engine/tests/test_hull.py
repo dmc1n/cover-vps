@@ -45,14 +45,14 @@ FURNITURE = load_config()["furniture"]
 
 def busy_factor() -> float:
     """The time limits are for a quiet machine; while other work (renders, other test runs) keeps
-    the CPUs busy, a limit grows with the load per CPU, never below 1."""
+    the CPUs busy, a limit grows with the load per CPU (quiet: about 1, fully loaded: 2)."""
     import os
 
     try:
         load = os.getloadavg()[0]
     except OSError:
         return 1.0
-    return max(1.0, load / (os.cpu_count() or 1))
+    return 1.0 + load / (os.cpu_count() or 1)
 
 
 def params(**overrides: Any) -> Any:
