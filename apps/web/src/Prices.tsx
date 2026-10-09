@@ -13,6 +13,7 @@ import {
   PricesState,
   PriceVersion,
 } from "./api";
+import { PriceImport } from "./PriceImport";
 
 // Prices & costing (ADR-098): materials, labour, the fixed exchange rate, the extra costs and
 // the price lists per channel, the costing of every cover. Admins edit a draft, preview which
@@ -102,6 +103,7 @@ export function Prices({ canEdit }: { canEdit: boolean }) {
         setDoc(structuredClone(s.draft?.data ?? s.current));
         setErrors(s.draft_errors);
         setDirty(false);
+        if (s.draft?.note) setNote(s.draft.note); // an import's "Imported from …" (ADR-113)
       })
       .catch((e) => setMsg(String(e)));
   }, []);
@@ -356,6 +358,17 @@ export function Prices({ canEdit }: { canEdit: boolean }) {
         {sub === "materials" && <Materials {...ctx} />}
         {sub === "labour" && <Labour {...ctx} />}
         {sub === "rate" && <Rate {...ctx} />}
+        {sub === "channels" && edit && (
+          <PriceImport
+            beforeApply={async () => !dirty || (await saveDraft()).length === 0}
+            onApplied={(m) => {
+              load();
+              setMoves(null);
+              setMsg(m);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
+        )}
         {sub === "channels" && <Channels {...ctx} />}
         {sub === "costing" && (
           <CostingView

@@ -929,7 +929,10 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             glb = q.scene_glb(req.product, given, p, req.support)
         except CoverError as exc:
             raise HTTPException(400, str(exc)) from None
-        if stock:  # an existing cover: its own sizes, and the stock discount (when set)
+        fixed = costing.fixed_price(ps, stock["model_id"], "b2c") if stock else None
+        if fixed:  # the consumer list's fixed price for this cover wins (ADR-098, ADR-113)
+            full["price"]["sale_eur"] = fixed["gross_eur"]
+        elif stock:  # an existing cover: its own sizes, and the stock discount (when set)
             off = settings()["matching"].get("stock_discount_pct") or 0
             full["price"]["sale_eur"] = round(full["price"]["sale_eur"] * (1 - float(off) / 100), 2)  # noqa: PLR2004 - percent
         extra = 0.0  # the support is sold next to the cover, at the consumer price list's price

@@ -1560,6 +1560,7 @@ main:has(.desk) {
 }
 .q-owner .d-btn {
   justify-self: start;
+}
 
 /* after sewing: measured against the check list (ADR-111) */
 .d-split figcaption .d-link {
