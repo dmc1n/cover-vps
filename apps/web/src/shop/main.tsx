@@ -18,6 +18,7 @@ import { Suggest, type Suggestion } from "./Suggest";
 import { createRoot } from "react-dom/client";
 import "./shop.css";
 import { Icon } from "./Icons";
+import { HeroFilm } from "./HeroFilm";
 import type { StoryContent } from "./Story";
 
 // three.js (the 3D) and GSAP/Lenis (the scroll story) load only on the pages that show them
@@ -73,6 +74,8 @@ interface Info {
     /** Mollie's mode from the key's prefix (ADR-103): test payments move no money */
     payment_mode?: "test" | "live" | "none";
     film_url: string;
+    /** the same film in AV1 (ADR-108); optional */
+    film_av1?: string;
     film_poster: string;
     logo_url: string;
     home_story: boolean;
@@ -309,6 +312,16 @@ function Home({ info, tx }: { info: Info; tx: Tx }) {
           media={{
             ...info.settings.story_media,
             hero: info.settings.story_media?.hero || info.settings.film_url,
+            hero_av1:
+              info.settings.story_media?.hero_av1 ||
+              (info.settings.story_media?.hero
+                ? ""
+                : info.settings.film_av1 || ""),
+            hero_poster:
+              info.settings.story_media?.hero_poster ||
+              (info.settings.story_media?.hero
+                ? ""
+                : info.settings.film_poster),
           }}
           model={info.settings.story_model}
           cta={t(c.hero.cta)}
@@ -331,19 +344,17 @@ function Home({ info, tx }: { info: Info; tx: Tx }) {
   return (
     <>
       <section className="s-hero">
-        {info.settings.film_url && !calm ? (
-          <video
+        {info.settings.film_url ||
+        info.settings.film_av1 ||
+        info.settings.film_poster ? (
+          <HeroFilm
             className="s-film"
-            src={info.settings.film_url}
-            poster={info.settings.film_poster || undefined}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
+            media={{
+              h264: info.settings.film_url,
+              av1: info.settings.film_av1,
+              poster: info.settings.film_poster,
+            }}
           />
-        ) : info.settings.film_poster ? (
-          <img className="s-film" src={info.settings.film_poster} alt="" />
         ) : (
           <div className="s-film">
             <Scene url="/api/shop/demo.glb" spin={!calm} dark />

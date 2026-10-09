@@ -89,7 +89,8 @@ SHOP_DEFAULTS: dict[str, Any] = {
         "frame": {"name": "Cover frame", "size": "", "photo": ""},
     },  # fmt: skip
     "colours": "",
-    "film_url": "",
+    "film_url": "",  # the home page's film, H.264 (/media/<file>.mp4)
+    "film_av1": "",  # the same film in AV1, played where the browser can (ADR-108)
     "film_poster": "",
     "logo_url": "",
     "og_image": "",  # the picture when the shop is shared (1200x630); empty: /brand/og-shop.png
@@ -882,6 +883,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             "payment": bool(s["payment"].get("mollie_key")),
             "payment_mode": payment_mode(s),
             "film_url": s["film_url"],
+            "film_av1": s["film_av1"],
             "film_poster": s["film_poster"],
             "logo_url": s["logo_url"],
             "home_story": bool(s["home_story"]),

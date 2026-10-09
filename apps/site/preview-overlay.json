@@ -3,8 +3,9 @@
   "settings": {
     "home_story": true,
     "story_media": {
-      "hero": "/media/hero-sand.mp4",
-      "hero_poster": "/media/hero-sand.jpg",
+      "hero": "/media/hero-kota1-h264.mp4",
+      "hero_av1": "/media/hero-kota1-av1.mp4",
+      "hero_poster": "/media/hero-kota1.jpg",
       "rain": "/media/rain2.mp4",
       "measure": "/media/measure.mp4",
       "cut": "/media/cut.mp4",
