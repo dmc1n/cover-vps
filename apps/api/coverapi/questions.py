@@ -548,9 +548,15 @@ def _people(auth: Any, names: set[str]) -> list[Any]:
     return [u for u in auth.users() if u.email and _matches(u, names)]
 
 
-def question_mails(auth: Any, params: Any, base_url: str, send: Any) -> dict[str, int]:
+def question_mails(
+    auth: Any, params: Any, base_url: str, send: Any, models_dir: Path | None = None
+) -> dict[str, int]:
     """The digests that are due: new questions (and what was done with yours) to the people who
-    may answer, new answers to the owners. At most one of each per its interval."""
+    may answer, new answers to the owners. At most one of each per its interval. The
+    arrangements sent to the Desk since the last digest go to the approvers in the same
+    questions digest (ADR-115): one mail a day, never one per click."""
+    from coverapi import desk
+
     sent = {"questions": 0, "answers": 0}
     state = dict(auth.setting(MAIL_KEY, {}) or {})
     now = _now()
@@ -566,11 +572,16 @@ def question_mails(auth: Any, params: Any, base_url: str, send: Any) -> dict[str
                 "SELECT * FROM questions WHERE processed_time > ? ORDER BY id", (since,)
             ).fetchall()
             default = _names(str(params["desk.approvers"]))
+            arrs = desk.arrangements_to_announce(models_dir) if models_dir else []
             people: dict[str, Any] = {}
             for q in [*new, *done]:
                 for u in _people(auth, _names(q["answerers"]) or default):
                     people[u.username] = u
+            if arrs:
+                for u in _people(auth, default):
+                    people[u.username] = u
             for u in people.values():
+                mine_arrs = arrs if _matches(u, default) else []
                 mine_new = [q for q in new if _matches(u, _names(q["answerers"]) or default)]
                 answered = {
                     r["question_id"]
@@ -579,9 +590,18 @@ def question_mails(auth: Any, params: Any, base_url: str, send: Any) -> dict[str
                     )
                 }
                 mine_done = [q for q in done if q["id"] in answered]
-                if not (mine_new or mine_done):
+                if not (mine_new or mine_done or mine_arrs):
                     continue
                 lines = [f"Hallo {(u.name or u.username).split(' ')[0]},", ""]
+                if mine_arrs:
+                    lines += [
+                        f"{len(mine_arrs)} opstelling(en) wachten op je goedkeuring op de Desk:",
+                        "",
+                    ]
+                    for a in mine_arrs:
+                        how = "opnieuw, na een wijziging" if a["again"] else f"van {a['by']}"
+                        lines.append(f"- {a['code']} ({how})\n  {base_url}/#/desk/{a['id']}")
+                    lines.append("")
                 if mine_new:
                     lines += [f"Er staan {len(mine_new)} nieuwe vragen voor je op de Desk:", ""]
                     lines += [
@@ -597,6 +617,8 @@ def question_mails(auth: Any, params: Any, base_url: str, send: Any) -> dict[str
                     u.email,
                     f"Cover Studio: {len(mine_new)} nieuwe vragen"
                     if mine_new
+                    else f"Cover Studio: {len(mine_arrs)} opstelling(en) klaar voor goedkeuring"
+                    if mine_arrs
                     else "Cover Studio: je antwoorden zijn verwerkt",
                     "\n".join(lines),
                 )
@@ -607,7 +629,9 @@ def question_mails(auth: Any, params: Any, base_url: str, send: Any) -> dict[str
                     "status<>'processed'",
                     (now,),
                 )
-            if new or done:
+            if arrs and models_dir:
+                desk.mark_announced(models_dir, [a["id"] for a in arrs], now)
+            if new or done or arrs:
                 state["questions"] = now
         hours = float(params["questions.answer_digest_hours"])
         if hours > 0 and now - float(state.get("answers", 0)) >= hours * HOUR_S:
@@ -801,7 +825,11 @@ def install(app: FastAPI, auth: Any, root: Path, models_dir: Path) -> None:
             return {"questions": 0, "answers": 0}
         base = str(auth.setting(PUBLIC_URL_KEY, DEFAULT_PUBLIC_URL)).rstrip("/")
         return question_mails(
-            auth, params(), base, lambda to, subject, text: mailer.send(auth, to, subject, text)
+            auth,
+            params(),
+            base,
+            lambda to, subject, text: mailer.send(auth, to, subject, text),
+            models_dir,
         )
 
     def mail_loop() -> None:

@@ -1,7 +1,8 @@
 // Arrangements (ADR-089): furniture from the catalogue placed together, then one cover over the
 // whole. The top view shows each member's real footprint; drag to move, turn by 90°, mirror,
 // or snap one member against another's side. "Build cover" makes the arrangement a model
-// (arr-<name>) and calculates its cover like any model.
+// (arr-<name>) and calculates its cover like any model. "Send to the Desk" puts it before Rens or
+// Wout for approval; a change after that sends it back for approval by itself (ADR-115).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Job, type ModelBrief } from "./api";
 
@@ -83,6 +84,22 @@ function PlanPreview({ plan }: { plan: Plan }) {
     </svg>
   );
 }
+/** Where an arrangement stands at the Desk (ADR-115). */
+interface DeskInfo {
+  status: string;
+  at_desk: boolean;
+  dxf_ok: boolean;
+  sent: { by: string; time: number } | null;
+  approved: { by: string; time: number } | null;
+  produced: { by: string; time: number } | null;
+  rejected: {
+    by: string;
+    time: number;
+    reasons?: string[];
+    text?: string;
+  } | null;
+  last: { action: string; by: string; time: number; text?: string } | null;
+}
 interface Listed {
   id: string;
   name: string;
@@ -90,6 +107,106 @@ interface Listed {
   members: string[];
   stale: string[];
   built: boolean;
+  desk?: DeskInfo;
+}
+
+const when = (t: number) =>
+  new Date(t * 1000).toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+/** The arrangement's place in the approval workflow, in words, with what to do next. */
+function deskWords(d: DeskInfo): [string, string] {
+  if (d.status === "approved" && d.approved)
+    return [
+      "approved",
+      `Approved by ${d.approved.by} on ${when(d.approved.time)}`,
+    ];
+  if (d.status === "produced" && d.produced)
+    return ["approved", `Produced (${when(d.produced.time)})`];
+  if (d.status === "rejected" && d.rejected)
+    return [
+      "rejected",
+      `Rejected by ${d.rejected.by} on ${when(d.rejected.time)}: ${[...(d.rejected.reasons ?? []), d.rejected.text ?? ""].filter(Boolean).join(" · ") || "no reason given"}`,
+    ];
+  if (d.status === "ai-checked" && d.sent) {
+    const again =
+      d.last && d.last.action.startsWith("changed after")
+        ? ` again (${d.last.action}: ${d.last.text ?? ""})`
+        : "";
+    return [
+      "waiting",
+      `Waiting for approval at the Desk${again} · sent by ${d.sent.by} on ${when(d.sent.time)}`,
+    ];
+  }
+  return ["new", "Not at the Desk yet"];
+}
+
+function DeskStatus({
+  id,
+  desk,
+  built,
+  running,
+  onSend,
+}: {
+  id: string;
+  desk: DeskInfo | null;
+  built: boolean;
+  running: boolean;
+  onSend: () => void;
+}) {
+  if (!desk) return null;
+  const [tone, words] = deskWords(desk);
+  const canSend =
+    built &&
+    !running &&
+    (desk.status === "new" ||
+      desk.status === "rejected" ||
+      (desk.status === "ai-checked" && !desk.sent));
+  return (
+    <div className={`arrange-desk t-${tone}`} data-testid="arr-desk-status">
+      <b>{words}</b>
+      {tone === "approved" && (
+        <span className="muted">
+          The cutting-table DXF is available. Changing the plan or the pieces
+          and building again sends it back for approval.
+        </span>
+      )}
+      {tone === "waiting" && (
+        <span className="muted">
+          Rens or Wout approve it at the Desk; the DXF for the cutting table
+          waits until then.
+        </span>
+      )}
+      {tone === "rejected" && (
+        <span className="muted">
+          Change it and build again: it goes back to the Desk by itself.
+        </span>
+      )}
+      {tone === "new" && (
+        <span className="muted">
+          {built
+            ? "When the cover looks right, send it to the Desk for approval. The DXF for the cutting table waits for the approval."
+            : "Build the cover first, then send it to the Desk for approval."}
+        </span>
+      )}
+      <div className="row">
+        {canSend && (
+          <button className="primary" onClick={onSend}>
+            {desk.status === "rejected"
+              ? "Send to the Desk again"
+              : "Send to the Desk"}
+          </button>
+        )}
+        {(desk.at_desk || desk.sent) && (
+          <a href={`#/desk/${id}`}>Open its Desk card ↗</a>
+        )}
+      </div>
+    </div>
+  );
 }
 
 async function call<T>(url: string, body?: unknown): Promise<T> {
@@ -135,7 +252,7 @@ const COLOURS = [
   "#9a8a5a",
 ];
 
-export function Arrangements() {
+export function Arrangements({ openId }: { openId?: string | null } = {}) {
   const [models, setModels] = useState<ModelBrief[]>([]);
   const [listed, setListed] = useState<Listed[]>([]);
   const [settings, setSettings] = useState<Settings>({
@@ -160,6 +277,9 @@ export function Arrangements() {
   const [plansFor, setPlansFor] = useState("");
   const [footprint, setFootprint] = useState("follow");
   const [builtFootprint, setBuiltFootprint] = useState<string | null>(null);
+  // where the arrangement being edited stands at the Desk (ADR-115)
+  const [desk, setDesk] = useState<DeskInfo | null>(null);
+  const [hasCover, setHasCover] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const drag = useRef<{
     i: number;
@@ -230,6 +350,29 @@ export function Arrangements() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placement]);
 
+  const refreshDesk = useCallback((id: string) => {
+    call<{ desk: DeskInfo; built: boolean }>(`/api/arrangements/${id}`)
+      .then((r) => {
+        setDesk(r.desk);
+        setHasCover(r.built);
+      })
+      .catch(() => undefined);
+  }, []);
+  const sendToDesk = async () => {
+    if (!built) return;
+    setMsg("");
+    try {
+      const r = await call<{ desk: DeskInfo }>(
+        `/api/arrangements/${built}/send`,
+        {},
+      );
+      setDesk(r.desk);
+      reload();
+    } catch (e) {
+      setMsg(String((e as Error).message ?? e));
+    }
+  };
+
   // the job building the cover: followed until it is done
   useEffect(() => {
     if (!job || job.status === "done" || job.status === "failed") return;
@@ -237,13 +380,16 @@ export function Arrangements() {
       try {
         const j = await api.job(job.id);
         setJob(j);
-        if (j.status === "done" || j.status === "failed") reload();
+        if (j.status === "done" || j.status === "failed") {
+          reload();
+          refreshDesk(j.model_id);
+        }
       } catch (e) {
         setMsg(String(e));
       }
     }, 2000);
     return () => clearTimeout(t);
-  }, [job, reload]);
+  }, [job, reload, refreshDesk]);
 
   const placed = members.map((m) =>
     outlines[m.model_id] ? placedRings(outlines[m.model_id], m) : [],
@@ -305,20 +451,24 @@ export function Arrangements() {
   const build = async (plan: string = footprint) => {
     setMsg("");
     try {
-      const r = await call<{ model_id: string; job: Job; footprint: string }>(
-        "/api/arrangements",
-        {
-          name: name || "Arrangement",
-          members,
-          model_id: editing,
-          gap_mm: settings.gap_mm,
-          footprint: plan,
-        },
-      );
+      const r = await call<{
+        model_id: string;
+        job: Job;
+        footprint: string;
+        desk?: DeskInfo;
+      }>("/api/arrangements", {
+        name: name || "Arrangement",
+        members,
+        model_id: editing,
+        gap_mm: settings.gap_mm,
+        footprint: plan,
+      });
       setEditing(r.model_id);
       setBuilt(r.model_id);
       setBuiltFootprint(r.footprint);
       setJob(r.job);
+      if (r.desk) setDesk(r.desk);
+      setHasCover(false);
     } catch (e) {
       setMsg(String((e as Error).message ?? e));
     }
@@ -347,7 +497,13 @@ export function Arrangements() {
     setBuilt(id);
     setSel(null);
     setJob(null);
+    refreshDesk(id);
   };
+  // #/arrangements/<id>: open that arrangement (the Desk card's "Edit arrangement")
+  useEffect(() => {
+    if (openId && openId !== editing) void open(openId).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId]);
   const found =
     search.length < 2
       ? []
@@ -400,9 +556,27 @@ export function Arrangements() {
           <p className="muted">
             Arrangements:{" "}
             {listed.map((l) => (
-              <button key={l.id} className="link" onClick={() => open(l.id)}>
+              <button
+                key={l.id}
+                className="link"
+                onClick={() =>
+                  (window.location.hash = `#/arrangements/${l.id}`)
+                }
+              >
                 {l.name}{" "}
-                {l.stale.length > 0 ? "(a member changed: build again)" : ""}
+                {l.desk && (
+                  <span className={`arrange-pill t-${deskWords(l.desk)[0]}`}>
+                    {
+                      {
+                        approved: "approved",
+                        rejected: "rejected",
+                        waiting: "waiting for approval",
+                        new: "not at the Desk",
+                      }[deskWords(l.desk)[0]]
+                    }
+                  </span>
+                )}
+                {l.stale.length > 0 ? " (a member changed: build again)" : ""}
               </button>
             ))}
           </p>
@@ -630,6 +804,15 @@ export function Arrangements() {
               <a href={`#/model/${built}`}>Open the model ↗</a>{" "}
               <span className="muted">(3D, dimensions, air vents, Unfold)</span>
             </p>
+          )}
+          {built && (
+            <DeskStatus
+              id={built}
+              desk={desk}
+              built={hasCover || job?.status === "done"}
+              running={running}
+              onSend={sendToDesk}
+            />
           )}
           {msg && <p className="error">{msg}</p>}
         </section>

@@ -9,7 +9,10 @@
                                              ADR-095), each with its outline and size
 - GET  /api/arrangements/{model_id}          one arrangement (its members and places)
 - POST /api/arrangements                     make or update one and build its cover (a job:
-                                             import → hull → cut → flatten → export)
+                                             import → hull → cut → flatten → export); a change
+                                             to one at the Desk reopens its approval (ADR-115)
+- POST /api/arrangements/{model_id}/send     send a built one to the Desk: ready for approval
+                                             (ADR-115); the approvers get it in their digest
 
 An arrangement is an ordinary model (`arr-<name>`): it shows in the catalogue (tag
 "arrangement") and at the Desk, and its model page has the 3D, the sizes and Unfold.
@@ -61,10 +64,27 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
     from coverengine.errors import CoverError
     from coverengine.params import Registry
 
+    from coverapi import desk
     from coverapi.jobs import JobSpec
     from coverapi.security import require
 
     outlines: dict[tuple[str, float], dict[str, Any]] = {}
+    learning = Path(store.root) / "learning"
+
+    def desk_of(d: Path) -> dict[str, Any]:
+        """Where the arrangement stands at the Desk (ADR-115), for the page."""
+        desk.reopen_if_changed(d, learning)
+        st = desk.state(d)
+        keep = ("sent", "approved", "rejected", "produced")
+        last = st["history"][-1] if st["history"] else None
+        short = ("by", "time", "reasons", "text")  # not the fingerprints an approval keeps
+        return {
+            "status": st["status"],
+            **{k: {f: st[k][f] for f in short if f in st[k]} if st.get(k) else None for k in keep},
+            "at_desk": (d / "desk.json").is_file() and st["status"] != "new",
+            "dxf_ok": desk.dxf_allowed(d, params()),
+            "last": last and {k: last.get(k) for k in ("action", "by", "time", "text")},
+        }
 
     def params() -> Any:
         return Registry.load(None).resolve()
@@ -87,7 +107,8 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
                 out.append({"id": d.name, "name": doc.get("name"), "size_mm": doc.get("size_mm"),
                             "members": [m["model_id"] for m in doc.get("members", [])],
                             "stale": ar.stale(Path(store.models), doc),
-                            "built": (d / "finished.json").is_file()})  # fmt: skip
+                            "built": (d / "finished.json").is_file(),
+                            "desk": desk_of(d)})  # fmt: skip
         return out
 
     @app.get("/api/arrangements/settings")
@@ -144,7 +165,27 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
             doc = ar.read(d)
         except (KeyError, CoverError):
             raise HTTPException(404, f"no arrangement {model_id!r}") from None
-        return {**doc, "stale": ar.stale(Path(store.models), doc)}
+        return {**doc, "stale": ar.stale(Path(store.models), doc), "desk": desk_of(d),
+                "built": (d / "finished.json").is_file()}  # fmt: skip
+
+    @app.post("/api/arrangements/{model_id}/send")
+    def send(model_id: str, request: Request) -> dict[str, Any]:
+        """Send a built arrangement to the Desk: ready for approval by Rens or Wout (ADR-115).
+        Whoever may build one may send it; the approvers hear of it in their daily digest."""
+        user = require(request, "edit")
+        if not re.fullmatch(r"arr-[a-z0-9-]+", model_id):
+            raise HTTPException(400, "not an arrangement")
+        try:
+            d = Path(store.model_dir(model_id))
+        except KeyError:
+            raise HTTPException(404, f"no arrangement {model_id!r}") from None
+        if not (d / ar.ARRANGEMENT_JSON).is_file():
+            raise HTTPException(404, f"no arrangement {model_id!r}")
+        job = jobs.latest(model_id)
+        if job and job.get("status") in ("queued", "running"):
+            raise HTTPException(409, "the cover is still being built: send it when it is ready")
+        desk.send_arrangement(d, user, learning)
+        return {"model_id": model_id, "desk": desk_of(d)}
 
     @app.post("/api/arrangements")
     def build(body: ArrangementIn, request: Request) -> dict[str, Any]:
@@ -168,6 +209,7 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
         footprint = body.footprint or str(params()["arrange.footprint"])
         if footprint not in ar.FOOTPRINTS:
             raise HTTPException(400, f"footprint: one of {', '.join(ar.FOOTPRINTS)}")
+        old = ar.read(d) if (d / ar.ARRANGEMENT_JSON).is_file() else None
         try:
             src = ar.write(Path(store.models), model_id, body.name, members, body.gap_mm,
                            footprint)  # fmt: skip
@@ -186,6 +228,42 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
         doc.setdefault("status", "draft")
         cj.write_text(json.dumps(doc, indent=2) + "\n")
         steps = ["import", "hull", "cut", "flatten", "export"]
+        if old is not None:  # at the Desk: a change reopens its approval, never silently
+            desk.arrangement_changed(d, changes(old, ar.read(d), Path(store.models)), user,
+                                     learning)  # fmt: skip
         job = jobs.submit(JobSpec(model_id, steps, {}, source=str(src), units="mm", up="z"))
         return {"model_id": model_id, "job": job, "size_mm": ar.read(d)["size_mm"],
-                "footprint": footprint}  # fmt: skip
+                "footprint": footprint, "desk": desk_of(d)}  # fmt: skip
+
+
+def changes(old: dict[str, Any], new: dict[str, Any], models: Path) -> list[str]:
+    """What a rebuild changes in an arrangement, in words for the Desk's history (ADR-115):
+    members, places, the plan, the gap, or a member's own furniture changed since."""
+    from coverengine import arrange as ar
+
+    a, b = ar.placement(old), ar.placement(new)
+    out = []
+    ids_a = [m["model_id"] for m in a["members"]]
+    ids_b = [m["model_id"] for m in b["members"]]
+    if ids_a != ids_b:
+        out.append(f"members {', '.join(ids_a)} → {', '.join(ids_b)}")
+    elif a["members"] != b["members"]:
+        moved = [m["model_id"] for m, n in zip(a["members"], b["members"], strict=True) if m != n]
+        out.append(f"place of {', '.join(moved)}")
+    if a["footprint"] != b["footprint"]:  # None: built before ADR-095, the default plan
+        out.append(f"plan {a['footprint'] or 'default'} → {b['footprint']}")
+    if a["gap_mm"] != b["gap_mm"]:
+        out.append(f"gap {a['gap_mm']:g} → {b['gap_mm']:g} mm")
+    versions = {m["model_id"]: (m.get("version") or {}).get("model_glb")
+                for m in old.get("members") or []}  # fmt: skip
+    rebuilt = sorted(
+        m["model_id"]
+        for m in new.get("members") or []
+        if m["model_id"] in versions
+        and versions[m["model_id"]] != (m.get("version") or {}).get("model_glb")
+    )
+    if rebuilt:
+        out.append(f"furniture of {', '.join(rebuilt)} changed")
+    # a new name alone changes nothing to cut; should the rebuilt cut file differ all the
+    # same, its fingerprint reopens the approval (desk.reopen_if_changed)
+    return out

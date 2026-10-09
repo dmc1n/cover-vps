@@ -143,7 +143,11 @@ export function App() {
               selected={hash.match(/^#\/desk\/([a-z0-9-]+)/)?.[1] ?? null}
             />
           ) : hash.startsWith("#/arrangements") ? (
-            <Arrangements />
+            <Arrangements
+              openId={
+                hash.match(/^#\/arrangements\/(arr-[a-z0-9-]+)/)?.[1] ?? null
+              }
+            />
           ) : hash.startsWith("#/catalogue") ? (
             <Gallery />
           ) : hash.startsWith("#/learning") ? (

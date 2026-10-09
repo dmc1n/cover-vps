@@ -25,6 +25,13 @@ correction (a snapshot of the 3D view or the drawing, a file, a paste), marked w
 circles and lines in the browser. They are uploaded first (`POST /api/desk/{id}/pictures`),
 checked and re-encoded as PNG without metadata into the model's desk/ folder, and then named in
 the action; the history entry, learning/desk.jsonl and a correction's test case carry them.
+
+Arrangements (ADR-115): an `arr-*` model is approved here too. Its maker sends it to the Desk
+(`sent`: who, when; status ai-checked, "ready for approval"); the approvers hear of it in their
+daily digest. An approval records the cut file's fingerprint and the placement (members, places,
+plan); a later change to either reopens it ("changed after approval", back to waiting), so an
+approved arrangement never changes silently. Its cutting-table DXF waits for the approval
+whatever `desk.gate_scope` says (`desk.gate_arrangements`).
 """
 
 from __future__ import annotations
@@ -56,6 +63,10 @@ PICTURE_FORMATS = ("JPEG", "PNG", "WEBP")
 WITH_PICTURES = ("reject", "note", "fit")
 MB = 1024 * 1024  # param-ok: bytes in a megabyte
 _lock = threading.Lock()
+ARRANGEMENT_PREFIX = "arr-"
+ARRANGEMENT_JSON = "arrangement.json"  # as coverengine.arrange
+WAITING = "ai-checked"  # an arrangement sent to the Desk: ready for approval (ADR-115)
+DONE = ("approved", "produced")
 
 
 class Action(BaseModel):
@@ -144,6 +155,10 @@ def _code(d: Path) -> str:
         return str(st.get("code") or c.get("code"))
     if d.name.startswith("drawing-"):
         return d.name.removeprefix("drawing-").upper()
+    if is_arrangement(d):  # its own name, as made on the Arrangements page (ADR-115)
+        name = str(_read(d / ARRANGEMENT_JSON).get("name") or "").strip()
+        if name:
+            return re.sub(r"\s+", " ", name)[:80]
     # a catalogue model (SUNS): its own name, as its notes carry it ("…: SUNS-Chaise lounge-…")
     notes = str(_read(d / "cover.json").get("notes") or "")
     name = notes.rsplit(": ", 1)[-1] if ": " in notes else d.name
@@ -161,6 +176,8 @@ def brief(d: Path) -> dict[str, Any]:
         "id": d.name,
         "code": _code(d),
         "drawing": d.name.startswith("drawing-"),
+        "arrangement": is_arrangement(d),
+        "sent": st.get("sent"),  # an arrangement sent to the Desk: who, when (ADR-115)
         "status": st["status"],
         "outcome": c.get("outcome"),
         "scores": sc,
@@ -194,12 +211,202 @@ def approver(user: Any, params: Any) -> bool:
 def dxf_allowed(d: Path, params: Any) -> bool:
     if not bool(params["desk.require_approval_for_dxf"]):
         return True
+    if is_arrangement(d) and bool(params["desk.gate_arrangements"]):
+        # an arrangement waits for its approval whatever gate_scope says, and an approval of
+        # an older cut file or placement does not count (ADR-115)
+        st = state(d)
+        return st["status"] in DONE and not _changed_since_approval(d, st)
     if str(params["desk.gate_scope"]) != "all" and not d.name.startswith("drawing-"):
         return True
     st = state(d)
     if d.name.startswith("drawing-") or (d / "desk.json").is_file():
         return st["status"] in ("approved", "produced")
     return _read(d / "cover.json").get("status") in ("checked", "production")
+
+
+# ---- arrangements (ADR-115) -----------------------------------------------------------------
+
+
+def is_arrangement(d: Path) -> bool:
+    return d.name.startswith(ARRANGEMENT_PREFIX) and (d / ARRANGEMENT_JSON).is_file()
+
+
+def cut_fingerprint(d: Path) -> str | None:
+    """The cutting table's file as it is now: what an approval of an arrangement is for."""
+    import hashlib
+
+    f = d / "cut.dxf"
+    return hashlib.sha256(f.read_bytes()).hexdigest()[:20] if f.is_file() else None
+
+
+def _placement(d: Path) -> dict[str, Any]:
+    from coverengine.arrange import placement
+
+    return placement(_read(d / ARRANGEMENT_JSON))
+
+
+def _changed_since_approval(d: Path, st: dict[str, Any]) -> list[str]:
+    """What changed in an approved arrangement since its approval: its cut file, its placement.
+    Empty when nothing did (or nothing was recorded, as before ADR-115)."""
+    ok = st.get("approved") or {}
+    out = []
+    if ok.get("cut") and ok["cut"] != cut_fingerprint(d):
+        out.append("the cut file")
+    if ok.get("placement") and ok["placement"] != _placement(d):
+        out.append("the members or the plan")
+    return out
+
+
+def _reopen(d: Path, st: dict[str, Any], who: str, action: str, why: str) -> dict[str, Any]:
+    """Back to waiting for approval and sent again, so the digest announces it again. The
+    caller holds _lock and writes desk.json."""
+    before = {k: v for k, v in st.items() if k != "history"}
+    now = time.time()
+    st["status"] = WAITING
+    for k in ("approved", "produced", "rejected"):
+        st.pop(k, None)
+    st["sent"] = {"by": who, "time": now, "announced": None}
+    entry = {"action": action, "by": who, "time": now, "text": why, "before": before}
+    st["history"].append(entry)
+    return entry
+
+
+def reopen_if_changed(d: Path, learning: Path) -> dict[str, Any] | None:
+    """An approved arrangement whose cut file or placement changed since (a rebuild from the
+    model page, a correction, a member rebuilt) goes back to waiting, the reason in its
+    history."""
+    if not is_arrangement(d) or not (d / "desk.json").is_file():
+        return None
+    from coverengine.catalogue import set_info
+
+    with _lock:
+        st = state(d)
+        if st["status"] not in DONE:
+            return None
+        what = _changed_since_approval(d, st)
+        if not what:
+            return None
+        why = f"{' and '.join(what)} changed after the approval"
+        entry = _reopen(d, st, "the studio", "changed after approval", why)
+        _write(d / "desk.json", st)
+        _catalogue(d, WAITING, set_info)
+        _log(learning, d, entry)
+    return entry
+
+
+def send_arrangement(d: Path, user: Any, learning: Path, note: str = "") -> dict[str, Any]:
+    """Its maker sends a built arrangement to the Desk: ready for approval."""
+    if not is_arrangement(d):
+        raise HTTPException(400, "not an arrangement")
+    if not ((d / "finished.json").is_file() and (d / "cut.dxf").is_file()):
+        raise HTTPException(409, "build the cover first, then send it to the Desk")
+    who = user.name or user.username
+    with _lock:
+        st = state(d)
+        if st["status"] in DONE:
+            raise HTTPException(409, f"already {st['status']}: change it to send it again")
+        if st["status"] == WAITING and st.get("sent"):
+            return st  # already waiting: a second click changes nothing, no second mail
+        before = {k: v for k, v in st.items() if k != "history"}
+        now = time.time()
+        st["status"] = WAITING
+        st.pop("rejected", None)
+        st["sent"] = {"by": who, "time": now, "announced": None}
+        entry = {"action": "sent to the Desk", "by": who, "time": now, "before": before}
+        if note:
+            entry["text"] = note
+        st["history"].append(entry)
+        _write(d / "desk.json", st)
+        _log(learning, d, entry)
+    return state(d)
+
+
+def arrangement_changed(
+    d: Path, what: list[str], user: Any, learning: Path
+) -> dict[str, Any] | None:
+    """The arrangement changed and is built again (Arrangements page). Approved or rejected:
+    back to waiting ("changed after approval" / "changed after rejection"); waiting: noted in
+    its history; not sent yet: nothing. Never silent once it is at the Desk."""
+    if not what or not (d / "desk.json").is_file():
+        return None
+    from coverengine.catalogue import set_info
+
+    who = user.name or user.username
+    why = f"changed: {', '.join(what)}"
+    with _lock:
+        st = state(d)
+        if st["status"] in DONE:
+            entry = _reopen(d, st, who, "changed after approval", why)
+        elif st["status"] == "rejected":
+            entry = _reopen(d, st, who, "changed after rejection", why)
+        elif st["status"] == WAITING and st.get("sent"):
+            before = {k: v for k, v in st.items() if k != "history"}
+            entry = {"action": "changed while waiting", "by": who, "time": time.time(),
+                     "text": why, "before": before}  # fmt: skip
+            st["history"].append(entry)
+        else:
+            return None
+        _write(d / "desk.json", st)
+        _catalogue(d, st["status"], set_info)
+        _log(learning, d, entry)
+    return entry
+
+
+def arrangements_to_announce(models: Path) -> list[dict[str, Any]]:
+    """Arrangements sent to the Desk and not yet in the approvers' digest (ADR-115)."""
+    out = []
+    for d in sorted(models.glob(ARRANGEMENT_PREFIX + "*")):
+        if not is_arrangement(d):
+            continue
+        st = state(d)
+        sent = st.get("sent") or {}
+        if st["status"] == WAITING and sent and not sent.get("announced"):
+            again = any(str(h.get("action", "")).startswith("changed after")
+                        for h in st["history"])  # fmt: skip
+            out.append({"id": d.name, "code": _code(d), "by": sent.get("by"), "again": again})
+    return out
+
+
+def mark_announced(models: Path, ids: list[str], when: float) -> None:
+    with _lock:
+        for model_id in ids:
+            d = models / model_id
+            st = state(d)
+            if st.get("sent") and not st["sent"].get("announced"):
+                st["sent"]["announced"] = when
+                _write(d / "desk.json", st)
+
+
+def arrangement_card(d: Path, models: Path) -> dict[str, Any]:
+    """The arrangement on the Desk's card: its members with their places, and the plan."""
+    from coverengine.arrange import plan_view, stale
+    from coverengine.errors import CoverError
+
+    doc = _read(d / ARRANGEMENT_JSON)
+    try:
+        view: dict[str, Any] | None = plan_view(doc, _settings())
+    except (CoverError, KeyError, ValueError, TypeError):
+        view = None  # an old or broken arrangement.json: the card shows the members only
+    try:
+        changed = set(stale(models, doc))
+    except (OSError, KeyError):
+        changed = set()
+    members = []
+    for m in doc.get("members") or []:
+        md = models / str(m.get("model_id"))
+        members.append({
+            "model_id": m.get("model_id"),
+            "code": _code(md) if md.is_dir() else m.get("model_id"),
+            "x_mm": m.get("x_mm"), "y_mm": m.get("y_mm"), "rot_deg": m.get("rot_deg"),
+            "mirror": bool(m.get("mirror")),
+            "size_mm": (m.get("version") or {}).get("size_mm"),
+            "exists": md.is_dir(),
+            "has_picture": (md / "cover.png").is_file(),
+            "stale": m.get("model_id") in changed,
+        })  # fmt: skip
+    return {"name": doc.get("name"), "gap_mm": doc.get("gap_mm"), "size_mm": doc.get("size_mm"),
+            "time": doc.get("time"), "members": members, "plan": view,
+            "stale": sorted(changed)}  # fmt: skip
 
 
 # ---- the drawing ----------------------------------------------------------------------------
@@ -342,6 +549,8 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
         if a.action == "approve":
             st["status"] = "approved"
             st["approved"] = {"by": who, "time": now}
+            if is_arrangement(d):  # what the approval is for (ADR-115)
+                st["approved"] |= {"cut": cut_fingerprint(d), "placement": _placement(d)}
             st.pop("rejected", None)
         elif a.action == "reject":
             bad = [r for r in a.reasons if r not in REASONS]
@@ -644,8 +853,12 @@ def install(app: FastAPI, store: Any) -> None:
         user = current_user(request)
         params = Registry.load(None).resolve()
         dirs = sorted(p for p in Path(store.models).iterdir() if (p / "cover.json").is_file())
-        if scope != "all":
+        if scope == "arrangements":
+            dirs = [p for p in dirs if is_arrangement(p)]
+        elif scope != "all":
             dirs = [p for p in dirs if p.name.startswith("drawing-")]
+        for p in dirs:
+            reopen_if_changed(p, learning)  # an approved arrangement never changes silently
         items = sorted((brief(p) for p in dirs), key=lambda b: (b["priority"], b["code"]))
         counts = {s: sum(1 for i in items if i["status"] == s) for s in STATUSES}
         avgs = [i["scores"]["avg"] for i in items if i["scores"]["avg"] is not None]
@@ -671,6 +884,7 @@ def install(app: FastAPI, store: Any) -> None:
 
         current_user(request)
         d = folder(model_id)
+        reopen_if_changed(d, learning)
         pieces, count, vents = _pieces(d)
         pdf = drawing_pdf(d, store.root)
         pages = 0
@@ -693,6 +907,10 @@ def install(app: FastAPI, store: Any) -> None:
             "product_list": products_card(d),
             "pages": pages,
             "dxf_ok": dxf_allowed(d, Registry.load(None).resolve()),
+            # the members, their places and the plan (ADR-115)
+            "arrangement_info": arrangement_card(d, Path(store.models))
+            if is_arrangement(d)
+            else None,
         }
 
     @app.get("/api/desk/{model_id}/page/{page}")

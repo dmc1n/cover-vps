@@ -162,3 +162,42 @@ meer voor te mailen.
 
 Nieuwe vragen komen hooguit één keer per dag per mail, nooit per klik. Werkt het plaatje niet in
 Edge, dan staat er in rood waarom; kies dan **Upload…** met een schermafdruk.
+
+## Arrangements at the Desk (ADR-115)
+
+An arrangement (furniture placed together under one cover, see
+[arrangements.md](arrangements.md)) is approved at the Desk like a drawing cover.
+
+- **ARR** in the series chips shows only the arrangements, with the number beside it. Each is
+  named by its own name ("portofino 2 + c"), with an **ARR** tag instead of AI scores.
+- **Status:** "Not sent yet" (built, its maker has not sent it), **Ready for approval** (sent;
+  the list says by whom), Approved, Rejected, Produced.
+- **The card** has, instead of the drawing, the arrangement seen from above: each piece in
+  its own colour with its number, the cover's plan (follow, box or smoothed) as a red line,
+  the front at the bottom. Below: each piece with its picture, size, place (cm), turn and
+  mirror, a link to its own model and to its own Desk card. The bar above the card says where
+  it stands: waiting (sent by whom, when), approved by whom, rejected and why, or "waiting
+  again" after a change. Then the 3D cover (Measure, Vent sizes, Check list), the pieces,
+  the revisions and the history. **Edit arrangement ↗** opens it on the Arrangements page.
+- **The DXF** of an arrangement downloads only once it is approved, whatever
+  `desk.gate_scope` says (`desk.gate_arrangements: true`).
+- **An approved arrangement never changes silently.** If its plan or pieces change on the
+  Arrangements page, or its cut file changes at all (built again from the model page, a
+  correction), it goes back to "Ready for approval" with "changed after approval" in the
+  history, and the DXF is locked again.
+- **Mail:** the approvers get the arrangements sent that day in the daily digest of the
+  Questions (`questions.digest_hours`), never one mail per click.
+
+### Opstellingen goedkeuren (voor Rens en Wout)
+
+1. **Desk → ARR.** Je ziet alle opstellingen. "Ready for approval" wacht op jou; erbij staat
+   wie hem stuurde. Je krijgt ze ook één keer per dag in de mail met de vragen.
+2. **Open de kaart.** Links de opstelling van bovenaf: elk meubel met een nummer, de rode lijn
+   is de hoes. Onder de tekening de meubels zelf, met een link naar hun eigen model. Rechts de
+   hoes in 3D; met **Measure** meet je, met **Vent sizes** zie je de maten van de vents.
+3. **Klopt het?** **Approve** (`a`). Dan pas kan de werkplaats de DXF downloaden.
+4. **Klopt het niet?** **Reject** (`r`) met een reden en eventueel een plaatje. Wie hem maakte
+   past hem aan op de pagina Arrangements; na opnieuw bouwen staat hij vanzelf weer bij jou.
+5. **Later veranderd?** Verandert iemand een goedgekeurde opstelling (andere plattegrond,
+   meubel verschoven, ander meubel), dan staat hij weer op "Ready for approval" met
+   "changed after approval" in de geschiedenis, en is de DXF weer op slot.

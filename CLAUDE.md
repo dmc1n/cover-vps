@@ -250,6 +250,9 @@ apps/web/e2e/priceimport.py                 the import in a real browser (sample
 <website>/b2b, Admin → B2B customers        the B2B shop: business logins, own prices ex VAT, orders on account (ADR-104)
 apps/web/e2e/b2b.py                         the B2B shop in a real browser (ADR-104; usage in its docstring)
 apps/web/e2e/measure.py                     Measure, Vent sizes, the check list and measured fits in a real browser (ADR-111)
+Arrangements → Send to the Desk; Desk → ARR   an arrangement approved by Rens or Wout; a change reopens it; DXF after approval (ADR-115)
+COVER_DATA_DIR=~/cover-data uv run python scripts/desk_arrangements.py [--apply] [--only a,b]   the existing arr-* to "ready for approval" (ADR-115)
+apps/web/e2e/arrangements_desk.py           the arrangement → Desk workflow in a real browser (ADR-115; usage in its docstring)
 3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs

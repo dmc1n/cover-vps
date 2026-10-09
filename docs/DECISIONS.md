@@ -3624,3 +3624,57 @@ upload this Excel somewhere so you set these prices as fixed prices for the curr
   page); `min-width: 0` lets their tables scroll inside.
 - **Better later:** a per-row confirmation memory (aliases learned from hand picks), the
   supplier's article numbers once the covers carry them, price lists per colour or quality.
+
+## ADR-115 — Arrangements are approved at the Desk; an approved one never changes silently
+
+The owner (9 October 2026): "set the arrangements ready in the Desk; that must be the workflow,
+so that Rens or Wout approve them." Arrangements (ADR-089) already appeared at the Desk as
+models with status "new", unnamed and without a way to send them or to see what was placed.
+
+- **The workflow:** built on the Arrangements page → **Send to the Desk**
+  (`POST /api/arrangements/{id}/send`, the `edit` right; refused while its cover is building or
+  when nothing is built) → status `ai-checked`, shown for arrangements as **Ready for approval**,
+  with `sent` = who, when, `announced` in desk.json and a history entry "sent to the Desk" →
+  approved / rejected at the Desk by the approvers, as any cover. No new status: the queue's
+  counts, the pipeline bar and the undo work unchanged. A second click changes nothing.
+- **Never silently changed:** an approval of an arrangement records the cut file's fingerprint
+  (sha256 of cut.dxf) and its placement (members, places, gap, plan; `arrange.placement`).
+  - Building it again from the Arrangements page with another plan, moved, added or removed
+    members, or a member whose furniture changed puts it back to waiting with "changed after
+    approval: …" (from rejected: "changed after rejection"; while waiting: "changed while
+    waiting", a note only). A new name alone is not a change.
+  - Any other change of the cut file (a rebuild from the model page, a Desk correction) is
+    found by the fingerprint: the queue, the card and the Arrangements page reopen it with
+    "changed after approval" by "the studio", and the DXF gate refuses it at once.
+  - Reopening clears approved/produced/rejected, marks it sent again (so the digest lists it
+    again) and sets the catalogue status back to draft.
+- **The DXF gate:** `desk.gate_arrangements: true` (new key) gates every `arr-*` model on its
+  approval whatever `desk.gate_scope` says; false: arrangements follow gate_scope like any
+  model.
+- **At the Desk:** the series chip **ARR** (with a count), the arrangement's own name as its
+  code, an ARR tag instead of AI scores, `GET /api/desk?scope=arrangements`. The card shows,
+  in place of the drawing, the plan from above (`arrange.plan_view`: each member's rectangle
+  and the chosen footprint's outline; follow and box exactly as the cover is built, smooth as
+  the convex hull plus the clearance), the members with picture, size, place, turn, mirror, a
+  link to their own model and Desk card, "changed since" per member; a status bar (waiting,
+  approved by, rejected and why, waiting again after a change); "The arrangement" facts in
+  place of what the program read; no AI panel and no "Let the AI read it". The 3D viewer
+  (Measure, Vent sizes), pieces, check list and history as for every cover.
+- **Mail:** the arrangements sent and not yet announced go to the approvers in the Questions
+  digest (`questions.question_mails`, once per `questions.digest_hours`), one section
+  "opstelling(en) wachten op je goedkeuring" with links; never a mail per click.
+  `desk.approvers` gains "wout" (Wout logs in as wout; "wouter" did not match him).
+- **The existing arrangements:** `scripts/desk_arrangements.py` (dry run by default,
+  `--apply`, `--only`, `--by`) puts every built `arr-*` that is new or waiting without a
+  sender into "ready for approval", keeping desk.json and its history; approved, rejected and
+  already sent ones are left alone.
+- **Tests:** `apps/api/tests/test_desk_arrangements.py` (queue filter and names, the card's
+  plan, send rights and repeats, the gate and its switch, reopening on a changed cut file and
+  on a change after approval or rejection, the change words, the digest once);
+  test_arrangements.py builds, sends, approves and rebuilds with another plan through the API.
+  Browser: `apps/web/e2e/arrangements_desk.py` (send, ARR filter, card, approve, DXF, change
+  after approval, phone width).
+- **Also fixed:** on a phone the Desk overflowed by 8 px (its margins assumed the desktop
+  gutter, and the fit row did not wrap).
+- **Better later:** the smooth plan drawn from the built cover's own outline; a per-member
+  check that the arrangement's pieces still match the member's latest cover.

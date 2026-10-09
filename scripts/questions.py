@@ -310,7 +310,9 @@ def cmd_mail(db: Any, args: argparse.Namespace) -> int:
         print("no mail server set (admin page, Mail)")
         return 1
     base = str(auth.setting(PUBLIC_URL_KEY, DEFAULT_PUBLIC_URL)).rstrip("/")
-    sent = Q.question_mails(auth, params(), base, lambda to, s, t: mailer.send(auth, to, s, t))
+    sent = Q.question_mails(
+        auth, params(), base, lambda to, s, t: mailer.send(auth, to, s, t), data_dir() / "models"
+    )
     print(f"sent: {sent}")
     return 0
 

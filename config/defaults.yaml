@@ -356,11 +356,14 @@ drawn:
 
 
 desk:                            # the drawing desk: people approve covers, AI only sorts (ADR-079)
-  approvers: "rens,rick,wouter"  # who may approve, reject and mark produced (owner, 6 Oct 2026);
-                                 # matched on user name or first name; admins always may
+  approvers: "rens,rick,wouter,wout"  # who may approve, reject, mark produced (owner, 6 Oct 2026);
+                                 # matched on user name or first name; admins always may; "wout": Wout
+                                 # logs in as wout, so he gets the approvers' digest too (ADR-115)
   require_approval_for_dxf: true # the cutting table's DXF only once a cover is approved (owner)
   gate_scope: drawings           # drawings: only drawing-* covers need approval for the DXF; all: every
                                  # model (to confirm: the 314 SUNS models are all still "draft")
+  gate_arrangements: true        # an arrangement's (arr-*) DXF only once approved at the Desk, whatever
+                                 # gate_scope says (owner, 9 Oct 2026: Rens or Wout approve them; ADR-115)
   learn_after: 5                 # the same correction on this many covers of a group is proposed
                                  # as the group's rule; a person accepts it (ADR-082)
   picture_max_mb: 15             # a picture attached at the Desk (snapshot, photo, screenshot) may be
