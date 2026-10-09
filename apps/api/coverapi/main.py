@@ -122,9 +122,10 @@ def create_app(
     from coverapi import own_reference
 
     own_reference.install(app, store)  # the workshop's own reference per model (ADR-070)
-    from coverapi import desk
+    from coverapi import desk, questions
 
     desk.install(app, store)  # the drawing desk: people approve, the AI sorts (ADR-079)
+    questions.install(app, auth, store.root, Path(store.models))  # questions at the Desk (ADR-109)
     from coverapi import drawing_upload, unfold
 
     drawing_upload.install(app, store, jobs)  # route A: a drawing (PDF) -> a cover (ADR-081)

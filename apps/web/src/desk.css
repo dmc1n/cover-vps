@@ -1228,3 +1228,336 @@ main:has(.desk) {
   font-size: 12px;
   color: var(--d-muted);
 }
+
+/* the Desk's tabs and the Questions tab (ADR-109) */
+.d-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--d-line);
+}
+.d-tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  min-height: 44px; /* a finger on a tablet */
+  box-sizing: border-box;
+  color: var(--d-muted);
+  text-decoration: none;
+  font-size: 15px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.d-tabs a:hover {
+  color: var(--d-ink);
+}
+.d-tabs a.on {
+  color: var(--d-ink);
+  border-bottom-color: var(--d-green);
+  font-weight: 500;
+}
+.d-tabs a:focus-visible,
+.q-row:focus-visible,
+.q-toggle:focus-visible,
+.q-pic:focus-visible {
+  outline: 2px solid var(--d-sage);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.d-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--d-soft);
+  color: var(--d-muted);
+  border: 1px solid var(--d-line);
+}
+.d-badge.mine {
+  background: var(--d-bad);
+  border-color: var(--d-bad);
+  color: #fff;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.q-list li {
+  padding: 0;
+}
+.q-row {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.q-row .d-row-top strong {
+  white-space: normal;
+  line-height: 1.3;
+}
+.q-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--d-bad);
+  flex: none;
+}
+.d-pill.q-answered {
+  background: var(--d-mid-bg);
+  color: var(--d-mid-c);
+}
+.d-pill.q-processed,
+.d-pill.q-final {
+  background: var(--d-good-bg);
+  color: var(--d-good);
+}
+.q-body {
+  display: grid;
+  gap: 18px;
+  padding: 18px 22px 22px;
+}
+.q-text {
+  font-size: 17px;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-line;
+}
+.q-note-done {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--d-good-bg);
+  color: var(--d-ink);
+  font-size: 14px;
+}
+.q-section {
+  display: grid;
+  gap: 8px;
+}
+.q-section h3,
+.q-form h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--d-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.q-toggle {
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.q-context {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-line;
+  color: var(--d-muted);
+  max-height: 320px;
+  overflow: auto;
+}
+.q-covers,
+.q-pictures {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.q-covers a {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--d-line);
+  color: inherit;
+  text-decoration: none;
+  font-size: 12.5px;
+  min-width: 84px;
+}
+.q-covers a:hover {
+  background: var(--d-soft);
+}
+.q-covers img,
+.q-covers .d-noimg {
+  width: 84px;
+  height: 64px;
+  object-fit: contain;
+}
+.q-pictures li {
+  display: grid;
+  gap: 4px;
+  max-width: 260px;
+  font-size: 12px;
+  color: var(--d-muted);
+}
+.q-pic {
+  padding: 0;
+  border: 1px solid var(--d-line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  cursor: zoom-in;
+}
+.q-pic img {
+  display: block;
+  width: 260px;
+  max-width: 100%;
+  height: 150px;
+  object-fit: contain;
+}
+.q-answers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.q-answers li {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--d-line);
+  display: grid;
+  gap: 4px;
+}
+.q-answers li.final {
+  border-color: var(--d-good);
+  box-shadow: inset 3px 0 0 var(--d-good);
+}
+.q-answer-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.q-chosen {
+  font-weight: 500;
+}
+.q-comment {
+  white-space: pre-line;
+  font-size: 14px;
+}
+.q-answers .d-thumbs {
+  padding-left: 0;
+}
+/* the answer form: options, then the Pictures block, then the comment and Send, all in the
+   normal flow of the card, so nothing hides below a sticky bar (ADR-096's lesson) */
+.q-form {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--d-soft);
+  scroll-margin: 80px;
+}
+.q-options {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.q-options label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 12px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid var(--d-line);
+  background: var(--d-card);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.q-options label.on {
+  border-color: var(--d-green);
+  box-shadow: inset 0 0 0 1px var(--d-green);
+}
+.q-options input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: var(--d-green);
+}
+.q-options label:focus-within {
+  outline: 2px solid var(--d-sage);
+  outline-offset: 1px;
+}
+.q-other {
+  flex-wrap: wrap;
+}
+.q-other .d-search {
+  flex: 1 1 220px;
+  width: auto;
+  background: var(--d-soft);
+}
+.q-form .d-pics {
+  background: var(--d-card);
+}
+.q-form textarea,
+.q-done textarea {
+  min-height: 64px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--d-line);
+  font: inherit;
+  font-size: 14px;
+  background: var(--d-card);
+  color: var(--d-ink);
+  resize: vertical;
+}
+.q-send {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.q-done {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.q-done textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 800px) {
+  .q-body {
+    padding: 14px 14px 16px;
+  }
+  .q-pic img {
+    width: 100%;
+  }
+}
+/* one column (a tablet): the list scrolls in its own box above the question, never over it */
+@media (max-width: 1100px) {
+  .d-queue.q-queue {
+    position: static;
+    max-height: 46vh;
+  }
+}
+.q-owner .d-btn {
+  justify-self: start;
+}

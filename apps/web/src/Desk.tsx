@@ -18,6 +18,7 @@ import {
   uploadPictures,
   type Pending,
 } from "./DeskPictures";
+import { DeskTabs } from "./Questions";
 import "./desk.css";
 
 type Scores = {
@@ -257,12 +258,14 @@ export function Desk({ selected }: { selected: string | null }) {
   if (err)
     return (
       <div className="desk">
+        <DeskTabs active="covers" />
         <p className="d-err">{err}</p>
       </div>
     );
   if (!q)
     return (
       <div className="desk">
+        <DeskTabs active="covers" />
         <p className="d-muted">Loading the desk…</p>
       </div>
     );
@@ -278,6 +281,7 @@ export function Desk({ selected }: { selected: string | null }) {
   ] as const;
   return (
     <div className="desk">
+      <DeskTabs active="covers" />
       <section className="d-top">
         <div className="d-title">
           <h1>Desk</h1>

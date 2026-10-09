@@ -1,5 +1,6 @@
 import { Arrangements } from "./Arrangements";
 import { Desk } from "./Desk";
+import { Questions } from "./Questions";
 import { DrawingUpload } from "./DrawingUpload";
 import { useCallback, useEffect, useState } from "react";
 import Configure from "./Configure";
@@ -131,6 +132,12 @@ export function App() {
         <main>
           {m ? (
             <ModelPage id={m[1]} />
+          ) : hash.startsWith("#/questions") ? (
+            <Questions
+              selected={
+                Number(hash.match(/^#\/questions\/(\d+)/)?.[1] ?? "") || null
+              }
+            />
           ) : hash.startsWith("#/desk") ? (
             <Desk
               selected={hash.match(/^#\/desk\/([a-z0-9-]+)/)?.[1] ?? null}

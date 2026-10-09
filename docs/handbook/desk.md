@@ -128,3 +128,34 @@ correcties wordt het een regel voor alle hoezen (ADR-082).
 **Minder handig:** alleen "klopt niet" of "vorm fout". Dan moet geraden worden wat er bedoeld is.
 
 Eén zin met **waar, wat en een getal** is genoeg.
+
+## Vragen beantwoorden (voor Rens, ADR-109)
+
+De vragen over hoezen, de werkplaats, de shop en de prijzen staan nu in de Desk. Je hoeft er niet
+meer voor te mailen.
+
+1. **Desk → Questions.** Het getal op het tabblad is het aantal open vragen. Is het rood, dan
+   wachten er vragen op jouw antwoord. Die hebben in de lijst een rood stipje.
+2. **Kies een vraag.** Filter bovenaan op Open, Answered of Processed, of op onderwerp (vents,
+   shape, seams, webshop, prices, …). Zoeken kan ook, met `/`.
+3. **Lees de vraag.** Daaronder staan:
+   - de hoezen waar het over gaat (klik om de kaart op de Desk te openen);
+   - de plaatjes (klik om te vergroten);
+   - "Context" met wat er al is klaargezet;
+   - wat anderen al antwoordden.
+4. **Antwoord:**
+   - kies een optie (of druk `1`, `2`, `3` …), of **Anders, namelijk…** (`0`) en schrijf wat;
+   - wil je iets aanwijzen, gebruik dan **Pictures**, net als bij Reject: **Mark picture 1**
+     (een plaatje van de vraag) of **Mark S45** (de hoes), of **Upload…**, slepen of plakken.
+     Teken in rood en kies **Use this picture**;
+   - een opmerking erbij mag altijd: waarom, een maat, wat er nog ontbreekt;
+   - **Send answer** of `Ctrl+Enter`.
+5. **Van mening veranderd?** Antwoord opnieuw; je nieuwe antwoord vervangt het oude.
+6. **Wat er daarna gebeurt:**
+   - elke dag rond 18:00 verwerkt Claude de antwoorden;
+   - Rick kan een antwoord als definitief markeren;
+   - een verwerkte vraag gaat naar "Processed", met wat er is gedaan. Dat zie je bij de vraag
+     en in de mail van de volgende dag.
+
+Nieuwe vragen komen hooguit één keer per dag per mail, nooit per klik. Werkt het plaatje niet in
+Edge, dan staat er in rood waarom; kies dan **Upload…** met een schermafdruk.

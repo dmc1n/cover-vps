@@ -3329,3 +3329,95 @@ asks for it.
   a few seconds of real workshop footage would lift it most (ADR-065's list still holds).
 - **Rejected:** Veo/Sora takes (not our cover, paid); the dark green set of ADR-065 (it hid the
   sand colour).
+
+## ADR-109 — Questions at the Desk: the owner's and the workshop's questions answered in the studio
+
+The owner (9 October 2026): "for Rens it's easier if we put the questions in a tab in the Desk so
+he can answer there; I (Rick) am the only one with SSH access. Can we make a questions form? And
+every day around 18:00 check and process the answers." Until now the open questions lived in
+docs/QUESTIONS.md and in the rejection agents' results (the "doubt" rows), which only Rick could
+read on the server; answers came back by mail or by word of mouth.
+
+- **Where:** a second tab on the Desk, **Questions** (`#/questions`, `#/questions/<id>`), beside
+  **Covers**. The tab carries a badge with the number of open questions (red when some wait for
+  your own answer).
+- **Kept in app.db** (`coverapi/questions.py`), not in a JSON file: three tables, like the price
+  sets (ADR-098):
+  - `questions`: the question, its context, options and state;
+  - `question_answers`: every answer, never deleted. A new answer by the same person replaces
+    the earlier one by pointing at it (`replaced_by`), so the trail stays;
+  - `question_log`: every change, who and when (add, answer, final, processed, reopen).
+
+  Writes go in one `BEGIN IMMEDIATE` transaction under a lock. The audit log of app.db also
+  notes each answer.
+- **A question** has:
+  - a title and the question itself, in Dutch (the studio around it stays English);
+  - a topic (vents, shape, seams, sizes, drawings, workshop, webshop, b2b, prices, film, other);
+  - context;
+  - the covers it is about, as links to their Desk cards with their picture;
+  - its own pictures with a caption (an agent's before/after with the plan and side views);
+  - 2 to 5 options plus "anders, namelijk…", or none for a free answer;
+  - who may answer: the Desk's approvers (`desk.approvers`) by default, or named people. Admins
+    always may.
+- **The state:** open → answered (someone answered) → processed. Processed carries a note, who
+  and when; the answerer sees it on the question and in the next digest. Several people may
+  answer and all answers show. The owner (`questions.owners`, "rick") can:
+  - mark one answer final;
+  - mark the question processed;
+  - reopen it.
+
+  Answering a processed question is refused until it is reopened.
+- **Rights:** every logged-in user reads. Only the question's answerers (approvers) and admins
+  answer, a viewer-role approver too: `/api/questions` passes the front door for viewers, and
+  the route decides. Adding a question, `answers?since=`, final and processed are the owner's or
+  an admin's.
+- **Pictures:**
+  - The answer form has the Desk's Pictures block (ADR-096): Upload…, drop, paste, plus "Mark
+    picture n" for the question's own pictures and "Mark <code>" for the covers' pictures. There
+    is no 3D on a question, so no "Snapshot 3D".
+  - `desk.save_picture` checks each one and keeps it as a PNG without metadata in
+    `questions/<id>/` (it takes a folder now); `GET /api/questions/{id}/pictures/{name}` serves
+    only names it made.
+  - The block comes after the options and before the comment and Send, in the normal flow of
+    the card, never under a sticky bar. "1"–"5" bring the form into view with the block on the
+    screen.
+- **Keyboard and tablet:**
+  - keys: `j`/`k` next/previous, `1`–`5` an option, `0` "anders", `Ctrl+Enter` send, `/`
+    search, `Esc` closes a picture;
+  - the options are real radio buttons, 44 px high;
+  - below 1100 px the list sits above the question.
+- **Mail, quietly:** an hourly loop in the app, the first look two minutes after start.
+  - New questions go to the people who may answer, in one digest per `questions.digest_hours`
+    (24). The digest also lists what was done with their answers.
+  - New answers go to the owners in one digest per `questions.answer_digest_hours` (8).
+  - Never a mail per click; 0 switches a digest off; without a mail server nothing is sent.
+- **The daily processing** (the main session, 18:00), with `scripts/questions.py`, straight on
+  app.db:
+  - `new [--since T] [--json]` lists the answers since the last `ack`;
+  - `ack` remembers "seen until now";
+  - `done ID "note"` marks a question processed;
+  - also `list`, `show`, `reopen`, `add FILE.json` (a new question with pictures) and `mail`.
+- **The import** (`scripts/questions.py import [--dry-run]`, data in `scripts/questions_seed.py`)
+  makes the open questions of 9 October:
+  - the rejection agents' doubts. Rows with the same question are one question with all their
+    covers; "zelfde vraag als S38" rows join their leader. Question 71, vents on the inner
+    walls, is left out: it was answered yes on 9 October. Each doubt carries the agent's compare
+    picture or the staged cover;
+  - the questions of docs/QUESTIONS.md still open for the owner or the workshop: webshop (73),
+    prices (70), B2B (72), the film (ADR-108), drawings, arrangements (69) and the workshop's
+    construction questions (5–7, 36, 49, 50, 57). Each is rewritten as a short Dutch question
+    with options.
+
+  Every question has a fixed key, so running it again adds nothing. On the data of 9 October:
+  23 from the doubts plus 43 from QUESTIONS.md, 66 in all.
+- **Tests:**
+  - `apps/api/tests/test_questions.py`: rights (viewers read-only; a viewer-role approver
+    answers), answering and replacing, final and processed by the owner only, pictures, digests
+    (one mail per person, nothing twice within the interval), the import run twice, the CLI;
+  - `apps/web/e2e/questions.py`: Chromium, WebKit, Firefox and Edge, 1440 px and an 820 px
+    tablet. Edge runs with office policies from `apps/web/e2e/edge-policies.json` (no hardware
+    acceleration, clipboard blocked, strict tracking prevention).
+- **Not yet:**
+  - the studio has no form to write a new question; it comes from the CLI or the API;
+  - a picture uploaded for an answer that is never sent stays unlinked, as at the Desk;
+  - docs/QUESTIONS.md is not updated from the answers by itself; the daily processing does that.

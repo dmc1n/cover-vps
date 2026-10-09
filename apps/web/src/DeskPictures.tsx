@@ -66,11 +66,13 @@ export async function picturesWork(): Promise<string> {
 export async function uploadPictures(
   id: string,
   pics: Pending[],
+  endpoint?: string, // another place that keeps pictures (a question's, ADR-109)
 ): Promise<string[]> {
   if (!pics.length) return [];
   const form = new FormData();
   pics.forEach((p, i) => form.append("files", p.blob, `picture-${i + 1}.png`));
-  const r = await fetch(`/api/desk/${encodeURIComponent(id)}/pictures`, {
+  const url = endpoint ?? `/api/desk/${encodeURIComponent(id)}/pictures`;
+  const r = await fetch(url, {
     method: "POST",
     body: form,
   });
@@ -102,14 +104,16 @@ export function PictureTray({
   max,
   paste = true,
   label = "Pictures",
+  sources = [],
 }: {
   pending: Pending[];
   onChange: (p: Pending[]) => void;
-  snapshot3d: () => string | null;
+  snapshot3d?: () => string | null; // none: no "Snapshot 3D" button (a question, ADR-109)
   drawingUrl: string | null;
   max: number;
   paste?: boolean; // only one tray on the page listens to Ctrl+V
   label?: string;
+  sources?: { label: string; url: string }[]; // more pictures to mark (a question's own)
 }) {
   const [marking, setMarking] = useState<{
     source: string;
@@ -209,31 +213,33 @@ export function PictureTray({
     >
       <div className="d-pics-bar">
         <span className="d-pics-label">{label}</span>
-        <button
-          type="button"
-          className="d-btn d-ghost d-small"
-          disabled={full}
-          onClick={() => {
-            setNote("");
-            let shot: string | null = null;
-            try {
-              shot = snapshot3d();
-            } catch (e) {
-              fail("This browser would not copy the 3D view", e);
-              return;
-            }
-            if (!shot)
-              setNote(
-                "The 3D view is not ready yet: wait until the cover shows.",
-              );
-            else if (shot.length < 200)
-              // an empty "data:," when WebGL may not be read back (blocked or lost)
-              fail("This browser gave an empty copy of the 3D view");
-            else setMarking({ source: shot });
-          }}
-        >
-          Snapshot 3D
-        </button>
+        {snapshot3d && (
+          <button
+            type="button"
+            className="d-btn d-ghost d-small"
+            disabled={full}
+            onClick={() => {
+              setNote("");
+              let shot: string | null = null;
+              try {
+                shot = snapshot3d();
+              } catch (e) {
+                fail("This browser would not copy the 3D view", e);
+                return;
+              }
+              if (!shot)
+                setNote(
+                  "The 3D view is not ready yet: wait until the cover shows.",
+                );
+              else if (shot.length < 200)
+                // an empty "data:," when WebGL may not be read back (blocked or lost)
+                fail("This browser gave an empty copy of the 3D view");
+              else setMarking({ source: shot });
+            }}
+          >
+            Snapshot 3D
+          </button>
+        )}
         {drawingUrl && (
           <button
             type="button"
@@ -244,6 +250,17 @@ export function PictureTray({
             Snapshot drawing
           </button>
         )}
+        {sources.map((src) => (
+          <button
+            key={src.url}
+            type="button"
+            className="d-btn d-ghost d-small"
+            disabled={full}
+            onClick={() => setMarking({ source: src.url })}
+          >
+            {src.label}
+          </button>
+        ))}
         <button
           type="button"
           className="d-btn d-ghost d-small"

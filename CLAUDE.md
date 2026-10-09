@@ -231,6 +231,10 @@ uv run python scripts/film/hero_encode.py FRAMES DIR --name hero-kotaN   AV1 + H
 make e2e        the web app flow in a real browser (Playwright in Docker)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
 apps/web/e2e/prices.py                      Prices & costing in a real browser (ADR-098; usage in its docstring)
+Desk → Questions (#/questions)              the owner's and the workshop's questions, answered in the studio (ADR-109)
+COVER_DATA_DIR=~/cover-data uv run python scripts/questions.py new|ack|done ID "note"|list|show ID|add F|import [--dry-run]|mail
+                                             the daily processing of the answers; the import of 9 Oct (ADR-109)
+apps/web/e2e/questions.py                   the Questions tab in a real browser, Edge with office policies (ADR-109)
 apps/web/e2e/b2c.py                         the public consumer shop, desktop and 390 px, through the Worker (ADR-103)
 
 node apps/web/e2e/site_serve.mjs [--port N]  this build of the website locally, data from the preview (ADR-106)

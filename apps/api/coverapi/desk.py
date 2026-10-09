@@ -254,8 +254,9 @@ def picture_file(d: Path, name: str) -> Path | None:
     return path if path.is_file() else None
 
 
-def save_picture(d: Path, data: bytes, params: Any) -> str:
-    """Check an uploaded picture with Pillow and keep it as a fresh PNG without metadata."""
+def save_picture(d: Path, data: bytes, params: Any, sub: str = PICTURES_DIR) -> str:
+    """Check an uploaded picture with Pillow and keep it as a fresh PNG without metadata, in
+    `d/sub` (the model's desk/ folder; a question's own folder, ADR-109)."""
     from PIL import Image, ImageOps, UnidentifiedImageError
 
     most = float(params["desk.picture_max_mb"])
@@ -281,8 +282,8 @@ def save_picture(d: Path, data: bytes, params: Any) -> str:
     clean.info = {}  # no EXIF, text chunks, ICC or comments are written into the PNG
     side = int(params["desk.picture_max_side_px"])
     clean.thumbnail((side, side))
-    folder = d / PICTURES_DIR
-    folder.mkdir(exist_ok=True)
+    folder = d / sub if sub else d
+    folder.mkdir(parents=True, exist_ok=True)
     with _lock:
         stamp = time.strftime("%Y%m%d-%H%M%S")
         n = 1

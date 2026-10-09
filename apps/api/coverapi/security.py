@@ -216,6 +216,8 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
             return user.may("edit")  # colleagues edit the site, answer matches (ADR-062, 064)
         if path.startswith("/api/admin/"):
             return user.may("admin")
+        if path.startswith("/api/questions"):
+            return user.may("view")  # the route checks who may answer (ADR-109)
         if path.endswith("/approve") or path.endswith("/approval-request"):
             return user.may("view")  # the route itself checks can_approve / edit
         return user.may("edit")
