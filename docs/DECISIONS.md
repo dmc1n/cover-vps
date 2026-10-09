@@ -2752,3 +2752,61 @@ docs/plans/prices-costing.md; handbook: docs/handbook/prices.md.
   of the catalogue's 2-seaters, or any cover the owner picks. The maths did not change.
 - **Better later:** price per colour/quality in the configurator, separate workcenters, shipping
   per country and box size, duties per HS code, the B2B storefront.
+
+## ADR-101 — The home page's film: our own cover, path-traced from our own data, no generated video
+
+The owner (8 October 2026): "the animation on the start page does not show our quality"; before
+that, "the first animation still shows a green cover instead of sand". The live home page showed
+the turning 3D dining set (a see-through box with balloons, on dark green); the preview showed a
+Veo take of a cover that is not ours (ADR-071). Paid video generation is off unless the owner
+asks for it.
+
+- **What the film shows** (13.6 s loop, 24 fps, soft dissolves, the end dissolving into the
+  start), all of it the SUNS Kota 2-seater and its real cover in sand Coverlast:
+  1. the covered sofa on a stone terrace against a lime-plaster wall, a low hazy sun from the
+     left, a slow dolly;
+  2. close on the front corner: the double-stitched seams, the hem and the soft pleats its cord
+     gathers;
+  3. the cutting table: the cover's own pieces (cut.dxf) cut in one sheet, the machine's pen
+     labels ("P7 TOP-1 …") and the vents cut out;
+  4. the cover lowered over the sofa by its ridge and settling;
+  5. rain: drops run down the paths our rain check computed on the draped cover
+     (drape_rain.json), gather at the hem and fall; the coating beads; the stone gets wet.
+- **Our data, nothing modelled by hand:** the drape is Style3D's (drape.bin, ADR-059); the sewn
+  pieces carry their flat positions as UV, so the weave follows the fabric's grain; the
+  stitching is baked into a picture in the flat pieces (`seams.png`, 0.35 mm a pixel): two rows
+  4 and 10 mm from each seam on the panel that laps over (the higher one; on an upright seam the
+  front one — domain rule 6), the hem row 32 mm up, the folded allowance as a soft ridge, a
+  faint pucker. The lowering (shot 4) is Blender's cloth solver on the same sewn mesh, held by
+  the ridge, blended into the Style3D drape as it comes to rest.
+- **How it is made** (`scripts/film/`):
+  - `hero_assets.py` fetches CC0 scans from Poly Haven (a fine plain weave's normals and
+    roughness, stone, plaster, an HDRI, a plant);
+  - `hero_data.py MODEL OUT` writes cover.npz, seams.png, pieces.json (needs ~7 GB RAM for the
+    0.35 mm picture);
+  - `hero_fall.py` (Blender) the lowering, `fall.npz`;
+  - `render_hero.py` (Blender 4.2 Cycles, CPU, OpenImageDenoise, AgX): 376 frames at 1600×900,
+    32 samples, about 75 s a frame (rain 105 s) on 6 cores at nice 19 here: one night. Frames
+    that exist are skipped.
+  - `hero_encode.py FRAMES OUT --name hero-kota1`: dissolves, AV1 (libaom, 1600×900) and H.264
+    (1280×720, High 4.1), both two-pass under 3.8 MB, fast start; a JPEG and WebP poster; a
+    strip.
+- **Result:** `hero-kota1-av1.mp4` 3.5 MB, `hero-kota1-h264.mp4` 3.65 MB, poster 135 KB (WebP
+  52 KB). In Chromium, WebKit and Firefox (Playwright) the AV1 file plays; the first frame shows
+  about 0.75 s after navigation on the local studio; 0–1 dropped frames over a loop on desktop
+  and phone sizes.
+- **On the page** (`HeroFilm.tsx`): `<video muted autoplay loop playsinline>` with an AV1 and an
+  H.264 `<source>` and the poster; muted is set before play (iOS); it plays only while on screen
+  and the tab is visible; reduced motion, Save-Data or a 2G connection get the poster only; if
+  the device refuses to play (iOS Low Power Mode) the poster stays. The cover sits right of
+  centre; narrow screens crop to it. Used by the scroll story (`story_media.hero`, `hero_av1`,
+  `hero_poster`) and the classic home page (`film_url`, the new `film_av1`, `film_poster`).
+- **Why a film and not live three.js:** path tracing (soft sun, the sheen, the stitches, rain
+  with motion blur) is far beyond what a mid phone draws at 60 fps, and a 3.5 MB loop starts as
+  fast as a 3D scene loads. The live 3D stays where it earns its place: the configurator.
+- **Not yet as good as a photograph:** the weave is not visible at the wide shots (the coated
+  fabric reads smooth), the wide terrace and the table look rendered rather than shot, and the
+  sofa's base shows its model's facets in shot 4. A real Coverlast scan (or close photos) and
+  a few seconds of real workshop footage would lift it most (ADR-065's list still holds).
+- **Rejected:** Veo/Sora takes (not our cover, paid); the dark green set of ADR-065 (it hid the
+  sand colour).

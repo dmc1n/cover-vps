@@ -219,6 +219,9 @@ uv run python scripts/fewer_check.py DIR ...   re-measure a built cover from its
 uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   drawing, old and new cover side by side
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
 COVER_DATA_DIR=~/cover-data uv run python scripts/learned_check.py [--recalc]   do the Desk's corrections still hold? (ADR-082)
+uv run python scripts/film/hero_data.py MODEL_DIR OUT   the home film's data: cover.npz, seams.png, pieces.json (ADR-101)
+blender -b -P scripts/film/render_hero.py -- --data OUT --assets DIR --out FRAMES   the home film's frames (and hero_fall.py, hero_assets.py)
+uv run python scripts/film/hero_encode.py FRAMES DIR --name hero-kotaN   AV1 + H.264 under 4 MB, poster, strip (ADR-101)
 make e2e        the web app flow in a real browser (Playwright in Docker)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
 apps/web/e2e/prices.py                      Prices & costing in a real browser (ADR-098; usage in its docstring)

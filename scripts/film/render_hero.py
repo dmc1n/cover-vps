@@ -513,7 +513,7 @@ def table(a: argparse.Namespace, mat: bpy.types.Material) -> None:
             ob = bpy.data.objects.new(f"opening{i}", me)
             sc.collection.objects.link(ob)
             ob.location = origin
-            me.materials.append(felt)
+            me.materials.append(kerf)  # the opening: the dark felt under the fabric
         cu = bpy.data.curves.new(f"cut{i}", "CURVE")
         cu.dimensions = "3D"
         cu.bevel_depth = 0.0005
@@ -549,20 +549,6 @@ def table(a: argparse.Namespace, mat: bpy.types.Material) -> None:
         ob.rotation_euler.z = math.radians(tx["rot"])
         cu.materials.append(ink)
         sc.collection.objects.link(ob)
-    # the gantry with its knife and pen head, crossing the table
-    alu = simple("alu", "c9cbcc", 0.3, 1.0)
-    bpy.ops.mesh.primitive_cube_add(size=1)
-    beam = bpy.context.object
-    beam.name = "gantry"
-    beam.scale = (0.16, hi[1] - lo[1] + 1.1, 0.12)
-    beam.location = TABLE_AT + Vector((0.0, 0.0, TABLE_Z + 0.22))
-    beam.data.materials.append(alu)
-    bpy.ops.mesh.primitive_cube_add(size=1)
-    head = bpy.context.object
-    head.name = "head"
-    head.scale = (0.2, 0.16, 0.22)
-    head.location = TABLE_AT + Vector((0.0, -0.3, TABLE_Z + 0.16))
-    head.data.materials.append(simple("head", "1e2124", 0.4, 0.2))
     # the workshop's light: a long soft panel overhead
     lt = bpy.data.lights.new("bay", "AREA")
     lt.shape, lt.size, lt.size_y, lt.energy = "RECTANGLE", 5, 2.5, 450
@@ -572,16 +558,6 @@ def table(a: argparse.Namespace, mat: bpy.types.Material) -> None:
     lo_.rotation_euler = (math.radians(-12), 0, 0)
     sc.collection.objects.link(lo_)
     lo_.visible_camera = False
-    for o in (beam, head):
-        o.location.x -= 1.0
-        o.keyframe_insert("location", frame=start("table"))
-    for o, dx in ((beam, 0.7), (head, 0.7)):
-        o.location.x += dx
-        o.keyframe_insert("location", frame=span("table")[1])
-    for o in (beam, head):
-        for fc in o.animation_data.action.fcurves:
-            for k in fc.keyframe_points:
-                k.interpolation = "LINEAR"
 
 
 # ---- the rain -----------------------------------------------------------------------------
