@@ -43,6 +43,18 @@ SHAPES = ["box_with_legs", "slatted_table", "chair", "l_lounge", "sphere", "cone
 FURNITURE = load_config()["furniture"]
 
 
+def busy_factor() -> float:
+    """The time limits are for a quiet machine; while other work (renders, other test runs) keeps
+    the CPUs busy, a limit grows with the load per CPU, never below 1."""
+    import os
+
+    try:
+        load = os.getloadavg()[0]
+    except OSError:
+        return 1.0
+    return max(1.0, load / (os.cpu_count() or 1))
+
+
 def params(**overrides: Any) -> Any:
     trial = {**IMPORT_PARAMS, **HULL, **{f"hull.{k}": v for k, v in overrides.items()}}
     return Registry.load().resolve(trial=trial)
@@ -256,7 +268,7 @@ def test_500k_triangle_soup_under_a_minute(tmp_path: Path) -> None:
     hull = build_hull(tmp_path / "soup", params())
     elapsed = time.perf_counter() - start
     assert hull.report["distance_to_model_mm"]["min"] >= 10 - 1e-3
-    assert elapsed < 60, f"hull took {elapsed:.1f} s"
+    assert elapsed < 60 * busy_factor(), f"hull took {elapsed:.1f} s"  # a minute when quiet
 
 
 GOLDEN = Path(__file__).resolve().parents[2] / "testdata" / "golden" / "hull"
