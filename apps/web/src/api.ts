@@ -889,7 +889,7 @@ export interface PricesState {
   published: PriceVersion | null;
   current: PriceSet;
   using_defaults: boolean;
-  draft: { data: PriceSet; by: string; time: number } | null;
+  draft: { data: PriceSet; by: string; time: number; note?: string } | null;
   draft_errors: string[];
   defaults: PriceSet;
   can_edit: boolean;
@@ -1031,4 +1031,102 @@ export const prices = {
     fetch(`/api/prices/costing?${new URLSearchParams(q)}`).then((r) =>
       json<Costing>(r),
     ),
+  /** a price list read and matched (ADR-113): a new file, or the kept upload with other choices */
+  importLook: (file: File | null, opts: PriceImportOptions) => {
+    const form = new FormData();
+    if (file) form.append("file", file);
+    form.append("upload", opts.upload ?? "");
+    form.append("channel", opts.channel);
+    form.append("incl_vat", opts.incl_vat);
+    form.append("price_column", opts.price_column ?? "");
+    form.append("id_columns", (opts.id_columns ?? []).join("\n"));
+    return fetch("/api/prices/import", { method: "POST", body: form }).then(
+      (r) => json<PriceImportReport>(r),
+    );
+  },
+  /** the chosen prices into the draft; the server matches the list again */
+  importApply: (
+    opts: PriceImportOptions & {
+      exclude: string[];
+      picks: { index: number; id: string }[];
+    },
+  ) =>
+    send("POST", "/api/prices/import/apply", opts).then((r) =>
+      json<{
+        count: number;
+        note: string;
+        errors: string[];
+        draft: PricesState["draft"];
+      }>(r),
+    ),
 };
+
+export interface PriceImportOptions {
+  upload?: string;
+  channel: ChannelKey;
+  /** "auto" (the header decides; incl. when it says nothing), "true", "false" */
+  incl_vat: string;
+  price_column?: string;
+  id_columns?: string[];
+}
+export type ImportConfidence = "exact" | "probable";
+export interface PriceImportTarget {
+  id: string;
+  name: string;
+  kind: string;
+  code: string;
+  calculated: boolean;
+  confidence: ImportConfidence;
+  why: string;
+  stored?: number;
+  shown_incl?: number;
+  shown_ex?: number;
+  current: { incl: number; ex: number; fixed: boolean } | null;
+  in_draft?: number;
+  chosen: boolean;
+  conflict?: boolean;
+  dropped?: string;
+  same_as?: number;
+}
+export interface PriceImportRow {
+  index: number;
+  sheet: string;
+  line: number;
+  label: string;
+  cells: Record<string, string>;
+  price_raw: string;
+  price_given: number | null;
+  status: "exact" | "probable" | "ambiguous" | "none" | "no_price";
+  note: string;
+  targets: PriceImportTarget[];
+  candidates: {
+    id: string;
+    name: string;
+    kind: string;
+    code: string;
+    why: string;
+  }[];
+}
+export interface PriceImportReport {
+  upload: string;
+  file: string;
+  channel: ChannelKey;
+  channel_name: string;
+  channel_shows_vat: boolean;
+  vat_pct: number;
+  incl_vat: boolean;
+  vat_hint: boolean | null;
+  price_column: string;
+  price_columns: string[];
+  id_columns: string[];
+  columns: string[];
+  rows: PriceImportRow[];
+  counts: Record<string, number>;
+  conflicts: {
+    id: string;
+    name: string;
+    rows: { index: number; line: number; label: string; price_given: number }[];
+  }[];
+  chosen: number;
+  covers: { id: string; name: string; kind: string; code: string }[];
+}

@@ -243,6 +243,10 @@ Admin → Photo test                          a photo suggestion step by step: i
 node apps/web/e2e/site_serve.mjs [--port N]  this build of the website locally, data from the preview (ADR-106)
 apps/web/e2e/site_rain.py | site_3d.py | site_perf.py   the website: rain keeps falling, 3D loads lean, timings (ADR-106)
 Admin → Prices & costing (#/prices)         price set per channel, versioned in app.db; costing per cover (ADR-098)
+Prices & costing → Channels → Import prices (Excel)   a price list as fixed prices, into the draft only (ADR-113)
+COVER_DATA_DIR=~/cover-data uv run python scripts/prices_import.py FILE [--channel b2c] [--incl-vat|--ex-vat] [--json OUT] [--apply]
+                                             the same matching report; --apply writes the draft, never publishes (ADR-113)
+apps/web/e2e/priceimport.py                 the import in a real browser (sample: e2e/priceimport_sheet.py; usage in its docstring)
 <website>/b2b, Admin → B2B customers        the B2B shop: business logins, own prices ex VAT, orders on account (ADR-104)
 apps/web/e2e/b2b.py                         the B2B shop in a real browser (ADR-104; usage in its docstring)
 apps/web/e2e/measure.py                     Measure, Vent sizes, the check list and measured fits in a real browser (ADR-111)

@@ -381,7 +381,7 @@ fieldset.card legend { font-weight: 600; text-transform: capitalize; padding: 0 
 .prices h4 { margin: 4px 0 8px; }
 .prices h5 { margin: 14px 0 4px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
 .prices .prices-channels { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }
-.prices .prices-channels > .card { margin: 0; }
+.prices .prices-channels > .card { margin: 0; min-width: 0; }
 .prices .card.costing .prices-channels { margin-top: 12px; }
 .prices a.button { font-size: 14px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); text-decoration: none; }
 .prices a.button:hover { border-color: var(--sand); }
@@ -425,6 +425,24 @@ fieldset.card legend { font-weight: 600; text-transform: capitalize; padding: 0 
 .prices dl.terms { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 8px 0 4px; }
 .prices dl.terms dt { font-weight: 600; }
 .prices dl.terms dd { margin: 0; }
+/* Import prices (Excel), ADR-113 */
+.prices .price-import { border-left: 4px solid var(--sage); }
+.prices .pi-summary { margin: 10px 0 6px; font-size: 14px; }
+.prices .pi-choices { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 6px 0; }
+.prices .pi-cols { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+.prices .pi-cols label.check { color: var(--ink); }
+.prices table.pi-table td { vertical-align: top; font-size: 13px; }
+.prices table.pi-table td.num, .prices table.pi-table th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prices table.pi-table td.pi-row { max-width: 300px; }
+.prices table.pi-table tr.pi-off td:not(.pi-row) { opacity: 0.5; }
+.prices table.pi-table .pi-why { font-size: 12px; }
+.prices table.pi-table td input[list] { min-width: 200px; margin-top: 4px; }
+.prices table.pi-table td .up { color: var(--bad); font-size: 12px; }
+.prices table.pi-table td .down { color: var(--ok); font-size: 12px; }
+.prices .pill.pi-exact { background: var(--ok-soft); color: var(--ok); margin-left: 0; }
+.prices .pill.pi-probable, .prices .pill.pi-ambiguous { background: var(--warn-soft); color: var(--warn); margin-left: 0; }
+.prices .pill.pi-none, .prices .pill.pi-no_price { background: var(--bad-soft); color: var(--bad); margin-left: 0; }
+.prices .pi-apply { margin-top: 14px; }
 @media (max-width: 700px) {
   .prices .prices-channels { grid-template-columns: 1fr; }
   .prices label.setting { flex-direction: column; align-items: flex-start; }

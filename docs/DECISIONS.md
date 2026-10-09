@@ -3566,3 +3566,61 @@ search (by look only: no brand recognised) and the comparison.
   written.
 - **Not done:** Lens-quality matching of home photos needs another service; options with costs
   in QUESTIONS 74 (Vision Product Search over our own catalogue recommended to try first).
+
+## ADR-113 — A price list from Excel as fixed prices in the draft
+
+The owner (9 Oct 2026): "I have a price list in Excel; these are retail prices incl. VAT. Can I
+upload this Excel somewhere so you set these prices as fixed prices for the current covers?"
+(Numbered 113: ADR-112 went to the photo search on main while this was built.)
+
+- **Where:** Admin → Prices & costing → Channels & price lists → **Import prices (Excel)**,
+  admins only (`POST /api/prices/import` to look, `POST /api/prices/import/apply` to write;
+  editors 403, viewers 403). Code: `apps/api/coverapi/prices_import.py`, the endpoints and
+  `import_draft()` in `prices.py`, the page `apps/web/src/PriceImport.tsx`.
+- **Reading** reuses the product list's careful reader (ADR-091: .xlsx/.csv/.zip, openpyxl,
+  zip path and size limits, `products.max_files`/`max_bytes`, header = first row with two text
+  cells). Every upload is kept as `prices/imports/<stamp>-<name>`; looking again with other
+  choices reads the kept file by its name (no paths from the client).
+- **Money as people write it:** "€ 1.234,95", "1,234.95", "1234,95", "€ 459,-", "EUR 249" and
+  number cells; the last of "." and "," is the decimal mark, a single separator before three
+  digits in a valid grouping is thousands. Prices are taken to the cent.
+- **Columns by content:** the price column is the one most cells of which read as money, with a
+  head start for a header saying prijs / price / retail / verkoop / incl and a penalty for
+  code / number / size headers and for 1, 2, 3 row numbers. Incl. or ex VAT: incl. by default
+  (the owner's case); a header saying "excl" / "ex BTW" turns it to ex; a person can switch.
+  The identification columns are those naming a cover in ≥ 10 % of the rows. All three are a
+  person's choice on the page (`--price-column`, `--id-column` in the CLI).
+- **Matching, conservative:** *exact* = a drawing cover's code, folder name or drawing order
+  number ("Cover 66", through `products_sheet.drawing_keys`), a cover's own name or id ("SUNS
+  2 Seater Kota"), a drawing cover's product name from its products.json, an arrangement's
+  name, the balloon or the frame. *Probable* = SUNS models named by a description with a family
+  and a type in common, same shape, left never for right (`products_sheet.suns_for`), and the
+  SUNS models the product list links to a drawing cover matched by code (only when that cover
+  carries one product: a code shared by two products links both, which says nothing).
+  *Ambiguous* = the columns name different covers, or a family without a type (candidates are
+  offered). Rows naming a configurator product are reported, never priced: their price follows
+  from the sizes. One cover, two prices from two rows: an exact match beats probable ones;
+  otherwise the cover is left out until a person picks the row. The page sends only what to
+  leave out and what was picked; the server matches the list again.
+- **Exact VAT conversion:** a fixed price is stored in the channel's own unit (B2C incl. VAT,
+  B2B ex VAT, `show_vat`). A price given incl. VAT into an ex-VAT channel is stored as
+  given ÷ (1 + VAT) with six decimals, and `costing._price` no longer rounds a fixed price to
+  cents *before* adding VAT, so the price incl. VAT comes back as the sheet's to the cent (a
+  test runs a thousand prices both ways). No channel rounding on a fixed price, as before.
+- **Draft only:** the prices are added to the draft (or to a new draft from the live set) with
+  the note "Imported from <file> (N prices, B2C)"; the draft keeps the note through later
+  saves and Publish uses it when no other note is written. Audit log: `prices imported to
+  draft`. Never published automatically; the published set is untouched until Publish.
+- **The shop follows:** the consumer shop sold an existing (stock) cover at its configurator
+  price minus the stock discount and ignored a B2C fixed price for that model. A fixed B2C price
+  for the stock model now wins (no discount on top), as ADR-098 meant (`costing.fixed_price`).
+- **CLI:** `scripts/prices_import.py FILE [--channel] [--incl-vat|--ex-vat] [--json] [--apply]`
+  prints the same report (a table, JSON with --json) and writes the draft only with --apply.
+- **Speed:** `prices.Facts` reads the yaml once instead of once per cover (a list of a hundred
+  covers took 0.16 s per cover only to read the defaults).
+- **On the way:** an unclosed rule in desk.css (`.q-owner .d-btn {`, from the ADR-111 merge)
+  nested the whole studio stylesheet inside it, so the built studio showed unstyled pages; it
+  is closed. The channel cards on a phone could not shrink below their content (536 px wide
+  page); `min-width: 0` lets their tables scroll inside.
+- **Better later:** a per-row confirmation memory (aliases learned from hand picks), the
+  supplier's article numbers once the covers carry them, price lists per colour or quality.

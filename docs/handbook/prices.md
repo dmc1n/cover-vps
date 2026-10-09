@@ -71,4 +71,47 @@ price you keep: price = base ÷ (1 − margin). The same price both ways: markup
 A wrong number (a negative price, a margin of 100 %)? The page says what is wrong and does not
 publish. Only admins can change prices; every publish is in the audit log.
 
+## Prijslijst uit Excel importeren (vaste prijzen)
+
+Heb je een prijslijst in Excel, bijvoorbeeld consumentenprijzen incl. BTW? Dan zet de studio
+die in één keer als **vaste prijzen** voor onze hoezen (ADR-113). Alleen admins.
+
+1. Ga naar **Admin → Prices & costing → Channels & price lists**. Bovenaan staat
+   **Import prices (Excel)**. Kies de prijslijst (**B2C** = webshop, standaard; of **B2B**) en
+   klik **Upload price list (Excel)**. Een .xlsx, een .csv of een .zip met zulke bestanden.
+2. **Kijk wat er gevonden is.** De studio zoekt zelf de prijskolom (bedragen als
+   "€ 1.234,95", "459,-" of gewone getallen; een kop met prijs / verkoop / incl helpt) en de
+   kolommen die zeggen welke hoes het is: de code (S40, C23), het nummer van de tekening
+   ("Cover 66") of de naam (SUNS-modellen, de productnamen uit de productlijst). Klopt de
+   keuze niet, kies dan zelf een andere prijskolom of vink kolommen aan of uit. Staan je
+   prijzen **ex BTW**, zet dan "The sheet's prices are" op *ex VAT* (standaard: incl. BTW;
+   een kop met "excl" zet het vanzelf op ex).
+   - **exact** (groen): gevonden op code, tekeningnummer of eigen naam.
+   - **probable** (oranje): een SUNS-model waarvan familie en soort kloppen ("Kota
+     3-seater"), of een SUNS-model dat de productlijst aan die tekening koppelt. Even
+     nakijken; een vinkje uit = niet meenemen. Links en rechts worden nooit verwisseld.
+   - **One cover, two prices**: twee regels geven één hoes een verschillende prijs. Kies welke
+     regel telt, of laat de hoes weg.
+   - **Not matched or not sure**: regels zonder hoes ("which cover?" of "not found"). Kies de
+     hoes zelf (typ een code, naam of id) of laat de regel weg.
+   - Per regel zie je de prijs uit Excel, wat we opslaan, de prijs incl. BTW die de klant
+     ziet, en de prijs van nu.
+3. Klik **Put N prices in the draft**. De prijzen gaan in het **concept**, niet live. Daarna
+   zoals altijd: **Preview changes** (welke prijzen veranderen) en **Publish**. De notitie
+   "Imported from <bestand> (N prices, B2C)" staat al klaar voor de geschiedenis.
+
+Goed om te weten:
+
+- **Geen afronding**: een vaste prijs is precies de prijs uit de lijst. B2B toont prijzen ex
+  BTW; een prijs incl. BTW wordt daar ex BTW opgeslagen (÷ 1,21, met zes decimalen), zodat de
+  prijs incl. BTW tot op de cent gelijk blijft aan die in je Excel.
+- De webshop verkoopt een bestaande hoes (een SUNS-model) voor zijn vaste B2C-prijs; de
+  korting voor bestaande hoezen geldt dan niet, de vaste prijs is de prijs.
+- Producten uit de configurator (bank, eethoek op maat) krijgen geen vaste prijs: hun prijs
+  hangt van de maten af.
+- Elke geüploade lijst blijft bewaard in de datamap (`prices/imports/`).
+- Voor Claude: `uv run python scripts/prices_import.py LIJST.xlsx [--channel b2c]
+  [--incl-vat | --ex-vat] [--json uit.json]` toont hetzelfde overzicht; pas met `--apply`
+  komen de prijzen in het concept.
+
 Later we link this to Odoo (docs/plans/prices-costing.md); until then this is the place.
