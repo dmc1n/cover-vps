@@ -3562,6 +3562,12 @@ search (by look only: no brand recognised) and the comparison.
   small thumbnail with its score; the pick; the final answer), the time and the cost. Nothing
   is kept: the photo lives only for the request, the result goes only to the admin's browser;
   the ledger gets the cost on a line of its own.
+- **Final sizing settings** (11 October 2026): `suggest.final_model` and
+  `suggest.final_thinking` independently configure the final configurator answer. The model
+  stays Gemini Flash and thinking defaults to low; previously this call omitted reasoning
+  effort and used Gemini's default. Its ledger entry is tagged `suggest final`. Global AI
+  defaults and drawing reading keep their existing settings. Fake network tests check both
+  the default and overridden settings and the ledger tag.
 - **The box that stuck out:** while the customer waits (30–60 s) the button says "We zoeken je
   meubel op… (dit kan een minuut duren)". Buttons do not wrap (`.s-btn { white-space: nowrap }`)
   and the box was a grid whose one column grew to that line: the photo field, the link field
