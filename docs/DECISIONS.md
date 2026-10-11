@@ -3743,6 +3743,10 @@ models with status "new", unnamed and without a way to send them or to see what 
   gutter, and the fit row did not wrap).
 - **Better later:** the smooth plan drawn from the built cover's own outline; a per-member
   check that the arrangement's pieces still match the member's latest cover.
+- **Approval safety (2026-10-11):** approving an arrangement without `cut.dxf` returns HTTP
+  400 before saving any approval. A missing or null approved cut fingerprint counts as a
+  changed cut file, including before the first build; legacy approvals require fresh approval
+  before the DXF can be downloaded. Regression tests cover both cases.
 
 ## ADR-116 — Rens's answers on the drawing covers (9 Oct 2026): shapes read again, a person's vent count kept
 
