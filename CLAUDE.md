@@ -322,3 +322,7 @@ Staging scripts validate output roots and model destinations with
   logs or reports.
 - Write the operator handbook in docs/handbook/ as features land; the owner is the first user.
 - Keep this file current in the same commit as the change it describes.
+
+Drawing Desk approvals record the cut fingerprint (ADR-120); changed cuts return to waiting.
+Historical DXFs require an approved fingerprint. Earlier approvals are grandfathered lazily or
+with `uv run python scripts/desk_fingerprints.py --dry-run|--apply` (COVER_DATA_DIR/models).

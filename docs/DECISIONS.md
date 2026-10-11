@@ -3995,6 +3995,19 @@ docs/plans/bbq-covers.md (Dutch summary) and docs/plans/bbq-covers-research.md (
   OFYR Island; measuring the Kamado Joe carts (the maker and the shops differ by 10–17 cm);
   pricing BBQ catalogue covers from their own pattern rather than the configurator's shape.
 
+## ADR-120 — Drawing approvals belong to the cutting file
+
+A drawing cover's Desk approval now records `cut_fingerprint()` in `approved.cut` and retains
+an `approved_fingerprints` list. Current DXF downloads require the approved fingerprint to
+match. A changed or missing cut after a recorded approval reopens the cover to waiting, with
+history and catalogue status draft, as for arrangements (ADR-115). Revision downloads require
+that revision's fingerprint to have been approved at some point, independently of current status.
+
+Earlier approved/produced drawing covers are grandfathered with their current cut fingerprint,
+once, on first read or through `scripts/desk_fingerprints.py --dry-run|--apply`. The history says
+“fingerprint recorded for an earlier approval”; older different cuts are not inferred approved.
+A missing current cut cannot be grandfathered. New approvals require a built cut. Gate settings
+and the logged admin override still apply. Migration validation uses temporary fixtures only.
 ## ADR-122 — The studio's new layout: five sections, every page and tab in the address, one Settings area
 
 The owner (9 Oct 2026): "the backend is messy; too much information in too many places; it
