@@ -256,6 +256,9 @@ async def as_rick(page: Page, width: int) -> None:
     # a Desk card: four tabs in the address
     for t in ["check", "pieces", "correct", "history"]:
         await page.goto(f"{URL}/#/work/desk/{MODEL}{'' if t == 'check' else '/' + t}")
+        # a fresh page per tab: headless Chromium (software WebGL) stalled a capture of the
+        # History tab reached from Check in the same page, while the page itself kept going
+        await page.reload()
         card = page.locator(".d-card")
         await expect(card.get_by_role("navigation", name="Card")).to_be_visible(timeout=SLOW)
         cur = card.get_by_role("navigation", name="Card").locator("a[aria-current=page]")
@@ -263,6 +266,7 @@ async def as_rick(page: Page, width: int) -> None:
         n[0] += 1
         await shot(page, width, f"{n[0]:02d}-desk-card-{t}")
     await page.goto(f"{URL}/#/work/desk/{ARR}")
+    await page.reload()
     await expect(page.locator(".d-card")).to_be_visible(timeout=SLOW)
     n[0] += 1
     await shot(page, width, f"{n[0]:02d}-desk-card-arrangement")

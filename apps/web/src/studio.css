@@ -788,8 +788,16 @@ table.list.compact input {
   border-bottom-color: var(--d-sand);
   font-weight: 500;
 }
+/* off the screen, not display:none: a WebGL canvas taken out of the layout after it was drawn
+   stalled the browser's page capture (and a snapshot still needs its size) */
 .d-split[hidden] {
-  display: none;
+  display: grid;
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 900px;
+  visibility: hidden;
+  pointer-events: none;
 }
 .d-measuring {
   margin: 12px 16px 0;

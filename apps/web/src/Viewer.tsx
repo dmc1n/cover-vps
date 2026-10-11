@@ -393,6 +393,8 @@ export function Viewer({
         : new ResizeObserver(onResize);
     sized?.observe(el);
     renderer.setAnimationLoop(() => {
+      // hidden (a Desk card's other tab): no drawing at all; a snapshot draws by itself
+      if (el.closest("[hidden]")) return;
       controls.update();
       const anim = rainAnim.current;
       if (anim) {
