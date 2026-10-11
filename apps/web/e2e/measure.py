@@ -60,10 +60,11 @@ async def ready(page: Page) -> None:
 
 
 async def top(page: Page) -> None:
-    """The 3D view at the top of the window, its toolbar just above."""
+    """The 3D view at the top of the window, its toolbar just under the sticky header."""
     await page.evaluate(
-        "() => { const t = document.querySelector('.viewer .layers');"
-        " window.scrollTo(0, window.scrollY + t.getBoundingClientRect().top - 8); }"
+        "() => { const t = document.querySelector('.viewer .vbar');"
+        " const bar = document.querySelector('.topbar').getBoundingClientRect().height;"
+        " window.scrollTo(0, window.scrollY + t.getBoundingClientRect().top - bar - 8); }"
     )
     await page.wait_for_timeout(300)
 

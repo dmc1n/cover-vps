@@ -30,7 +30,7 @@ async def login(page: Page, user: str) -> None:
     await page.get_by_label("User name").fill(user)
     await page.get_by_label("Password").fill(PASSWORD)
     await page.get_by_role("button", name="Log in").click()
-    await expect(page.get_by_role("link", name="Models")).to_be_visible()
+    await expect(page.get_by_role("button", name="Log out")).to_be_visible()
 
 
 async def shot(page: Page, name: str) -> None:
