@@ -1,5 +1,6 @@
 import { Arrangements } from "./Arrangements";
 import { Desk } from "./Desk";
+import { Questions } from "./Questions";
 import { DrawingUpload } from "./DrawingUpload";
 import { useCallback, useEffect, useState } from "react";
 import Configure from "./Configure";
@@ -131,12 +132,22 @@ export function App() {
         <main>
           {m ? (
             <ModelPage id={m[1]} />
+          ) : hash.startsWith("#/questions") ? (
+            <Questions
+              selected={
+                Number(hash.match(/^#\/questions\/(\d+)/)?.[1] ?? "") || null
+              }
+            />
           ) : hash.startsWith("#/desk") ? (
             <Desk
               selected={hash.match(/^#\/desk\/([a-z0-9-]+)/)?.[1] ?? null}
             />
           ) : hash.startsWith("#/arrangements") ? (
-            <Arrangements />
+            <Arrangements
+              openId={
+                hash.match(/^#\/arrangements\/(arr-[a-z0-9-]+)/)?.[1] ?? null
+              }
+            />
           ) : hash.startsWith("#/catalogue") ? (
             <Gallery />
           ) : hash.startsWith("#/learning") ? (
@@ -885,6 +896,10 @@ function CutPieces({ model, stamp }: { model: ModelDetail; stamp: number }) {
           rel="noreferrer"
         >
           cutting list (PDF)
+        </a>{" "}
+        ·{" "}
+        <a href={fileUrl(model.id, "checklist.pdf")}>
+          check list for the sewn cover (PDF)
         </a>
       </p>
       <div className="svgbox">
@@ -948,6 +963,8 @@ const FILE_HELP: Record<string, string> = {
   "cut.dxf": "for the cutting table: pieces with allowances",
   "cut.svg": "the cut pieces, to view or print",
   "cutting-list.pdf": "every piece and the fabric needed",
+  "checklist.pdf":
+    "the workshop's check list: sizes to measure on the sewn cover",
   "sizes.pdf": "size drawing, seam to seam",
   "pattern.dxf": "flat pieces seam to seam (no allowances)",
   "pattern.svg": "flat pieces, to view or print",

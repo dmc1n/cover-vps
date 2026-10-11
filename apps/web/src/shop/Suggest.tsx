@@ -1,6 +1,6 @@
 // "Have a photo or a link to your furniture?" (ADR-086): the customer's photo(s) or a webshop
 // page, read by the AI into the configurator's product and sizes, to check before ordering.
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Icon } from "./Icons";
 
 export interface Suggestion {
@@ -26,6 +26,14 @@ export interface Suggestion {
 
 const MAX_PHOTOS = 3;
 
+// the steps a suggestion goes through, with roughly when each starts (s): shown while waiting
+const WAIT_STEPS: [string, number][] = [
+  ["suggest_step_look", 0],
+  ["suggest_step_search", 5],
+  ["suggest_step_compare", 18],
+  ["suggest_step_propose", 32],
+];
+
 export function Suggest({
   w,
   lang,
@@ -43,6 +51,29 @@ export function Suggest({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [got, setGot] = useState<Suggestion | null>(null);
+  const [since, setSince] = useState(0); // seconds waited, for the waiting panel
+
+  // while we look the furniture up (20-60 s): a counter of the seconds waited
+  useEffect(() => {
+    if (!busy) return;
+    setSince(0);
+    const t0 = Date.now();
+    const id = window.setInterval(
+      () => setSince(Math.floor((Date.now() - t0) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(id);
+  }, [busy]);
+  const thumb = useMemo(
+    () => (photos[0] ? URL.createObjectURL(photos[0]) : ""),
+    [photos],
+  );
+  useEffect(
+    () => () => {
+      if (thumb) URL.revokeObjectURL(thumb);
+    },
+    [thumb],
+  );
 
   const read = async () => {
     setBusy(true);
@@ -106,6 +137,32 @@ export function Suggest({
       >
         {busy ? w("suggest_reading") : w("suggest_go")}
       </button>
+      {busy && (
+        <div className="s-wait" role="status" aria-live="polite">
+          {thumb && (
+            <div className="s-wait-photo">
+              <img src={thumb} alt="" />
+              <span className="s-wait-scan" />
+            </div>
+          )}
+          <ol className="s-wait-steps">
+            {WAIT_STEPS.map(([key, from], i) => {
+              const next = WAIT_STEPS[i + 1]?.[1] ?? Infinity;
+              const state =
+                since >= next ? "done" : since >= from ? "now" : "todo";
+              return (
+                <li key={key} className={state}>
+                  {w(key)}
+                </li>
+              );
+            })}
+          </ol>
+          <div className="s-wait-bar">
+            <span />
+          </div>
+          <p className="s-muted">{w("suggest_waited", { n: since })}</p>
+        </div>
+      )}
       <p className="s-muted s-privacy">{w("suggest_privacy")}</p>
       {error && <p className="s-error">{error}</p>}
       {got && (

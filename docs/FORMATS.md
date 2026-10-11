@@ -180,7 +180,10 @@ list and how it relates to the `features.*` counts is settled in M5.
 
 `cover.json` may also hold `"family"` (a preset `config/presets/<family>.yaml`, parameter layer
 2), `"status"` (`draft` | `checked` | `production`), `"tags"` (list of strings) and `"notes"`
-(text for the machine operator). Every `cover export` into the model folder keeps a revision:
+(text for the machine operator). A drawing cover may hold `"match": {"kind": "dining_set" |
+"round_set" | "sofa" | "corner_sofa" | "lounger" | "item" | "none", "side": "left" | "right" |
+"both", "chairs": true | false}`: a person's word on what it is offered for in the shop, which
+also confirms a doubtful one (ADR-114). Every `cover export` into the model folder keeps a revision:
 `revisions/<nnn>/` with `pattern.json`, `finished.json`, `cut.dxf`, `cover.json`, `seams.json`,
 listed in `revisions/index.json` (`number`, `time`, `parameter_hash`, `trial` = the keys set
 with `--set`, `status`, `panels`, `max_stretch_pct`, `roll_length_mm`, `warnings`).

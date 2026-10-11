@@ -52,6 +52,7 @@ EXTRA_FILES = [
     "drape_rain.png",
     "audit.png",
     "vents.json",
+    "checklist.pdf",
 ]
 ALLOWED = {f for files in STEP_FILES.values() for f in files} | set(EXTRA_FILES)
 MEDIA = {
@@ -149,6 +150,8 @@ class Store:
             files = sorted([*files, "sizes.pdf"])
         if "finished.json" in files and "vents.json" not in files:
             files = sorted([*files, "vents.json"])
+        if "finished.json" in files and "pattern.json" in files and "checklist.pdf" not in files:
+            files = sorted([*files, "checklist.pdf"])
         done = [s for s in STEPS if all((d / f).is_file() for f in STEP_FILES[s][:1])]
         out: dict[str, Any] = {"id": model_id, "steps_done": done, "files": files}
         out.update(info(d))

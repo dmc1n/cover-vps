@@ -122,13 +122,17 @@ def create_app(
     from coverapi import own_reference
 
     own_reference.install(app, store)  # the workshop's own reference per model (ADR-070)
-    from coverapi import desk
+    from coverapi import desk, questions
 
     desk.install(app, store)  # the drawing desk: people approve, the AI sorts (ADR-079)
+    questions.install(app, auth, store.root, Path(store.models))  # questions at the Desk (ADR-109)
     from coverapi import drawing_upload, unfold
 
     drawing_upload.install(app, store, jobs)  # route A: a drawing (PDF) -> a cover (ADR-081)
     unfold.install(app, store)  # the cover unfolded, with where its fabric goes (ADR-085)
+    from coverapi import measure
+
+    measure.install(app, store)  # measuring on the 3D cover, the check list (ADR-111)
     from coverapi import arrangements
 
     arrangements.install(app, store, jobs)  # furniture placed together, one cover (ADR-089)
@@ -226,6 +230,10 @@ def create_app(
             from coverengine.finish.vents3d import ensure_vents
 
             ensure_vents(d)
+        elif name == "checklist.pdf":  # the workshop's check list (ADR-111)
+            from coverengine.export.checklist import ensure_checklist
+
+            ensure_checklist(d)
         if name not in ALLOWED or not (d / name).is_file():
             raise HTTPException(404, f"no file {name!r}")
         if name == "cut.dxf":  # the cutting table's file: only an approved cover (ADR-079)

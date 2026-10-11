@@ -2434,6 +2434,12 @@ really a good idea"; show it to the customer.
 
 ## ADR-093 — Air vents only on the outside, never on an inner wall
 
+> **Superseded by the owner's answer of 9 Oct 2026** (QUESTIONS 71, ADR-110): on 7 Oct he
+> meant vents drawn *inside the fabric* (the 3D display bug, ADR-088), not the inner walls of an
+> L. Vents now go round every side, the front walls in the inner corner of L, U and C covers
+> included (`features.vent_inner_walls: true`). The inner-wall test below stays: it finds those
+> walls for the switch and for the checks.
+
 Owner, 7 Oct 2026 (C23): "er horen nooit airvents aan de binnenkant te zitten, alleen aan de
 buitenkant". The drawing of C23 points two of its six vents at the inner walls of the L; the
 owner's rule wins over the drawing's positions, the drawing's number still wins (ADR-075), so
@@ -2841,9 +2847,9 @@ twice by the vision model, and by eye against the covers' own vents.json):
   daybed, 2-seater) hands its vents to the piece above, placed over the seam
   (`features.vent_above_low_skirt`, default on); before, those sides had none (the warning
   "no air vent on the back: lower than 16.5 cm").
-- **Front (inner) walls** (`features.vent_inner_walls`, default **false** = ADR-093 stands):
-  Rens's circles on 30 covers are exactly the walls the owner excluded on 7 Oct (C23). That
-  is the owner's call (docs/QUESTIONS.md 71); the staged covers set it per cover.
+- **Front (inner) walls** (`features.vent_inner_walls`): Rens's circles on 30 covers are
+  exactly the walls excluded on 7 Oct (C23). The owner answered on 9 Oct 2026 (QUESTIONS 71):
+  **yes**, vents go there too; the default is now **true** (ADR-110, ADR-093 superseded).
 - **By hand** (`features.vent_positions`, "piece@fraction, ..."): where a person's marks differ
   from the rule; wins over the count.
 - **Height on the skirt** (`features.vent_align` bottom | middle | top, `vent_below_top_mm`):
@@ -3329,6 +3335,414 @@ asks for it.
   a few seconds of real workshop footage would lift it most (ADR-065's list still holds).
 - **Rejected:** Veo/Sora takes (not our cover, paid); the dark green set of ADR-065 (it hid the
   sand colour).
+
+## ADR-109 — Questions at the Desk: the owner's and the workshop's questions answered in the studio
+
+The owner (9 October 2026): "for Rens it's easier if we put the questions in a tab in the Desk so
+he can answer there; I (Rick) am the only one with SSH access. Can we make a questions form? And
+every day around 18:00 check and process the answers." Until now the open questions lived in
+docs/QUESTIONS.md and in the rejection agents' results (the "doubt" rows), which only Rick could
+read on the server; answers came back by mail or by word of mouth.
+
+- **Where:** a second tab on the Desk, **Questions** (`#/questions`, `#/questions/<id>`), beside
+  **Covers**. The tab carries a badge with the number of open questions (red when some wait for
+  your own answer).
+- **Kept in app.db** (`coverapi/questions.py`), not in a JSON file: three tables, like the price
+  sets (ADR-098):
+  - `questions`: the question, its context, options and state;
+  - `question_answers`: every answer, never deleted. A new answer by the same person replaces
+    the earlier one by pointing at it (`replaced_by`), so the trail stays;
+  - `question_log`: every change, who and when (add, answer, final, processed, reopen).
+
+  Writes go in one `BEGIN IMMEDIATE` transaction under a lock. The audit log of app.db also
+  notes each answer.
+- **A question** has:
+  - a title and the question itself, in Dutch (the studio around it stays English);
+  - a topic (vents, shape, seams, sizes, drawings, workshop, webshop, b2b, prices, film, other);
+  - context;
+  - the covers it is about, as links to their Desk cards with their picture;
+  - its own pictures with a caption (an agent's before/after with the plan and side views);
+  - 2 to 5 options plus "anders, namelijk…", or none for a free answer;
+  - who may answer: the Desk's approvers (`desk.approvers`) by default, or named people. Admins
+    always may.
+- **The state:** open → answered (someone answered) → processed. Processed carries a note, who
+  and when; the answerer sees it on the question and in the next digest. Several people may
+  answer and all answers show. The owner (`questions.owners`, "rick") can:
+  - mark one answer final;
+  - mark the question processed;
+  - reopen it.
+
+  Answering a processed question is refused until it is reopened.
+- **Rights:** every logged-in user reads. Only the question's answerers (approvers) and admins
+  answer, a viewer-role approver too: `/api/questions` passes the front door for viewers, and
+  the route decides. Adding a question, `answers?since=`, final and processed are the owner's or
+  an admin's.
+- **Pictures:**
+  - The answer form has the Desk's Pictures block (ADR-096): Upload…, drop, paste, plus "Mark
+    picture n" for the question's own pictures and "Mark <code>" for the covers' pictures. There
+    is no 3D on a question, so no "Snapshot 3D".
+  - `desk.save_picture` checks each one and keeps it as a PNG without metadata in
+    `questions/<id>/` (it takes a folder now); `GET /api/questions/{id}/pictures/{name}` serves
+    only names it made.
+  - The block comes after the options and before the comment and Send, in the normal flow of
+    the card, never under a sticky bar. "1"–"5" bring the form into view with the block on the
+    screen.
+- **Keyboard and tablet:**
+  - keys: `j`/`k` next/previous, `1`–`5` an option, `0` "anders", `Ctrl+Enter` send, `/`
+    search, `Esc` closes a picture;
+  - the options are real radio buttons, 44 px high;
+  - below 1100 px the list sits above the question.
+- **Mail, quietly:** an hourly loop in the app, the first look two minutes after start.
+  - New questions go to the people who may answer, in one digest per `questions.digest_hours`
+    (24). The digest also lists what was done with their answers.
+  - New answers go to the owners in one digest per `questions.answer_digest_hours` (8).
+  - Never a mail per click; 0 switches a digest off; without a mail server nothing is sent.
+- **The daily processing** (the main session, 18:00), with `scripts/questions.py`, straight on
+  app.db:
+  - `new [--since T] [--json]` lists the answers since the last `ack`;
+  - `ack` remembers "seen until now";
+  - `done ID "note"` marks a question processed;
+  - also `list`, `show`, `reopen`, `add FILE.json` (a new question with pictures) and `mail`.
+- **The import** (`scripts/questions.py import [--dry-run]`, data in `scripts/questions_seed.py`)
+  makes the open questions of 9 October:
+  - the rejection agents' doubts. Rows with the same question are one question with all their
+    covers; "zelfde vraag als S38" rows join their leader. Question 71, vents on the inner
+    walls, is left out: it was answered yes on 9 October. Each doubt carries the agent's compare
+    picture or the staged cover;
+  - the questions of docs/QUESTIONS.md still open for the owner or the workshop: webshop (73),
+    prices (70), B2B (72), the film (ADR-108), drawings, arrangements (69) and the workshop's
+    construction questions (5–7, 36, 49, 50, 57). Each is rewritten as a short Dutch question
+    with options.
+
+  Every question has a fixed key, so running it again adds nothing. On the data of 9 October:
+  23 from the doubts plus 43 from QUESTIONS.md, 66 in all.
+- **Tests:**
+  - `apps/api/tests/test_questions.py`: rights (viewers read-only; a viewer-role approver
+    answers), answering and replacing, final and processed by the owner only, pictures, digests
+    (one mail per person, nothing twice within the interval), the import run twice, the CLI;
+  - `apps/web/e2e/questions.py`: Chromium, WebKit, Firefox and Edge, 1440 px and an 820 px
+    tablet. Edge runs with office policies from `apps/web/e2e/edge-policies.json` (no hardware
+    acceleration, clipboard blocked, strict tracking prevention).
+- **Not yet:**
+  - the studio has no form to write a new question; it comes from the CLI or the API;
+  - a picture uploaded for an answer that is never sent stays unlinked, as at the Desk;
+  - docs/QUESTIONS.md is not updated from the answers by itself; the daily processing does that.
+
+## ADR-110 — Air vents on the front walls in the inner corner of L, U and C covers (owner, 9 Oct 2026)
+
+The owner's answer to QUESTIONS 71 ("may vents go on the front walls in the inner corner of L, U
+and C covers?"): **yes**. His remark of 7 Oct on C23 ("never vents on the inside, only on the
+outside") was about vents drawn *inside the fabric* (a 3D display bug, ADR-088), not about the
+inner walls of an L; ADR-093 misread it.
+
+- `features.vent_inner_walls: true` is the company default (config/defaults.yaml). The vents go
+  round every side (ADR-101), the front (inner) walls included; the drawing's count is kept.
+- The switch stays: false skips the inner walls (ADR-093's rule) for a cover that needs it.
+  `features.vent_inner_mm` still says what an inner wall is.
+- `cover audit` (vents check) and `scripts/fewer_check.py` accept vents on the inner walls
+  whenever the cover's effective switch is on; fewer_check reads it through `resolve_model`
+  (defaults, preset, cover.json), no longer only from cover.json.
+- The AI lesson of 8 Oct (config/ai_lessons.json) and CLAUDE.md say the same. Tests:
+  test_finish.py `test_vents_on_an_inner_wall_by_the_switch` (off: none, on/default: vents).
+- Swept: every cover with inner walls rebuilt in staging (out/innerwalls/), with the per-cover
+  `vent_positions` from Rens's circles carried over where the vents agent had set them.
+
+## ADR-111 — Measuring on the 3D cover, the vents' sizes and a check list for the sewn cover
+
+The owner (9 October 2026): "for the system we need a measuring tool on the 3D model; we have
+sewn some covers, and for checking it's easier if we have sizes in the 3D part, for example the
+height of the air vents and their placement."
+
+- **Measure** (3D view, studio and Desk card): click or tap two points; a point snaps (14 px,
+  26 px for a finger) to a vent corner or a seam's end first, then a mesh vertex, then a point on
+  a seam or the hem, else the surface; a snap point hidden behind the cover is skipped. Shown:
+  the straight distance, the height difference and the distance **along the fabric**, in cm
+  with one decimal. The fabric distance is the exact shortest path on the cover's triangle mesh
+  (geometry-central's edge-flip geodesics via potpourri3d, `POST .../measure/geodesic`); the
+  cover is first made a manifold, oriented surface for it (vertices split per fan, faces glued
+  only along consistently oriented two-face edges; lengths unchanged) and the two points are
+  inserted as vertices. Measurements live in the 3D scene, so turning and zooming keep them;
+  labels are screen-constant sprites. Several stay; remove one or all; Esc drops a first point.
+  The snap lines come from `GET .../measure.json` (seams and free edges from panels.npz, the
+  vents).
+- **Vent sizes** (toggle beside "Show air vents"): per vent, from `vents.json` (format 2), which
+  takes the numbers off the flat piece the opening is cut in, as `place_vents` cut it: the
+  opening W × H; its bottom edge above the hem (the lift on the flat piece; over a skirt too low
+  for a vent the skirt's height is added); the distance along the piece's bottom edge from each
+  side of the opening to the seam there, or to a corner of the cover inside the piece (the
+  bottom edge turns ≥ 45° within 100 mm), left and right as seen from outside; the piece; the
+  bottom's height above the ground. Drawn as dimension lines on the cover and listed under it.
+  An older vents.json (no `format`) is made again on the next request.
+- **Check list** (`checklist.pdf`, made when opened like sizes.pdf, `coverengine/export/
+  checklist.py`): page 1 landscape: front, back, left and right at one scale (two by two for a
+  long low cover) with numbered vents; overall L × D × H, the hem all round (the free edges at
+  the lowest point only, not a drawing cover's open inner edges), skirt heights, every vent's
+  numbers, each with a box for the measured value and an OK box. Then the pieces (hem seam to
+  seam, flat size) and every seam's length. Links: viewer toolbar, Desk card, Cut pieces,
+  Downloads.
+- **Measured after sewing** (Desk, "Measured…" beside Fits / Does not fit): the check list's
+  points as cm fields; the fit stores per point expected, measured and the difference in
+  desk.json (`fit.measured` and the history entry, so learning/desk.jsonl too).
+  `learned.measured_deviations` groups them per cover group and kind of size (vent.above_hem,
+  skirt, seam, ...); a mean beyond `tolerance.cover_mm` on `desk.learn_after` covers is marked
+  systematic (`/api/desk-rules` → `measured`). Turning a systematic deviation into a parameter
+  change stays a person's decision, as the other learned rules.
+- **Not done (simpler first):** measuring on the draped (Style3D) cover; snapping to the
+  furniture's own features; the check list in the PDF reader's form fields.
+
+## ADR-112 — A photo alone: read Google's search by image properly; the photo box stays in its panel
+
+The owner (9 October 2026): "Google Vision recognises the photo I upload badly, while with
+Google image search (Lens) I get a 100 % match. Also the box for uploading photos sticks out of
+the browser." The ledger shows his run at 09:57: the image search ran, then identify, one
+search (by look only: no brand recognised) and the comparison.
+
+- **The cause, measured** (15 photos: 5 SUNS cut-outs and 6 mood pictures from hello-suns.com,
+  4 "phone" photos made from them: cropped, tilted, mirrored, re-coloured; raw Vision answers in
+  five variants, about 90 Vision calls, €0.28):
+  - we asked Vision for `maxResults = suggest.search_pages` = 5. Google lists the pages about
+    its best-guess label first ("studio couch", "club chair", "swimming pool", "tree": Pinterest,
+    YouTube; none shows the photo) and only after them the pages that really show it. With 5
+    we got only the label's pages: in **0 of 15** photos did anything we used name the
+    product;
+  - that label was put first among the search queries ("swimming pool", "tree", "patio");
+  - what Vision did find was thrown away: its matching pictures (`fullMatchingImages`,
+    `partialMatchingImages`) carry the product in their file names
+    ("Marolo-SUNS-Daybed-BZ-CR-PDB-Free-26.png", "suns-tuinmeubelen-suns-basta-lage-bar-tafel")
+    in **12 of 15** photos, already with 5 results; with 50 the pages showing them come too.
+  - `webEntities` rarely name the model (a shop name, once a wrong product);
+    `visuallySimilarImages` are generic (other sofas): both kept for the diagnostics only.
+  - Variants: PNG 1600 px or JPEG 2048 px, `includeGeoResults`: the same answers. **Cropping to
+    the furniture first** (OBJECT_LOCALIZATION, then web detection) is worse: 7 of 15 instead of
+    12 (the crop is no longer the picture on the web, and phone photos gained nothing). Not
+    built.
+  - **Lens** searches Google's product index as well as the web's pictures; Cloud Vision only
+    the latter. Photos that exist online are found by both; a photo taken at home only when a
+    similar picture is online (1 of the 4 phone photos). That gap is a service question
+    (QUESTIONS 74).
+- **Now** (`shop_suggest.py`):
+  1. the search by image runs **first** (a second or two), with `suggest.reverse_max` (50,
+     same fee) and the photo as JPEG; `read_web_detection` keeps only pages that show the photo,
+     full matches first, and collects the **names** of the matching pictures (file names made
+     readable by `image_name`) and pages;
+  2. those names go to the **identification** ("a name that recurs is very likely this
+     product's brand and model"): it now says "SUNS Marolo" with 0.95 where it said "Talenti
+     Cliff" or "Tribù Mood";
+  3. the best-guess label is **no query** any more;
+  4. the image search's pages that name the recognised model go first among the candidates;
+     when one does, the search by look is skipped (one search fee less);
+  5. a candidate whose only picture is the one the image search matched (a category page shows
+     it too) counts as "recognised" only when its title or address names the model;
+  6. a picture's address is no product page: a search result that is a .jpg is dropped (it was
+     shown to the customer as the recognised link);
+  7. a recognised name loses the shop's suffix ("Marolo daybed - SUNS Outdoor Lifestyle" →
+     "SUNS Marolo daybed").
+- **Measured** on the 15 photos, whole flow (before → after):
+  - the right SUNS product recognised: **2 → 8–11** (two runs; Gemini's same/not-same for a
+    set in a mood picture varies); plus 2 recognised as another SUNS piece in the same mood
+    picture (the Nova table with Dolce chairs, the Fiavè stool at the Basta table) and 2 offered
+    as a "comparable" of the same collection; a wrong brand recognised: **1 → 0**;
+  - the 4 phone photos: 0 → 1 (Marolo); the others stay on the photo's own estimates;
+  - time: median 28 → 25 s; **cost**: €0.028 → €0.026 per photo for the search part, about
+    €0.028 per suggestion with the final answer (ledger, 15 photos each).
+- **Admin → Photo test** (`POST /api/admin/shop/photo-test`, admins only; `PhotoTest.tsx`):
+  the customer's flow with every step's own result (Vision's labels, entities, names, pages,
+  pictures and similar ones; the identification; the searches; each candidate's picture as a
+  small thumbnail with its score; the pick; the final answer), the time and the cost. Nothing
+  is kept: the photo lives only for the request, the result goes only to the admin's browser;
+  the ledger gets the cost on a line of its own.
+- **The box that stuck out:** while the customer waits (30–60 s) the button says "We zoeken je
+  meubel op… (dit kan een minuut duren)". Buttons do not wrap (`.s-btn { white-space: nowrap }`)
+  and the box was a grid whose one column grew to that line: the photo field, the link field
+  and the button stretched past the panel and the screen at 1440, 1024 and 390 px, in
+  Chromium, WebKit and Firefox (at 820 the line fits). Now the box's column is
+  `minmax(0, 1fr)`, its button wraps, its answer card breaks long links, and the invisible
+  file field lies over the photo box instead of beside it. `apps/web/e2e/suggest_layout.py`
+  checks the three moments (photo chosen, waiting, answer) in the three engines at four widths;
+  screenshots before/after in out/suggestfix/.
+- **Tests** (no paid call): reading a raw web detection answer, picture file names, the order
+  and the skipped search, a category page that only shows the photo, a picture as a page, the
+  request (maxResults, JPEG) and its fee, the photo test's rights, steps and that no photo is
+  written.
+- **Not done:** Lens-quality matching of home photos needs another service; options with costs
+  in QUESTIONS 74 (Vision Product Search over our own catalogue recommended to try first).
+
+## ADR-113 — A price list from Excel as fixed prices in the draft
+
+The owner (9 Oct 2026): "I have a price list in Excel; these are retail prices incl. VAT. Can I
+upload this Excel somewhere so you set these prices as fixed prices for the current covers?"
+(Numbered 113: ADR-112 went to the photo search on main while this was built.)
+
+- **Where:** Admin → Prices & costing → Channels & price lists → **Import prices (Excel)**,
+  admins only (`POST /api/prices/import` to look, `POST /api/prices/import/apply` to write;
+  editors 403, viewers 403). Code: `apps/api/coverapi/prices_import.py`, the endpoints and
+  `import_draft()` in `prices.py`, the page `apps/web/src/PriceImport.tsx`.
+- **Reading** reuses the product list's careful reader (ADR-091: .xlsx/.csv/.zip, openpyxl,
+  zip path and size limits, `products.max_files`/`max_bytes`, header = first row with two text
+  cells). Every upload is kept as `prices/imports/<stamp>-<name>`; looking again with other
+  choices reads the kept file by its name (no paths from the client).
+- **Money as people write it:** "€ 1.234,95", "1,234.95", "1234,95", "€ 459,-", "EUR 249" and
+  number cells; the last of "." and "," is the decimal mark, a single separator before three
+  digits in a valid grouping is thousands. Prices are taken to the cent.
+- **Columns by content:** the price column is the one most cells of which read as money, with a
+  head start for a header saying prijs / price / retail / verkoop / incl and a penalty for
+  code / number / size headers and for 1, 2, 3 row numbers. Incl. or ex VAT: incl. by default
+  (the owner's case); a header saying "excl" / "ex BTW" turns it to ex; a person can switch.
+  The identification columns are those naming a cover in ≥ 10 % of the rows. All three are a
+  person's choice on the page (`--price-column`, `--id-column` in the CLI).
+- **Matching, conservative:** *exact* = a drawing cover's code, folder name or drawing order
+  number ("Cover 66", through `products_sheet.drawing_keys`), a cover's own name or id ("SUNS
+  2 Seater Kota"), a drawing cover's product name from its products.json, an arrangement's
+  name, the balloon or the frame. *Probable* = SUNS models named by a description with a family
+  and a type in common, same shape, left never for right (`products_sheet.suns_for`), and the
+  SUNS models the product list links to a drawing cover matched by code (only when that cover
+  carries one product: a code shared by two products links both, which says nothing).
+  *Ambiguous* = the columns name different covers, or a family without a type (candidates are
+  offered). Rows naming a configurator product are reported, never priced: their price follows
+  from the sizes. One cover, two prices from two rows: an exact match beats probable ones;
+  otherwise the cover is left out until a person picks the row. The page sends only what to
+  leave out and what was picked; the server matches the list again.
+- **Exact VAT conversion:** a fixed price is stored in the channel's own unit (B2C incl. VAT,
+  B2B ex VAT, `show_vat`). A price given incl. VAT into an ex-VAT channel is stored as
+  given ÷ (1 + VAT) with six decimals, and `costing._price` no longer rounds a fixed price to
+  cents *before* adding VAT, so the price incl. VAT comes back as the sheet's to the cent (a
+  test runs a thousand prices both ways). No channel rounding on a fixed price, as before.
+- **Draft only:** the prices are added to the draft (or to a new draft from the live set) with
+  the note "Imported from <file> (N prices, B2C)"; the draft keeps the note through later
+  saves and Publish uses it when no other note is written. Audit log: `prices imported to
+  draft`. Never published automatically; the published set is untouched until Publish.
+- **The shop follows:** the consumer shop sold an existing (stock) cover at its configurator
+  price minus the stock discount and ignored a B2C fixed price for that model. A fixed B2C price
+  for the stock model now wins (no discount on top), as ADR-098 meant (`costing.fixed_price`).
+- **CLI:** `scripts/prices_import.py FILE [--channel] [--incl-vat|--ex-vat] [--json] [--apply]`
+  prints the same report (a table, JSON with --json) and writes the draft only with --apply.
+- **Speed:** `prices.Facts` reads the yaml once instead of once per cover (a list of a hundred
+  covers took 0.16 s per cover only to read the defaults).
+- **On the way:** an unclosed rule in desk.css (`.q-owner .d-btn {`, from the ADR-111 merge)
+  nested the whole studio stylesheet inside it, so the built studio showed unstyled pages; it
+  is closed. The channel cards on a phone could not shrink below their content (536 px wide
+  page); `min-width: 0` lets their tables scroll inside.
+- **Better later:** a per-row confirmation memory (aliases learned from hand picks), the
+  supplier's article numbers once the covers carry them, price lists per colour or quality.
+
+## ADR-114 — Approved drawing covers offered as existing covers
+
+The owner (9 Oct 2026), option a: every drawing cover whose Desk status is approved (or
+produced) is also offered by the configurator as "we already make a cover that fits", with the
+kind of furniture from the product list. Later the same day: the retail price list he uploaded
+(Import prices, ADR-113; sheet "SUNS Covers", column "Type nr." = our drawing code) is the main
+source for the kind, before products.json and the shape.
+
+- **Which covers:** drawing-* folders with Desk status in `match.drawing_statuses`
+  (default `approved,produced`). A cover rejected later drops out at once: the card cache
+  (`match.cards`) is stamped with the newest change of every drawing cover's desk.json,
+  cover.json, products.json and model.json, and with the price list's file and time.
+- **The kind, first that says something** (`engine/coverengine/match_drawings.py`):
+  1. a person's word: `"match": {"kind": ..., "side": ..., "chairs": ...}` in the cover's
+     cover.json (`"none"` keeps it out); it also confirms a doubtful cover;
+  2. the price list (`apps/api/coverapi/match_list.py`): the newest kept list in
+     `prices/imports/` with a drawing-code column. One-cell rows are headings: a section
+     ("Corner sets", "Dining tables": words like sets/tables/items) or a family ("Kota / Aspen/
+     Evora"); a one-cell row with a colon continues the row above's "Suitable for". `#VALUE!`
+     cells are ignored. The kind comes from the item name ("corner set left", "loungechair",
+     "2-seater sofa bench", "Ibiza style", "dining tables" + Ø → round), else from "Suitable
+     for" and the section;
+  3. the product names linked from the uploaded product list (products.json labels, ADR-091);
+  4. the shape: an L is a corner sofa, a round one a round set, a sloped box a sofa (a chair
+     below 150 cm), a flat box at chair height as wide as a table with chairs a dining set.
+  Nothing says it: unknown, not offered. The category in the live cover.json is not touched;
+  the derived kind lives in the card and the review list.
+- **Doubtful, not offered until confirmed:** sources that disagree (price list, product names,
+  a clear shape); the price list's sizes that are not the cover's (that row is then not used:
+  the list's D6 is the Blocchi hocker, drawing-d6 the Blocchi daybed); left/right disagreeing
+  between the item name, the product names and the plan; a U/C shape (Rios) or a curved/free
+  shape for a sofa; Ibiza style (a corner and a sofa in one row); one code on two approved
+  covers (S10 box and plain, L4).
+- **Sizes as the SUNS cards (the furniture, not the cover):** the drawing's cover minus
+  `hull.clearance_mm` on each side and on top. A dining or round cover over table and chairs
+  gets the table's own size (from the list's "Tables 340 x 100 cm" / "Ø 170" or the product
+  name, else the cover minus `hull.chair_room_mm` per side) and its height is a ceiling
+  (`height_max`): any table lower than the cover fits under it (no score lost on height). The
+  price list's size check allows `match.drawing_size_tol_cm` (3.2) and, for tables, a table
+  size smaller than the cover by the chair room.
+- **Left and right:** the item name ("corner set left"), else the product names, else the plan:
+  every drawing named left is longer along x (C12, C15, C18, C21, C25 …). "Suitable for" is not
+  used for the hand (it names the modules' hands). Left and right in one folder (a mirrored
+  pair) fits either hand.
+- **Families:** "Suitable for"'s families (Kota, Aspen, Evora) are on the card, with the SUNS
+  models of those families and the same kind (`suits`). `match.match(hint=...)` puts a drawing
+  cover of the named family first among equal scores; the photo/link suggestion passes the
+  recognised product's name.
+- **Shop:** `stock_model` is `^(suns|drawing)-…` (shop and B2B; the admin's Matches choice too).
+  The customer sees the price list's name ("SUNS cover corner set left – Savona with arms /
+  Siena : …"), else the product list's name, never the folder name. Price: the published B2C
+  fixed price for that model when set, otherwise the configurator's price for its sizes minus
+  `stock_discount_pct`, as SUNS covers. The configurator's sizes for pricing are clamped to its
+  field ranges (a 420 cm table is priced as 400). The B2B catalogue lists offered drawing covers
+  too.
+- **Review list:** `scripts/matchcards.py` writes `out/matchcards/review.json`, `review.csv`
+  (model, kind, how it was decided, sizes, side, chairs, doubts) and `listing.json` (the price
+  list as read, and the rows it could not place: no cover, not approved, other sizes,
+  umbrellas). Read-only.
+- **First run (9 Oct, live data read-only):** 76 approved, 62 offered: 20 corner sofas, 13
+  sofas, 12 chairs/side tables/hockers, 7 dining sets, 7 round sets, 3 loungers. 14 doubtful.
+- **Better later:** the customer's own hand for Ibiza-style and U-shaped sets in the
+  configurator; a family question in the configurator itself; the customer-facing name per
+  language (the list is in English).
+
+## ADR-115 — Arrangements are approved at the Desk; an approved one never changes silently
+
+The owner (9 October 2026): "set the arrangements ready in the Desk; that must be the workflow,
+so that Rens or Wout approve them." Arrangements (ADR-089) already appeared at the Desk as
+models with status "new", unnamed and without a way to send them or to see what was placed.
+
+- **The workflow:** built on the Arrangements page → **Send to the Desk**
+  (`POST /api/arrangements/{id}/send`, the `edit` right; refused while its cover is building or
+  when nothing is built) → status `ai-checked`, shown for arrangements as **Ready for approval**,
+  with `sent` = who, when, `announced` in desk.json and a history entry "sent to the Desk" →
+  approved / rejected at the Desk by the approvers, as any cover. No new status: the queue's
+  counts, the pipeline bar and the undo work unchanged. A second click changes nothing.
+- **Never silently changed:** an approval of an arrangement records the cut file's fingerprint
+  (sha256 of cut.dxf) and its placement (members, places, gap, plan; `arrange.placement`).
+  - Building it again from the Arrangements page with another plan, moved, added or removed
+    members, or a member whose furniture changed puts it back to waiting with "changed after
+    approval: …" (from rejected: "changed after rejection"; while waiting: "changed while
+    waiting", a note only). A new name alone is not a change.
+  - Any other change of the cut file (a rebuild from the model page, a Desk correction) is
+    found by the fingerprint: the queue, the card and the Arrangements page reopen it with
+    "changed after approval" by "the studio", and the DXF gate refuses it at once.
+  - Reopening clears approved/produced/rejected, marks it sent again (so the digest lists it
+    again) and sets the catalogue status back to draft.
+- **The DXF gate:** `desk.gate_arrangements: true` (new key) gates every `arr-*` model on its
+  approval whatever `desk.gate_scope` says; false: arrangements follow gate_scope like any
+  model.
+- **At the Desk:** the series chip **ARR** (with a count), the arrangement's own name as its
+  code, an ARR tag instead of AI scores, `GET /api/desk?scope=arrangements`. The card shows,
+  in place of the drawing, the plan from above (`arrange.plan_view`: each member's rectangle
+  and the chosen footprint's outline; follow and box exactly as the cover is built, smooth as
+  the convex hull plus the clearance), the members with picture, size, place, turn, mirror, a
+  link to their own model and Desk card, "changed since" per member; a status bar (waiting,
+  approved by, rejected and why, waiting again after a change); "The arrangement" facts in
+  place of what the program read; no AI panel and no "Let the AI read it". The 3D viewer
+  (Measure, Vent sizes), pieces, check list and history as for every cover.
+- **Mail:** the arrangements sent and not yet announced go to the approvers in the Questions
+  digest (`questions.question_mails`, once per `questions.digest_hours`), one section
+  "opstelling(en) wachten op je goedkeuring" with links; never a mail per click.
+  `desk.approvers` gains "wout" (Wout logs in as wout; "wouter" did not match him).
+- **The existing arrangements:** `scripts/desk_arrangements.py` (dry run by default,
+  `--apply`, `--only`, `--by`) puts every built `arr-*` that is new or waiting without a
+  sender into "ready for approval", keeping desk.json and its history; approved, rejected and
+  already sent ones are left alone.
+- **Tests:** `apps/api/tests/test_desk_arrangements.py` (queue filter and names, the card's
+  plan, send rights and repeats, the gate and its switch, reopening on a changed cut file and
+  on a change after approval or rejection, the change words, the digest once);
+  test_arrangements.py builds, sends, approves and rebuilds with another plan through the API.
+  Browser: `apps/web/e2e/arrangements_desk.py` (send, ARR filter, card, approve, DXF, change
+  after approval, phone width).
+- **Also fixed:** on a phone the Desk overflowed by 8 px (its margins assumed the desktop
+  gutter, and the fit row did not wrap).
+- **Better later:** the smooth plan drawn from the built cover's own outline; a per-member
+  check that the arrangement's pieces still match the member's latest cover.
 
 ## ADR-116 — The scroll page all our own: rain drawn in time, the chapters and clips rendered from our data
 

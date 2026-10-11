@@ -235,6 +235,45 @@ def footprint_of(doc: dict[str, Any], params: Any) -> str:
     return chosen if chosen in FOOTPRINTS else str(params["arrange.footprint"])
 
 
+def plan_view(doc: dict[str, Any], params: Any) -> dict[str, Any]:
+    """The arrangement seen from above, for the Desk's card (ADR-115): every member's plan
+    rectangle and the outline of the chosen footprint at the hem (mm, the arrangement's frame).
+    Follow and box are exactly the plan the cover is built on; smooth (slanted walls, from the
+    furniture's points) is shown as the convex hull of the rectangles plus the clearance."""
+    import shapely
+
+    from coverengine.hull import plan as hp
+
+    rects = plan_rects(doc)
+    chosen = footprint_of(doc, params)
+    c = float(params["hull.clearance_mm"])
+    polys = hp.aligned([shapely.Polygon(r) for r in rects], [hp.rect_angle(r) for r in rects],
+                       float(params["arrange.align_mm"]))  # fmt: skip
+    if chosen == "smooth":
+        shape = shapely.union_all(polys).convex_hull.buffer(c, join_style=hp.MITRE)
+    else:
+        close = float(doc.get("gap_mm") or 0.0) + float(params["arrange.close_mm"])
+        shape, _ = hp.outline(polys, chosen, close, c)
+    x0, y0, x1, y1 = shape.bounds
+    return {
+        "footprint": chosen,
+        "outline_mm": [[round(float(x), 1), round(float(y), 1)] for x, y in shape.exterior.coords],
+        "rects_mm": [[[round(float(x), 1), round(float(y), 1)] for x, y in r] for r in rects],
+        "size_mm": [round(x1 - x0, 1), round(y1 - y0, 1)],
+    }
+
+
+def placement(doc: dict[str, Any]) -> dict[str, Any]:
+    """What an approval of the arrangement covers besides its files: the members, their places,
+    the gap and the plan. A change here reopens the approval (ADR-115)."""
+    keys = ("model_id", "x_mm", "y_mm", "rot_deg", "mirror")
+    return {
+        "members": [{k: m.get(k) for k in keys} for m in doc.get("members") or []],
+        "gap_mm": float(doc.get("gap_mm") or 0.0),
+        "footprint": doc.get("footprint"),
+    }
+
+
 def footprints(
     models: Path, members: list[Member], gap_mm: float, params: Any
 ) -> list[dict[str, Any]]:

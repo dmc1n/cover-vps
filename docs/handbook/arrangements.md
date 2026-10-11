@@ -52,8 +52,27 @@ outline; opened, they offer the default plan, and the page says the cover was bu
   `top_gain_pct`, `top_slopes` (front: tops slope only to each piece's front, so no diagonal
   seams on top).
 - Each piece is covered as its plan rectangle: a rounded arm is covered square.
-- Air vents go only on the outer walls; the walls of the inner corner get none (ADR-093).
+- Air vents go round every side, the front walls of the inner corner included (ADR-110).
 - The skirt runs at one height all round; where a piece is lower (the chaise longue's back),
   the skirt there is short, and the program may place no air vent on that side.
 - **Snap** puts pieces touching (`arrange.gap_mm: 0`, a company setting). For a gap, drag the
   piece a little after snapping.
+
+## Send it to the Desk for approval (ADR-115)
+
+An arrangement is approved at the Desk by Rens or Wout before the workshop cuts it.
+
+1. Build the cover and look at it (**Open the model ↗**).
+2. The box under the build button says where the arrangement stands. When the cover is right,
+   press **Send to the Desk**. The box then says **Waiting for approval at the Desk**, by whom
+   and when, with **Open its Desk card ↗**. The approvers get it in their daily digest.
+3. Afterwards the box says **Approved by Rens on …** (the cutting-table DXF is available) or
+   **Rejected by … : the reason**.
+4. **Changing it later** (another plan, a piece moved, added or removed) and building again
+   sends it back to the Desk by itself: "Waiting for approval at the Desk again (changed after
+   approval: …)". The DXF is locked again until it is approved again. A rejected arrangement
+   goes back the same way once it is changed. A new name alone does not reopen it.
+
+The list of arrangements shows each one's state (not at the Desk, waiting, approved,
+rejected). The arrangements made before 9 October 2026 were put at the Desk once with
+`scripts/desk_arrangements.py` (dry run first, `--apply` to write).

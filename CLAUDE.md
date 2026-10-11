@@ -49,8 +49,8 @@ one-line edit there.
 - Standard features: drawcord hem, wind straps with buckles, handles: which are standard,
   which optional per model? Air vents are standard (owner, 2026-09-30): 25 x 22 cm (W x H), bottom
   edge 5 cm above the lower end of the cover, one per full metre of hem length, spread evenly,
-  at least one, only on the outside of the cover, never on an inner wall of an L, U or C shape (owner, 2026-10-07;
-  Rens asks for them on the front walls too: QUESTIONS 73, `features.vent_inner_walls`). Round every side first,
+  at least one, round every side of the cover including the front walls in the inner corner of L, U and C
+  shapes (owner, 2026-10-09, QUESTIONS 71, ADR-110; `features.vent_inner_walls`, default on). Round every side first,
   one in the middle of each piece, the drawing's count kept, never on a free top edge (Rens, 2026-10-08, ADR-101). Built as a cut opening with a hood of extra fabric holding a plastic insert
   that keeps it open, and a membrane inside against dirt (`features.vent_*`, pieces in M5).
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
@@ -221,8 +221,11 @@ uv run python scripts/fewer_check.py DIR ...   re-measure a built cover from its
 uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT   the Desk picture's red marks mapped onto the cover's panels and 3D (camera fitted, ADR-100)
 uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   drawing, old and new cover side by side
 uv run python scripts/vents_compare.py OUT.png --old DIR --new DIR [--pics ...]   a cover's vents before/after, with the Desk's marked pictures (ADR-101)
+uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--staged DIR]   covers with inner walls rebuilt in staging, vents on the front walls, checked twice (ADR-110)
 uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--only a,b]   drawing covers from a shape a person read
                                              (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102)
+COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py [--out out/matchcards]   approved drawing covers as existing covers:
+                                             kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114)
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
 COVER_DATA_DIR=~/cover-data uv run python scripts/learned_check.py [--recalc]   do the Desk's corrections still hold? (ADR-082)
 uv run python scripts/film/hero_data.py MODEL_DIR OUT   the home film's data: cover.npz, seams.png, pieces.json (ADR-108)
@@ -236,13 +239,28 @@ uv run python scripts/film/story_frames.py OUT --name storyN --chapters DIR | --
 make e2e        the web app flow in a real browser (Playwright in Docker)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
 apps/web/e2e/prices.py                      Prices & costing in a real browser (ADR-098; usage in its docstring)
+Desk → Questions (#/questions)              the owner's and the workshop's questions, answered in the studio (ADR-109)
+COVER_DATA_DIR=~/cover-data uv run python scripts/questions.py new|ack|done ID "note"|list|show ID|add F|import [--dry-run]|mail
+                                             the daily processing of the answers; the import of 9 Oct (ADR-109)
+apps/web/e2e/questions.py                   the Questions tab in a real browser, Edge with office policies (ADR-109)
 apps/web/e2e/b2c.py                         the public consumer shop, desktop and 390 px, through the Worker (ADR-103)
+apps/web/e2e/suggest_layout.py              the configurator's photo/link box in Chromium, WebKit, Firefox at 4 widths (ADR-112)
+Admin → Photo test                          a photo suggestion step by step: image search, identification, searches, scores (ADR-112)
 
 node apps/web/e2e/site_serve.mjs [--port N]  this build of the website locally, data from the preview (ADR-106)
 apps/web/e2e/site_rain.py | site_3d.py | site_perf.py   the website: rain keeps falling, 3D loads lean, timings (ADR-106)
 Admin → Prices & costing (#/prices)         price set per channel, versioned in app.db; costing per cover (ADR-098)
+Prices & costing → Channels → Import prices (Excel)   a price list as fixed prices, into the draft only (ADR-113)
+COVER_DATA_DIR=~/cover-data uv run python scripts/prices_import.py FILE [--channel b2c] [--incl-vat|--ex-vat] [--json OUT] [--apply]
+                                             the same matching report; --apply writes the draft, never publishes (ADR-113)
+apps/web/e2e/priceimport.py                 the import in a real browser (sample: e2e/priceimport_sheet.py; usage in its docstring)
 <website>/b2b, Admin → B2B customers        the B2B shop: business logins, own prices ex VAT, orders on account (ADR-104)
 apps/web/e2e/b2b.py                         the B2B shop in a real browser (ADR-104; usage in its docstring)
+apps/web/e2e/measure.py                     Measure, Vent sizes, the check list and measured fits in a real browser (ADR-111)
+Arrangements → Send to the Desk; Desk → ARR   an arrangement approved by Rens or Wout; a change reopens it; DXF after approval (ADR-115)
+COVER_DATA_DIR=~/cover-data uv run python scripts/desk_arrangements.py [--apply] [--only a,b]   the existing arr-* to "ready for approval" (ADR-115)
+apps/web/e2e/arrangements_desk.py           the arrangement → Desk workflow in a real browser (ADR-115; usage in its docstring)
+3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/

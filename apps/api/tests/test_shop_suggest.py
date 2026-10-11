@@ -15,6 +15,7 @@ from PIL import Image
 
 REAL_GEMINI = sg.gemini  # the tests of the calls themselves fake the network under them
 REAL_REVERSE = sg.reverse_search
+REAL_SEARCH = sg.search_comparable
 
 
 @pytest.fixture(autouse=True)
@@ -414,15 +415,34 @@ def test_every_gemini_call_and_each_search_query_is_in_the_ledger(
     assert "tools" not in sent[1]
 
 
-def test_the_search_by_image_when_switched_on_comes_first(monkeypatch: pytest.MonkeyPatch) -> None:
-    """ADR-092: Google's search by image (off until the owner gives a key). Its pages showing the
-    very picture come first and its best guess of the name is the first query."""
+def _by_image(title: str, url: str, full: bool = True) -> dict[str, Any]:
+    """A page of the search by image as read_web_detection gives it."""
+    return {"url": url, "title": title, "image": url + ".jpg", "same": full,
+            "match": "full" if full else "partial", "from": "image search"}  # fmt: skip
+
+
+def test_the_search_by_image_names_the_product_and_its_pages_come_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR-112 (owner, 9 Oct 2026: "Vision recognises my photo badly, Lens finds it 100 %"). The
+    search by image runs first; the names of its matching pictures go to the identification;
+    Google's generic label ("studio couch") is no query; its pages that name the recognised
+    model come first; when one does, the search by look is skipped (one fee less)."""
     from coverengine.params import Registry
 
-    ident = {"kind": "sofa", "queries": ["outdoor sofa rope back"]}
-    seen = _photo_flow(monkeypatch, ident, {False: [_page("Kettal Cala 3-seater")]}, {
-        0: {"same": True, "similarity": 0.97, "why": "the same picture"},
-        1: {"same": False, "similarity": 0.5, "why": "other arms"}})  # fmt: skip
+    ident = {"kind": "sofa", "brand": "SUNS", "model": "Marolo", "brand_confidence": 0.95,
+             "queries": ["round outdoor daybed rope"]}  # fmt: skip
+    seen = _photo_flow(monkeypatch, ident, {True: [_page("SUNS Marolo daybed", "SUNS", True)],
+                                            False: [_page("Talenti Cliff daybed")]},
+                       {0: {"same": True, "similarity": 0.97, "why": "the same picture"},
+                        1: {"same": True, "similarity": 0.95, "why": "identical"},
+                        2: {"same": False, "similarity": 0.5, "why": "other"}})  # fmt: skip
+    got: dict[str, Any] = {}
+
+    def identify(params: Any, png: bytes, names: Any = None) -> dict[str, Any]:
+        got["names"] = names
+        return ident
+
     queries: list[Any] = []
     search = sg.search_comparable
 
@@ -430,22 +450,129 @@ def test_the_search_by_image_when_switched_on_comes_first(monkeypatch: pytest.Mo
         queries.append(list((idt or {}).get("queries") or []))
         return search(p, png, idt, brand)
 
+    monkeypatch.setattr(sg, "identify", identify)
     monkeypatch.setattr(sg, "search_comparable", spy)
     monkeypatch.setattr(sg, "reverse_search", lambda *a, **k: {
-        "labels": ["suns tosca sofa"],
-        "pages": [_page("Tosca 3-zits bank", "SUNS", True)]})  # fmt: skip
-    off = Registry.load(None).resolve(trial={"suggest.reverse_search": False})
-    assert sg._reverse(off, _png()) == {"pages": [], "labels": []}  # switched off
+        "labels": ["studio couch"], "names": ["Marolo SUNS Daybed BZ CR PDB Free"],
+        "pages": [_by_image("Outdoor daybeds | Milola", "https://milola.example/daybeds"),
+                  _by_image("Marolo daybed - SUNS Outdoor Lifestyle",
+                            "https://hello-suns.example/marolo-daybed", False)]})  # fmt: skip
+    on = Registry.load(None).resolve(trial={"suggest.reverse_search": True})
+    trace: dict[str, Any] = {}
+    out = sg.find_comparable(on, _png(), 5, 1000, 1000, trace)
+    assert got["names"] == ["Marolo SUNS Daybed BZ CR PDB Free"]
+    assert all("studio couch" not in q for q in queries)
+    assert seen["searches"] == [True]  # the page naming the model is there: no search by look
+    assert seen["candidates"][0] == "Marolo daybed - SUNS Outdoor Lifestyle"
+    # both the image search's page and the brand's are the same product: the one with written
+    # sizes is taken (the image search's page refused the robot here)
+    assert out["recognised"]["name"] == "SUNS Marolo daybed"
+    assert out["recognised"]["url"] == "https://shop.example/suns-marolo-daybed"
+    assert out["facts"]["relation"] == "the same product as in the photo"
+    # the trace (the admin's photo test) has every step
+    assert {"image_search", "identify", "searches", "candidates"} <= set(trace)
+    assert trace["candidates"][0]["from"] == "image search"
+    assert trace["candidates"][0]["thumb"].startswith("data:image/jpeg;base64,")
+
+
+def test_a_page_that_only_shows_the_photo_is_not_the_product(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A category page shows the customer's picture too: held against the photo, that picture
+    is "the same", so the page counts only when it names the recognised model (ADR-112)."""
+    from coverengine.params import Registry
+
+    ident = {"kind": "sofa", "brand": "SUNS", "model": "Marolo", "brand_confidence": 0.95}
+    seen = _photo_flow(monkeypatch, ident, {}, {
+        0: {"same": True, "similarity": 0.99, "why": "the same picture"}})  # fmt: skip
+    monkeypatch.setattr(sg, "reverse_search", lambda *a, **k: {
+        "names": [], "labels": [],
+        "pages": [_by_image("Garden furniture sale", "https://shop.example/sale")]})  # fmt: skip
     on = Registry.load(None).resolve(trial={"suggest.reverse_search": True})
     out = sg.find_comparable(on, _png(), 5, 1000, 1000)
-    assert seen["candidates"][0] == "Tosca 3-zits bank"
-    assert queries[0][0] == "suns tosca sofa"
-    assert out["recognised"]["name"] == "SUNS Tosca 3-zits bank"
+    assert seen["candidates"] == ["Garden furniture sale"]
+    assert out["recognised"] is None
 
 
-def test_the_search_by_image_reads_google_s_answer_and_records_its_fee(
+def test_google_s_web_detection_is_read_for_the_pages_that_show_the_photo() -> None:
+    """ADR-112, measured on 15 photos: Google lists the pages about its label first (no
+    matching picture: dropped), the pages that show the photo after them (kept, full matches
+    first); the matching pictures' file names say what the product is."""
+    web = {
+        "bestGuessLabels": [{"label": "studio couch"}],
+        "webEntities": [{"entityId": "/m/1", "description": "Daybed", "score": 0.9},
+                        {"entityId": "/m/2", "score": 0.5}],
+        "fullMatchingImages": [
+            {"url": "https://www.solfelt.example/cdn/shop/files/"
+                    "Marolo-SUNS-Daybed-BZ-CR-PDB-Free-26-2500_1.jpg?v=1772189411"}],
+        "partialMatchingImages": [{"url": "https://cdn.example/a1e18853f00d.jpg"}],
+        "pagesWithMatchingImages": [
+            {"url": "https://www.pinterest.example/ideas/studio-couch/1/",
+             "pageTitle": "Studio couch - Pinterest"},
+            {"url": "https://milola.example/collections/suns", "pageTitle": "<b>SUNS</b> Outdoor",
+             "partialMatchingImages": [
+                 {"url": "https://milola.example/files/Marolo-Daybed-Camel-Sand-Suns-Milola-2.webp"}]},
+            {"url": "https://www.dutchgarden.example/suns-marolo-daybed",
+             "pageTitle": "Suns Marolo Daybed | Dutch Garden",
+             "fullMatchingImages": [{"url": "https://www.dutchgarden.example/p.jpg"}]},
+        ],
+        "visuallySimilarImages": [{"url": "https://other.example/sofa.jpg"}],
+    }  # fmt: skip
+    got = sg.read_web_detection(web)
+    assert [p["url"] for p in got["pages"]] == [
+        "https://www.dutchgarden.example/suns-marolo-daybed",  # full match first
+        "https://milola.example/collections/suns",
+    ]  # the label's Pinterest page is gone
+    assert got["pages"][1]["title"] == "SUNS Outdoor" and got["pages"][1]["match"] == "partial"
+    assert got["pages"][0]["from"] == "image search" and got["pages"][0]["same"] is True
+    assert got["other_pages"] == 1
+    assert got["names"][:2] == ["Marolo SUNS Daybed BZ CR PDB Free",
+                                "Marolo Daybed Camel Sand Suns Milola"]  # fmt: skip
+    assert "Suns Marolo Daybed | Dutch Garden" in got["names"]
+    assert got["labels"] == ["studio couch"]
+    assert got["entities"] == [{"name": "Daybed", "score": 0.9}]
+    assert got["similar"] == ["https://other.example/sofa.jpg"]
+    assert got["images"]["partial"] == ["https://cdn.example/a1e18853f00d.jpg"]
+
+
+@pytest.mark.parametrize(("url", "name"), [
+    ("https://hello-suns.example/app/uploads/2026/03/Marolo-SUNS-Daybed-BZ-CR-PDB-Free-26.png",
+     "Marolo SUNS Daybed BZ CR PDB Free"),
+    ("https://www.dutchgarden.example/cdn/shop/files/"
+     "suns-tuinmeubelen-suns-basta-lage-bar-tafel-69732620894586.jpg?v=1770627924",
+     "suns tuinmeubelen suns basta lage bar tafel"),
+    ("https://x.example/Vivaro%20Nova_1024x683.webp", "Vivaro Nova"),
+    ("https://x.example/IMG_20260901_1024x683.webp", ""),  # one word says too little
+    ("https://cdn.example/a1e18853f00d4b2c.jpg", ""),
+    ("https://i.example/asr/750c61c1-6c41-4ab6-84ee-21b459984ca5.jpeg", ""),
+])  # fmt: skip
+def test_a_web_picture_s_file_name_says_what_it_shows(url: str, name: str) -> None:
+    assert sg.image_name(url) == name
+
+
+def test_a_picture_the_search_names_as_a_page_is_no_product_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The search once named a picture's address as the product page; it became the customer's
+    "recognised" link (ADR-112). A picture is no page."""
+    from coverengine.params import Registry
+
+    text = json.dumps({"pages": [
+        {"url": "https://hello-suns.example/app/uploads/Marolo-SUNS-Daybed-Mood-768x1151.jpg",
+         "title": "Marolo", "same": True},
+        {"url": "https://sunslifestyle.example/products/marolo-daybed", "title": "Marolo daybed",
+         "same": True, "sizes_cm": {"width": 197, "depth": 200}}]})  # fmt: skip
+    monkeypatch.setattr(sg, "gemini", lambda *a, **k: {"text": text, "links": [], "queries": []})
+    got = REAL_SEARCH(Registry.load(None).resolve(), _png(), {"brand": "SUNS"}, True)
+    assert [p["url"] for p in got] == ["https://sunslifestyle.example/products/marolo-daybed"]
+
+
+def test_the_search_by_image_asks_for_enough_results_and_records_its_fee(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """With 5 results Google gave only the label's pages; suggest.reverse_max asks for more (the
+    same fee). The photo goes as a JPEG. The fee is in the month's ledger."""
+    import base64
     import urllib.request
 
     import coverengine.ai
@@ -453,23 +580,61 @@ def test_the_search_by_image_reads_google_s_answer_and_records_its_fee(
 
     monkeypatch.setenv("COVER_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(coverengine.ai, "_key", lambda provider: "test-key")
-    web = {"bestGuessLabels": [{"label": "suns tosca"}], "pagesWithMatchingImages": [
+    sent: list[Any] = []
+    web = {"pagesWithMatchingImages": [
         {"url": "https://hello-suns.com/tosca", "pageTitle": "<b>Tosca</b> sofa",
-         "fullMatchingImages": [{"url": "https://hello-suns.com/tosca.jpg"}]},
-        {"url": "https://pins.example/1", "pageTitle": "a pin",
-         "partialMatchingImages": [{"url": "https://pins.example/1.jpg"}]}]}  # fmt: skip
-    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: _Reply(
-        {"responses": [{"webDetection": web}]}))  # fmt: skip
+         "fullMatchingImages": [{"url": "https://hello-suns.com/tosca.jpg"}]}]}  # fmt: skip
+
+    def urlopen(req: Any, timeout: float = 0) -> Any:
+        sent.append(json.loads(req.data))
+        return _Reply({"responses": [{"webDetection": web}]})
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
     p = Registry.load(None).resolve()
     got = REAL_REVERSE(p, _png())
-    assert got["labels"] == ["suns tosca"]
-    first = {"url": "https://hello-suns.com/tosca", "title": "Tosca sofa",
-             "image": "https://hello-suns.com/tosca.jpg", "same": True}  # fmt: skip
-    assert got["pages"][0] == first
-    assert got["pages"][1]["same"] is False
+    feature = sent[0]["requests"][0]["features"][0]
+    assert feature == {"type": "WEB_DETECTION", "maxResults": int(p["suggest.reverse_max"])}  # type: ignore[arg-type]
+    assert base64.b64decode(sent[0]["requests"][0]["image"]["content"])[:2] == b"\xff\xd8"
+    assert got["pages"][0]["title"] == "Tosca sofa" and got["pages"][0]["same"] is True
     rows = [json.loads(x) for f in (tmp_path / "usage").glob("*.jsonl")
             for x in f.read_text().splitlines()]  # fmt: skip
-    assert rows[0]["eur"] == pytest.approx(float(p["suggest.reverse_eur"]))
+    assert rows[0]["eur"] == pytest.approx(float(p["suggest.reverse_eur"]))  # type: ignore[arg-type]
+
+
+def test_the_admin_s_photo_test_shows_each_step_and_keeps_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Admin → Photo test (ADR-112): admins only; the answer carries each step and the cost;
+    no photo is written anywhere."""
+    monkeypatch.setenv("COVER_DATA_DIR", str(tmp_path / "ledger"))
+    a = create_app(tmp_path / "data", login_required=True)
+    auth = a.state.auth
+    u = auth.add_user("rick", "Rick", "admin", "rick@example.com", True)
+    auth.set_password(auth.invite(u.id), "a-long-admin-password")
+    auth.set_password(auth.invite(auth.add_user("eddy", "Eddy", "editor").id), "a-long-editor-pw")
+    ident = {"kind": "sofa", "brand": "SUNS", "model": "Tosca", "brand_confidence": 0.9}
+    _photo_flow(monkeypatch, ident, {True: [_page("SUNS Tosca sofa", "SUNS", True)]},
+                {0: {"same": True, "similarity": 0.95, "why": "identical"}})  # fmt: skip
+    photo = [("photos", ("s.png", _png(), "image/png"))]
+    assert TestClient(a).post("/api/admin/shop/photo-test", files=photo).status_code == 401
+    editor = TestClient(a)
+    editor.post("/api/auth/login", json={"username": "eddy", "password": "a-long-editor-pw"})
+    assert editor.post("/api/admin/shop/photo-test", files=photo).status_code == 403
+    before = {p for p in (tmp_path / "data").rglob("*") if p.is_file()}
+    admin = TestClient(a)
+    admin.post("/api/auth/login", json={"username": "rick", "password": "a-long-admin-password"})
+    r = admin.post("/api/admin/shop/photo-test", files=photo, data={"lang": "en"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["proposal"]["recognised"]["name"] == "SUNS Tosca sofa"
+    assert d["trace"]["identify"]["model"] == "Tosca"
+    assert d["trace"]["image_search"]["pages"] == []
+    assert d["trace"]["candidates"][0]["similarity"] == 0.95
+    assert d["trace"]["answer"]["product"] == "sofa"
+    assert d["cost_eur"] == 0 and d["error"] is None
+    after = {p for p in (tmp_path / "data").rglob("*") if p.is_file()}
+    new = [p for p in after - before if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")]
+    assert new == []  # the photo is not kept
 
 
 def test_a_cut_out_picture_gets_a_white_background() -> None:

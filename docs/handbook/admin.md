@@ -130,6 +130,15 @@ Three tabs on the admin page belong to it.
     `/media` files for a day. How the film is made: ADR-108 (`scripts/film/`).
 
   The empty fields are listed at the top.
+- **Photo test** (ADR-112): try the shop's "start from a photo or a link" yourself and see
+  every step: what Google's search by image found (its best guess, the pages that show your
+  photo, the names of the matching pictures), what Gemini recognised (brand, model, sizes),
+  the web searches, each found picture held against your photo with its score, which one was
+  picked and the final answer, plus the time and the cost (about €0.03). Nothing is kept: the
+  photo is only used for the test and the result only shows on your screen. Use it when a
+  customer says a photo was read wrongly: try the same kind of photo and read where it went
+  wrong. A photo found on the web (a shop's picture) is recognised almost always; a photo
+  taken at home is found by Google's search by image only when a similar picture is online.
 - **Website (AI):** type what should change on the site, in plain words, for example "add a
   question about delivery time: about three weeks". The AI changes the draft in Dutch and
   English. Open the preview, then **Publish** (or **Discard**). Earlier versions can be
@@ -147,7 +156,7 @@ Three tabs on the admin page belong to it.
   - **Learning mode** (Shop settings, matching, mode `shadow`; the default): the customer leaves
     an e-mail address. You get a mail, and the request appears in the admin tab **Matches**
     with the best covers, their percentage and the difference per size in cm (+ is roomier).
-  - Press **Take N %** for the proposal, **Custom**, or type another cover (`suns-…`) and press
+  - Press **Take N %** for the proposal, **Custom**, or type another cover (`suns-…` or `drawing-…`) and press
     **Choose**. A note for the customer is optional.
   - The customer gets a link to the proposal, in their own language, and can order the existing
     cover or a custom one.
@@ -155,6 +164,20 @@ Three tabs on the admin page belong to it.
   how often the proposal was changed, the fit answers of customers (1–5) and the returns.
   When a band fits well, set the threshold (Shop settings, matching, `threshold_pct`) and,
   when you trust it, mode `auto`: customers then see the match at once.
+- **Drawing covers are offered too** (ADR-114): every drawing cover approved or produced at the
+  Desk, as the kind of furniture the price list says (Import prices keeps your list; its
+  column "Type nr." is the drawing code), else the product list's name, else its shape. The
+  customer sees the price list's name, never "drawing-t1"; it sells at its fixed B2C price, or
+  at the configurator's price minus the stock discount. Reject a cover at the Desk and it is no
+  longer offered.
+  - **The review list:** `COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py`
+    writes `out/matchcards/review.csv`: every drawing cover, its kind, how that was decided,
+    the sizes, left or right, and why a cover is held back.
+  - **Doubtful covers are held back** (sources disagree, the list's sizes differ, a U or curved
+    shape, Ibiza style, one code on two covers). To confirm or correct one, add to its
+    cover.json `"match": {"kind": "corner_sofa", "side": "left"}` (kinds: dining_set,
+    round_set, sofa, corner_sofa, lounger, item; `"none"` keeps it out; `"chairs": true` for
+    tables).
 - **The fit question:** Shop settings, `fit_mail`. Switch it on and set the days. It needs the
   domain and the mail server. A shipped order then gets one question by mail; the answers
   appear under Matches.

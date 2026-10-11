@@ -25,7 +25,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 DRAFT_SETTING = "prices_draft"
@@ -93,6 +93,17 @@ class Facts:
     def __init__(self, models: Path) -> None:
         self.models = models
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
+        self._registry: tuple[float, Any] | None = None
+
+    def registry(self) -> Any:
+        """The yaml read once, again only when it changes (a price list's import looks up
+        a hundred covers at once, ADR-113)."""
+        from coverengine.params.registry import Registry, default_config_path
+
+        stamp = default_config_path().stat().st_mtime
+        if self._registry is None or self._registry[0] != stamp:
+            self._registry = (stamp, Registry.load(None))
+        return self._registry[1]
 
     def get(self, model_id: str) -> dict[str, Any] | None:
         from coverengine import costing
@@ -110,7 +121,7 @@ class Facts:
         if hit and hit[0] == stamp:
             return hit[1]
         try:
-            params = resolve_model(d)
+            params = resolve_model(d, registry=self.registry())
         except Exception:  # noqa: BLE001 - a broken cover.json: the company defaults
             params = Registry.load(None).resolve()
         try:
@@ -454,6 +465,9 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             raise HTTPException(400, "send {data: the price set}")
         data = costing.normalised(data)
         d = {"data": data, "by": admin.username, "time": time.time()}
+        before = draft()
+        if before and before.get("note"):  # an import's note stays with the draft (ADR-113)
+            d["note"] = before["note"]
         auth.set_setting(DRAFT_SETTING, d)
         return {"draft": d, "errors": costing.validate(data)}
 
@@ -498,7 +512,7 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
         data = checked(d["data"])
         before = current(auth)
         moved = compare(before, data, facts.all(), shop_params(auth))["changed"]
-        note = str(body.get("note") or "")[:500]
+        note = str(body.get("note") or d.get("note") or "")[:500]
         with sqlite3.connect(auth.path) as db:
             cur = db.execute(
                 "INSERT INTO price_sets (created, username, note, data) VALUES (?, ?, ?, ?)",
@@ -542,6 +556,8 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             new = cur.lastrowid
         auth.log(admin, "prices rolled back", {"to": version, "version": new})
         return {"version": new, "from_version": version}
+
+    install_import(app, auth, store, facts, draft)
 
     @app.get("/api/prices/products")
     def products(request: Request) -> dict[str, Any]:
@@ -677,3 +693,130 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
         model = request.query_params.get("model")
         f = facts.get(model) if model else None
         return odoo.records(ps, {model: f} if model and f else {})
+
+
+def import_draft(
+    auth: Any,
+    report: dict[str, Any],
+    chosen: dict[str, dict[str, Any]],
+    filename: str,
+    by: str,
+) -> dict[str, Any]:
+    """Write an imported price list's fixed prices into the draft (never published), with the
+    note "Imported from <file> (N prices)" that the publish takes as its history note."""
+    from coverengine import costing
+
+    from coverapi import prices_import as pim
+
+    d: dict[str, Any] | None = auth.setting(DRAFT_SETTING, None)
+    base = dict(d["data"]) if d else current(auth)
+    data = costing.normalised(pim.into_draft(base, report["channel"], chosen))
+    note = pim.note_for(filename, len(chosen), report["channel"])
+    if d and d.get("note"):
+        note = f"{d['note']}; {note}"
+    new = {"data": data, "by": by, "time": time.time(), "note": note[:500]}
+    auth.set_setting(DRAFT_SETTING, new)
+    auth.log(by, "prices imported to draft", {"file": filename, "channel": report["channel"],
+                                              "prices": len(chosen)})  # fmt: skip
+    return {"draft": new, "errors": costing.validate(data), "count": len(chosen), "note": note}
+
+
+def install_import(app: FastAPI, auth: Any, store: Any, facts: Facts, draft: Any) -> None:
+    """Admin → Prices & costing → Import prices (Excel), ADR-113: upload and look
+    (`POST /api/prices/import`), then put the chosen prices in the draft
+    (`POST /api/prices/import/apply`). Admins only; nothing is published."""
+    from coverengine.params.registry import Registry
+
+    from coverapi import prices_import as pim
+    from coverapi.security import require
+
+    folder = store.root / "prices" / "imports"
+
+    def limits() -> tuple[int, int]:
+        p = Registry.load(None).resolve()
+        return int(p["products.max_files"]), int(p["products.max_bytes"])  # type: ignore[arg-type]
+
+    def report_for(upload: str, opts: dict[str, Any]) -> dict[str, Any]:
+        path = pim.kept(folder, upload)
+        max_files, max_bytes = limits()
+        d = draft()
+        tables = pim.read(pim.original_name(upload), path.read_bytes(), max_files, max_bytes)
+        incl = opts.get("incl_vat")
+        cols = opts.get("id_columns")
+        rep = pim.analyse(
+            tables,
+            pim.Matcher(Path(store.models), store.root),
+            current(auth),
+            str(opts.get("channel") or "b2c"),
+            None if incl in (None, "", "auto") else incl in (True, "true", "1", "incl"),
+            str(opts.get("price_column") or "") or None,
+            [str(c) for c in cols] if isinstance(cols, list) else None,
+            facts.get,
+        )
+        in_draft = (d["data"]["channels"].get(rep["channel"]) or {}).get("fixed") or {} if d else {}
+        for row in rep["rows"]:
+            for tg in row["targets"]:
+                if tg["id"] in in_draft:
+                    tg["in_draft"] = in_draft[tg["id"]]
+        return {**rep, "upload": upload, "file": pim.original_name(upload)}
+
+    def plain(fn: Any) -> Any:
+        try:
+            return fn()
+        except (pim.ImportError_, ValueError) as exc:
+            raise HTTPException(400, str(exc)) from None
+
+    @app.post("/api/prices/import")
+    async def import_look(
+        request: Request,
+        file: UploadFile | None = File(None),  # noqa: B008
+        upload: str = Form(""),  # noqa: B008
+        channel: str = Form("b2c"),  # noqa: B008
+        incl_vat: str = Form("auto"),  # noqa: B008
+        price_column: str = Form(""),  # noqa: B008
+        id_columns: str = Form(""),  # noqa: B008
+    ) -> dict[str, Any]:
+        """A price list read and matched to our covers; nothing changes yet. With `file` a new
+        upload (kept in prices/imports/); with `upload` the kept one read again with other
+        choices (columns, one per line; incl./ex VAT; channel)."""
+        require(request, "admin")
+        if file is not None:
+            _, max_bytes = limits()
+            data = await file.read(max_bytes + 1)
+            if len(data) > max_bytes:
+                raise HTTPException(400, f"the file is larger than {max_bytes // 1_000_000} MB")
+            name = Path(file.filename or "prices.xlsx").name
+            if name.lower().endswith(".xls"):
+                raise HTTPException(400, f"{name}: an old .xls file; please save it as .xlsx")
+            if not name.lower().endswith((".xlsx", ".xlsm", ".csv", ".zip")):
+                raise HTTPException(400, f"{name}: upload an .xlsx, a .csv or a .zip")
+            upload = pim.keep(folder, name, data)
+        cols = [c.strip() for c in id_columns.splitlines() if c.strip()] or None
+        opts = {"channel": channel, "incl_vat": incl_vat, "price_column": price_column,
+                "id_columns": cols}  # fmt: skip
+        rep: dict[str, Any] = plain(lambda: report_for(upload, opts))
+        return {**rep, "options": opts}
+
+    @app.post("/api/prices/import/apply")
+    async def import_apply(request: Request) -> dict[str, Any]:
+        """The chosen prices into the draft: {upload, channel, incl_vat, price_column,
+        id_columns, exclude: [cover ids], picks: [{index, id}]}. The list is matched again on
+        the server; the page only says which covers to leave out and which it chose by hand."""
+        admin = require(request, "admin")
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        if not isinstance(body, dict):
+            raise HTTPException(400, "send {upload, exclude, picks}")
+        rep: dict[str, Any] = plain(lambda: report_for(str(body.get("upload") or ""), body))
+        exclude = [str(x) for x in body.get("exclude") or []]
+        picks = body.get("picks") or []
+        if not isinstance(picks, list) or not all(isinstance(p, dict) for p in picks):
+            raise HTTPException(400, "picks: a list of {index, id}")
+        known = {c["id"] for c in rep["covers"]}
+        chosen: dict[str, Any] = plain(lambda: pim.choose(rep, exclude, picks, known))
+        if not chosen:
+            raise HTTPException(400, "no prices chosen; nothing was put in the draft")
+        out = import_draft(auth, rep, chosen, rep["file"], admin.username)
+        return {**out, "prices": chosen}

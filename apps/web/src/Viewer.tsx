@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { UnfoldView, type FrameHook } from "./Unfold";
+import { MeasureTool, VentSizes } from "./Measure";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -105,13 +106,22 @@ function ventGroup(vents: Vent[]): THREE.Group {
 // Dimensions (the owner, 7 Oct 2026): the cover's overall length, depth and height drawn on
 // the 3D view, in cm, to compare with the drawing (not only the pieces' sizes).
 const DIMS_KEY = "viewer.dims";
-const dimsSaved = () => {
+const VENT_SIZES_KEY = "viewer.ventSizes"; // the vents' sizes and places (ADR-111)
+const saved = (key: string) => {
   try {
-    return localStorage.getItem(DIMS_KEY) === "1";
+    return localStorage.getItem(key) === "1";
   } catch {
     return false;
   }
 };
+const remember = (key: string, on: boolean) => {
+  try {
+    localStorage.setItem(key, on ? "1" : "0");
+  } catch {
+    /* a private window: not remembered */
+  }
+};
+const dimsSaved = () => saved(DIMS_KEY);
 
 function label(text: string, size: number): THREE.Sprite {
   const c = document.createElement("canvas");
@@ -228,6 +238,10 @@ export function Viewer({
   const [showVents, setShowVents] = useState(ventsSaved);
   const [showDims, setShowDims] = useState(dimsSaved);
   const [unfolding, setUnfolding] = useState(false);
+  const [measuring, setMeasuring] = useState(false);
+  const [ventSizes, setVentSizes] = useState(() => saved(VENT_SIZES_KEY));
+  const [ready, setReady] = useState(0); // the scene exists (counts every new scene)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [glError, setGlError] = useState("");
   const frameHooks = useRef<FrameHook[]>([]);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -296,6 +310,20 @@ export function Viewer({
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(el.clientWidth, el.clientHeight);
     el.appendChild(renderer.domElement);
+    canvasRef.current = renderer.domElement;
+    // for the browser checks (e2e/measure.py): where an engine point (mm, Z up) is on screen
+    (
+      renderer.domElement as HTMLCanvasElement & {
+        coverToScreen?: (p: number[]) => number[];
+      }
+    ).coverToScreen = (p: number[]) => {
+      const q = toScene(p).project(camera);
+      const r = renderer.domElement.getBoundingClientRect();
+      return [
+        r.left + ((q.x + 1) / 2) * r.width,
+        r.top + ((1 - q.y) / 2) * r.height,
+      ];
+    };
     scene.add(new THREE.HemisphereLight("#fffdf6", "#85886f", 1.6)); // warm light, sage ground
     const sun = new THREE.DirectionalLight("#ffffff", 1.4);
     sun.position.set(2, 4, 3);
@@ -306,6 +334,7 @@ export function Viewer({
     controls.enableDamping = true;
     cameraRef.current = camera;
     controlsRef.current = controls;
+    setReady((n) => n + 1);
     const loader = new GLTFLoader();
     const box = new THREE.Box3();
     let framed = false;
@@ -333,6 +362,9 @@ export function Viewer({
         groups.current[layer.file] = root;
         root.visible = !!shownRef.current[layer.file];
         scene.add(root);
+        // how many layers are in (the browser checks wait for the cover)
+        const c = renderer.domElement.dataset;
+        c.loaded = String(Number(c.loaded ?? 0) + 1);
         if (!framed) {
           box.setFromObject(root);
           const size = box.getSize(new THREE.Vector3()).length();
@@ -408,6 +440,7 @@ export function Viewer({
       alive = false;
       rainAnim.current = null;
       sceneRef.current = null;
+      canvasRef.current = null;
       window.removeEventListener("resize", onResize);
       renderer.setAnimationLoop(null);
       renderer.dispose();
@@ -668,6 +701,24 @@ export function Viewer({
             Show air vents
           </label>
         )}
+        {files.includes("vents.json") && (
+          <label title="Each air vent's opening, its bottom edge above the hem and the distance to the seam or corner on each side, as in the cutting file: to check a sewn cover">
+            <input
+              type="checkbox"
+              data-testid="vent-sizes-toggle"
+              checked={ventSizes}
+              onChange={(e) => {
+                setVentSizes(e.target.checked);
+                remember(VENT_SIZES_KEY, e.target.checked);
+                if (e.target.checked && !showVents) {
+                  setShowVents(true);
+                  remember(VENTS_KEY, true);
+                }
+              }}
+            />
+            Vent sizes
+          </label>
+        )}
         <label title="The cover's overall length, depth and height in cm, to compare with the drawing">
           <input
             type="checkbox"
@@ -686,6 +737,27 @@ export function Viewer({
         <span className="muted">
           Drag to turn, scroll to zoom, right-drag to move.
         </span>
+        {files.includes("panels.glb") && (
+          <span className="rain-buttons">
+            <button
+              className={measuring ? "primary" : ""}
+              data-testid="measure-toggle"
+              title="Click two points on the cover: the straight distance, the height difference and the distance along the fabric, in cm"
+              onClick={() => setMeasuring(!measuring)}
+            >
+              {measuring ? "Stop measuring" : "Measure"}
+            </button>
+            {files.includes("checklist.pdf") && (
+              <a
+                href={fileUrl(id, "checklist.pdf")}
+                data-testid="checklist-link"
+                title="One sheet for the workshop: the sides of the cover with its vents, and every size to measure on the sewn cover"
+              >
+                Check list (PDF)
+              </a>
+            )}
+          </span>
+        )}
         {files.includes("finished.json") && files.includes("panels.glb") && (
           <span className="rain-buttons">
             <button
@@ -768,6 +840,38 @@ export function Viewer({
           </p>
         )}
       </div>
+      {measuring &&
+        ready > 0 &&
+        sceneRef.current &&
+        cameraRef.current &&
+        canvasRef.current && (
+          <MeasureTool
+            key={`${id}-${stamp}-${ready}`}
+            id={id}
+            stamp={stamp}
+            scene={sceneRef.current}
+            camera={cameraRef.current}
+            canvas={canvasRef.current}
+            pickables={() =>
+              Object.values(groups.current).filter((o) => o.visible)
+            }
+          />
+        )}
+      {ventSizes &&
+        showVents &&
+        files.includes("vents.json") &&
+        ready > 0 &&
+        sceneRef.current &&
+        cameraRef.current && (
+          <VentSizes
+            key={`${id}-${stamp}-${ready}`}
+            id={id}
+            stamp={stamp}
+            scene={sceneRef.current}
+            camera={cameraRef.current}
+            frameHooks={frameHooks}
+          />
+        )}
       {unfolding && (
         <UnfoldView
           id={id}

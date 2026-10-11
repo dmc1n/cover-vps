@@ -52,6 +52,22 @@ def test_place_snap_and_build_one_cover(app: Any) -> None:
     one = c.get("/api/arrangements/arr-two-boxes").json()
     assert one["members"][1]["model_id"] == "box-b"
     assert one["footprint"] == "follow"  # the plan it was built with, stored
+    # to the Desk, approved there; a change of plan reopens the approval (ADR-115)
+    assert one["desk"]["status"] == "new" and one["desk"]["dxf_ok"] is False
+    sent = c.post("/api/arrangements/arr-two-boxes/send").json()["desk"]
+    assert sent["status"] == "ai-checked" and sent["sent"]["by"] == "Local user"
+    assert c.post("/api/desk/arr-two-boxes", json={"action": "approve"}).status_code == 200
+    assert c.get("/api/models/arr-two-boxes/files/cut.dxf").status_code == 200
+    again = {"name": "Two boxes", "model_id": "arr-two-boxes", "members": [members[0], snapped],
+             "footprint": "box"}  # fmt: skip
+    r = c.post("/api/arrangements", json=again)
+    assert r.status_code == 200, r.text
+    assert r.json()["desk"]["status"] == "ai-checked"
+    assert r.json()["desk"]["last"]["action"] == "changed after approval"
+    assert "plan follow → box" in r.json()["desk"]["last"]["text"]
+    assert c.get("/api/models/arr-two-boxes/files/cut.dxf").status_code == 403
+    job = app.state.jobs.wait(r.json()["job"]["id"], 900)
+    assert job["status"] == "done", job
 
 
 def test_wrong_requests_are_refused(app: Any) -> None:

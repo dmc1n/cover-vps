@@ -172,12 +172,11 @@ features:                        # per-cover defaults, overridden per model
   vents_total: 0                 # the number of vents written on the drawing ("4 Air Pocket"); it
                                  # always wins over the rule above (owner, 5 Oct 2026); 0 = rule.
                                  # Spread over the sides by their length.
-  vent_inner_mm: 300             # never an air vent on an inner wall (owner, 7 Oct 2026: only on
-                                 # the outside): a skirt piece whose middle lies this far inside
+  vent_inner_mm: 300             # an inner wall: a skirt piece whose middle lies this far inside
                                  # the footprint's convex hull (an L/U/C shape's open corner)
-  vent_inner_walls: false        # to confirm (ADR-101): true puts vents on the front (inner) walls of
-                                 # an L, U or C too, as Rens marked on 30 covers (8 Oct 2026);
-                                 # false keeps the owner's rule of 7 Oct (ADR-093)
+  vent_inner_walls: true         # owner, 9 Oct 2026 (QUESTIONS 71, ADR-110): vents go on the front
+                                 # (inner) walls of an L, U or C too, as Rens marked (8 Oct 2026);
+                                 # false skips them (the old reading of 7 Oct, ADR-093)
   vent_wall_angle_deg: 45        # pieces facing within this angle of each other face the same side:
                                  # the vents go round all sides first, longest piece first (ADR-101)
   vent_align: bottom             # bottom | middle | top   where on the skirt: bottom edge
@@ -357,17 +356,28 @@ drawn:
 
 
 desk:                            # the drawing desk: people approve covers, AI only sorts (ADR-079)
-  approvers: "rens,rick,wouter"  # who may approve, reject and mark produced (owner, 6 Oct 2026);
-                                 # matched on user name or first name; admins always may
+  approvers: "rens,rick,wouter,wout"  # who may approve, reject, mark produced (owner, 6 Oct 2026);
+                                 # matched on user name or first name; admins always may; "wout": Wout
+                                 # logs in as wout, so he gets the approvers' digest too (ADR-115)
   require_approval_for_dxf: true # the cutting table's DXF only once a cover is approved (owner)
   gate_scope: drawings           # drawings: only drawing-* covers need approval for the DXF; all: every
                                  # model (to confirm: the 314 SUNS models are all still "draft")
+  gate_arrangements: true        # an arrangement's (arr-*) DXF only once approved at the Desk, whatever
+                                 # gate_scope says (owner, 9 Oct 2026: Rens or Wout approve them; ADR-115)
   learn_after: 5                 # the same correction on this many covers of a group is proposed
                                  # as the group's rule; a person accepts it (ADR-082)
   picture_max_mb: 15             # a picture attached at the Desk (snapshot, photo, screenshot) may be
                                  # at most this large as uploaded (ADR-096)
   pictures_max: 8                # at most this many pictures on one reject, comment or correction
   picture_max_side_px: 2400      # a larger picture is scaled down to this longest side when kept
+
+questions:                       # questions for the owner and the workshop, answered at the Desk (ADR-109)
+  owners: "rick"                 # who marks an answer final and a question processed (owner, 9 Oct 2026);
+                                 # matched on user name or first name. Who answers: desk.approvers by default
+  digest_hours: 24               # new questions mailed to whoever may answer: at most one digest per this
+                                 # many hours (0: no mails)
+  answer_digest_hours: 8         # new answers mailed to the owners: at most one digest per this many hours
+                                 # (0: no mails); never a mail per click
 
 products:                        # the workshop's product list linked to the drawing covers (ADR-091)
   max_bytes: 52428800            # an uploaded list, or a zip unpacked, at most this large (50 MB)
@@ -472,6 +482,9 @@ suggest:                         # "start from a photo or a link" in the configu
   reverse_search: true           # a real search by image (Google Cloud Vision web detection, as Google Lens):
                                  # on since 7 Oct 2026 (owner gave the key, GOOGLE_VISION_API_KEY; QUESTIONS 68)
   reverse_eur: 0.0033            # to confirm: its fee per photo ($3.50 per 1000 after the first 1000 a month)
+  reverse_max: 50                # results of each kind asked from the search by image (same fee): Google lists
+                                 # the pages about its label first, the pages showing the photo after them;
+                                 # with 5 only the label's pages came back (ADR-112)
 
 match:                           # the customer's sizes against the covers we already make (ADR-064)
   tight_cm: 1.25                 # to confirm (Q57): an existing cover may be this much smaller and still count as exact
@@ -482,3 +495,5 @@ match:                           # the customer's sizes against the covers we al
   threshold_pct: 90              # from this match on we offer the existing cover (the owner, 2026-10-05)
   choice_pct: 80                 # from this on the customer chooses: existing or custom; below: custom
   mode: shadow                   # shadow: a colleague confirms every proposal first; auto: above the threshold directly
+  drawing_statuses: "approved,produced"  # drawing covers with this Desk status are offered as existing covers (owner, 2026-10-09, ADR-114)
+  drawing_size_tol_cm: 3.2       # a drawing cover's sizes and the price list's agree within this (else: doubtful, ADR-114)

@@ -501,6 +501,15 @@ def accessory_price(ps: dict[str, Any], code: str, channel: str) -> dict[str, fl
     return _price(cost, cost, ps["channels"][channel], code)
 
 
+def fixed_price(ps: dict[str, Any], key: str, channel: str) -> dict[str, float] | None:
+    """A product's fixed price in a channel (incl. and ex VAT), or None when it has none. The
+    margin in it means nothing: no cost is known here."""
+    ch = ps["channels"][channel]
+    if not (ch.get("fixed") or {}).get(key):
+        return None
+    return _price(0.0, 0.0, ch, key)
+
+
 def _price(cost: float, landed: float, ch: dict[str, Any], key: str | None) -> dict[str, float]:
     base = landed if ch.get("base", "landed") == "landed" else cost
     pct = float(ch["pct"]) / PERCENT
@@ -508,7 +517,9 @@ def _price(cost: float, landed: float, ch: dict[str, Any], key: str | None) -> d
     vat = float(ch["vat_pct"]) / PERCENT
     fixed = (ch.get("fixed") or {}).get(key) if key else None
     shown = float(fixed) if fixed else (net * (1 + vat) if ch["show_vat"] else net)
-    shown = round_price(shown, str(ch["rounding"])) if not fixed else round(shown, CENTS)
+    # a fixed price is not rounded before VAT: one stored ex VAT with more decimals (an imported
+    # list incl. VAT, ADR-113) gives back the list's price incl. VAT to the cent
+    shown = round_price(shown, str(ch["rounding"])) if not fixed else shown
     if ch["show_vat"]:
         gross, net = shown, shown / (1 + vat)
     else:

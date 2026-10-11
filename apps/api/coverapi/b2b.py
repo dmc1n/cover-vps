@@ -48,6 +48,7 @@ from coverapi.auth import (
     hash_password,
     password_problem,
 )
+from coverapi.match_list import STOCK_MODEL
 
 SETTING = "b2b"
 DEFAULTS: dict[str, Any] = {
@@ -208,7 +209,7 @@ class QuoteIn(BaseModel):
     colour: str | None = Field(default=None, max_length=40)
     vents: bool = True
     support: str = Field(default="none", pattern=r"^(none|balloons|frame)$")
-    stock_model: str | None = Field(default=None, pattern=r"^suns-[a-z0-9-]{1,120}$")
+    stock_model: str | None = Field(default=None, pattern=STOCK_MODEL)  # SUNS or drawing (ADR-114)
     rain: bool = True  # the rain check (the catalogue's tested covers skip it)
 
 
@@ -692,7 +693,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
     from coverengine import quote as q
     from coverengine.errors import CoverError
 
-    from coverapi import mailer, prices
+    from coverapi import mailer, match_list, prices
     from coverapi.security import SESSION_COOKIE, _address, _https, require
     from coverapi.shop import SHOP_DEFAULTS, SHOP_SETTING, link_ok, merged, shop_params, shop_root
 
@@ -924,7 +925,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         channel = channel_of(ps, company)
         products = set(q.options(shop_params(auth))["products"])
         items = []
-        for c in mt.cards(store.models):
+        for c in mt.cards(store.models, None, match_list.for_data(data)):
             if c["kind"] not in products:
                 continue
             fixed = company["fixed"].get(c["model_id"]) or _list_fixed(ps, channel, c["model_id"])
@@ -948,7 +949,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         stock = None
         sizes = req.sizes
         if req.stock_model:
-            stock = mt.card(store.models / req.stock_model)
+            stock = mt.card(store.models / req.stock_model, None, match_list.for_data(data), p)
             if stock is None or stock["kind"] != req.product:
                 raise HTTPException(400, "this cover is not in our range for this furniture")
             sizes = {**req.sizes, **mt.fields_for(req.product, stock["size_cm"])}
