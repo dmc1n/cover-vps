@@ -481,6 +481,8 @@ suggest:                         # "start from a photo or a link" in the configu
   search_query_eur: 0.013        # to confirm on the bill: Google's grounding fee per search query the
                                  # model runs (Gemini 3: $14 per 1000 queries), for the budget
   thinking: low                  # how long Gemini thinks in the photo steps (low: about 3x faster)
+  final_model: gemini-3.8-flash   # final configurator sizing, independently of drawing reading
+  final_thinking: low            # reasoning effort for final sizing (avoids Gemini's medium default)
   queries: 5                     # the photo is first identified (brand, model, features); the search by its
                                  # look gets this many queries, and a recognised brand a search of its own (ADR-092)
   compare_px: 512                # each found product's picture is made this small to hold it against
