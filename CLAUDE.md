@@ -241,6 +241,7 @@ COVER_DATA_DIR=~/cover-data uv run python scripts/questions.py new|ack|done ID "
 apps/web/e2e/questions.py                   the Questions tab in a real browser, Edge with office policies (ADR-109)
 apps/web/e2e/b2c.py                         the public consumer shop, desktop and 390 px, through the Worker (ADR-103)
 apps/web/e2e/suggest_layout.py              the configurator's photo/link box in Chromium, WebKit, Firefox at 4 widths (ADR-112)
+apps/web/e2e/stock_order.py                 an existing cover ordered directly: card, price, delivery promise, checkout (ADR-118)
 Admin → Photo test                          a photo suggestion step by step: image search, identification, searches, scores (ADR-112)
 
 node apps/web/e2e/site_serve.mjs [--port N]  this build of the website locally, data from the preview (ADR-106)
