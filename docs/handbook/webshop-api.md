@@ -10,7 +10,7 @@ the pieces, the fabric and a price. A webshop offers this in one of two ways.
         style="width:100%;height:950px;border:0" title="Design your cover"></iframe>
 ```
 
-First add the webshop's address on the admin page (Admin → Webshop → *Configurator in the
+First add the webshop's address on the admin page (Settings → Website & API keys → *Configurator in the
 webshop*), for example `https://hello-suns.com`. Without that the browser refuses to show it.
 Customers' requests appear on the same page and are mailed to the address set there.
 
@@ -51,7 +51,7 @@ reached through this API.
 
 ## Prices
 
-The price comes from the price set published on Admin → **Prices & costing** (ADR-098,
+The price comes from the price set published on **Prices** (ADR-098,
 docs/handbook/prices.md): materials, labour, the exchange rate and the B2C price list. Before
 anything is published, the documented defaults `quote.*` in `config/defaults.yaml` are used.
 Until the owner switches "indicative" off and publishes, the price is shown as indicative.

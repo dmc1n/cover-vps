@@ -200,7 +200,7 @@ def test_digests_not_a_mail_per_click(app: Any) -> None:
     Q.question_mails(auth, params, "https://studio", send)
     to = sorted(m[0] for m in mails)
     assert to == ["rens@example.com", "rick@example.com", "wouter@example.com"]  # one each
-    assert "/#/questions/" in mails[0][2] and "Tweede vraag" in mails[0][2]
+    assert "/#/work/questions/" in mails[0][2] and "Tweede vraag" in mails[0][2]
     mails.clear()
     _add(app, title="Derde")
     login(app, "rens").post(f"/api/questions/{q1}/answer", json={"choice": 0})

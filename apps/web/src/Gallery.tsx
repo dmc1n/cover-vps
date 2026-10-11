@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, fileUrl, ModelBrief } from "./api";
+import { modelHref } from "./nav";
 
 // The catalogue: every product with its photo and a picture of its cover, the key numbers and
 // how far the cover is. A click opens the model.
@@ -23,25 +24,38 @@ export function Gallery() {
   useEffect(() => {
     api.models().then(setModels);
   }, []);
-  const tags = useMemo(() => [...new Set((models ?? []).flatMap((m) => m.tags))].sort(), [models]);
+  const tags = useMemo(
+    () => [...new Set((models ?? []).flatMap((m) => m.tags))].sort(),
+    [models],
+  );
   const cats = useMemo(
-    () => [...new Set((models ?? []).map((m) => m.category).filter(Boolean))].sort() as string[],
+    () =>
+      [
+        ...new Set((models ?? []).map((m) => m.category).filter(Boolean)),
+      ].sort() as string[],
     [models],
   );
   const shown = useMemo(() => {
     const f = q.toLowerCase();
     const list = (models ?? []).filter(
       (m) =>
-        (!f || m.id.includes(f.replace(/\s+/g, "-")) || m.notes.toLowerCase().includes(f)) &&
+        (!f ||
+          m.id.includes(f.replace(/\s+/g, "-")) ||
+          m.notes.toLowerCase().includes(f)) &&
         (!grade || m.grade === grade) &&
         (!family ||
-          (family === "-" ? !m.category : m.category === family || (m.category ?? "").startsWith(`${family} ›`))) &&
+          (family === "-"
+            ? !m.category
+            : m.category === family ||
+              (m.category ?? "").startsWith(`${family} ›`))) &&
         (!tag || m.tags.includes(tag)),
     );
-    const vol = (m: ModelBrief) => (m.size_mm ? m.size_mm[0] * m.size_mm[1] * m.size_mm[2] : 0);
+    const vol = (m: ModelBrief) =>
+      m.size_mm ? m.size_mm[0] * m.size_mm[1] * m.size_mm[2] : 0;
     list.sort((a, b) =>
       sort === "grade"
-        ? GRADE_ORDER[a.grade] - GRADE_ORDER[b.grade] || a.id.localeCompare(b.id)
+        ? GRADE_ORDER[a.grade] - GRADE_ORDER[b.grade] ||
+          a.id.localeCompare(b.id)
         : sort === "stretch"
           ? (a.max_stretch_pct ?? 999) - (b.max_stretch_pct ?? 999)
           : sort === "size"
@@ -57,11 +71,17 @@ export function Gallery() {
       <h2>
         Catalogue{" "}
         <span className="muted">
-          {models.length} products · {count("ready")} ready · {count("check")} to check · {count("failed")} failed
+          {models.length} products · {count("ready")} ready · {count("check")}{" "}
+          to check · {count("failed")} failed
         </span>
       </h2>
       <div className="row">
-        <input className="search" placeholder="Search products…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input
+          className="search"
+          placeholder="Search products…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         <select value={grade} onChange={(e) => setGrade(e.target.value)}>
           <option value="">every cover</option>
           <option value="ready">ready</option>
@@ -100,29 +120,54 @@ export function Gallery() {
       </div>
       <div className="gallery">
         {shown.map((m) => (
-          <a key={m.id} className="product" href={`#/model/${m.id}`} title={m.reasons.join("\n")}>
+          <a
+            key={m.id}
+            className="product"
+            href={modelHref(m.id)}
+            title={m.reasons.join("\n")}
+          >
             <div className="pics">
               {m.files.includes("product.jpg") ? (
-                <img loading="lazy" src={fileUrl(m.id, "product.jpg")} alt="product" />
+                <img
+                  loading="lazy"
+                  src={fileUrl(m.id, "product.jpg")}
+                  alt="product"
+                />
               ) : (
                 <div className="nopic">no photo</div>
               )}
               {m.files.includes("cover.png") ? (
-                <img loading="lazy" src={fileUrl(m.id, "cover.png")} alt="cover" />
+                <img
+                  loading="lazy"
+                  src={fileUrl(m.id, "cover.png")}
+                  alt="cover"
+                />
               ) : (
                 <div className="nopic">no cover yet</div>
               )}
             </div>
             <div className="name">{title(m.id)}</div>
             <div className="facts">
-              <span className={`badge grade-${m.grade}`}>{m.grade === "check" ? "to check" : m.grade}</span>
-              {m.category && <span className="badge">{m.category.split(" › ")[1]}</span>}
-              {m.size_mm && <span>{m.size_mm.map((v) => Math.round(v / 10)).join("×")} cm</span>}
+              <span className={`badge grade-${m.grade}`}>
+                {m.grade === "check" ? "to check" : m.grade}
+              </span>
+              {m.category && (
+                <span className="badge">{m.category.split(" › ")[1]}</span>
+              )}
+              {m.size_mm && (
+                <span>
+                  {m.size_mm.map((v) => Math.round(v / 10)).join("×")} cm
+                </span>
+              )}
               {m.panels != null && <span>{m.panels} panels</span>}
               {m.max_stretch_pct != null && (
-                <span className={m.max_stretch_pct > 2 ? "bad" : "ok"}>{m.max_stretch_pct.toFixed(1)} %</span>
+                <span className={m.max_stretch_pct > 2 ? "bad" : "ok"}>
+                  {m.max_stretch_pct.toFixed(1)} %
+                </span>
               )}
-              {m.roll_length_mm ? <span>{(m.roll_length_mm / 1000).toFixed(1)} m fabric</span> : null}
+              {m.roll_length_mm ? (
+                <span>{(m.roll_length_mm / 1000).toFixed(1)} m fabric</span>
+              ) : null}
             </div>
           </a>
         ))}

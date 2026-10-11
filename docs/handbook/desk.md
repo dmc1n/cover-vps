@@ -1,6 +1,6 @@
 # The Desk: approve the drawing covers
 
-**Desk** in the top bar. The AI sorts, people decide (ADR-079).
+**Work → Desk** (the start page of an approver; see [navigation.md](navigation.md)). The AI sorts, people decide (ADR-079).
 
 - **The queue** puts first what needs a person:
   1. covers where Gemini and DeepSeek disagree;

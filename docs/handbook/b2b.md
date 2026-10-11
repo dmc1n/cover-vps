@@ -9,7 +9,7 @@ payment. Decision: ADR-104.
 
 ## A new business customer
 
-1. Admin → **B2B customers** → *Invite a company*: company, VAT number, contact, the e-mail
+1. Shop → **B2B customers** → *Invite a company*: company, VAT number, contact, the e-mail
    address that logs in, the invoice address, the price list (Business by default) and the
    language of the mails. *Invite*.
 2. The contact gets a mail with a link (valid 7 days) to choose a password (at least 12
@@ -39,7 +39,7 @@ Click a company in the list:
 
 ## Orders
 
-Every line of a B2B order appears under Admin → **Orders** with a green **B2B n · PO …** mark,
+Every line of a B2B order appears under Shop → **Orders** with a green **B2B n · PO …** mark,
 its quantity and its price ex VAT, status *on_account*. It goes into production at once, the
 same way as a paid consumer order (a made-to-measure cover becomes `order-<n>`, a catalogue
 cover is cut from its own pattern). The buyer, the company's e-mail and the alert address get a
@@ -59,7 +59,7 @@ B2B logins are not studio users: a business customer can never open Cover Studio
 colleague's studio login does not open the B2B shop. Passwords are stored as hashes; 5 wrong
 passwords lock that person for 15 minutes (10 from one address lock that address). A forgotten
 password: *Forgot your password?* on the login page mails a link valid for 2 hours. Every
-login, failure, order and change is in Admin → **Audit log** as `b2b:<e-mail>`.
+login, failure, order and change is in Settings → **Logins & audit log** as `b2b:<e-mail>`.
 
 ## Languages
 

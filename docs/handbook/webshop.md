@@ -18,7 +18,7 @@ An address the shop does not know shows "this page does not exist" (a real 404).
 
 ## Barbecues (ADR-119)
 
-**Off on the live shop until you set their prices:** Admin → **Shop settings** →
+**Off on the live shop until you set their prices:** Settings → **Company & shop** →
 `bbq_enabled`. While it is off, the shop, B2B and the public API show no barbecues; the preview
 site (preview.<domain>) always shows them, so you can try them there.
 
@@ -43,11 +43,11 @@ catalogue. The products, their fields and ranges are in `config/quote_products.j
 Each legal page shows a draft that starts with a red **CONCEPT — TER GOEDKEURING** line, in
 Dutch and English (German and French visitors see the English one until it is translated).
 
-1. Fill in the company details: Admin → **Shop settings** → company (name, legal name, street,
+1. Fill in the company details: Settings → **Company & shop** → The company (name, legal name, street,
    postcode, city, KvK, VAT number, e-mail, phone). They appear in the texts at once; anything
    still empty shows as "[nog in te vullen: …]".
 2. Have the texts read. The drafts are in `config/shop_legal.json`.
-3. Publish your own text: Admin → **Website (AI)**, for example "zet als algemene voorwaarden
+3. Publish your own text: Shop → **Website (AI)**, for example "zet als algemene voorwaarden
    (legal.terms.nl) deze tekst: …", check the preview, **Publish**. From then on that page
    shows your text and the draft is gone. A line starting with `## ` is a heading, `- ` a list
    item, an empty line a new paragraph.
@@ -58,7 +58,7 @@ which applies.
 
 ## Prices
 
-The prices are the **B2C** list of the published price set (Admin → **Prices & costing**,
+The prices are the **B2C** list of the published price set (**Prices**,
 docs/handbook/prices.md), incl. VAT. While that set is marked **indicative**, the configurator
 and the checkout say so plainly ("Indicatieve prijs — … je betaalt pas na bevestiging").
 Publish a set with *indicative* off when the prices are final; the note disappears.

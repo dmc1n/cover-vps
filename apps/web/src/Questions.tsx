@@ -7,6 +7,7 @@
 // Keys: j / k next / previous question, 1–5 choose an option, 0 "anders", Ctrl+Enter send.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PictureTray, uploadPictures, type Pending } from "./DeskPictures";
+import { deskHref, questionHref } from "./nav";
 import "./desk.css";
 
 interface ModelRef {
@@ -96,51 +97,6 @@ const isTyping = (t: EventTarget | null) => {
   );
 };
 
-/** "Covers | Questions (n)" at the top of the Desk; the badge counts the open questions. */
-export function DeskTabs({ active }: { active: "covers" | "questions" }) {
-  const [n, setN] = useState<{ open: number; for_you: number } | null>(null);
-  useEffect(() => {
-    let live = true;
-    const load = () =>
-      call<{ open: number; for_you: number }>("/api/questions/count")
-        .then((c) => live && setN(c))
-        .catch(() => undefined);
-    load();
-    window.addEventListener("questions-changed", load);
-    return () => {
-      live = false;
-      window.removeEventListener("questions-changed", load);
-    };
-  }, []);
-  return (
-    <nav className="d-tabs" aria-label="Desk">
-      <a
-        href="#/desk"
-        className={active === "covers" ? "on" : ""}
-        aria-current={active === "covers" ? "page" : undefined}
-      >
-        Covers
-      </a>
-      <a
-        href="#/questions"
-        className={active === "questions" ? "on" : ""}
-        aria-current={active === "questions" ? "page" : undefined}
-      >
-        Questions
-        {n && n.open > 0 && (
-          <span
-            className={`d-badge ${n.for_you ? "mine" : ""}`}
-            title={`${n.open} open, ${n.for_you} waiting for your answer`}
-            aria-label={`${n.open} open questions`}
-          >
-            {n.open}
-          </span>
-        )}
-      </a>
-    </nav>
-  );
-}
-
 export function Questions({ selected }: { selected: number | null }) {
   const [list, setList] = useState<Listing | null>(null);
   const [err, setErr] = useState("");
@@ -172,7 +128,7 @@ export function Questions({ selected }: { selected: number | null }) {
     });
   }, [list, status, topic, search]);
   const current = list?.items.find((q) => q.id === selected) ?? null;
-  const open = (id: number) => (window.location.hash = `#/questions/${id}`);
+  const open = (id: number) => (window.location.hash = questionHref(id));
   const idx = items.findIndex((q) => q.id === selected);
   // one column (a tablet): a chosen question comes into view below the list
   useEffect(() => {
@@ -217,21 +173,18 @@ export function Questions({ selected }: { selected: number | null }) {
   if (err)
     return (
       <div className="desk">
-        <DeskTabs active="questions" />
         <p className="d-err">{err}</p>
       </div>
     );
   if (!list)
     return (
       <div className="desk">
-        <DeskTabs active="questions" />
         <p className="d-muted">Loading the questions…</p>
       </div>
     );
   const c = list.counts;
   return (
     <div className="desk">
-      <DeskTabs active="questions" />
       <section className="d-top">
         <div className="d-title">
           <h1>Questions</h1>
@@ -299,7 +252,7 @@ export function Questions({ selected }: { selected: number | null }) {
               >
                 <a
                   className="q-row"
-                  href={`#/questions/${q.id}`}
+                  href={questionHref(q.id)}
                   aria-current={q.id === selected ? "true" : undefined}
                 >
                   <span className="d-row-top">
@@ -540,10 +493,7 @@ function QuestionCard({
             <ul className="q-covers">
               {q.models.map((m) => (
                 <li key={m.id}>
-                  <a
-                    href={`#/desk/${m.id}`}
-                    title={`Open ${m.code} on the Desk`}
-                  >
+                  <a href={deskHref(m.id)} title={`Open ${m.code} on the Desk`}>
                     {m.picture ? (
                       <img
                         src={`/api/models/${encodeURIComponent(m.id)}/files/cover.png`}

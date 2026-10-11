@@ -235,16 +235,6 @@ export function UserMenu({
 }) {
   return (
     <span className="user">
-      {user.role === "admin" && (
-        <a href="#/admin" className="nav">
-          Admin
-        </a>
-      )}
-      {user.role === "editor" && (
-        <a href="#/website" className="nav">
-          Website
-        </a>
-      )}
       <a
         href="#/account"
         className="nav"

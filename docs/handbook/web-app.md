@@ -17,10 +17,10 @@ and leave that window open. Then go to **http://localhost:8080** in the browser.
 
 ## What is where
 
-- **Catalogue** (top bar): every product as a card with its photo, a 3D picture of its cover,
+- **Covers → All covers → Cards** (was Catalogue; the map of the studio: [navigation.md](navigation.md)): every product as a card with its photo, a 3D picture of its cover,
   the grade, size, number of pieces, worst stretch and fabric. Search, filter by grade, family
   and tag, sort. Click a card to open the product.
-- **Arrangements** (top bar): put catalogue products together (a sofa with a chaise longue)
+- **Covers → Arrangements**: put catalogue products together (a sofa with a chaise longue)
   and build one cover over the whole. See [arrangements.md](arrangements.md).
 
 - **Models:** all models with how far the cover is (**ready**: every piece within the stretch

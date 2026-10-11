@@ -115,10 +115,10 @@ async def as_rens(browser: Browser, name: str, size: tuple[int, ...]) -> list[st
         ),
     )
 
-    # the Desk's tabs, the badge on Questions
-    await page.goto(f"{URL}/#/desk")
-    tabs = page.get_by_role("navigation", name="Desk")
-    badge = tabs.locator(".d-badge")
+    # Work's sub-menu (Desk · Questions, ADR-122), the count on Questions
+    await page.goto(f"{URL}/#/work/desk")
+    tabs = page.get_by_role("navigation", name="Work")
+    badge = tabs.locator(".nav-count")
     await expect(badge).to_be_visible()
     open_n = int(await badge.inner_text())
     assert open_n > 0, f"{tag}: badge {open_n}"
@@ -141,7 +141,9 @@ async def as_rens(browser: Browser, name: str, size: tuple[int, ...]) -> list[st
     await pick(page)
     card = page.locator(".q-card")
     await expect(card.get_by_role("heading", level=2)).to_contain_text(QUESTION)
-    await expect(card.locator(".q-covers a").first).to_have_attribute("href", "#/desk/drawing-s45")
+    await expect(card.locator(".q-covers a").first).to_have_attribute(
+        "href", "#/work/desk/drawing-s45"
+    )
     await expect(card.locator(".q-answers li", has_text="Wouter")).to_be_visible()
     await page.screenshot(path=f"{SHOTS}/{tag}-3-question.png", full_page=True)
 
@@ -197,14 +199,14 @@ async def as_rens(browser: Browser, name: str, size: tuple[int, ...]) -> list[st
 
 async def as_vic_and_rick(browser: Browser, name: str) -> None:
     ctx, page = await login(browser, "vic", (1440, 900))
-    await page.goto(f"{URL}/#/questions")
+    await page.goto(f"{URL}/#/work/questions")
     await pick(page)
     await expect(page.locator(".q-card .q-answers")).to_be_visible()
     assert await page.locator(".q-form").count() == 0, "a viewer sees an answer form"
     await ctx.close()
 
     ctx, page = await login(browser, "rick", (1440, 900))
-    await page.goto(f"{URL}/#/questions")
+    await page.goto(f"{URL}/#/work/questions")
     await pick(page)
     card = page.locator(".q-card")
     rens = card.locator(".q-answers li", has_text="Rens")

@@ -1,6 +1,6 @@
 # Prices and costing
 
-Admin → **Prices & costing** (colleagues with the editor role: **Prices** in the top bar, to
+**Prices** in the top bar, its tabs in the sub-menu (colleagues with the editor role: the same, to
 look only). Every price the shop, the configurator and each costing use is set here (ADR-098).
 
 ## How a price is made
@@ -76,7 +76,7 @@ publish. Only admins can change prices; every publish is in the audit log.
 Heb je een prijslijst in Excel, bijvoorbeeld consumentenprijzen incl. BTW? Dan zet de studio
 die in één keer als **vaste prijzen** voor onze hoezen (ADR-113). Alleen admins.
 
-1. Ga naar **Admin → Prices & costing → Channels & price lists**. Bovenaan staat
+1. Ga naar **Prices → Import (Excel)** (een eigen tab sinds ADR-122). Bovenaan staat
    **Import prices (Excel)**. Kies de prijslijst (**B2C** = webshop, standaard; of **B2B**) en
    klik **Upload price list (Excel)**. Een .xlsx, een .csv of een .zip met zulke bestanden.
 2. **Kijk wat er gevonden is.** De studio zoekt zelf de prijskolom (bedragen als

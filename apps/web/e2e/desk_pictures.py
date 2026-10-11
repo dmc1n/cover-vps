@@ -127,7 +127,7 @@ async def one(browser: Browser, name: str, width: int, model: str) -> list[str]:
     await page.get_by_label("Password").fill(PASSWORD)
     await page.get_by_role("button", name="Log in").click()
     await expect(page.get_by_role("button", name="Log out")).to_be_visible()
-    await page.goto(f"{URL}/#/desk/{model}")
+    await page.goto(f"{URL}/#/work/desk/{model}")  # the card opens on Check
     actions = page.locator(".d-actions")
     # the 3D view, or (no WebGL, as Firefox in this container) its message: the card stays
     await expect(
@@ -164,14 +164,14 @@ async def one(browser: Browser, name: str, width: int, model: str) -> list[str]:
     await reject.locator("textarea").fill(f"browser check {tag}")
     await page.screenshot(path=f"{SHOTS}/{tag}-3-ready.png")
     await reject.get_by_role("button", name="Reject", exact=True).click()
-    await expect(page.locator(".d-msg")).to_have_text("Rejected")
+    await expect(page.locator(".d-msg")).to_contain_text("Rejected")
     uploads = [p for p in posts if p[0].endswith("/pictures")]
     assert uploads, f"{tag}: no POST .../pictures"
     act = [b for u, b in posts if u == model and b and b.get("action") == "reject"][-1]
     assert len(act["pictures"]) == want, f"{tag}: the reject names {act['pictures']}"
 
     # a correction with a picture
-    await page.goto(f"{URL}/#/desk/{model}")
+    await page.goto(f"{URL}/#/work/desk/{model}/correct")  # the card's Correct tab (ADR-122)
     await page.reload()
     fix = page.locator(".dc")
     await expect(fix).to_be_visible()
@@ -185,7 +185,8 @@ async def one(browser: Browser, name: str, width: int, model: str) -> list[str]:
     corr = [b for u, b in posts if u == f"{model}/correct" and b][-1]
     assert len(corr["pictures"]) == 1, f"{tag}: the correction names {corr['pictures']}"
 
-    # the history: thumbnails that load
+    # the history: thumbnails that load (the card's History tab)
+    await page.get_by_role("navigation", name="Card").get_by_role("link", name="History").click()
     thumbs = page.locator(".d-timeline .d-thumbs img")
     await expect(thumbs.nth(want)).to_be_attached()  # the reject's, and 1 with the correction
     sizes = await page.evaluate(
@@ -219,7 +220,7 @@ async def blocked(browser: Browser, model: str) -> None:
     await page.get_by_label("Password").fill(PASSWORD)
     await page.get_by_role("button", name="Log in").click()
     await expect(page.get_by_role("button", name="Log out")).to_be_visible()
-    await page.goto(f"{URL}/#/desk/{model}")
+    await page.goto(f"{URL}/#/work/desk/{model}")
     await expect(
         page.locator(".d-card .d-3d canvas, .d-card .d-3d .gl-error").first
     ).to_be_visible()

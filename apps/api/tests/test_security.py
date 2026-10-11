@@ -75,6 +75,19 @@ def test_requests_from_another_site_are_refused(app: Any) -> None:
     assert r.status_code == 403
 
 
+def test_me_says_who_approves_at_the_desk(app: Any) -> None:
+    """The studio opens on Work → Desk for a Desk approver (ADR-122): an admin, or a name in
+    desk.approvers; others start on Covers."""
+    me = login(app, "rick", "a-long-admin-password").get("/api/auth/me").json()["user"]
+    assert me["desk_approver"] is True
+    me = login(app, "eddy", "a-long-editor-password").get("/api/auth/me").json()["user"]
+    assert me["desk_approver"] is False
+    rens = app.state.auth.add_user("rens", "Rens", "editor")
+    app.state.auth.set_password(app.state.auth.invite(rens.id), "a-long-approver-secret")
+    me = login(app, "rens", "a-long-approver-secret").get("/api/auth/me").json()["user"]
+    assert me["desk_approver"] is True  # desk.approvers names Rens
+
+
 def test_invite_link_sets_the_password_once(app: Any) -> None:
     admin = login(app, "rick", "a-long-admin-password")
     r = admin.post("/api/admin/users", json={"username": "wout", "name": "Wout", "role": "admin"})

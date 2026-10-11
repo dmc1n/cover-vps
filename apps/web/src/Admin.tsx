@@ -11,100 +11,14 @@ import {
   User,
   WebshopSettings,
 } from "./api";
-import { B2BCustomers } from "./B2BCustomers";
-import { PhotoTest } from "./PhotoTest";
-import { Prices } from "./Prices";
+import { modelHref } from "./nav";
 
-type Tab =
-  | "users"
-  | "orders"
-  | "b2b"
-  | "matches"
-  | "shop"
-  | "phototest"
-  | "prices"
-  | "website"
-  | "webshop"
-  | "mail"
-  | "sessions"
-  | "audit"
-  | "system";
 const when = (t: number | null) =>
   t ? new Date(t * 1000).toLocaleString() : "—";
 
-// The admin page (ADR-047): users and their rights, the mail server, the public address,
-// who is logged in, the audit log, and the state of the system.
-export function Admin() {
-  const [tab, setTab] = useState<Tab>("users");
-  return (
-    <>
-      <section className="card">
-        <h2>Admin</h2>
-        <p className="muted">
-          Users and their rights, the mail server, logins and the audit log.
-        </p>
-      </section>
-      <nav className="tabs">
-        {(
-          [
-            "users",
-            "orders",
-            "b2b",
-            "matches",
-            "shop",
-            "phototest",
-            "prices",
-            "website",
-            "webshop",
-            "mail",
-            "sessions",
-            "audit",
-            "system",
-          ] as Tab[]
-        ).map((t) => (
-          <button
-            key={t}
-            className={tab === t ? "active" : ""}
-            onClick={() => setTab(t)}
-          >
-            {
-              {
-                users: "Users",
-                orders: "Orders",
-                b2b: "B2B customers",
-                matches: "Matches",
-                shop: "Shop settings",
-                phototest: "Photo test",
-                prices: "Prices & costing",
-                website: "Website (AI)",
-                webshop: "Requests",
-                mail: "Mail and address",
-                sessions: "Logged in",
-                audit: "Audit log",
-                system: "System",
-              }[t]
-            }
-          </button>
-        ))}
-      </nav>
-      <section className="tab">
-        {tab === "users" && <Users />}
-        {tab === "mail" && <Mail />}
-        {tab === "sessions" && <Sessions />}
-        {tab === "audit" && <Audit />}
-        {tab === "system" && <System />}
-        {tab === "webshop" && <Webshop />}
-        {tab === "orders" && <Orders />}
-        {tab === "b2b" && <B2BCustomers />}
-        {tab === "matches" && <Matches />}
-        {tab === "shop" && <ShopSettings />}
-        {tab === "phototest" && <PhotoTest />}
-        {tab === "prices" && <Prices canEdit />}
-        {tab === "website" && <Website />}
-      </section>
-    </>
-  );
-}
+// The admin parts (ADR-047), now spread over Shop and Settings (ADR-122, nav.ts): users and
+// their rights, the mail server, logins and the audit log, the state of the system, orders,
+// requests, matches and the website. The old #/admin and its tabs redirect to their places.
 
 function InviteBox({ invite, who }: { invite: Invite; who: string }) {
   const [copied, setCopied] = useState(false);
@@ -140,7 +54,7 @@ function InviteBox({ invite, who }: { invite: Invite; who: string }) {
   );
 }
 
-function Users() {
+export function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState("");
   const [invite, setInvite] = useState<{ invite: Invite; who: string } | null>(
@@ -444,7 +358,7 @@ function Users() {
   );
 }
 
-function Mail() {
+export function Mail() {
   const [m, setM] = useState<MailSettings & { password?: string }>({});
   const [url, setUrl] = useState("");
   const [to, setTo] = useState("");
@@ -596,7 +510,7 @@ function Mail() {
   );
 }
 
-function Sessions() {
+export function Sessions() {
   const [rows, setRows] = useState<
     { username: string; created: number; expires: number; address: string }[]
   >([]);
@@ -627,7 +541,7 @@ function Sessions() {
   );
 }
 
-function Audit() {
+export function Audit() {
   const [rows, setRows] = useState<
     {
       time: number;
@@ -663,15 +577,10 @@ function Audit() {
   );
 }
 
-function System() {
+export function System() {
   const [s, setS] = useState<Record<string, unknown> | null>(null);
-  const [to, setTo] = useState("");
-  const [msg, setMsg] = useState("");
   useEffect(() => {
-    admin.system().then((r) => {
-      setS(r);
-      setTo(String(r.alert_email ?? ""));
-    });
+    admin.system().then(setS);
   }, []);
   if (!s) return <p className="muted">Loading…</p>;
   const yes = (v: unknown) => (v ? "yes" : "no");
@@ -741,69 +650,38 @@ function System() {
           </ul>
         </section>
       )}
-      <form
-        className="card"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          try {
-            setTo((await admin.alertEmail(to)).alert_email);
-            setMsg("Saved.");
-          } catch (err) {
-            setMsg(String(err));
-          }
-        }}
-      >
+      <section className="card">
         <h3>Alerts</h3>
         <p className="muted">
           The server checks itself every 10 minutes (app, https, services, disk,
-          certificate, backup, updates) and mails this address when something is
-          wrong, and again when it is solved.
+          certificate, backup, updates) and mails{" "}
+          <b>{String(s.alert_email ?? "—")}</b> when something is wrong, and
+          again when it is solved. The address: Settings →{" "}
+          <a href="#/settings/mail">Mail &amp; notifications</a>.
         </p>
-        <div className="row">
-          <input
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="link"
-          />
-          <button className="primary">Save</button>
-        </div>
-        {msg && <p className="muted">{msg}</p>}
         <h3>Last alerts</h3>
         {alerts.length === 0 ? (
           <p className="muted">None.</p>
         ) : (
           <pre>{alerts.join("\n")}</pre>
         )}
-      </form>
+      </section>
     </>
   );
 }
 
-// The webshop (ADR-061): customers' requests from the configurator, the API keys, and which
-// webshop addresses may show the configurator in an iframe.
-function Webshop() {
+// The webshop (ADR-061): customers' requests from the configurator (Shop → Requests); which
+// webshop addresses may show the configurator and the API keys (Settings → Website & API keys);
+// who gets the requests by mail (Settings → Mail & notifications).
+export function Requests() {
   const [reqs, setReqs] = useState<CustomerRequest[]>([]);
-  const [set, setSet] = useState<WebshopSettings | null>(null);
-  const [origins, setOrigins] = useState("");
-  const [to, setTo] = useState("");
-  const [keyName, setKeyName] = useState("");
-  const [newKey, setNewKey] = useState("");
   const [msg, setMsg] = useState("");
-  const load = () => {
+  useEffect(() => {
     admin
       .requests()
       .then((r) => setReqs(r.requests))
       .catch((e) => setMsg(String(e)));
-    admin
-      .webshop()
-      .then((w) => {
-        setSet(w);
-        setOrigins(w.embed_origins.join("\n"));
-        setTo(w.request_email);
-      })
-      .catch((e) => setMsg(String(e)));
-  };
-  useEffect(load, []);
+  }, []);
   return (
     <>
       {msg && <p className="muted">{msg}</p>}
@@ -873,6 +751,37 @@ function Webshop() {
           placeholders.
         </p>
       </section>
+      <p className="muted">
+        Who gets a request by mail: Settings →{" "}
+        <a href="#/settings/mail">Mail &amp; notifications</a>. The configurator
+        in a webshop and the API keys: Settings →{" "}
+        <a href="#/settings/website">Website &amp; API keys</a>.
+      </p>
+    </>
+  );
+}
+
+/** The configurator in a webshop (embed origins) and the API keys. */
+export function EmbedAndKeys() {
+  const [set, setSet] = useState<WebshopSettings | null>(null);
+  const [origins, setOrigins] = useState("");
+  const [keyName, setKeyName] = useState("");
+  const [newKey, setNewKey] = useState("");
+  const [msg, setMsg] = useState("");
+  const load = () =>
+    admin
+      .webshop()
+      .then((w) => {
+        setSet(w);
+        setOrigins(w.embed_origins.join("\n"));
+      })
+      .catch((e) => setMsg(String(e)));
+  useEffect(() => {
+    load();
+  }, []);
+  return (
+    <>
+      {msg && <p className="muted">{msg}</p>}
       <form
         className="card"
         onSubmit={async (e) => {
@@ -881,7 +790,6 @@ function Webshop() {
             setSet(
               await admin.setWebshop({
                 embed_origins: origins.split(/\s+/).filter(Boolean),
-                request_email: to,
               }),
             );
             setMsg("Saved.");
@@ -905,11 +813,9 @@ function Webshop() {
           onChange={(e) => setOrigins(e.target.value)}
           placeholder="https://hello-suns.com"
         />
-        <label>
-          Requests are mailed to{" "}
-          <input value={to} onChange={(e) => setTo(e.target.value)} />
-        </label>
-        <button className="primary">Save</button>
+        <div className="row">
+          <button className="primary">Save</button>
+        </div>
       </form>
       <section className="card">
         <h3>API keys</h3>
@@ -962,7 +868,7 @@ function Webshop() {
 
 // ---- the cover webshop (ADR-062) ----------------------------------------------------------------
 
-function Orders() {
+export function Orders() {
   const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
@@ -1057,7 +963,7 @@ function Orders() {
                 </td>
                 <td>
                   {o.model_id ? (
-                    <a href={`#/model/${o.model_id}`}>{o.model_id}</a>
+                    <a href={modelHref(o.model_id)}>{o.model_id}</a>
                   ) : (
                     <button
                       onClick={async () => {
@@ -1079,145 +985,6 @@ function Orders() {
         </tbody>
       </table>
     </section>
-  );
-}
-
-// Every setting the shop needs; what is empty is listed at the top, to fill in later.
-function ShopSettings() {
-  const [s, setS] = useState<Record<string, unknown> | null>(null);
-  const [linkKey, setLinkKey] = useState("");
-  const [missing, setMissing] = useState<string[]>([]);
-  const [msg, setMsg] = useState("");
-  useEffect(() => {
-    shopAdmin
-      .settings()
-      .then((r) => {
-        setS(r.settings);
-        setMissing(r.missing);
-      })
-      .catch((e) => setMsg(String(e)));
-  }, []);
-  if (!s) return <p className="muted">{msg || "Loading…"}</p>;
-  const set = (path: string[], value: unknown) => {
-    const copy = JSON.parse(JSON.stringify(s));
-    let cur = copy;
-    for (const k of path.slice(0, -1)) cur = cur[k];
-    cur[path[path.length - 1]] = value;
-    setS(copy);
-  };
-  const field = (path: string[], v: unknown): React.ReactNode => {
-    const key = path.join(".");
-    if (typeof v === "boolean")
-      return (
-        <label key={key} className="check">
-          <input
-            type="checkbox"
-            checked={v}
-            onChange={(e) => set(path, e.target.checked)}
-          />{" "}
-          {path[path.length - 1]}
-        </label>
-      );
-    if (v !== null && typeof v === "object" && !Array.isArray(v))
-      return (
-        <fieldset key={key} className="card">
-          <legend>{path[path.length - 1]}</legend>
-          {Object.entries(v as Record<string, unknown>).map(([k, x]) =>
-            field([...path, k], x),
-          )}
-        </fieldset>
-      );
-    if (Array.isArray(v))
-      return (
-        <fieldset key={key} className="card">
-          <legend>{path[path.length - 1]}</legend>
-          {v.map((x, i) => field([...path, String(i)], x))}
-        </fieldset>
-      );
-    const last = path[path.length - 1];
-    const numeric =
-      path[0] === "prices" ||
-      last === "eur" ||
-      last === "days" ||
-      last.endsWith("_pct");
-    return (
-      <label key={key} className="setting">
-        {path[path.length - 1]}
-        <input
-          value={v === null || v === undefined ? "" : String(v)}
-          placeholder="to fill in"
-          onChange={(e) =>
-            set(
-              path,
-              numeric
-                ? e.target.value === ""
-                  ? null
-                  : Number(e.target.value)
-                : e.target.value,
-            )
-          }
-        />
-      </label>
-    );
-  };
-  return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        try {
-          const r = await shopAdmin.saveSettings(s);
-          setS(r.settings);
-          setMissing(r.missing);
-          setMsg("Saved.");
-        } catch (err) {
-          setMsg(String(err));
-        }
-      }}
-    >
-      <section className="card">
-        <h3>Shop settings</h3>
-        <p className="muted">
-          Everything the shop needs. Empty fields are shown as placeholders in
-          the shop; payments work as soon as a Mollie key is filled in (test_…
-          for testing, live_… for real). The prices are on the{" "}
-          <i>Prices &amp; costing</i> tab.
-        </p>
-        {missing.length > 0 && (
-          <p className="error">Still to fill in: {missing.join(", ")}</p>
-        )}
-        {msg && <p className="muted">{msg}</p>}
-        <button className="primary">Save</button>
-      </section>
-      <section className="card">
-        <h3>The website's key</h3>
-        <p className="muted">
-          The website on its own domain (Cloudflare) reaches this studio with a
-          key (ADR-066). A new key is shown once and stops the old one: put it
-          in the Worker with <code>npx wrangler secret put LINK_KEY</code>.
-        </p>
-        {linkKey && (
-          <p>
-            <code>{linkKey}</code>
-          </p>
-        )}
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              setLinkKey((await shopAdmin.linkKey()).key);
-            } catch (err) {
-              setMsg(String(err));
-            }
-          }}
-        >
-          New website key
-        </button>
-      </section>
-      {Object.entries(s)
-        .filter(([k]) => k !== "prices") // on the Prices & costing tab now (ADR-098)
-        .map(([k, v]) => field([k], v))}
-      <button className="primary">Save</button>
-    </form>
   );
 }
 
@@ -1395,7 +1162,7 @@ export function Website({ canPublish = true }: { canPublish?: boolean }) {
 
 // ADR-064: which existing cover fits a customer's sizes. In learning mode (shadow) a colleague
 // answers every request: the proposal, another cover, or custom; every change is counted below.
-function Matches() {
+export function Matches() {
   const [data, setData] = useState<{
     requests: MatchRequest[];
     mode: string;
@@ -1481,7 +1248,7 @@ function Matches() {
                 <td>
                   {r.result.matches.slice(0, 4).map((m) => (
                     <div key={m.model_id}>
-                      <a href={`#/model/${m.model_id}`}>{m.name}</a>{" "}
+                      <a href={modelHref(m.model_id)}>{m.name}</a>{" "}
                       <b>{Math.round(m.score_pct)} %</b>{" "}
                       <span className="muted">
                         (

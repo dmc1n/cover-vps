@@ -293,7 +293,16 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
 
     @app.get("/api/auth/me")
     def me(request: Request) -> dict[str, Any]:
-        return {"user": current_user(request).public(), "auth": required}
+        from coverengine.params import Registry
+
+        from coverapi.desk import approver
+
+        user = current_user(request)
+        out = user.public()
+        # approves at the Desk (an admin, or a name in desk.approvers): the studio opens on
+        # Work → Desk for them (ADR-122)
+        out["desk_approver"] = approver(user, Registry.load(None).resolve())
+        return {"user": out, "auth": required}
 
     @app.post("/api/auth/password")
     def change_password(req: ChangePassword, request: Request) -> dict[str, Any]:

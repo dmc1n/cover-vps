@@ -286,7 +286,9 @@ export function Viewer({
     scene.background = new THREE.Color("#f9f6e8"); // SUNS cream
     const camera = new THREE.PerspectiveCamera(
       40,
-      el.clientWidth / el.clientHeight,
+      el.clientWidth && el.clientHeight
+        ? el.clientWidth / el.clientHeight
+        : 4 / 3,
       0.01,
       100,
     );
@@ -308,7 +310,7 @@ export function Viewer({
     }
     setGlError("");
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(el.clientWidth, el.clientHeight);
+    renderer.setSize(el.clientWidth || 1, el.clientHeight || 1);
     el.appendChild(renderer.domElement);
     canvasRef.current = renderer.domElement;
     // for the browser checks (e2e/measure.py): where an engine point (mm, Z up) is on screen
@@ -379,11 +381,17 @@ export function Viewer({
       });
     }
     const onResize = () => {
+      if (!el.clientWidth || !el.clientHeight) return; // hidden: keep the last size
       camera.aspect = el.clientWidth / el.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(el.clientWidth, el.clientHeight);
     };
     window.addEventListener("resize", onResize);
+    const sized =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(onResize);
+    sized?.observe(el);
     renderer.setAnimationLoop(() => {
       controls.update();
       const anim = rainAnim.current;
@@ -432,8 +440,15 @@ export function Viewer({
     // preserveDrawingBuffer (and its cost on every frame) is needed
     if (snapshot)
       snapshot.current = () => {
+        // never drawn on the screen (its tab hidden): a picture of a normal size all the same
+        const c = renderer.domElement;
+        if (c.width < 2 || c.height < 2) {
+          camera.aspect = 4 / 3;
+          camera.updateProjectionMatrix();
+          renderer.setSize(960, 720, false);
+        }
         renderer.render(scene, camera);
-        return renderer.domElement.toDataURL("image/png");
+        return c.toDataURL("image/png");
       };
     return () => {
       if (snapshot) snapshot.current = null;
@@ -442,6 +457,7 @@ export function Viewer({
       sceneRef.current = null;
       canvasRef.current = null;
       window.removeEventListener("resize", onResize);
+      sized?.disconnect();
       renderer.setAnimationLoop(null);
       renderer.dispose();
       el.removeChild(renderer.domElement);
@@ -669,167 +685,274 @@ export function Viewer({
     return (
       <p className="muted">Nothing to show yet: the model is being imported.</p>
     );
+  const hasRain = files.includes("rain.json");
+  const hasDrape = files.includes("drape.json");
+  const canUnfold =
+    files.includes("finished.json") && files.includes("panels.glb");
+  const mode = unfolding
+    ? "unfold"
+    : draping
+      ? "drape"
+      : raining
+        ? "rain"
+        : "design";
+  // which cover you look at: one at a time (was four separate buttons)
+  const look = (m: string) => {
+    setUnfolding(m === "unfold");
+    setDraping(m === "drape");
+    setRaining(m === "rain");
+  };
+  const views: [string, string, string][] = [
+    ["design", "Design", "The cover as designed"],
+    ...(hasRain
+      ? [
+          ["rain", "Rain", "Where the rain runs off and where it stays"] as [
+            string,
+            string,
+            string,
+          ],
+        ]
+      : []),
+    ...(hasDrape
+      ? [
+          [
+            "drape",
+            "Drape",
+            "The sewn pieces dropped over the furniture: folds and water",
+          ] as [string, string, string],
+        ]
+      : []),
+    ...(canUnfold
+      ? [
+          [
+            "unfold",
+            "Unfold",
+            "Every piece pulled apart and laid flat on a table: its net and cut size, the seam and hem allowances, and where the fabric goes",
+          ] as [string, string, string],
+        ]
+      : []),
+  ];
   return (
     <div className="viewer">
-      <div className="layers">
-        {available.map((l) => (
-          <label key={l.file}>
-            <input
-              type="checkbox"
-              checked={!!shown[l.file]}
-              onChange={(e) =>
-                setShown({ ...shown, [l.file]: e.target.checked })
-              }
-            />
-            {l.label}
-          </label>
-        ))}
-        {files.includes("vents.json") && (
-          <label title="Where the air vents sit on the cover: the opening and its hood">
-            <input
-              type="checkbox"
-              checked={showVents}
-              onChange={(e) => {
-                setShowVents(e.target.checked);
-                try {
-                  localStorage.setItem(VENTS_KEY, e.target.checked ? "1" : "0");
-                } catch {
-                  /* a private window: not remembered */
-                }
-              }}
-            />
-            Show air vents
-          </label>
-        )}
-        {files.includes("vents.json") && (
-          <label title="Each air vent's opening, its bottom edge above the hem and the distance to the seam or corner on each side, as in the cutting file: to check a sewn cover">
-            <input
-              type="checkbox"
-              data-testid="vent-sizes-toggle"
-              checked={ventSizes}
-              onChange={(e) => {
-                setVentSizes(e.target.checked);
-                remember(VENT_SIZES_KEY, e.target.checked);
-                if (e.target.checked && !showVents) {
-                  setShowVents(true);
-                  remember(VENTS_KEY, true);
-                }
-              }}
-            />
-            Vent sizes
-          </label>
-        )}
-        <label title="The cover's overall length, depth and height in cm, to compare with the drawing">
-          <input
-            type="checkbox"
-            checked={showDims}
-            onChange={(e) => {
-              setShowDims(e.target.checked);
-              try {
-                localStorage.setItem(DIMS_KEY, e.target.checked ? "1" : "0");
-              } catch {
-                /* a private window: not remembered */
-              }
-            }}
-          />
-          Show dimensions
-        </label>
-        <span className="muted">
-          Drag to turn, scroll to zoom, right-drag to move.
-        </span>
-        {files.includes("panels.glb") && (
-          <span className="rain-buttons">
-            <button
-              className={measuring ? "primary" : ""}
-              data-testid="measure-toggle"
-              title="Click two points on the cover: the straight distance, the height difference and the distance along the fabric, in cm"
-              onClick={() => setMeasuring(!measuring)}
-            >
-              {measuring ? "Stop measuring" : "Measure"}
-            </button>
-            {files.includes("checklist.pdf") && (
-              <a
-                href={fileUrl(id, "checklist.pdf")}
-                data-testid="checklist-link"
-                title="One sheet for the workshop: the sides of the cover with its vents, and every size to measure on the sewn cover"
-              >
-                Check list (PDF)
-              </a>
+      <div className="vbar" role="toolbar" aria-label="3D view">
+        <details className="menu" data-menu>
+          <summary
+            className="btn sm"
+            title="Layers, vents and sizes on the cover"
+            aria-label="Show"
+          >
+            Show
+            <span className="vbar-shown">
+              {available
+                .filter((l) => shown[l.file])
+                .map((l) => l.label)
+                .join(", ") || "nothing"}
+            </span>
+            ▾
+          </summary>
+          <div className="menu-list">
+            <span className="menu-group">Layers</span>
+            {available.map((l) => (
+              <label key={l.file}>
+                <input
+                  type="checkbox"
+                  checked={!!shown[l.file]}
+                  onChange={(e) =>
+                    setShown({ ...shown, [l.file]: e.target.checked })
+                  }
+                />
+                {l.label}
+              </label>
+            ))}
+            <span className="menu-group">On the cover</span>
+            {files.includes("vents.json") && (
+              <label title="Where the air vents sit on the cover: the opening and its hood">
+                <input
+                  type="checkbox"
+                  checked={showVents}
+                  onChange={(e) => {
+                    setShowVents(e.target.checked);
+                    try {
+                      localStorage.setItem(
+                        VENTS_KEY,
+                        e.target.checked ? "1" : "0",
+                      );
+                    } catch {
+                      /* a private window: not remembered */
+                    }
+                  }}
+                />
+                Air vents
+              </label>
             )}
-          </span>
-        )}
-        {files.includes("finished.json") && files.includes("panels.glb") && (
-          <span className="rain-buttons">
-            <button
-              className={unfolding ? "primary" : ""}
-              title="Every piece pulled apart and laid flat on a table: its net and cut size, the seam and hem allowances, and where the fabric goes"
-              onClick={() => setUnfolding(!unfolding)}
-            >
-              {unfolding ? "Back to the cover" : "Unfold"}
-            </button>
-          </span>
-        )}
-        <span className="rain-buttons">
-          {files.includes("rain.json") && (
-            <button
-              className={raining ? "primary" : ""}
-              onClick={() => setRaining(!raining)}
-            >
-              {raining ? "Stop the rain" : "Rain"}
-            </button>
-          )}
-          {onRain && (
-            <button
-              disabled={rainBusy}
-              onClick={() => {
-                setRaining(true);
-                onRain();
-              }}
-            >
-              {rainBusy
-                ? "Simulating…"
-                : files.includes("rain.json")
-                  ? "Simulate again"
-                  : "Rain simulation"}
-            </button>
-          )}
-        </span>
-        <span className="rain-buttons">
-          {files.includes("drape.json") && (
-            <button
-              className={draping ? "primary" : ""}
-              onClick={() => setDraping(!draping)}
-            >
-              {draping ? "Back to the design" : "Drape"}
-            </button>
-          )}
-          {draping && files.includes("drape_rain.glb") && (
-            <label>
+            {files.includes("vents.json") && (
+              <label title="Each air vent's opening, its bottom edge above the hem and the distance to the seam or corner on each side, as in the cutting file: to check a sewn cover">
+                <input
+                  type="checkbox"
+                  data-testid="vent-sizes-toggle"
+                  checked={ventSizes}
+                  onChange={(e) => {
+                    setVentSizes(e.target.checked);
+                    remember(VENT_SIZES_KEY, e.target.checked);
+                    if (e.target.checked && !showVents) {
+                      setShowVents(true);
+                      remember(VENTS_KEY, true);
+                    }
+                  }}
+                />
+                Vent sizes <small>opening, heights, to the seams</small>
+              </label>
+            )}
+            <label title="The cover's overall length, depth and height in cm, to compare with the drawing">
               <input
                 type="checkbox"
-                checked={water}
-                onChange={(e) => setWater(e.target.checked)}
-              />{" "}
-              Water
+                checked={showDims}
+                onChange={(e) => {
+                  setShowDims(e.target.checked);
+                  try {
+                    localStorage.setItem(
+                      DIMS_KEY,
+                      e.target.checked ? "1" : "0",
+                    );
+                  } catch {
+                    /* a private window: not remembered */
+                  }
+                }}
+              />
+              Overall dimensions
             </label>
-          )}
-          {onDrape && (
-            <button
-              disabled={drapeBusy}
-              title="The cut pieces sewn and dropped over the furniture (Style3D, lifelike): folds where there is too much fabric, then the rain on it. About 40 minutes for a sofa; the result is kept, and other work goes on meanwhile."
-              onClick={() => {
-                setDraping(false);
-                onDrape("default");
-              }}
-            >
-              {drapeBusy
-                ? "Draping… (about 40 min)"
-                : files.includes("drape.json")
-                  ? "Drape again"
-                  : "Drape simulation"}
-            </button>
-          )}
-        </span>
+            <span className="menu-hint">
+              Drag to turn, scroll to zoom, right-drag to move.
+            </span>
+          </div>
+        </details>
+        {files.includes("vents.json") && (
+          <button
+            className={`sm ${showVents ? "on" : ""}`}
+            aria-pressed={showVents}
+            title="Where the air vents sit on the cover: the opening and its hood"
+            onClick={() => {
+              setShowVents(!showVents);
+              remember(VENTS_KEY, !showVents);
+            }}
+          >
+            Vents
+          </button>
+        )}
+        <button
+          className={`sm ${showDims ? "on" : ""}`}
+          aria-pressed={showDims}
+          title="The cover's overall length, depth and height in cm, to compare with the drawing"
+          onClick={() => {
+            setShowDims(!showDims);
+            remember(DIMS_KEY, !showDims);
+          }}
+        >
+          Dimensions
+        </button>
+        {views.length > 1 && (
+          <span
+            className="seg"
+            role="group"
+            aria-label="Which cover you look at"
+          >
+            {views.map(([m, label, title]) => (
+              <button
+                key={m}
+                className={mode === m ? "on" : ""}
+                aria-pressed={mode === m}
+                title={title}
+                onClick={() => look(m)}
+              >
+                {label}
+              </button>
+            ))}
+          </span>
+        )}
+        {draping && files.includes("drape_rain.glb") && (
+          <label className="vbar-check">
+            <input
+              type="checkbox"
+              checked={water}
+              onChange={(e) => setWater(e.target.checked)}
+            />{" "}
+            Water
+          </label>
+        )}
+        {files.includes("panels.glb") && (
+          <button
+            className={`sm ${measuring ? "primary" : ""}`}
+            data-testid="measure-toggle"
+            title="Click two points on the cover: the straight distance, the height difference and the distance along the fabric, in cm"
+            onClick={() => setMeasuring(!measuring)}
+          >
+            {measuring ? "Stop measuring" : "Measure"}
+          </button>
+        )}
+        <span className="vbar-grow" />
+        {(rainBusy || drapeBusy) && (
+          <span className="vbar-busy" role="status">
+            {drapeBusy ? "Draping… (about 40 min)" : "Simulating the rain…"}
+          </span>
+        )}
+        {(onRain || onDrape) && (
+          <details className="menu right" data-menu>
+            <summary className="btn sm ghost">Simulate ▾</summary>
+            <div className="menu-list">
+              {onRain && (
+                <button
+                  disabled={rainBusy}
+                  onClick={(e) => {
+                    (
+                      e.currentTarget.closest("details") as HTMLDetailsElement
+                    ).open = false;
+                    setDraping(false);
+                    setUnfolding(false);
+                    setRaining(true);
+                    onRain();
+                  }}
+                >
+                  {rainBusy
+                    ? "Simulating…"
+                    : hasRain
+                      ? "Rain again"
+                      : "Rain simulation"}
+                  <small>about a minute</small>
+                </button>
+              )}
+              {onDrape && (
+                <button
+                  disabled={drapeBusy}
+                  title="The cut pieces sewn and dropped over the furniture (Style3D, lifelike): folds where there is too much fabric, then the rain on it. About 40 minutes for a sofa; the result is kept, and other work goes on meanwhile."
+                  onClick={(e) => {
+                    (
+                      e.currentTarget.closest("details") as HTMLDetailsElement
+                    ).open = false;
+                    setDraping(false);
+                    onDrape("default");
+                  }}
+                >
+                  {drapeBusy
+                    ? "Draping… (about 40 min)"
+                    : hasDrape
+                      ? "Drape again"
+                      : "Drape simulation"}
+                  <small>about 40 minutes, in its own queue</small>
+                </button>
+              )}
+            </div>
+          </details>
+        )}
+        {files.includes("panels.glb") && files.includes("checklist.pdf") && (
+          <a
+            className="btn sm ghost"
+            href={fileUrl(id, "checklist.pdf")}
+            data-testid="checklist-link"
+            title="One sheet for the workshop: the sides of the cover with its vents, and every size to measure on the sewn cover"
+          >
+            Check list (PDF)
+          </a>
+        )}
       </div>
       <div className="canvas" ref={host}>
         {glError && (

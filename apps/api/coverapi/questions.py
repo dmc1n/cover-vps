@@ -600,19 +600,19 @@ def question_mails(
                     ]
                     for a in mine_arrs:
                         how = "opnieuw, na een wijziging" if a["again"] else f"van {a['by']}"
-                        lines.append(f"- {a['code']} ({how})\n  {base_url}/#/desk/{a['id']}")
+                        lines.append(f"- {a['code']} ({how})\n  {base_url}/#/work/desk/{a['id']}")
                     lines.append("")
                 if mine_new:
                     lines += [f"Er staan {len(mine_new)} nieuwe vragen voor je op de Desk:", ""]
                     lines += [
-                        f"- {q['title']}\n  {base_url}/#/questions/{q['id']}" for q in mine_new
+                        f"- {q['title']}\n  {base_url}/#/work/questions/{q['id']}" for q in mine_new
                     ]
                     lines.append("")
                 if mine_done:
                     lines += ["Verwerkt (wat er met je antwoord is gedaan):", ""]
                     lines += [f"- {q['title']}: {q['processed_note']}" for q in mine_done]
                     lines.append("")
-                lines += [f"Alle vragen: {base_url}/#/questions", ""]
+                lines += [f"Alle vragen: {base_url}/#/work/questions", ""]
                 send(
                     u.email,
                     f"Cover Studio: {len(mine_new)} nieuwe vragen"
@@ -655,7 +655,7 @@ def question_mails(
                     lines.append(
                         f"- {r['title']} — {r['name']}: {chosen}"
                         + (f"\n  “{r['comment']}”" if r["comment"] else "")
-                        + f"\n  {base_url}/#/questions/{r['question_id']}"
+                        + f"\n  {base_url}/#/work/questions/{r['question_id']}"
                     )
                 for u in _people(auth, _names(str(params["questions.owners"]))):
                     send(u.email, f"Cover Studio: {len(rows)} new answers", "\n".join(lines))

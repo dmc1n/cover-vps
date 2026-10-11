@@ -503,7 +503,7 @@ def create_app(
                 mailer.send(
                     auth, u.email, f"Please approve the cover {model_id}",
                     f"Hello {u.name},\n\n{user.name} asks you to approve the definitive "
-                    f"drawing of {model_id}:\n\n{base}/#/model/{model_id}\n",
+                    f"drawing of {model_id}:\n\n{base}/#/model/{model_id}/3d\n",
                 )  # fmt: skip
                 sent.append(u.username)
             except Exception:  # noqa: BLE001

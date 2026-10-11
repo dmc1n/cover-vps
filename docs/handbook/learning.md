@@ -1,6 +1,6 @@
 # Learning from your own covers
 
-In the web app, **Learning** (top bar): upload one zip with your drawings and their 3D models.
+In the web app, **Covers → Learning**: upload one zip with your drawings and their 3D models.
 
 - **Pairs by name:** `1.step` + `1.pdf`, `2.stp` + `2.pdf`, `kota.glb` + `kota.pdf`. Any 3D
   format the program reads works (STEP, IGES, STL, OBJ, PLY, GLB). Folders inside the zip do not

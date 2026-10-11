@@ -1,6 +1,6 @@
 # The studio's layout: tighter and clearer (proposal, 11 Oct 2026)
 
-Status: **proposal, waiting for the owner's go.** Nothing in the live studio has changed. Audited
+Status: **steps 1, 2, 5 and 6 built (11 Oct 2026, night, ADR-122; §11), not released.** The rest is still a proposal. Audited
 release: v1.30.0 (main has moved on since, e.g. ADR-116; the layout findings still hold). This
 document, the clickable prototype and the audit scripts are on the branch `studio-ui-audit`.
 
@@ -537,3 +537,111 @@ step that changes how values are applied and gets its own ADR.
    (instead of Panels), "Adjust" for a cover's own settings — agreed?
 7. **Order of the steps**: start with 1–2 (navigation and Settings), or with 5 (the Desk card,
    which Rens uses most)?
+
+## 11. What was built (11 Oct 2026, night; ADR-122)
+
+The owner said to build the logical layout now. Steps **1, 2, 5 and 6** are built on the branch
+(not released); the business questions (§10) are kept as they are today: English, both
+approvals, no workshop role, the defaults read-only, the start pages as below.
+
+- **Step 1 — routes and the header:** `apps/web/src/nav.ts` (sections, pages, rights, tabs,
+  `redirect`, `parse`); the header on one line, the sub-menu bar, counts on Work/Questions;
+  every old address redirects; tabs in the address everywhere; start pages: approvers → Work →
+  Desk, an admin → the section page he used last, others → Covers.
+- **Step 2 — Settings:** `apps/web/src/SettingsArea.tsx`: 11 tabs in 4 groups; the shop's
+  settings in plain words over the same stored keys; B2B terms moved in; every mail recipient
+  in one list; Mollie key masked with Replace, under Website & API keys; the YAML defaults
+  read-only on Desk & approval, Cover defaults, AI & spending.
+- **Step 5 — the Desk card:** four tabs, the sticky decision bar with *After sewing ▾*, *More*;
+  the latest rejection on top of Check; the drawing and 3D on Check and Correct, mounted on
+  every tab for the pictures; product list → Covers; the spend tile for admins.
+- **Step 6 — a cover:** the head and status strip, seven tabs with addressable sub-views, the
+  compact 3D toolbar; the approval card, jobs, a Desk rejection and today's warnings above the
+  tabs; "since the run before" in History without noise.
+- **Codex's second opinion** (taken where it fits): an admin's remembered start page; Photo
+  test under *Tools*; nothing buried (the approval card, Withdraw and the approved PDFs, the
+  kind check, the batch bar, the learned rules, Send to the Desk all stay where they were or
+  above the tabs); vents and dimensions as quick toggles, the layers shown on the Show button,
+  Water beside Drape, simulation times shown; 40 px touch targets on a tablet; digest timings
+  under Mail; secrets masked with Replace; unsaved-edit warnings; the API's rights unchanged.
+  Not taken: merging Users & rights with Logins & audit log into one tab (the owner named them
+  as two tabs).
+- **Checks:** `apps/web/e2e/uinav.py` (every menu item per role, every old address, a cover's
+  and a card's tabs, 1440 and 820 px, screenshots in `out/uinew/`); the existing browser checks
+  follow the new addresses.
+
+### Inventory: every screen, action and field, and where it is now
+
+| before | now |
+|---|---|
+| Header: Models, Desk, Catalogue, Arrangements, Learning, Prices, Guide, crumb, search, Admin / Website, name, Log out | Work · Covers · Shop · Prices · Settings; crumb (on a cover); search; Guide; name (account); Log out |
+| Models: New model upload (file, units, up) | Covers → New cover |
+| Models: New cover from a drawing | Covers → New cover |
+| Models: table, search, category / grade / status filters, checkboxes, batch bar | Covers → All covers (Table), unchanged |
+| Catalogue: cards, search, grade, category, tag, sort | Covers → All covers → Cards (`?view=cards`), unchanged |
+| Arrangements: everything incl. Send to the Desk | Covers → Arrangements, unchanged |
+| Learning: zip upload, batches | Covers → Learning, unchanged |
+| Desk tabs Covers / Questions | Work sub-menu Desk / Questions (count on Questions and Work) |
+| Desk top: title and keys, KPI tiles, learned-rule proposals, pipeline | unchanged |
+| Desk top: AI spend tile | admins only; Settings → AI & spending |
+| Desk top: product-list upload | Covers → Product list (link in the card's More) |
+| Desk queue: search, status buttons, series chips, sort | unchanged (kept while moving between cards and tabs) |
+| Card head: code, outcome, scores, status, Open model | unchanged (Open cover ↗) |
+| Card head: Let the AI read it | More → Let the AI read it (cost shown) |
+| Card head: Edit arrangement | More → Edit arrangement |
+| Card: 2nd round note, AI reading note, arrangement status | above the tabs |
+| Card: drawing (pages, zoom) / arrangement plan and members, 3D viewer | Check and Correct tabs (mounted on all) |
+| Card: Check list (PDF) in the 3D caption | the 3D toolbar and More |
+| Card: Products, What the program read, What the AIs say (all differences) | Check tab |
+| Card: Pieces, Revisions (cut this, all revisions) | Pieces & revisions tab |
+| Card: Correct this cover (seams, vents, sizes, shape, pictures) | Correct this cover tab |
+| Card: Measured on the sewn cover | above the tabs while measuring |
+| Card: History (pictures, measured sizes) | History tab; the latest rejection also on Check |
+| Action bar: Approve, Reject (reasons, text, pictures), Comment, Undo | unchanged, sticky |
+| Action bar: Produced, after-sewing note, Measured…, Fits, Does not fit | After sewing ▾ row in the same bar |
+| Questions: everything | Work → Questions, unchanged |
+| Prices: draft bar, publish, versions, 6 tabs, import inside Channels | Prices; the tabs are the sub-menu; Import (Excel) its own tab |
+| Admin → Users | Settings → Users & rights |
+| Admin → Orders | Shop → Orders |
+| Admin → B2B customers (companies, invites, orders) | Shop → B2B customers |
+| Admin → B2B customers → B2B settings | Settings → B2B terms |
+| Admin → Matches | Shop → Matches |
+| Admin → Shop settings: company, domain, languages, colours, bbq, logo, og_image, delivery notes, products, film, story | Settings → Company & shop |
+| Admin → Shop settings: shipping (0 / 1 / 2) | Settings → Company & shop → Shipping per country (a table) |
+| Admin → Shop settings: payment (Mollie, bank transfer) | Settings → Website & API keys → Payment |
+| Admin → Shop settings: matching.* | Settings → Matching |
+| Admin → Shop settings: notify_email, fit_mail | Settings → Mail & notifications |
+| Admin → Shop settings: website_link.closed, home_story, the website's key | Settings → Website & API keys |
+| Admin → Shop settings: prices (hidden) | Prices (unchanged) |
+| Admin → Photo test | Shop → Tools: Photo test |
+| Admin → Prices & costing | Prices (redirect) |
+| Admin → Website (AI); `#/website` for editors | Shop → Website (AI) for both; Publish for admins |
+| Admin → Requests: the table | Shop → Requests |
+| Admin → Requests: embed origins, API keys | Settings → Website & API keys |
+| Admin → Requests: requests are mailed to | Settings → Mail & notifications |
+| Admin → Mail and address: SMTP, test mail, login code, public address | Settings → Mail & notifications |
+| Admin → Logged in, Audit log | Settings → Logins & audit log |
+| Admin → System (facts, releases, last alerts) | Settings → System |
+| Admin → System: alert address | Settings → Mail & notifications |
+| Cover: summary card, Run again | the head |
+| Cover: Check: what is this file? | above the tabs, unchanged |
+| Cover: approval card (Approve, Ask, Withdraw, approved PDFs) | above the tabs, unchanged; its state also in the strip |
+| Cover: catalogue info (category, family, status, tags, notes) | Edit details |
+| Cover: job bar | above the tabs |
+| Cover: Since the run before | History → Approval & changes (and a count in the strip) |
+| Cover tabs: 3D | 3D |
+| Your drawing, Your reference, AI advice | Compare → the same three |
+| Seams | Seams |
+| Patterns, Size drawing, Cut pieces | Pieces → Flat patterns, Size drawing, Cut pieces |
+| Settings (the cover's) | Adjust |
+| Revisions, Warnings and log | History → Revisions, Warnings and log; today's warnings also above the tabs |
+| Downloads | Files |
+| 3D: 5 layer checkboxes | Show ▾ (the layers on are named on the button) |
+| 3D: Show air vents, Show dimensions | quick toggles Vents, Dimensions (and in Show ▾) |
+| 3D: Vent sizes, the hint | Show ▾ |
+| 3D: Rain / Stop the rain, Drape / Back to the design, Unfold / Back to the cover | one switch Design · Rain · Drape · Unfold |
+| 3D: Water | beside the switch while on Drape |
+| 3D: Measure | Measure |
+| 3D: Rain simulation / Simulate again, Drape simulation / Drape again | Simulate ▾ (with the time each takes; running: shown in the bar) |
+| 3D: Check list (PDF) | Check list (PDF) |
+| Account, Guide, Configure, Welcome, Login | unchanged |

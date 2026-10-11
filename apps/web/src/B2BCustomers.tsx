@@ -85,7 +85,11 @@ interface InviteResult {
   mailed: boolean;
 }
 
-async function call<R>(method: string, path: string, body?: unknown): Promise<R> {
+async function call<R>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<R> {
   const r = await fetch(`/api/admin/b2b/${path}`, {
     method,
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
@@ -93,10 +97,15 @@ async function call<R>(method: string, path: string, body?: unknown): Promise<R>
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok)
-    throw new Error(typeof d.detail === "string" ? d.detail : `${r.status} ${JSON.stringify(d.detail ?? "")}`);
+    throw new Error(
+      typeof d.detail === "string"
+        ? d.detail
+        : `${r.status} ${JSON.stringify(d.detail ?? "")}`,
+    );
   return d as R;
 }
-const when = (t: number | null) => (t ? new Date(t * 1000).toLocaleString() : "—");
+const when = (t: number | null) =>
+  t ? new Date(t * 1000).toLocaleString() : "—";
 const eur = (n: number) => `€ ${n.toFixed(2)}`;
 const NEW = {
   name: "",
@@ -117,7 +126,9 @@ export function B2BCustomers() {
   const [error, setError] = useState("");
   const [open, setOpen] = useState<number | null>(null);
   const [form, setForm] = useState(NEW);
-  const [invite, setInvite] = useState<(InviteResult & { who: string }) | null>(null);
+  const [invite, setInvite] = useState<(InviteResult & { who: string }) | null>(
+    null,
+  );
   const load = useCallback(() => {
     call<State>("GET", "companies")
       .then(setS)
@@ -148,10 +159,11 @@ export function B2BCustomers() {
           <a href={s.shop_url} target="_blank" rel="noreferrer">
             {s.shop_url}
           </a>{" "}
-          with their own account (not a studio login). They see the same configurator and
-          the catalogue covers at their price list, ex VAT, and order on account; each order
-          line appears under Orders, flagged B2B. Nobody gets in without an invitation from
-          here: a request from the site waits below for your approval.
+          with their own account (not a studio login). They see the same
+          configurator and the catalogue covers at their price list, ex VAT, and
+          order on account; each order line appears under Orders, flagged B2B.
+          Nobody gets in without an invitation from here: a request from the
+          site waits below for your approval.
         </p>
         {invite && (
           <p className={invite.mailed ? "" : "error"}>
@@ -173,8 +185,8 @@ export function B2BCustomers() {
                     <strong>{c.name}</strong> · VAT {c.vat_number || "—"}
                     <br />
                     <span className="muted">
-                      {c.contact} &lt;{c.email}&gt; · {c.phone} · {c.city} {c.country} ·{" "}
-                      {when(c.created)}
+                      {c.contact} &lt;{c.email}&gt; · {c.phone} · {c.city}{" "}
+                      {c.country} · {when(c.created)}
                     </span>
                     {c.request?.message && <p>{c.request.message}</p>}
                   </td>
@@ -183,7 +195,10 @@ export function B2BCustomers() {
                       className="primary"
                       onClick={async () => {
                         const r = await run(() =>
-                          call<InviteResult>("POST", `companies/${c.id}/approve`),
+                          call<InviteResult>(
+                            "POST",
+                            `companies/${c.id}/approve`,
+                          ),
                         );
                         if (r) setInvite({ ...r, who: c.email ?? c.name });
                       }}
@@ -192,7 +207,11 @@ export function B2BCustomers() {
                     </button>{" "}
                     <button
                       onClick={() =>
-                        run(() => call("PUT", `companies/${c.id}`, { status: "rejected" }))
+                        run(() =>
+                          call("PUT", `companies/${c.id}`, {
+                            status: "rejected",
+                          }),
+                        )
                       }
                     >
                       Reject
@@ -225,7 +244,10 @@ export function B2BCustomers() {
               </tr>
             )}
             {rest.map((c) => (
-              <tr key={c.id} onClick={() => setOpen(open === c.id ? null : c.id)}>
+              <tr
+                key={c.id}
+                onClick={() => setOpen(open === c.id ? null : c.id)}
+              >
                 <td>
                   <strong>{c.name}</strong>
                   <br />
@@ -262,15 +284,19 @@ export function B2BCustomers() {
       <section className="card">
         <h3>Invite a company</h3>
         <p className="muted">
-          The company gets an account at once; its contact gets a mail with a link to
-          choose a password (valid for 7 days), in the language chosen here.
+          The company gets an account at once; its contact gets a mail with a
+          link to choose a password (valid for 7 days), in the language chosen
+          here.
         </p>
         <form
           className="fields b2b-fields"
           onSubmit={async (e) => {
             e.preventDefault();
             const r = await run(() =>
-              call<InviteResult>("POST", "companies", { ...form, send_invite: true }),
+              call<InviteResult>("POST", "companies", {
+                ...form,
+                send_invite: true,
+              }),
             );
             if (r) {
               setInvite({ ...r, who: form.email });
@@ -316,7 +342,10 @@ export function B2BCustomers() {
           </label>
           <label className="field">
             <span>Language of the mails</span>
-            <select value={form.lang} onChange={(e) => setForm({ ...form, lang: e.target.value })}>
+            <select
+              value={form.lang}
+              onChange={(e) => setForm({ ...form, lang: e.target.value })}
+            >
               {["nl", "en", "de", "fr"].map((l) => (
                 <option key={l}>{l}</option>
               ))}
@@ -325,7 +354,10 @@ export function B2BCustomers() {
           <button className="primary">Invite</button>
         </form>
       </section>
-      <SettingsCard s={s} run={run} />
+      <p className="muted">
+        The terms (minimum order, shipping, payment days, into production at
+        once): Settings → <a href="#/settings/b2b">B2B terms</a>.
+      </p>
     </>
   );
 }
@@ -384,13 +416,17 @@ function CompanyCard({
         {c.status !== "blocked" ? (
           <button
             className="danger"
-            onClick={() => run(() => call("PUT", `companies/${c.id}`, { status: "blocked" }))}
+            onClick={() =>
+              run(() => call("PUT", `companies/${c.id}`, { status: "blocked" }))
+            }
           >
             Block (logs everyone out)
           </button>
         ) : (
           <button
-            onClick={() => run(() => call("PUT", `companies/${c.id}`, { status: "active" }))}
+            onClick={() =>
+              run(() => call("PUT", `companies/${c.id}`, { status: "active" }))
+            }
           >
             Unblock
           </button>
@@ -400,7 +436,9 @@ function CompanyCard({
         className="fields b2b-fields"
         onSubmit={(e) => {
           e.preventDefault();
-          run(() => call("PUT", `companies/${c.id}`, { ...f, fixed: parsed() }));
+          run(() =>
+            call("PUT", `companies/${c.id}`, { ...f, fixed: parsed() }),
+          );
         }}
       >
         {(
@@ -418,7 +456,10 @@ function CompanyCard({
         ).map(([k, l]) => (
           <label className="field" key={k}>
             <span>{l}</span>
-            <input value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+            <input
+              value={f[k]}
+              onChange={(e) => setF({ ...f, [k]: e.target.value })}
+            />
           </label>
         ))}
         <label className="field">
@@ -440,31 +481,42 @@ function CompanyCard({
             checked={f.reverse_charge}
             onChange={(e) => setF({ ...f, reverse_charge: e.target.checked })}
           />{" "}
-          VAT reverse-charged (no VAT on the order: an EU company outside NL with a valid VAT
-          number; check with the accountant)
+          VAT reverse-charged (no VAT on the order: an EU company outside NL
+          with a valid VAT number; check with the accountant)
         </label>
         <label className="field">
           <span>
-            Fixed prices for this company, ex VAT, one per line: <code>suns-… = 249</code>,{" "}
-            <code>balloon = 12</code>, <code>frame = 55</code>. They win over the price list.
+            Fixed prices for this company, ex VAT, one per line:{" "}
+            <code>suns-… = 249</code>, <code>balloon = 12</code>,{" "}
+            <code>frame = 55</code>. They win over the price list.
           </span>
-          <textarea rows={4} value={fixed} onChange={(e) => setFixed(e.target.value)} />
+          <textarea
+            rows={4}
+            value={fixed}
+            onChange={(e) => setFixed(e.target.value)}
+          />
         </label>
         <label className="field">
           <span>Note (only for us)</span>
-          <textarea rows={2} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} />
+          <textarea
+            rows={2}
+            value={f.note}
+            onChange={(e) => setF({ ...f, note: e.target.value })}
+          />
         </label>
         <button className="primary">Save</button>
       </form>
       <h4>Delivery addresses</h4>
       {c.addresses.length === 0 ? (
-        <p className="muted">None besides the invoice address (the company can add them).</p>
+        <p className="muted">
+          None besides the invoice address (the company can add them).
+        </p>
       ) : (
         <ul>
           {c.addresses.map((a) => (
             <li key={a.id}>
-              <strong>{a.label || a.name}</strong>: {a.name}, {a.street}, {a.postcode} {a.city}{" "}
-              {a.country}
+              <strong>{a.label || a.name}</strong>: {a.name}, {a.street},{" "}
+              {a.postcode} {a.city} {a.country}
             </li>
           ))}
         </ul>
@@ -488,14 +540,22 @@ function CompanyCard({
               <td className="nowrap">
                 <button
                   onClick={async () => {
-                    const r = await run(() => call<InviteResult>("POST", `users/${u.id}/invite`));
+                    const r = await run(() =>
+                      call<InviteResult>("POST", `users/${u.id}/invite`),
+                    );
                     if (r) onInvite(r, u.email);
                   }}
                 >
-                  {u.has_password ? "New password link" : "Send the invitation again"}
+                  {u.has_password
+                    ? "New password link"
+                    : "Send the invitation again"}
                 </button>{" "}
                 <button
-                  onClick={() => run(() => call("PUT", `users/${u.id}`, { active: !u.active }))}
+                  onClick={() =>
+                    run(() =>
+                      call("PUT", `users/${u.id}`, { active: !u.active }),
+                    )
+                  }
                 >
                   {u.active ? "Switch off" : "Switch on"}
                 </button>
@@ -508,7 +568,9 @@ function CompanyCard({
         className="row"
         onSubmit={async (e) => {
           e.preventDefault();
-          const r = await run(() => call<InviteResult>("POST", `companies/${c.id}/users`, person));
+          const r = await run(() =>
+            call<InviteResult>("POST", `companies/${c.id}/users`, person),
+          );
           if (r) {
             onInvite(r, person.email);
             setPerson({ email: "", name: "", lang: "nl" });
@@ -561,69 +623,6 @@ function CompanyCard({
           </tbody>
         </table>
       )}
-    </section>
-  );
-}
-
-function SettingsCard({
-  s,
-  run,
-}: {
-  s: State;
-  run: <R>(f: () => Promise<R>) => Promise<R | undefined>;
-}) {
-  const [f, setF] = useState(s.settings);
-  return (
-    <section className="card">
-      <h3>B2B settings</h3>
-      <form
-        className="fields b2b-fields"
-        onSubmit={(e) => {
-          e.preventDefault();
-          run(() => call("PUT", "settings", f));
-        }}
-      >
-        <label className="field">
-          <span>Minimum order, € ex VAT (0: none)</span>
-          <input
-            type="number"
-            min={0}
-            value={f.min_order_eur}
-            onChange={(e) => setF({ ...f, min_order_eur: Number(e.target.value) })}
-          />
-        </label>
-        <label className="field">
-          <span>Shipping per order on top, € ex VAT (0: in the price list's extras)</span>
-          <input
-            type="number"
-            min={0}
-            value={f.shipping_eur}
-            onChange={(e) => setF({ ...f, shipping_eur: Number(e.target.value) })}
-          />
-        </label>
-        <label className="field">
-          <span>Payment term of the invoice, days</span>
-          <input
-            type="number"
-            min={0}
-            value={f.payment_days}
-            onChange={(e) => setF({ ...f, payment_days: Number(e.target.value) })}
-          />
-        </label>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={f.auto_produce}
-            onChange={(e) => setF({ ...f, auto_produce: e.target.checked })}
-          />{" "}
-          An order on account goes into production at once (like a paid consumer order)
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={f.online_payment} disabled readOnly /> Online payment
-          for business customers (later; every order is on account now)
-        </label>
-        <button className="primary">Save</button>
-      </form>
     </section>
   );
 }

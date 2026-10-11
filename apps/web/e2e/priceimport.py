@@ -31,12 +31,16 @@ async def login(page: Page, user: str) -> None:
     await page.get_by_label("User name").fill(user)
     await page.get_by_label("Password").fill(PASSWORD)
     await page.get_by_role("button", name="Log in").click()
-    await expect(page.get_by_role("link", name="Models")).to_be_visible()
+    await expect(page.get_by_role("button", name="Log out")).to_be_visible()
 
 
 async def channels(page: Page) -> None:
-    await page.goto(URL + "#/prices")
-    await page.get_by_role("button", name="Channels & price lists").click()
+    await page.goto(URL + "#/prices/channels")
+
+
+async def import_page(page: Page) -> None:
+    """Prices → Import (Excel): its own page in the sub-menu since ADR-122."""
+    await page.goto(URL + "#/prices/import")
 
 
 async def shot(page: Page, name: str, full: bool = True) -> None:
@@ -51,7 +55,7 @@ async def main() -> int:
         page = await browser.new_page(viewport={"width": 1440, "height": 950})
         page.on("pageerror", lambda e: errors.append(str(e)))
         await login(page, "tester")
-        await channels(page)
+        await import_page(page)
         box = page.get_by_test_id("price-import")
         await expect(box).to_contain_text("Import prices (Excel)")
         await page.get_by_test_id("price-import-file").set_input_files(SHEET)
@@ -102,13 +106,22 @@ async def main() -> int:
         await shot(page, "05-preview")
         await page.get_by_role("button", name="Publish", exact=True).click()
         await expect(page.get_by_text("Published version").first).to_be_visible()
-        await page.get_by_role("button", name="Versions").click()
+        await (
+            page.get_by_role("navigation", name="Prices")
+            .get_by_role("link", name="Versions", exact=True)
+            .click()
+        )
         await expect(page.get_by_text("Imported from prijslijst-2027.xlsx").first).to_be_visible()
         await shot(page, "06-versions", full=False)
         # the fixed prices are in the price list now
-        await page.get_by_role("button", name="Channels & price lists").click()
+        await (
+            page.get_by_role("navigation", name="Prices")
+            .get_by_role("link", name="Channels & price lists", exact=True)
+            .click()
+        )
         await expect(page.get_by_label("b2c fixed drawing-s40")).to_have_value("1234.95")
         # a phone
+        await import_page(page)
         await page.set_viewport_size({"width": 390, "height": 844})
         await page.get_by_test_id("price-import-file").set_input_files(SHEET)
         await expect(page.get_by_test_id("pi-matched")).to_contain_text(
@@ -129,6 +142,7 @@ async def main() -> int:
         await channels(ed)
         await expect(ed.get_by_text("Fixed prices").first).to_be_visible()
         await expect(ed.get_by_test_id("price-import")).to_have_count(0)
+        await expect(ed.get_by_role("link", name="Import (Excel)")).to_have_count(0)
         await browser.close()
     if errors:
         print("page errors:", *errors, sep="\n  ")

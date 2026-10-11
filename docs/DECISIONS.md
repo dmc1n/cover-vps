@@ -3994,3 +3994,81 @@ docs/plans/bbq-covers.md (Dutch summary) and docs/plans/bbq-covers-research.md (
 - **Better later:** lid-open and folded-shelf variants; a kettle (Weber Master-Touch) and the
   OFYR Island; measuring the Kamado Joe carts (the maker and the shops differ by 10–17 cm);
   pricing BBQ catalogue covers from their own pattern rather than the configurator's shape.
+
+## ADR-122 — The studio's new layout: five sections, every page and tab in the address, one Settings area
+
+The owner (9 Oct 2026): "the backend is messy; too much information in too many places; it
+must be tighter and clearer; sub-menus can help, and an admin page where most settings are, on
+tabs with more explanation." The audit and proposal (docs/plans/studio-ui.md, prototype in
+out/uiaudit/prototype/) were made on 11 Oct; that night the owner said to build the logical
+layout now, decide what I can decide, keep business choices as they are, and consult Codex.
+(Numbered 122: 120 and 121 are taken on other branches.) Built: steps 1, 2, 5 and 6 of the plan.
+
+- **The map (`apps/web/src/nav.ts`):** one table of sections, pages, who sees them, the
+  Settings tabs, a cover's and a Desk card's tabs; `redirect()` and `parse()` are pure
+  functions, so the browser check and the code use one list. Five sections in a one-line header
+  (Work · Covers · Shop · Prices · Settings) and a sub-menu bar under it; Admin and Website left
+  the user menu. Hash routes stay (no server change, the old links are hash links too).
+- **Every old address redirects** (`#/`, `#/desk[/id]`, `#/questions[/n]`, `#/catalogue`,
+  `#/arrangements[/id]`, `#/learning`, `#/prices`, `#/website`, `#/admin[/tab]`, `#/model/<id>`
+  and its old tab names) with `history.replaceState`, so Back does not bounce. The mails
+  (approval request, question and answer digests, the arrangements' digest) link to the new
+  form. Table: docs/handbook/navigation.md.
+- **Start page per person, existing roles only:** an approver at the Desk (`desk.approvers` or
+  an admin, now in `/api/auth/me` as `desk_approver`) or a user with *may approve* starts on
+  Work → Desk; an admin on the section page he used last (remembered in the browser, Codex's
+  advice); the rest on Covers → All covers. Open owner question 3 stays open.
+- **Tabs in the address:** a cover `#/model/<id>/<tab>[/<sub>]`; the bug where the next cover
+  opened on the tab of the one before is gone because the tab is no longer component state.
+  A Desk card `#/work/desk/<id>/<tab>`; the Prices tabs `#/prices/<tab>`; Settings
+  `#/settings/<tab>`. Moving between a card's tabs keeps the queue's filters (the Desk stays
+  mounted).
+- **Settings (step 2):** Users & rights, Mail & notifications, Logins & audit log, System and
+  Website & API keys moved in unchanged in function; the raw Shop settings form (49 bare keys,
+  `0 / 1 / 2`, a free-text enum) is rebuilt from a small schema (label, one line of help, kind,
+  unit, the company default that applies while empty) over the **same stored keys** (PUT
+  `/api/admin/shop/settings` with only the tab's top-level keys; no data migration): Company &
+  shop, Matching, and parts of Mail and Website. B2B terms moved from the B2B page (same API).
+  Every row shows default / changed / empty, or the company default that applies; *Only changed
+  values*; one sticky Save + Undo per tab. Every mail recipient is in one list (request mail,
+  alert address, new orders, the fit question, approval requests, digest timings). The Mollie
+  key is shown masked with *Replace* and sits with the other connections. Desk & approval, Cover
+  defaults and AI & spending show `config/defaults.yaml` read-only (owner-editable defaults are
+  step 4, which needs the owner's list, Q5).
+- **The Desk card (step 5):** four tabs (Check · Pieces & revisions · Correct this cover ·
+  History), a sticky bar (Approve, Reject, Comment, *After sewing ▾* with Produced, the note,
+  Measured…, Fits, Does not fit; Undo), *More* (Let the AI read it, the check list, Edit
+  arrangement, the cut pieces, the product list). Keys unchanged. The Check tab opens with the
+  latest rejection and what happened since. The drawing and the 3D stay mounted on every tab
+  (visible on Check and Correct), so *Snapshot 3D* works from any tab: the viewer now follows
+  its box with a ResizeObserver and a snapshot of a never-shown viewer renders at 960 × 720
+  (ADR-096's pictures, tested in e2e/desk_pictures.py). The product-list upload moved to Covers
+  → Product list; the AI spend tile is for admins only.
+- **The cover page (step 6):** one head (picture, facts, a status strip: grade, status, Desk,
+  approval, DXF lock, "N changes since the run before"), Run again, Edit details (the catalogue
+  info, folded), Desk card; the approval card (both approvals as they are: owner question 2),
+  a running or failed job, a Desk rejection and today's warnings stay above the tabs. Seven
+  tabs (3D · Pieces · Seams · Adjust · Compare · History · Files) with the old twelve as
+  addressable sub-views. "Since the run before" moved to History without the `null → value`
+  noise of new defaults. The 3D toolbar: Show ▾ (layers, named on the button; vents, vent
+  sizes, dimensions; the hint), quick Vents and Dimensions, one Design · Rain · Drape · Unfold
+  switch (Water beside it on the drape), Measure, Simulate ▾ (rain ≈ 1 min, drape ≈ 40 min, what
+  runs shown beside it), Check list. Every old control is still there.
+- **The look:** `studio.css` after `styles.css`: Work Sans everywhere, 8 px corners, 32 px
+  controls (40 px on a touch screen), the near-black header, page heads; the Desk keeps
+  desk.css. A full design system and dark mode for the whole studio (step 7) are not done:
+  not cheap with the many fixed colours in styles.css.
+- **Unsaved edits:** a form with changes (a Settings tab, shipping, B2B terms, Prices) asks
+  before a link leaves it and warns on closing the tab; moving between the Prices tabs keeps the
+  draft and does not ask.
+- **Rights are the server's:** nothing in the API changed except the extra `desk_approver` in
+  `/api/auth/me`; the menu only hides what the server refuses anyway, and a page for another
+  role says "Not for your account".
+- **Checks:** `apps/web/e2e/uinav.py` walks every section and sub-menu item for an admin, an
+  approver, an editor and a viewer, every Settings tab, every old address, a cover's 13 views
+  and a card's 4 tabs, the header on one line, at 1440 and 820 px, with screenshots
+  (out/uinew/). desk_pictures, questions, measure, prices, priceimport, arrangements_desk, b2b
+  and flow follow the new addresses.
+- **Not done (owner questions or later steps):** one approval (Q2), the workshop role and page
+  (Q4), owner-editable defaults (Q5, step 4), one approver list (step 3), Dutch UI (Q1: stays
+  English), Covers merged into one filter row and the search over everything (steps 8–9).
