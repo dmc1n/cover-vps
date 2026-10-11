@@ -4008,3 +4008,5 @@ once, on first read or through `scripts/desk_fingerprints.py --dry-run|--apply`.
 “fingerprint recorded for an earlier approval”; older different cuts are not inferred approved.
 A missing current cut cannot be grandfathered. New approvals require a built cut. Gate settings
 and the logged admin override still apply. Migration validation uses temporary fixtures only.
+
+2026-10-11: On-demand size drawings are published atomically after PDF completion and branding; definitive approval refuses PDFs with no pages with HTTP 400 before recording approval (ADR-080).

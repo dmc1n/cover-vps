@@ -18,6 +18,7 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 import igl
@@ -1003,14 +1004,20 @@ def write_drawing(model_dir: Path, doc: dict[str, Any], params: EffectiveParams,
     reference = find_reference(model_dir, cover.model_id)
     figures = [_overview(cover, params, reference), *_size_pages(cover, params, reference)]
     figures += [_panel_page(cover, p, params) for p in doc["panels"]]
-    with PdfPages(
-        out, metadata={"CreationDate": None, "Creator": f"cover-pattern-engine {__version__}"}
-    ) as pdf:
-        for fig in figures:
-            pdf.savefig(fig, dpi=DPI)
     from coverengine.export.brand import brand
 
-    return brand(out)
+    # Requests can overlap: never expose an unfinished PDF as a fresh cached drawing.
+    with TemporaryDirectory(dir=out.parent) as temporary:
+        pending = Path(temporary) / out.name
+        with PdfPages(
+            pending,
+            metadata={"CreationDate": None, "Creator": f"cover-pattern-engine {__version__}"},
+        ) as pdf:
+            for fig in figures:
+                pdf.savefig(fig, dpi=DPI)
+        brand(pending)
+        pending.replace(out)
+    return out
 
 
 def ensure_sizes(model_dir: Path, params: EffectiveParams | None = None) -> Path | None:
