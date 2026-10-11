@@ -268,6 +268,8 @@ uv run python scripts/bbq_models.py OUT [--only a,b] [--steps build,cover,check]
                                              audited and re-measured (ADR-119; list and sources in docs/plans/bbq-covers.md)
 apps/web/e2e/bbq.py                         the configurator's barbecue option in a real browser (ADR-119; usage in its docstring)
 3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
+apps/web/e2e/uiaudit.py | uiaudit_proto.py   every studio page at 1440/820 px with control counts; the proposed layout's
+                                             prototype (out/uiaudit/prototype/index.html, static) — docs/plans/studio-ui.md
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/
