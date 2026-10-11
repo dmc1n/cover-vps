@@ -45,6 +45,7 @@ def state(model_dir: Path) -> dict[str, Any] | None:
 
 
 def approve(model_dir: Path, username: str, name: str, note: str = "") -> dict[str, Any]:
+    import pymupdf
     from coverengine.export.drawing import ensure_sizes
 
     ensure_sizes(model_dir)  # the size drawing is made when it is needed (ADR-080)
@@ -53,6 +54,10 @@ def approve(model_dir: Path, username: str, name: str, note: str = "") -> dict[s
     ]
     if missing:
         raise ValueError(f"nothing to approve yet: {', '.join(missing)} missing")
+    for filename in STAMPED:
+        with pymupdf.open(model_dir / filename) as pdf:
+            if not pdf.page_count:
+                raise ValueError(f"nothing to approve yet: {filename} has no pages; regenerate it")
     revs = revisions(model_dir)
     doc = {
         "approved_by": username,
@@ -62,8 +67,8 @@ def approve(model_dir: Path, username: str, name: str, note: str = "") -> dict[s
         "note": note,
         "files": fingerprint(model_dir),
     }
-    (model_dir / APPROVAL_JSON).write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     stamp(model_dir, doc)
+    (model_dir / APPROVAL_JSON).write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     set_info(model_dir, {"status": "production"})
     return {**doc, "valid": True}
 
