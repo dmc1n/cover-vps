@@ -120,3 +120,96 @@ def test_the_cutting_dxf_waits_for_approval(app: Any) -> None:
     assert vera.get(url).status_code == 200
     assert vera.get("/api/models/suns-chair/files/cut.dxf").status_code == 200  # scope: drawings
     assert vera.get("/api/desk/drawing-a").json()["dxf_ok"] is False
+
+
+def test_drawing_fingerprint_reopens_and_revision_gate(app: Any, tmp_path: Path) -> None:
+    from coverapi import desk
+
+    d = tmp_path / "data/models/drawing-a"
+    rens = login(app, "rens")
+    viewer = login(app, "vera")
+    old = d / "revisions/001"
+    unapproved = d / "revisions/002"
+    old.mkdir(parents=True)
+    unapproved.mkdir()
+    (old / "cut.dxf").write_bytes((d / "cut.dxf").read_bytes())
+    (unapproved / "cut.dxf").write_text("never approved")
+    base = "/api/models/drawing-a"
+    assert viewer.get(f"{base}/revisions/001/cut.dxf").status_code == 403
+    approved = rens.post("/api/desk/drawing-a", json={"action": "approve"}).json()
+    cut = desk.cut_fingerprint(d)
+    assert approved["approved"]["cut"] == cut
+    assert approved["approved_fingerprints"] == [cut]
+    assert viewer.get(f"{base}/revisions/001/cut.dxf").status_code == 200
+    assert viewer.get(f"{base}/revisions/002/cut.dxf").status_code == 403
+    rens.post("/api/desk/drawing-a", json={"action": "produced"})
+    (d / "cut.dxf").write_text("rebuilt cut")
+    assert viewer.get(f"{base}/files/cut.dxf").status_code == 403
+    st = desk.state(d)
+    assert st["status"] == desk.WAITING
+    assert "approved" not in st and "produced" not in st
+    assert st["history"][-1]["action"] == "changed after approval"
+    assert json.loads((d / "cover.json").read_text())["status"] == "draft"
+    assert viewer.get(f"{base}/revisions/001/cut.dxf").status_code == 200
+    assert viewer.get(f"{base}/revisions/002/cut.dxf").status_code == 403
+    rens.post("/api/desk/drawing-a", json={"action": "approve"})
+    assert desk.state(d)["approved_fingerprints"] == [cut, desk.cut_fingerprint(d)]
+    assert viewer.get(f"{base}/files/cut.dxf").status_code == 200
+
+
+@pytest.mark.parametrize("status", ["approved", "produced"])
+def test_drawing_legacy_approval_is_grandfathered(app: Any, tmp_path: Path, status: str) -> None:
+    from coverapi import desk
+
+    d = tmp_path / "data/models/drawing-a"
+    (d / "desk.json").write_text(
+        json.dumps({"status": status, "approved": {"by": "Rens", "time": 123}, "history": []})
+    )
+    assert login(app, "vera").get("/api/models/drawing-a/files/cut.dxf").status_code == 200
+    st = desk.state(d)
+    assert st["status"] == status
+    assert st["approved"]["by"] == "Rens"
+    assert st["approved"]["cut"] == desk.cut_fingerprint(d)
+    assert st["history"][-1]["text"] == "fingerprint recorded for an earlier approval"
+    assert len(st["history"]) == 1
+    (d / "cut.dxf").write_text("changed later")
+    assert desk.state(d)["status"] == desk.WAITING
+
+
+def test_drawing_fingerprint_migration_is_read_only_and_idempotent(tmp_path: Path) -> None:
+    import importlib.util
+
+    script = Path(__file__).resolve().parents[3] / "scripts/desk_fingerprints.py"
+    spec = importlib.util.spec_from_file_location("desk_fingerprints", script)
+    assert spec and spec.loader
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    d = _model(tmp_path, "drawing-old", None, None)
+    path = d / "desk.json"
+    original = json.dumps({"status": "produced", "history": [], "approved": {"by": "Rens"}})
+    path.write_text(original)
+    assert migration.main(["--models", str(d.parent), "--dry-run"]) == 0
+    assert path.read_text() == original
+    assert migration.main(["--models", str(d.parent), "--apply"]) == 0
+    recorded = path.read_text()
+    assert migration.migrate(d.parent, apply=True) == []
+    assert path.read_text() == recorded
+    assert len(json.loads(recorded)["history"]) == 1
+
+
+def test_drawing_approval_requires_cut_and_missing_cut_reopens(app: Any, tmp_path: Path) -> None:
+    from coverapi import desk
+
+    d = tmp_path / "data/models/drawing-e"
+    rens = login(app, "rens")
+    (d / "cut.dxf").unlink()
+    assert rens.post("/api/desk/drawing-e", json={"action": "approve"}).status_code == 400
+    assert not (d / "desk.json").exists()
+    (d / "cut.dxf").write_text("approved cut")
+    rens.post("/api/desk/drawing-e", json={"action": "approve"})
+    (d / "cut.dxf").unlink()
+    # A plain Desk read reopens it, even before any download attempt.
+    assert desk.state(d)["status"] == desk.WAITING
+    assert (
+        len([e for e in desk.state(d)["history"] if e["action"] == "changed after approval"]) == 1
+    )

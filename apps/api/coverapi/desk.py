@@ -67,7 +67,7 @@ PICTURE_RE = re.compile(r"^[0-9]{8}-[0-9]{6}-[0-9]{1,4}\.png$")
 PICTURE_FORMATS = ("JPEG", "PNG", "WEBP")
 WITH_PICTURES = ("reject", "note", "fit")
 MB = 1024 * 1024  # param-ok: bytes in a megabyte
-_lock = threading.Lock()
+_lock = threading.RLock()
 ARRANGEMENT_PREFIX = "arr-"
 ARRANGEMENT_JSON = "arrangement.json"  # as coverengine.arrange
 WAITING = "ai-checked"  # an arrangement sent to the Desk: ready for approval (ADR-115)
@@ -106,12 +106,54 @@ def _write(path: Path, doc: Any) -> None:
 
 
 def state(d: Path) -> dict[str, Any]:
-    doc = _read(d / "desk.json")
-    doc.setdefault("status", "new")
-    doc.setdefault("history", [])
-    if doc["status"] == "new" and (d / "check.json").is_file():
-        doc["status"] = "ai-checked"
-    return doc
+    with _lock:
+        doc = _read(d / "desk.json")
+        doc.setdefault("status", "new")
+        doc.setdefault("history", [])
+        if doc["status"] == "new" and (d / "check.json").is_file():
+            doc["status"] = "ai-checked"
+        if grandfather_fingerprint(d, doc):
+            _write(d / "desk.json", doc)
+        if (
+            d.name.startswith("drawing-")
+            and doc["status"] in DONE
+            and (doc.get("approved") or {}).get("cut")
+            and _changed_since_approval(d, doc)
+        ):
+            from coverengine.catalogue import set_info
+
+            entry = _reopen(
+                d,
+                doc,
+                "the studio",
+                "changed after approval",
+                "the cut file changed after the approval",
+            )
+            _write(d / "desk.json", doc)
+            _catalogue(d, WAITING, set_info)
+            _log(d.parent.parent / "learning", d, entry)
+        return doc
+
+
+def grandfather_fingerprint(d: Path, doc: dict[str, Any]) -> bool:
+    """Amend an earlier drawing approval once; caller holds _lock and saves the document."""
+    if not d.name.startswith("drawing-") or doc.get("status") not in DONE:
+        return False
+    approved = doc.get("approved") or {}
+    if approved.get("cut") or not (cut := cut_fingerprint(d)):
+        return False
+    doc["approved"] = {**approved, "cut": cut}
+    doc["approved_fingerprints"] = list(dict.fromkeys([*doc.get("approved_fingerprints", []), cut]))
+    doc.setdefault("history", []).append(
+        {
+            "action": "fingerprint recorded",
+            "by": "the studio",
+            "time": time.time(),
+            "text": "fingerprint recorded for an earlier approval",
+            "cut": cut,
+        }
+    )
+    return True
 
 
 def check(d: Path) -> dict[str, Any]:
@@ -221,9 +263,15 @@ def refuse_no_cover(d: Path, action: str) -> None:
         raise HTTPException(409, f"{d.name} needs no cover (not on the Desk): nothing to {action}")
 
 
-def dxf_allowed(d: Path, params: Any) -> bool:
+def dxf_allowed(d: Path, params: Any, revision: Path | None = None) -> bool:
     if not bool(params["desk.require_approval_for_dxf"]):
         return True
+    if d.name.startswith("drawing-"):
+        st = state(d)
+        if revision is not None:
+            cut = cut_fingerprint(revision)
+            return cut is not None and cut in st.get("approved_fingerprints", [])
+        return st["status"] in DONE and not _changed_since_approval(d, st)
     if is_arrangement(d) and bool(params["desk.gate_arrangements"]):
         # an arrangement waits for its approval whatever gate_scope says, and an approval of
         # an older cut file or placement does not count (ADR-115)
@@ -245,7 +293,7 @@ def is_arrangement(d: Path) -> bool:
 
 
 def cut_fingerprint(d: Path) -> str | None:
-    """The cutting table's file as it is now: what an approval of an arrangement is for."""
+    """The cutting table's file as it is now: what a Desk approval is for."""
     import hashlib
 
     f = d / "cut.dxf"
@@ -265,7 +313,7 @@ def _changed_since_approval(d: Path, st: dict[str, Any]) -> list[str]:
     out = []
     if not ok.get("cut") or ok["cut"] != cut_fingerprint(d):
         out.append("the cut file")
-    if ok.get("placement") and ok["placement"] != _placement(d):
+    if is_arrangement(d) and ok.get("placement") and ok["placement"] != _placement(d):
         out.append("the members or the plan")
     return out
 
@@ -562,13 +610,21 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
         who = user.name or user.username
         entry: dict[str, Any] = {"action": a.action, "by": who, "time": now}
         if a.action == "approve":
-            cut = cut_fingerprint(d) if is_arrangement(d) else None
-            if is_arrangement(d) and cut is None:
+            cut = cut_fingerprint(d) if is_arrangement(d) or d.name.startswith("drawing-") else None
+            if (is_arrangement(d) or d.name.startswith("drawing-")) and cut is None:
                 raise HTTPException(
-                    400, "Build the arrangement's cutting file before approving it."
+                    400,
+                    "Build the arrangement's cutting file before approving it."
+                    if is_arrangement(d)
+                    else "Build the cover's cutting file before approving it.",
                 )
             st["status"] = "approved"
             st["approved"] = {"by": who, "time": now}
+            if cut is not None:
+                st["approved"]["cut"] = cut
+                st["approved_fingerprints"] = list(
+                    dict.fromkeys([*st.get("approved_fingerprints", []), cut])
+                )
             if is_arrangement(d):  # what the approval is for (ADR-115)
                 st["approved"] |= {"cut": cut, "placement": _placement(d)}
             st.pop("rejected", None)
@@ -619,7 +675,10 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
             if i is None:
                 raise HTTPException(409, "nothing to undo")
             hist[i]["undone"] = True
+            fingerprints = st.get("approved_fingerprints", [])
             st = {**hist[i]["before"], "history": hist}
+            if fingerprints:
+                st["approved_fingerprints"] = fingerprints
             entry = {"action": "undo", "by": who, "time": now, "undid": hist[i].get("action")}
             st["history"].append(entry)
             _write(d / "desk.json", st)
@@ -1091,7 +1150,7 @@ def install(app: FastAPI, store: Any) -> None:
         return apply(folder(model_id), a, user, learning)
 
 
-def gate(d: Path, model_id: str, request: Request) -> None:
+def gate(d: Path, model_id: str, request: Request, revision: Path | None = None) -> None:
     """The cutting table's DXF only for an approved cover (ADR-079); an admin may override
     with ?override=1, which the desk's history keeps."""
     from coverengine.params import Registry
@@ -1099,7 +1158,7 @@ def gate(d: Path, model_id: str, request: Request) -> None:
     from coverapi.security import current_user
 
     params = Registry.load(None).resolve()
-    if dxf_allowed(d, params):
+    if dxf_allowed(d, params, revision):
         return
     user = current_user(request)
     if request.query_params.get("override") == "1" and user.may("admin"):

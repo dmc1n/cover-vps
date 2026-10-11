@@ -5,6 +5,7 @@
 // Wout for approval; a change after that sends it back for approval by itself (ADR-115).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Job, type ModelBrief } from "./api";
+import { arrangementHref, deskHref, modelHref } from "./nav";
 
 interface Member {
   model_id: string;
@@ -202,7 +203,7 @@ function DeskStatus({
           </button>
         )}
         {(desk.at_desk || desk.sent) && (
-          <a href={`#/desk/${id}`}>Open its Desk card ↗</a>
+          <a href={deskHref(id)}>Open its Desk card ↗</a>
         )}
       </div>
     </div>
@@ -559,9 +560,7 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
               <button
                 key={l.id}
                 className="link"
-                onClick={() =>
-                  (window.location.hash = `#/arrangements/${l.id}`)
-                }
+                onClick={() => (window.location.hash = arrangementHref(l.id))}
               >
                 {l.name}{" "}
                 {l.desk && (
@@ -801,7 +800,7 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
           )}
           {built && (
             <p>
-              <a href={`#/model/${built}`}>Open the model ↗</a>{" "}
+              <a href={modelHref(built)}>Open the model ↗</a>{" "}
               <span className="muted">(3D, dimensions, air vents, Unfold)</span>
             </p>
           )}

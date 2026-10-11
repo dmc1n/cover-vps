@@ -2,6 +2,7 @@
 // see what was linked through which column, pick another column and apply again; and on a
 // card the products of a drawing cover, or the drawings a SUNS model is linked to.
 import { useEffect, useRef, useState } from "react";
+import { deskHref } from "./nav";
 import "./desk.css";
 import "./desk-products.css";
 
@@ -40,7 +41,10 @@ export interface ProductList {
 const SHOWN_ROWS = 12;
 const sunsName = (id: string) => id.replace(/^suns-/, "").replace(/-/g, " ");
 
-async function send(file: File | null, column: string): Promise<ProductsResult> {
+async function send(
+  file: File | null,
+  column: string,
+): Promise<ProductsResult> {
   const form = new FormData();
   if (file) form.append("file", file);
   if (column) form.append("column", column);
@@ -57,7 +61,10 @@ export function ProductsUpload({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [res, setRes] = useState<ProductsResult | null>(null);
-  const [last, setLast] = useState<{ file: string | null; time?: number } | null>(null);
+  const [last, setLast] = useState<{
+    file: string | null;
+    time?: number;
+  } | null>(null);
   useEffect(() => {
     fetch("/api/desk-products")
       .then((r) => (r.ok ? r.json() : null))
@@ -184,7 +191,8 @@ export function ProductsSummary({
         {res.files.map((f) => (
           <li key={f.file} className={f.error ? "bad" : ""}>
             {f.file}:{" "}
-            {f.error ?? `${f.rows} rows in ${f.tables} sheet${f.tables === 1 ? "" : "s"}`}
+            {f.error ??
+              `${f.rows} rows in ${f.tables} sheet${f.tables === 1 ? "" : "s"}`}
           </li>
         ))}
         {res.suns && (
@@ -211,7 +219,8 @@ export function ProductsSummary({
       </ul>
       {twice.length > 0 && (
         <div className="dp-warn">
-          <strong>One code, two products</strong> — both are on the drawing; worth a look:
+          <strong>One code, two products</strong> — both are on the drawing;
+          worth a look:
           <ul>
             {twice.map(([code, names]) => (
               <li key={code}>
@@ -236,13 +245,15 @@ export function ProductsSummary({
               </tr>
             </thead>
             <tbody>
-              {unmatched.slice(0, allRows ? undefined : SHOWN_ROWS).map((r, i) => (
-                <tr key={i}>
-                  {heads.map((h) => (
-                    <td key={h}>{r[h]}</td>
-                  ))}
-                </tr>
-              ))}
+              {unmatched
+                .slice(0, allRows ? undefined : SHOWN_ROWS)
+                .map((r, i) => (
+                  <tr key={i}>
+                    {heads.map((h) => (
+                      <td key={h}>{r[h]}</td>
+                    ))}
+                  </tr>
+                ))}
             </tbody>
           </table>
           {unmatched.length > SHOWN_ROWS && (
@@ -310,9 +321,11 @@ export function ProductsPanel({ list }: { list: ProductList }) {
       </div>
       {(suns.linked.length > 0 || suns.suggested.length > 0) && (
         <div className="dp-suns">
-          {suns.linked.length > 0 && <span className="dp-sub">SUNS models</span>}
+          {suns.linked.length > 0 && (
+            <span className="dp-sub">SUNS models</span>
+          )}
           {suns.linked.map((id) => (
-            <a key={id} className="dp-chip" href={`#/desk/${id}`}>
+            <a key={id} className="dp-chip" href={deskHref(id)}>
               {sunsName(id)}
             </a>
           ))}
@@ -323,7 +336,7 @@ export function ProductsPanel({ list }: { list: ProductList }) {
             <a
               key={id}
               className="dp-chip soft"
-              href={`#/desk/${id}`}
+              href={deskHref(id)}
               title="Same family; the type could not be confirmed from the description"
             >
               {sunsName(id)}?
@@ -344,7 +357,7 @@ function DrawingRefs({ refs, soft }: { refs: Ref[]; soft?: boolean }) {
     <ul className="dp-refs">
       {refs.map((r) => (
         <li key={r.id}>
-          <a className={`dp-chip ${soft ? "soft" : ""}`} href={`#/desk/${r.id}`}>
+          <a className={`dp-chip ${soft ? "soft" : ""}`} href={deskHref(r.id)}>
             {r.code}
             {soft && "?"}
           </a>

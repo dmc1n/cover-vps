@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { fileUrl } from "./api";
+import { modelHref } from "./nav";
 import { ProductsSummary, type ProductsResult } from "./DeskProducts";
 
 // Learning: upload one zip with the owner's drawings and their 3D models, paired by name
@@ -21,11 +22,16 @@ export function Learning() {
   // a zip with the product list and no drawings goes to the Desk's product list (ADR-091)
   const [products, setProducts] = useState<ProductsResult | null>(null);
   const load = useCallback(() => {
-    fetch("/api/references").then((r) => r.json()).then(setBatches).catch((e) => setError(String(e)));
+    fetch("/api/references")
+      .then((r) => r.json())
+      .then(setBatches)
+      .catch((e) => setError(String(e)));
   }, []);
   useEffect(load, [load]);
   useEffect(() => {
-    const busy = batches?.some((b) => b.pairs.some((p) => p.status === "queued" || p.status === "running"));
+    const busy = batches?.some((b) =>
+      b.pairs.some((p) => p.status === "queued" || p.status === "running"),
+    );
     if (!busy) return;
     const t = window.setInterval(load, 5000);
     return () => window.clearInterval(t);
@@ -38,7 +44,8 @@ export function Learning() {
     form.append("file", file);
     const xhr = new XMLHttpRequest(); // XHR for upload progress on a large zip
     xhr.open("POST", "/api/references");
-    xhr.upload.onprogress = (e) => e.lengthComputable && setProgress(Math.round((100 * e.loaded) / e.total));
+    xhr.upload.onprogress = (e) =>
+      e.lengthComputable && setProgress(Math.round((100 * e.loaded) / e.total));
     xhr.onload = () => {
       setProgress(null);
       if (xhr.status >= 300) {
@@ -70,22 +77,35 @@ export function Learning() {
       <section className="card upload">
         <h2>Learn from your own covers</h2>
         <p className="muted">
-          One zip with your drawings and their 3D models, with the same name for each pair: <code>1.step</code> +{" "}
-          <code>1.pdf</code>, <code>2.stp</code> + <code>2.pdf</code>, or <code>kota.glb</code> + <code>kota.pdf</code>. Folders
-          inside the zip do not matter. Every pair is calculated and shown next to your drawing.
+          One zip with your drawings and their 3D models, with the same name for
+          each pair: <code>1.step</code> + <code>1.pdf</code>,{" "}
+          <code>2.stp</code> + <code>2.pdf</code>, or <code>kota.glb</code> +{" "}
+          <code>kota.pdf</code>. Folders inside the zip do not matter. Every
+          pair is calculated and shown next to your drawing.
         </p>
         <div className="row">
-          <input type="file" accept=".zip" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          <button className="primary" disabled={!file || progress !== null} onClick={send}>
-            {progress !== null ? `Uploading ${progress} %` : "Upload and calculate"}
+          <input
+            type="file"
+            accept=".zip"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+          <button
+            className="primary"
+            disabled={!file || progress !== null}
+            onClick={send}
+          >
+            {progress !== null
+              ? `Uploading ${progress} %`
+              : "Upload and calculate"}
           </button>
         </div>
         {error && <p className="error">{error}</p>}
         {products && (
           <div className="desk dp-host">
             <p className="muted">
-              This zip held the product list and no drawings: it was linked to the drawing covers. See them at{" "}
-              <a href="#/desk">the Desk</a>.
+              This zip held the product list and no drawings: it was linked to
+              the drawing covers. See them at <a href="#/work/desk">the Desk</a>
+              .
             </p>
             <ProductsSummary res={products} onClose={() => setProducts(null)} />
           </div>
@@ -99,24 +119,44 @@ export function Learning() {
       ) : (
         batches.map((b) => (
           <section key={b.id} className="card">
-            <strong>{b.file}</strong> <span className="muted">· {b.id} · {b.pairs.length} pairs</span>
+            <strong>{b.file}</strong>{" "}
+            <span className="muted">
+              · {b.id} · {b.pairs.length} pairs
+            </span>
             {(b.drawings_only ?? []).length > 0 && (
               <p className="muted">
-                {b.drawings_only!.length} drawings without a 3D model: kept for the analysis of your covers.
+                {b.drawings_only!.length} drawings without a 3D model: kept for
+                the analysis of your covers.
               </p>
             )}
             {b.unpaired.length > 0 && (
-              <p className="muted">Without a partner (not used): {b.unpaired.join(", ")}</p>
+              <p className="muted">
+                Without a partner (not used): {b.unpaired.join(", ")}
+              </p>
             )}
             <div className="gallery">
               {b.pairs.map((p) => (
-                <a key={p.model_id} className="product" href={`#/model/${p.model_id}`}>
+                <a
+                  key={p.model_id}
+                  className="product"
+                  href={modelHref(p.model_id)}
+                >
                   <div className="pics">
-                    <img loading="lazy" src={fileUrl(p.model_id, "reference.png")} alt="your drawing" />
+                    <img
+                      loading="lazy"
+                      src={fileUrl(p.model_id, "reference.png")}
+                      alt="your drawing"
+                    />
                     {p.status === "done" ? (
-                      <img loading="lazy" src={fileUrl(p.model_id, "cover.png")} alt="calculated cover" />
+                      <img
+                        loading="lazy"
+                        src={fileUrl(p.model_id, "cover.png")}
+                        alt="calculated cover"
+                      />
                     ) : (
-                      <div className="nopic">{p.status === "failed" ? "failed" : "calculating…"}</div>
+                      <div className="nopic">
+                        {p.status === "failed" ? "failed" : "calculating…"}
+                      </div>
                     )}
                   </div>
                   <div className="name">{p.name}</div>
@@ -133,31 +173,57 @@ export function Learning() {
   );
 }
 
-export function Drawing({ id, files, stamp }: { id: string; files: string[]; stamp: number }) {
-  const [ref, setRef] = useState<{ sizes: { text: string; mm: number; line: string }[]; vector_paths: number } | null>(
-    null,
-  );
+export function Drawing({
+  id,
+  files,
+  stamp,
+}: {
+  id: string;
+  files: string[];
+  stamp: number;
+}) {
+  const [ref, setRef] = useState<{
+    sizes: { text: string; mm: number; line: string }[];
+    vector_paths: number;
+  } | null>(null);
   const [calc, setCalc] = useState<{ label: string; mm: number }[]>([]);
   useEffect(() => {
-    fetch(`${fileUrl(id, "reference.json")}?v=${stamp}`).then((r) => r.json()).then(setRef).catch(() => setRef(null));
-    fetch(`/api/models/${id}/sizes`).then((r) => r.json()).then(setCalc).catch(() => setCalc([]));
+    fetch(`${fileUrl(id, "reference.json")}?v=${stamp}`)
+      .then((r) => r.json())
+      .then(setRef)
+      .catch(() => setRef(null));
+    fetch(`/api/models/${id}/sizes`)
+      .then((r) => r.json())
+      .then(setCalc)
+      .catch(() => setCalc([]));
   }, [id, stamp]);
-  if (!files.includes("reference.png")) return <p className="muted">No drawing for this product.</p>;
+  if (!files.includes("reference.png"))
+    return <p className="muted">No drawing for this product.</p>;
   return (
     <>
       <div className="side">
         <figure>
-          <img src={`${fileUrl(id, "reference.png")}?v=${stamp}`} alt="your drawing" />
+          <img
+            src={`${fileUrl(id, "reference.png")}?v=${stamp}`}
+            alt="your drawing"
+          />
           <figcaption>
             Your drawing ·{" "}
-            <a href={fileUrl(id, "reference.pdf")} target="_blank" rel="noreferrer">
+            <a
+              href={fileUrl(id, "reference.pdf")}
+              target="_blank"
+              rel="noreferrer"
+            >
               PDF
             </a>
           </figcaption>
         </figure>
         <figure>
           {files.includes("cover.png") ? (
-            <img src={`${fileUrl(id, "cover.png")}?v=${stamp}`} alt="calculated cover" />
+            <img
+              src={`${fileUrl(id, "cover.png")}?v=${stamp}`}
+              alt="calculated cover"
+            />
           ) : (
             <div className="nopic">not calculated yet</div>
           )}
@@ -165,7 +231,10 @@ export function Drawing({ id, files, stamp }: { id: string; files: string[]; sta
         </figure>
       </div>
       {ref && ref.vector_paths === 0 && (
-        <p className="error">This drawing is a picture (a scan or photo): the program cannot read its lines, only its texts.</p>
+        <p className="error">
+          This drawing is a picture (a scan or photo): the program cannot read
+          its lines, only its texts.
+        </p>
       )}
       <div className="side">
         <section>

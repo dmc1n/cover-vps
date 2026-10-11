@@ -244,24 +244,24 @@ uv run python scripts/film/story_frames.py OUT --name storyN --chapters DIR | --
 make e2e        the web app flow in a real browser (Playwright in Docker)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
 apps/web/e2e/prices.py                      Prices & costing in a real browser (ADR-098; usage in its docstring)
-Desk → Questions (#/questions)              the owner's and the workshop's questions, answered in the studio (ADR-109)
+Work → Questions (#/work/questions)         the owner's and the workshop's questions, answered in the studio (ADR-109)
 COVER_DATA_DIR=~/cover-data uv run python scripts/questions.py new|ack|done ID "note"|list|show ID|add F|import [--dry-run]|mail
                                              the daily processing of the answers; the import of 9 Oct (ADR-109)
 apps/web/e2e/questions.py                   the Questions tab in a real browser, Edge with office policies (ADR-109)
 apps/web/e2e/b2c.py                         the public consumer shop, desktop and 390 px, through the Worker (ADR-103)
 apps/web/e2e/suggest_layout.py              the configurator's photo/link box in Chromium, WebKit, Firefox at 4 widths (ADR-112)
 apps/web/e2e/stock_order.py                 an existing cover ordered directly: card, price, delivery promise, checkout (ADR-118)
-Admin → Photo test                          a photo suggestion step by step: image search, identification, searches, scores (ADR-112)
+Shop → Tools → Photo test                   a photo suggestion step by step: image search, identification, searches, scores (ADR-112)
                                              final sizing uses suggest.final_model/final_thinking; ledger: "suggest final"
 
 node apps/web/e2e/site_serve.mjs [--port N]  this build of the website locally, data from the preview (ADR-106)
 apps/web/e2e/site_rain.py | site_3d.py | site_perf.py   the website: rain keeps falling, 3D loads lean, timings (ADR-106)
-Admin → Prices & costing (#/prices)         price set per channel, versioned in app.db; costing per cover (ADR-098)
+Prices (#/prices/<tab>)                     price set per channel, versioned in app.db; costing per cover (ADR-098)
 Prices & costing → Channels → Import prices (Excel)   a price list as fixed prices, into the draft only (ADR-113)
 COVER_DATA_DIR=~/cover-data uv run python scripts/prices_import.py FILE [--channel b2c] [--incl-vat|--ex-vat] [--json OUT] [--apply]
                                              the same matching report; --apply writes the draft, never publishes (ADR-113)
 apps/web/e2e/priceimport.py                 the import in a real browser (sample: e2e/priceimport_sheet.py; usage in its docstring)
-<website>/b2b, Admin → B2B customers        the B2B shop: business logins, own prices ex VAT, orders on account with atomic checkout, retry keys and restart dispatch recovery (ADR-104)
+<website>/b2b, Shop → B2B customers         the B2B shop: business logins, own prices ex VAT, orders on account with atomic checkout, retry keys and restart dispatch recovery (ADR-104)
 apps/web/e2e/b2b.py                         the B2B shop in a real browser (ADR-104; usage in its docstring)
 apps/web/e2e/measure.py                     Measure, Vent sizes, the check list and measured fits in a real browser (ADR-111)
 Arrangements → Send to the Desk; Desk → ARR   an arrangement approved by Rens or Wout; a change reopens it; DXF after approval (ADR-115)
@@ -273,6 +273,10 @@ uv run python scripts/bbq_models.py OUT [--only a,b] [--steps build,cover,check]
                                              audited and re-measured (ADR-119; list and sources in docs/plans/bbq-covers.md)
 apps/web/e2e/bbq.py                         the configurator's barbecue option in a real browser (ADR-119; usage in its docstring)
 3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
+apps/web/e2e/uinav.py                       the studio's map (ADR-122): every menu item per role, every old address, a
+                                             cover's and a Desk card's tabs, 1440/820 px, screenshots; docs/handbook/navigation.md
+apps/web/e2e/uiaudit.py | uiaudit_proto.py   every studio page at 1440/820 px with control counts; the proposed layout's
+                                             prototype (out/uiaudit/prototype/index.html, static) — docs/plans/studio-ui.md
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
 make shapes     procedural test shapes into testdata/generated/
@@ -323,3 +327,7 @@ Staging scripts validate output roots and model destinations with
   logs or reports.
 - Write the operator handbook in docs/handbook/ as features land; the owner is the first user.
 - Keep this file current in the same commit as the change it describes.
+
+Drawing Desk approvals record the cut fingerprint (ADR-120); changed cuts return to waiting.
+Historical DXFs require an approved fingerprint. Earlier approvals are grandfathered lazily or
+with `uv run python scripts/desk_fingerprints.py --dry-run|--apply` (COVER_DATA_DIR/models).

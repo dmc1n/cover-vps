@@ -1,3 +1,4 @@
+import { useUnsaved } from "./unsaved";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChannelKey,
@@ -24,13 +25,21 @@ import { PriceImport } from "./PriceImport";
 // config/defaults.yaml). Live examples beside the settings cost one real cover with the numbers
 // as they are typed (POST /api/prices/check), so the owner sees what a number does.
 
+// The tabs are the Prices section's sub-menu, in the address (#/prices/<tab>, ADR-122).
 type Sub =
-  "materials" | "labour" | "rate" | "channels" | "costing" | "versions";
+  | "materials"
+  | "labour"
+  | "rate"
+  | "channels"
+  | "import"
+  | "costing"
+  | "versions";
 const SUBS: [Sub, string][] = [
   ["materials", "Materials"],
   ["labour", "Labour"],
   ["rate", "Exchange rate"],
   ["channels", "Channels & price lists"],
+  ["import", "Import (Excel)"],
   ["costing", "Costing"],
   ["versions", "Versions"],
 ];
@@ -78,11 +87,19 @@ const OPERATION_HELP: Record<string, string> = {
   pack: "Once per cover: folding, bagging and boxing. Example 6.5 min.",
 };
 
-export function Prices({ canEdit }: { canEdit: boolean }) {
+export function Prices({
+  canEdit,
+  sub: subIn = "materials",
+}: {
+  canEdit: boolean;
+  sub?: string;
+}) {
   const [state, setState] = useState<PricesState | null>(null);
   const [doc, setDoc] = useState<PriceSet | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [sub, setSub] = useState<Sub>("materials");
+  const sub: Sub = SUBS.some(([k]) => k === subIn)
+    ? (subIn as Sub)
+    : "materials";
   const [msg, setMsg] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
   const [moves, setMoves] = useState<{
@@ -137,6 +154,7 @@ export function Prices({ canEdit }: { canEdit: boolean }) {
     }, 300);
     return () => clearTimeout(t);
   }, [doc, example]);
+  useUnsaved("prices", dirty, "#/prices/"); // leaving with numbers not saved as a draft asks first
   if (!state || !doc) return <p className="muted">{msg || "Loading…"}</p>;
   const edit = canEdit && state.can_edit;
   const update = (fn: (d: PriceSet) => void) => {
@@ -343,22 +361,14 @@ export function Prices({ canEdit }: { canEdit: boolean }) {
         {msg && <p className="muted">{msg}</p>}
       </section>
       {moves && <Moves moves={moves} />}
-      <nav className="tabs">
-        {SUBS.map(([k, label]) => (
-          <button
-            key={k}
-            className={sub === k ? "active" : ""}
-            onClick={() => setSub(k)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
       <section className="tab">
         {sub === "materials" && <Materials {...ctx} />}
         {sub === "labour" && <Labour {...ctx} />}
         {sub === "rate" && <Rate {...ctx} />}
-        {sub === "channels" && edit && (
+        {sub === "import" && !edit && (
+          <p className="muted">An admin imports a price list.</p>
+        )}
+        {sub === "import" && edit && (
           <PriceImport
             beforeApply={async () => !dirty || (await saveDraft()).length === 0}
             onApplied={(m) => {

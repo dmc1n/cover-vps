@@ -9,11 +9,11 @@ An admin makes your account and sends you an invitation in English (by mail when
 server is set, or the link copied by hand). It says what Cover Studio is, gives your user name
 and a personal link, valid for 7 days, that works once. Open it, choose a password of at least
 12 characters (not your user name), and you are logged in. Forgot your password? Ask an admin
-(Admin → Users → Reset password, then confirm); the old password stops working.
+(Settings → Users & rights → Reset password, then confirm); the old password stops working.
 
 ## Inviting people (for example for a kickoff)
 
-Admin → Users:
+Settings → Users & rights:
 
 1. Add everyone (user name, name, e-mail, role, may approve). Untick **send the invitation
    now** to add people first and invite them all at once later.
@@ -55,16 +55,26 @@ On every model with cut pieces there is a block at the top:
 An editor who may not approve presses *Ask for approval*: the approvers get a mail with the
 link. Status *production* can only be set with a valid approval.
 
-## The admin page (Admin in the header)
+## Settings (was the admin page; the map: navigation.md)
 
-- **Users**: add, change role, may approve, active (an inactive user is logged out at once),
-  e-mail; *New link* / *Reset* makes a password link (shown to copy, and mailed when possible).
-- **Mail and address**: the outgoing mail server (SMTP: server, port, security, user name,
-  password, sender), a test mail; the public address used in links.
-- **Logged in**: who is logged in, since when and from where.
-- **Audit log**: every login, failed login, change, approval, with who and when.
-- **System**: version, disk, last backup, mail and AI state, open problems, the alert address
-  (mails when the server has a problem) and the last alerts.
+Since ADR-122 the old Admin page is split: the shop's work is under **Shop** (Orders, Requests,
+Matches, B2B customers, Website (AI), Photo test), the prices under **Prices**, and everything
+set once under **Settings** (admins), on tabs:
+
+- **Users & rights**: add, change role, may approve, active (an inactive user is logged out at
+  once), e-mail; *New link* / *Reset* makes a password link (shown to copy, and mailed when
+  possible).
+- **Mail & notifications**: who gets which mail (one list: configurator requests, server alerts
+  and B2B, new orders, the fit question, approval requests, the digests), the outgoing mail
+  server (SMTP: server, port, security, user name, password, sender), a test mail, the login
+  code by mail, the public address used in links.
+- **Logins & audit log**: who is logged in, since when and from where; every login, failed
+  login, change, approval, with who and when.
+- **System**: version, disk, last backup, mail and AI state, open problems and the last alerts
+  (the alert address itself is under Mail & notifications).
+- **Company & shop**, **B2B terms**, **Matching**, **Website & API keys**: the shop's settings
+  in plain words (below); **Desk & approval**, **Cover defaults**, **AI & spending**: the company
+  defaults from `config/defaults.yaml`, read-only.
 
 ## From the command line (the server)
 
@@ -115,11 +125,12 @@ The rain on the designed surface (the **Rain** button) stays, to compare.
 ## The cover webshop
 
 The shop is at **/shop/**: the landing page, the configurator, checkout and the order status.
-Three tabs on the admin page belong to it.
+Its settings are under Settings (Company & shop, Matching, Mail & notifications, Website & API
+keys); its work under Shop.
 
-- **Shop settings:** everything the shop needs (the public consumer shop: docs/handbook/webshop.md):
+- **Shop settings** (Settings → Company & shop and the tabs beside it): everything the shop needs (the public consumer shop: docs/handbook/webshop.md):
   - company data and domain;
-  - prices: on the **Prices & costing** tab now (versioned, B2C and B2B; docs/handbook/prices.md);
+  - prices: under **Prices** now (versioned, B2C and B2B; docs/handbook/prices.md);
   - delivery costs per country;
   - the Mollie key (`test_…` to try, `live_…` for real);
   - the balloon and frame products, colours, and the film's address: **film_url** (H.264),
@@ -197,7 +208,7 @@ covers comes from this studio (ADR-066).
 
 1. **Shop settings:** set `domain` to the website's domain (for example `example.com`) and,
    optionally, `logo_url`.
-2. **Admin, Shop settings:** make the website key (*New website key*, or
+2. **Settings → Website & API keys:** make the website key (*New website key*, or
    `POST /api/admin/shop/link-key`). It is shown once.
 3. **On the server, in `apps/site/`:**
    - `npx wrangler login` (or set `CLOUDFLARE_API_TOKEN`);

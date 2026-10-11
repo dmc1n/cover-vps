@@ -2,6 +2,7 @@
 // or says why it could not ("needs a person"). Nothing is guessed.
 import { useEffect, useState } from "react";
 import { api, type DrawingRead, type Job } from "./api";
+import { deskHref, modelHref } from "./nav";
 
 export function DrawingUpload() {
   const [file, setFile] = useState<File | null>(null);
@@ -86,8 +87,8 @@ export function DrawingUpload() {
           {read.features?.vents_from
             ? ` (count ${read.features.vents_from} on the drawing)`
             : ""}
-          . <a href={`#/model/${model}`}>Open the cover</a> ·{" "}
-          <a href={`#/desk/${model}`}>To the Desk</a>
+          . <a href={modelHref(model)}>Open the cover</a> ·{" "}
+          <a href={deskHref(model)}>To the Desk</a>
           {conflicts.length > 0 && (
             <span className="error">
               {" "}
@@ -107,10 +108,10 @@ export function DrawingUpload() {
               <li key={r}>{r}</li>
             ))}
           </ul>
-          <a href={`#/desk/${model}`}>It waits at the top of the Desk.</a>
+          <a href={deskHref(model)}>It waits at the top of the Desk.</a>
           <p className="muted">
-            Or let the AI read it: a proposal (about 1–5 cents), marked
-            "read by the AI", that a person approves at the Desk.
+            Or let the AI read it: a proposal (about 1–5 cents), marked "read by
+            the AI", that a person approves at the Desk.
           </p>
           <button
             disabled={running || !model}

@@ -26,7 +26,9 @@ import { AiAdvice } from "./AiAdvice";
 import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
 import { Gallery } from "./Gallery";
 import { QuickSearch } from "./QuickSearch";
-import { Admin, Website } from "./Admin";
+import { Matches, Orders, Requests, Website } from "./Admin";
+import { B2BCustomers } from "./B2BCustomers";
+import { PhotoTest } from "./PhotoTest";
 import { Prices } from "./Prices";
 import { Reference } from "./Reference";
 import {
@@ -38,25 +40,77 @@ import {
   Welcome,
 } from "./Session";
 import { Drawing, Learning } from "./Learning";
+import { ProductsUpload } from "./DeskProducts";
 import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
+import { SettingsArea } from "./SettingsArea";
 import { Viewer } from "./Viewer";
+import { installUnsavedGuard, mayLeave } from "./unsaved";
+import {
+  allowed,
+  deskHref,
+  MODEL_SUBS,
+  MODEL_TABS,
+  modelHref,
+  parse,
+  redirect,
+  rememberPage,
+  Route,
+  SECTIONS,
+  sectionHome,
+  visibleSections,
+} from "./nav";
 
-// Pages: #/ (all models, upload) and #/model/<id> (one model).
+// The studio's pages (ADR-122, nav.ts): five sections in the header, each with its sub-menu;
+// every page, a cover's tab and a Desk card's tab in the address; old addresses redirect.
 
 function useHash(): string {
   const [hash, setHash] = useState(window.location.hash);
   useEffect(() => {
-    const on = () => setHash(window.location.hash);
+    let shown = window.location.hash;
+    // Back / Forward with unsaved edits asks too; staying puts the address back
+    const on = () => {
+      const next = window.location.hash;
+      if (next === shown) return;
+      if (!mayLeave(next)) {
+        window.history.pushState(null, "", shown || "#/");
+        return;
+      }
+      shown = next;
+      setHash(next);
+    };
     window.addEventListener("hashchange", on);
-    return () => window.removeEventListener("hashchange", on);
+    window.addEventListener("popstate", on);
+    return () => {
+      window.removeEventListener("hashchange", on);
+      window.removeEventListener("popstate", on);
+    };
   }, []);
   return hash;
 }
 
+/** Open and waiting questions, for the counts in the header (was on the Desk's tabs). */
+function useQuestionCount(): { open: number; for_you: number } | null {
+  const [n, setN] = useState<{ open: number; for_you: number } | null>(null);
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      fetch("/api/questions/count")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((c) => live && c && setN(c))
+        .catch(() => undefined);
+    load();
+    window.addEventListener("questions-changed", load);
+    return () => {
+      live = false;
+      window.removeEventListener("questions-changed", load);
+    };
+  }, []);
+  return n;
+}
+
 export function App() {
   const hash = useHash();
-  const m = hash.match(/^#\/model\/([a-z0-9-]+)/);
   const welcome = hash.match(/^#\/welcome\/([A-Za-z0-9_-]+)/);
   const [user, setUser] = useState<User | null | undefined>(undefined); // undefined: checking
   const [loginRequired, setLoginRequired] = useState(true);
@@ -72,6 +126,36 @@ export function App() {
     window.addEventListener("login-needed", out);
     return () => window.removeEventListener("login-needed", out);
   }, []);
+  // a menu (details[data-menu]: Show, Simulate, More) closes on a click elsewhere or Escape
+  useEffect(() => {
+    const close = (keep: EventTarget | null) =>
+      document
+        .querySelectorAll<HTMLDetailsElement>("details[data-menu][open]")
+        .forEach((d) => {
+          if (!(keep instanceof Node) || !d.contains(keep)) d.open = false;
+        });
+    const click = (e: MouseEvent) => close(e.target);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && close(null);
+    document.addEventListener("click", click);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("click", click);
+      document.removeEventListener("keydown", key);
+    };
+  }, []);
+  useEffect(installUnsavedGuard, []);
+  // an admin's start page is the section page he was on last
+  useEffect(() => {
+    if (user && !redirect(hash, user)) rememberPage(hash, user);
+  }, [hash, user]);
+  // an old or bare address: to its new place, without a step in the browser's history
+  const target = user ? redirect(hash, user) : null;
+  useEffect(() => {
+    if (target && target !== hash) {
+      window.history.replaceState(null, "", target);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }, [target, hash]);
   if (welcome) return <Welcome token={welcome[1]} onDone={setUser} />;
   if (hash.startsWith("#/configure")) return <Configure />; // the customers' configurator: no login
   if (hash.startsWith("#/guide") && !user)
@@ -83,100 +167,273 @@ export function App() {
   if (user === undefined)
     return <div className="login-page muted">Loading…</div>;
   if (user === null) return <Login onDone={setUser} />;
+  if (target && target !== hash)
+    return <div className="login-page muted">Loading…</div>;
+  const route = parse(hash);
   return (
     <SessionContext.Provider value={{ user, loginRequired }}>
       <div className="app">
-        <header>
-          <a href="#/" className="brand" title="Cover Studio">
-            <span className="logos">
-              <img src="/brand/s2dio-mark.svg" alt="S2DIO" />
-              <span className="wordmark">
-                s2dio
-                <br />
-                industries
-              </span>
-              <span className="times">×</span>
-              <img src="/brand/suns.svg" alt="SUNS" />
-            </span>
-            <span className="title">Cover Studio</span>
-          </a>
-          <a href="#/" className="nav">
-            Models
-          </a>
-          <a href="#/desk" className="nav">
-            Desk
-          </a>
-          <a href="#/catalogue" className="nav">
-            Catalogue
-          </a>
-          <a href="#/arrangements" className="nav">
-            Arrangements
-          </a>
-          <a href="#/learning" className="nav">
-            Learning
-          </a>
-          {user.role !== "viewer" && (
-            <a href="#/prices" className="nav">
-              Prices
-            </a>
-          )}
-          <a href="#/guide" className="nav">
-            Guide
-          </a>
-          {m && <span className="crumb">/ {m[1]}</span>}
-          <QuickSearch />
-          {loginRequired && (
-            <UserMenu user={user} onLogout={() => setUser(null)} />
-          )}
-        </header>
-        <main>
-          {m ? (
-            <ModelPage id={m[1]} />
-          ) : hash.startsWith("#/questions") ? (
-            <Questions
-              selected={
-                Number(hash.match(/^#\/questions\/(\d+)/)?.[1] ?? "") || null
-              }
-            />
-          ) : hash.startsWith("#/desk") ? (
-            <Desk
-              selected={hash.match(/^#\/desk\/([a-z0-9-]+)/)?.[1] ?? null}
-            />
-          ) : hash.startsWith("#/arrangements") ? (
-            <Arrangements
-              openId={
-                hash.match(/^#\/arrangements\/(arr-[a-z0-9-]+)/)?.[1] ?? null
-              }
-            />
-          ) : hash.startsWith("#/catalogue") ? (
-            <Gallery />
-          ) : hash.startsWith("#/learning") ? (
-            <Learning />
-          ) : hash.startsWith("#/admin") && user.role === "admin" ? (
-            <Admin />
-          ) : hash.startsWith("#/prices") && user.role !== "viewer" ? (
-            <Prices canEdit={user.role === "admin"} />
-          ) : hash.startsWith("#/website") && user.role !== "viewer" ? (
-            <>
-              <section className="card">
-                <h2>Website</h2>
-                <p className="muted">
-                  Draft changes to the shop with AI and check the preview; an
-                  admin publishes.
-                </p>
-              </section>
-              <Website canPublish={user.role === "admin"} />
-            </>
-          ) : hash.startsWith("#/guide") ? (
-            <Guide loggedIn />
-          ) : hash.startsWith("#/account") ? (
-            <Account user={user} />
-          ) : (
-            <ModelList />
-          )}
+        <TopBar
+          user={user}
+          route={route}
+          loginRequired={loginRequired}
+          onLogout={() => setUser(null)}
+        />
+        <main className={`m-${route.section}`}>
+          <Page route={route} user={user} />
         </main>
       </div>
     </SessionContext.Provider>
+  );
+}
+
+/** The header (one line: the mark, five sections, search, guide, me) and the sub-menu. */
+function TopBar({
+  user,
+  route,
+  loginRequired,
+  onLogout,
+}: {
+  user: User;
+  route: Route;
+  loginRequired: boolean;
+  onLogout: () => void;
+}) {
+  const questions = useQuestionCount();
+  const sections = visibleSections(user);
+  const current = sections.find((s) => s.id === route.section);
+  const count = (page: string) =>
+    page === "questions" && questions && questions.open > 0 ? (
+      <span
+        className={`nav-count ${questions.for_you ? "mine" : ""}`}
+        title={`${questions.open} open, ${questions.for_you} waiting for your answer`}
+        aria-label={`${questions.open} open questions`}
+      >
+        {questions.open}
+      </span>
+    ) : null;
+  return (
+    <div className="topbar">
+      <header className="hdr">
+        <a href="#/" className="brand" title="Cover Studio: your start page">
+          <img src="/brand/s2dio-mark.svg" alt="" />
+          <span className="title">Cover Studio</span>
+        </a>
+        <nav className="sections" aria-label="Sections">
+          {sections.map((s) => (
+            <a
+              key={s.id}
+              href={sectionHome(s.id, user) ?? "#/"}
+              className={s.id === route.section ? "on" : ""}
+              aria-current={s.id === route.section ? "true" : undefined}
+              title={s.hint}
+            >
+              {s.label}
+              {s.id === "work" && count("questions")}
+            </a>
+          ))}
+        </nav>
+        {route.section === "model" && (
+          <span className="crumb">
+            <a href="#/covers/all">Covers</a> / {route.page}
+          </span>
+        )}
+        <QuickSearch />
+        <a
+          href="#/guide"
+          className={`hdr-icon ${route.section === "guide" ? "on" : ""}`}
+          title="The guide"
+        >
+          Guide
+        </a>
+        {loginRequired && <UserMenu user={user} onLogout={onLogout} />}
+      </header>
+      {current && current.pages.length > 0 && (
+        <nav className="subnav" aria-label={current.label}>
+          {current.pages.map((p) => [
+            p.group && (
+              <span key={`g-${p.id}`} className="subnav-group">
+                {p.group}
+              </span>
+            ),
+            <a
+              key={p.id}
+              href={`#/${current.id}/${p.id}`}
+              className={`${p.id === route.page ? "on" : ""} ${p.sep && !p.group ? "sep" : ""}`}
+              aria-current={p.id === route.page ? "page" : undefined}
+              title={p.hint}
+            >
+              {p.label}
+              {count(p.id)}
+            </a>,
+          ])}
+        </nav>
+      )}
+    </div>
+  );
+}
+
+function NotAllowed() {
+  return (
+    <section className="card">
+      <h2>Not for your account</h2>
+      <p className="muted">
+        This page is for {""}
+        other roles. Ask an admin if you need it;{" "}
+        <a href="#/">your start page</a>.
+      </p>
+    </section>
+  );
+}
+
+function PageHead({
+  title,
+  children,
+  actions,
+}: {
+  title: string;
+  children?: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="page-head">
+      <div>
+        <h1 className="page-title">{title}</h1>
+        {children && <p className="muted">{children}</p>}
+      </div>
+      {actions && <div className="page-actions">{actions}</div>}
+    </div>
+  );
+}
+
+/** Which page an address shows; a page this person may not see says so. */
+function Page({ route, user }: { route: Route; user: User }) {
+  const { section, page, rest, query } = route;
+  const sec = SECTIONS.find((s) => s.id === section);
+  if (sec) {
+    const pg = sec.pages.find((p) => p.id === page);
+    if (!allowed(sec.who, user) || (pg && !allowed(pg.who, user)))
+      return <NotAllowed />;
+  }
+  const isAdmin = user.role === "admin";
+  switch (section) {
+    case "model":
+      return page ? (
+        <ModelPage id={page} tab={rest[0] ?? "3d"} sub={rest[1] ?? ""} />
+      ) : null;
+    case "work":
+      if (page === "questions")
+        return <Questions selected={Number(rest[0] ?? "") || null} />;
+      return <Desk selected={rest[0] ?? null} tab={rest[1] ?? "check"} />;
+    case "covers":
+      if (page === "arrangements")
+        return (
+          <Arrangements
+            openId={rest[0]?.match(/^arr-[a-z0-9-]+$/) ? rest[0] : null}
+          />
+        );
+      if (page === "new") return <NewCover />;
+      if (page === "learning") return <Learning />;
+      if (page === "products") return <ProductList />;
+      return <AllCovers cards={query.get("view") === "cards"} />;
+    case "shop":
+      if (page === "orders") return <Orders />;
+      if (page === "requests")
+        return (
+          <>
+            <PageHead title="Requests">
+              Quotes customers asked for in the configurator.
+            </PageHead>
+            <Requests />
+          </>
+        );
+      if (page === "matches") return <Matches />;
+      if (page === "b2b") return <B2BCustomers />;
+      if (page === "phototest") return <PhotoTest />;
+      return (
+        <>
+          <PageHead title="Website (AI)">
+            Say what should change on the website; the AI changes the draft, you
+            check the preview{isAdmin ? " and publish" : "; an admin publishes"}
+            .
+          </PageHead>
+          <Website canPublish={isAdmin} />
+        </>
+      );
+    case "prices":
+      return <Prices canEdit={isAdmin} sub={page} />;
+    case "settings":
+      return <SettingsArea tab={page} />;
+    case "guide":
+      return <Guide loggedIn />;
+    case "account":
+      return <Account user={user} />;
+    default:
+      return <NotAllowed />;
+  }
+}
+
+/** Covers → All covers: one list, as a table or as cards (was Models and Catalogue). */
+function AllCovers({ cards }: { cards: boolean }) {
+  const { user } = useSession();
+  return (
+    <>
+      <PageHead
+        title="All covers"
+        actions={
+          <>
+            <span className="seg" role="group" aria-label="View">
+              <a href="#/covers/all" className={cards ? "" : "on"}>
+                Table
+              </a>
+              <a href="#/covers/all?view=cards" className={cards ? "on" : ""}>
+                Cards
+              </a>
+            </span>
+            {user?.role !== "viewer" && (
+              <a className="btn primary" href="#/covers/new">
+                + New cover
+              </a>
+            )}
+          </>
+        }
+      >
+        Every model and its cover. A row or a card opens the cover.
+      </PageHead>
+      {cards ? <Gallery /> : <ModelList />}
+    </>
+  );
+}
+
+/** Covers → New cover: from a 3D file or from a drawing (was the top of the Models page). */
+function NewCover() {
+  return (
+    <>
+      <PageHead title="New cover">
+        From a 3D file of the furniture, or from a drawing (PDF). Pairs of
+        drawings and 3D to learn from go to{" "}
+        <a href="#/covers/learning">Learning</a>.
+      </PageHead>
+      <Upload />
+      <DrawingUpload />
+    </>
+  );
+}
+
+/** Covers → Product list: the product list (Excel) linked to the drawings (was on the Desk). */
+function ProductList() {
+  const [done, setDone] = useState(0);
+  return (
+    <>
+      <PageHead title="Product list">
+        The workshop's product list (Excel): every row is linked to its drawing
+        cover; the Desk shows the products on each card.
+        {done > 0 && " The list is read; the Desk shows it."}
+      </PageHead>
+      <div className="desk desk-inline">
+        <ProductsUpload onDone={() => setDone((n) => n + 1)} />
+      </div>
+    </>
   );
 }
 
@@ -217,9 +474,7 @@ function ModelList() {
   const selected = shown.filter((m) => picked[m.id]);
   return (
     <>
-      <Upload />
-      <DrawingUpload />
-      <h2>
+      <h2 className="count-line">
         Models{" "}
         {models && (
           <span className="muted">
@@ -271,7 +526,7 @@ function ModelList() {
       {!models ? (
         <p className="muted">Loading…</p>
       ) : !models.length ? (
-        <p className="muted">No models yet. Upload a 3D file above.</p>
+        <p className="muted">No models yet: Covers → New cover.</p>
       ) : (
         <table className="list">
           <thead>
@@ -304,7 +559,7 @@ function ModelList() {
             {shown.map((m) => (
               <tr
                 key={m.id}
-                onClick={() => (window.location.hash = `#/model/${m.id}`)}
+                onClick={() => (window.location.hash = modelHref(m.id))}
               >
                 <td onClick={(e) => e.stopPropagation()}>
                   <input
@@ -316,7 +571,7 @@ function ModelList() {
                   />
                 </td>
                 <td>
-                  <a href={`#/model/${m.id}`}>{m.id}</a>
+                  <a href={modelHref(m.id)}>{m.id}</a>
                   {m.tags.map((t) => (
                     <span key={t} className="badge">
                       {t}
@@ -328,7 +583,9 @@ function ModelList() {
                   {m.no_cover && (
                     <span
                       className="badge no-cover"
-                      title={m.no_cover_reason || "not in the shop, not on the Desk"}
+                      title={
+                        m.no_cover_reason || "not in the shop, not on the Desk"
+                      }
                     >
                       no cover
                     </span>
@@ -390,7 +647,7 @@ function Upload() {
     setError("");
     try {
       const r = await api.upload(file, units, up);
-      window.location.hash = `#/model/${r.model_id}`;
+      window.location.hash = modelHref(r.model_id);
     } catch (e) {
       setError(String(e));
       setBusy(false);
@@ -440,34 +697,6 @@ function Upload() {
     </section>
   );
 }
-
-type Tab =
-  | "3d"
-  | "drawing"
-  | "reference"
-  | "seams"
-  | "ai"
-  | "patterns"
-  | "sizes"
-  | "cut"
-  | "settings"
-  | "revisions"
-  | "files"
-  | "log";
-const TABS: [Tab, string][] = [
-  ["3d", "3D"],
-  ["drawing", "Your drawing"],
-  ["reference", "Your reference"],
-  ["seams", "Seams"],
-  ["ai", "AI advice"],
-  ["patterns", "Patterns"],
-  ["sizes", "Size drawing"],
-  ["cut", "Cut pieces"],
-  ["settings", "Settings"],
-  ["revisions", "Revisions"],
-  ["files", "Downloads"],
-  ["log", "Warnings and log"],
-];
 
 /** The approval of the definitive drawing (ADR-047): who approved which revision, or why not. */
 function ApprovalCard({
@@ -626,13 +855,53 @@ function KindCheck({
   );
 }
 
-function ModelPage({ id }: { id: string }) {
+/** The changes since the run before, without the noise of a new default (`null → value`). */
+function realChanges(model: ModelDetail) {
+  const settings = (model.diff?.settings ?? []).filter(
+    (s) => s.before !== null && s.before !== undefined,
+  );
+  const panels = model.diff?.panels ?? [];
+  return { settings, panels };
+}
+
+/** A sub-view row inside a cover's tab (the old tabs, each one click away, in the address). */
+function SubTabs({ id, tab, sub }: { id: string; tab: string; sub: string }) {
+  const subs = MODEL_SUBS[tab];
+  if (!subs) return null;
+  return (
+    <span className="seg sub-seg" role="group" aria-label="In this tab">
+      {subs.map(([k, label]) => (
+        <a
+          key={k}
+          href={modelHref(id, tab, k)}
+          className={k === sub ? "on" : ""}
+        >
+          {label}
+        </a>
+      ))}
+    </span>
+  );
+}
+
+function ModelPage({
+  id,
+  tab: tabIn,
+  sub: subIn,
+}: {
+  id: string;
+  tab: string;
+  sub: string;
+}) {
   const { user } = useSession();
   const [model, setModel] = useState<ModelDetail | null>(null);
   const [job, setJob] = useState<Job | null>(null);
-  const [tab, setTab] = useState<Tab>("3d");
   const [error, setError] = useState("");
   const [stamp, setStamp] = useState(Date.now());
+  const [details, setDetails] = useState(false);
+  // the tab is the address's (#/model/<id>/<tab>): another cover opens on its own tab
+  const tab = MODEL_TABS.some(([t]) => t === tabIn) ? tabIn : "3d";
+  const subs = MODEL_SUBS[tab];
+  const sub = subs?.some(([k]) => k === subIn) ? subIn : (subs?.[0][0] ?? "");
 
   const load = useCallback(() => {
     api
@@ -643,7 +912,11 @@ function ModelPage({ id }: { id: string }) {
       })
       .catch((e) => setError(String(e)));
   }, [id]);
-  useEffect(load, [load]);
+  useEffect(() => {
+    setModel(null);
+    setDetails(false);
+    load();
+  }, [load]);
 
   // follow a running job
   useEffect(() => {
@@ -671,12 +944,22 @@ function ModelPage({ id }: { id: string }) {
   if (!model) return <p className="muted">Loading…</p>;
   const running = job && (job.status === "queued" || job.status === "running");
   const has = (f: string) => model.files.includes(f);
+  const changes = realChanges(model);
+  const nChanges = changes.settings.length + changes.panels.length;
+  const a = model.approval;
 
   return (
     <>
-      <section className="card summary">
-        <div>
-          <h2>{model.id}</h2>
+      <section className="cv-head">
+        {has("cover.png") && (
+          <img
+            className="cv-thumb"
+            src={`${fileUrl(id, "cover.png")}?v=${stamp}`}
+            alt=""
+          />
+        )}
+        <div className="cv-title">
+          <h1 className="page-title">{model.id}</h1>
           <p className="muted">
             {model.source}
             {model.size_mm &&
@@ -688,8 +971,48 @@ function ModelPage({ id }: { id: string }) {
             {model.finished?.sheet &&
               ` · about ${(model.finished.sheet.roll_length_mm / 1000).toFixed(2)} m of roll`}
           </p>
+          <div className="cv-strip" data-testid="status-strip">
+            <span
+              className={`badge grade-${model.grade}`}
+              title={model.reasons.join("\n")}
+            >
+              cover: {model.grade}
+            </span>
+            <span className={`badge status-${model.status}`}>
+              {model.status}
+            </span>
+            {model.no_cover && <span className="badge no-cover">no cover</span>}
+            {model.desk_status && (
+              <a className="badge" href={deskHref(id)} title="Its Desk card">
+                Desk: {model.desk_status}
+              </a>
+            )}
+            <span
+              className={`badge ${a ? (a.valid ? "ok" : "warn") : ""}`}
+              title="The definitive drawing (approval below)"
+            >
+              {a
+                ? a.valid
+                  ? `approved by ${a.name}`
+                  : "changed after approval"
+                : "not approved"}
+            </span>
+            {model.dxf_ok === false && (
+              <span
+                className="badge"
+                title="Approve the cover on the Desk first"
+              >
+                🔒 DXF
+              </span>
+            )}
+            {nChanges > 0 && (
+              <a className="badge" href={modelHref(id, "history", "changes")}>
+                {nChanges} change{nChanges > 1 ? "s" : ""} since the run before
+              </a>
+            )}
+          </div>
         </div>
-        <div className="actions">
+        <div className="cv-actions">
           <button
             className="primary"
             disabled={!!running || !has("model.json")}
@@ -697,6 +1020,16 @@ function ModelPage({ id }: { id: string }) {
           >
             Run again
           </button>
+          <button
+            className={details ? "on" : ""}
+            aria-expanded={details}
+            onClick={() => setDetails(!details)}
+          >
+            Edit details
+          </button>
+          <a className="btn" href={deskHref(id)}>
+            Desk card ↗
+          </a>
         </div>
       </section>
       {model.kind && !model.kind.confirmed && has("model.json") && !running && (
@@ -714,49 +1047,50 @@ function ModelPage({ id }: { id: string }) {
         />
       )}
       <ApprovalCard model={model} onChange={load} />
-      <ModelInfo
-        key={`${model.id}-${model.family}-${model.status}`}
-        model={model}
-        onSaved={load}
-      />
+      {details && (
+        <ModelInfo
+          key={`${model.id}-${model.family}-${model.status}`}
+          model={model}
+          onSaved={load}
+        />
+      )}
       {job && <JobBar job={job} />}
+      {model.desk_status === "rejected" && (
+        <section className="card attention" role="status">
+          <strong>Rejected at the Desk.</strong> The reasons and the pictures
+          are on its <a href={deskHref(id)}>Desk card</a>; correct the cover,
+          then it goes back to the Desk.
+        </section>
+      )}
+      {model.warnings.length > 0 && (
+        <section className="card attention" data-testid="warnings-now">
+          <strong>
+            {model.warnings.length} warning
+            {model.warnings.length > 1 ? "s" : ""} now:
+          </strong>{" "}
+          {model.warnings.slice(0, 2).join(" · ")}
+          {model.warnings.length > 2 && " …"}{" "}
+          <a href={modelHref(id, "history", "log")}>all, with the run log</a>
+        </section>
+      )}
       {error && <p className="error">{error}</p>}
-      {model.diff &&
-        (model.diff.panels.length > 0 || model.diff.settings.length > 0) && (
-          <section className="card diff">
-            <strong>Since the run before:</strong>{" "}
-            {model.diff.settings.map((s) => (
-              <span key={s.key} className="chip">
-                {s.key}: {String(s.before)} → {String(s.after)}
-              </span>
-            ))}
-            {model.diff.panels.length === 0
-              ? " no panel changed by more than 1 mm."
-              : model.diff.panels.map((p) => (
-                  <span key={p.name} className="chip">
-                    {p.name}:{" "}
-                    {p.change === "size" && p.before_mm && p.after_mm
-                      ? `${p.before_mm.map((v) => v.toFixed(0)).join("×")} → ${p.after_mm.map((v) => v.toFixed(0)).join("×")} mm`
-                      : p.change}
-                  </span>
-                ))}
-          </section>
-        )}
-      <nav className="tabs">
-        {TABS.map(([t, label]) => (
-          <button
+      <nav className="tabs" aria-label="Cover">
+        {MODEL_TABS.map(([t, label]) => (
+          <a
             key={t}
+            href={modelHref(id, t)}
             className={tab === t ? "active" : ""}
-            onClick={() => setTab(t)}
+            aria-current={tab === t ? "page" : undefined}
           >
             {label}
-            {t === "log" && model.warnings.length > 0 && (
+            {t === "history" && model.warnings.length > 0 && (
               <span className="count">{model.warnings.length}</span>
             )}
-          </button>
+          </a>
         ))}
       </nav>
       <section className="tab">
+        <SubTabs id={id} tab={tab} sub={sub} />
         {tab === "3d" && (
           <Viewer
             id={id}
@@ -772,28 +1106,81 @@ function ModelPage({ id }: { id: string }) {
             drapeBusy={!!running && job?.steps.some((s) => s.name === "drape")}
           />
         )}
-        {tab === "seams" && <SeamEditor id={id} stamp={stamp} onJob={setJob} />}
-        {tab === "reference" && (
-          <Reference id={id} canEdit={user?.role !== "viewer"} />
+        {tab === "pieces" && sub === "cut" && (
+          <CutPieces model={model} stamp={stamp} />
         )}
-        {tab === "drawing" && (
-          <Drawing id={id} files={model.files} stamp={stamp} />
+        {tab === "pieces" && sub === "flat" && (
+          <Patterns model={model} stamp={stamp} />
         )}
-        {tab === "ai" && (
-          <AiAdvice id={id} files={model.files} stamp={stamp} onJob={setJob} />
-        )}
-        {tab === "patterns" && <Patterns model={model} stamp={stamp} />}
-        {tab === "sizes" && (
+        {tab === "pieces" && sub === "sizes" && (
           <Pdf id={id} name="sizes.pdf" has={has("sizes.pdf")} stamp={stamp} />
         )}
-        {tab === "cut" && <CutPieces model={model} stamp={stamp} />}
-        {tab === "settings" && (
+        {tab === "seams" && <SeamEditor id={id} stamp={stamp} onJob={setJob} />}
+        {tab === "adjust" && (
           <Settings id={id} onRun={(steps, trial) => run(steps, trial)} />
         )}
-        {tab === "revisions" && <Revisions model={model} />}
+        {tab === "compare" && sub === "drawing" && (
+          <Drawing id={id} files={model.files} stamp={stamp} />
+        )}
+        {tab === "compare" && sub === "reference" && (
+          <Reference id={id} canEdit={user?.role !== "viewer"} />
+        )}
+        {tab === "compare" && sub === "ai" && (
+          <AiAdvice id={id} files={model.files} stamp={stamp} onJob={setJob} />
+        )}
+        {tab === "history" && sub === "changes" && <Changes model={model} />}
+        {tab === "history" && sub === "revisions" && (
+          <Revisions model={model} />
+        )}
+        {tab === "history" && sub === "log" && <Log model={model} job={job} />}
         {tab === "files" && <Files model={model} />}
-        {tab === "log" && <Log model={model} job={job} />}
       </section>
+    </>
+  );
+}
+
+/** History → Approval & changes: the approval, the Desk, and what changed since the run before. */
+function Changes({ model }: { model: ModelDetail }) {
+  const { settings, panels } = realChanges(model);
+  const a = model.approval;
+  return (
+    <>
+      <h3>Approval</h3>
+      <p>
+        {!a && "The definitive drawing is not approved yet."}
+        {a &&
+          `${a.valid ? "Approved" : "Approved, then changed"} by ${a.name} on ${new Date(a.time * 1000).toLocaleString()}${a.revision !== null ? `, revision ${a.revision}` : ""}.`}{" "}
+        At the Desk:{" "}
+        <a href={deskHref(model.id, "history")}>
+          {model.desk_status ?? "not on the Desk"}
+        </a>{" "}
+        (its history, the pictures and the measured fits).
+      </p>
+      <h3>Since the run before</h3>
+      {settings.length === 0 && panels.length === 0 ? (
+        <p className="muted">
+          No setting and no panel changed (new defaults that this cover did not
+          have before are not listed).
+        </p>
+      ) : (
+        <section className="card diff">
+          {settings.map((s) => (
+            <span key={s.key} className="chip">
+              {s.key}: {String(s.before)} → {String(s.after)}
+            </span>
+          ))}
+          {panels.length === 0
+            ? " no panel changed by more than 1 mm."
+            : panels.map((p) => (
+                <span key={p.name} className="chip">
+                  {p.name}:{" "}
+                  {p.change === "size" && p.before_mm && p.after_mm
+                    ? `${p.before_mm.map((v) => v.toFixed(0)).join("×")} → ${p.after_mm.map((v) => v.toFixed(0)).join("×")} mm`
+                    : p.change}
+                </span>
+              ))}
+        </section>
+      )}
     </>
   );
 }
@@ -890,7 +1277,7 @@ function CutPieces({ model, stamp }: { model: ModelDetail; stamp: number }) {
             title="Approve the cover on the Desk first"
           >
             🔒 DXF for the cutting table: approve this cover on the{" "}
-            <a href={`#/desk/${model.id}`}>Desk</a> first
+            <a href={deskHref(model.id)}>Desk</a> first
           </span>
         ) : (
           <a href={fileUrl(model.id, "cut.dxf")} download>

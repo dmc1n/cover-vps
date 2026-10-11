@@ -60,10 +60,11 @@ async def ready(page: Page) -> None:
 
 
 async def top(page: Page) -> None:
-    """The 3D view at the top of the window, its toolbar just above."""
+    """The 3D view at the top of the window, its toolbar just under the sticky header."""
     await page.evaluate(
-        "() => { const t = document.querySelector('.viewer .layers');"
-        " window.scrollTo(0, window.scrollY + t.getBoundingClientRect().top - 8); }"
+        "() => { const t = document.querySelector('.viewer .vbar');"
+        " const bar = document.querySelector('.topbar').getBoundingClientRect().height;"
+        " window.scrollTo(0, window.scrollY + t.getBoundingClientRect().top - bar - 8); }"
     )
     await page.wait_for_timeout(300)
 
@@ -72,8 +73,11 @@ async def vent_sizes(page: Page, model: str, tag: str) -> list[dict[str, Any]]:
     doc = await (await page.request.get(f"{URL}/api/models/{model}/files/vents.json")).json()
     vents = doc["vents"]
     toggle = page.get_by_test_id("vent-sizes-toggle")
+    # in the 3D toolbar's Show menu (ADR-122)
+    await page.get_by_role("toolbar", name="3D view").get_by_label("Show", exact=True).click()
     if not await toggle.is_checked():
         await toggle.check()
+    await page.keyboard.press("Escape")
     rows = page.get_by_test_id("vent-row")
     await expect(rows).to_have_count(len(vents))
     for k, v in enumerate(vents):
@@ -133,7 +137,7 @@ async def studio(browser: Browser, model: str, problems: list[str]) -> None:
     page.set_default_timeout(SLOW)
     page.on("pageerror", lambda e: problems.append(f"{tag}: {e}"))
     await login(page)
-    await page.goto(f"{URL}/#/model/{model}")
+    await page.goto(f"{URL}/#/model/{model}/3d")
     await ready(page)
     vents = await vent_sizes(page, model, tag)
     await page.get_by_test_id("measure-toggle").click()
@@ -204,7 +208,7 @@ async def phone(browser: Browser, model: str, problems: list[str]) -> None:
     page.set_default_timeout(SLOW)
     page.on("pageerror", lambda e: problems.append(f"{tag}: {e}"))
     await login(page)
-    await page.goto(f"{URL}/#/model/{model}")
+    await page.goto(f"{URL}/#/model/{model}/3d")
     await ready(page)
     doc = await (await page.request.get(f"{URL}/api/models/{model}/files/vents.json")).json()
     await page.get_by_test_id("measure-toggle").tap()
@@ -225,13 +229,14 @@ async def desk(browser: Browser, model: str, problems: list[str]) -> None:
     page.set_default_timeout(SLOW)
     page.on("pageerror", lambda e: problems.append(f"{tag}: {e}"))
     await login(page)
-    await page.goto(f"{URL}/#/desk/{model}")
-    link = page.locator(".d-3d figcaption a", has_text="Check list")
+    await page.goto(f"{URL}/#/work/desk/{model}")
+    link = page.locator(".d-3d").get_by_test_id("checklist-link")
     await expect(link).to_be_visible()
     r = await page.request.get(URL + (await link.get_attribute("href") or ""))
     assert r.ok and (await r.body()).startswith(b"%PDF"), "the check list is a PDF"
     pts = await (await page.request.get(f"{URL}/api/models/{model}/checkpoints")).json()
     key = next(p for p in pts["points"] if p["key"].endswith(".above_hem"))
+    await page.get_by_test_id("after-sewing").click()  # the action bar's "After sewing" row
     await page.get_by_test_id("measured-toggle").click()
     form = page.get_by_test_id("measured-form")
     await expect(form).to_be_visible()
@@ -241,6 +246,7 @@ async def desk(browser: Browser, model: str, problems: list[str]) -> None:
     await page.get_by_role("button", name="Does not fit").click()
     # the card reloads after the action: the new history comes with it
     await page.wait_for_timeout(3000)
+    await page.get_by_role("navigation", name="Card").get_by_role("link", name="History").click()
     await expect(page.locator(".d-timeline")).to_contain_text("measured 1 size")
     await page.locator(".d-timeline").screenshot(path=f"{SHOTS}/{tag}-history.png")
     print(f"{tag}: check list downloads; a fit with 1 measured size is in the history")

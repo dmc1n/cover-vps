@@ -431,11 +431,11 @@ def create_app(
         d = model_or_404(model_id)
         if name not in KEPT:
             raise HTTPException(404, f"no file {name!r}")
-        if name == "cut.dxf":
-            desk.gate(d, model_id, request)
         path = revision_file(d, number, name)
         if not path.is_file():
             raise HTTPException(404, f"revision {number} has no {name}")
+        if name == "cut.dxf":
+            desk.gate(d, model_id, request, revision=path.parent)
         file, kind = _named(model_id, name, number)
         return FileResponse(path, media_type=MEDIA.get(path.suffix, "application/octet-stream"),
                             filename=file, content_disposition_type=kind)  # fmt: skip
@@ -503,7 +503,7 @@ def create_app(
                 mailer.send(
                     auth, u.email, f"Please approve the cover {model_id}",
                     f"Hello {u.name},\n\n{user.name} asks you to approve the definitive "
-                    f"drawing of {model_id}:\n\n{base}/#/model/{model_id}\n",
+                    f"drawing of {model_id}:\n\n{base}/#/model/{model_id}/3d\n",
                 )  # fmt: skip
                 sent.append(u.username)
             except Exception:  # noqa: BLE001

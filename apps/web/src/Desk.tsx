@@ -2,6 +2,9 @@
 // order of need, one card per cover (the drawing beside our cover, what the program read, what
 // the AIs say), and the actions: approve, reject with a reason, produced, fit after sewing.
 // Keys: j / k next / previous, a approve, r reject, c comment, p produced, u undo.
+// The card in four tabs, each in the address (#/work/desk/<id>/<tab>, ADR-122): Check (the
+// drawing beside our cover, what the program read, the AIs), Pieces & revisions, Correct this
+// cover, History; the decision bar stays at the bottom of the screen.
 // A reject or a comment takes pictures, marked in red (DeskPictures.tsx, ADR-096).
 // Arrangements (ADR-115): the series ARR; their card shows the members, their places and the
 // cover's plan from above instead of a drawing; their maker sends them, Rens or Wout approve.
@@ -14,18 +17,15 @@ import {
   MeasuredSummary,
   type MeasuredRow,
 } from "./DeskMeasured";
-import {
-  ProductsPanel,
-  ProductsUpload,
-  type ProductList,
-} from "./DeskProducts";
+import { ProductsPanel, type ProductList } from "./DeskProducts";
 import {
   PictureThumbs,
   PictureTray,
   uploadPictures,
   type Pending,
 } from "./DeskPictures";
-import { DeskTabs } from "./Questions";
+import { useSession } from "./Session";
+import { arrangementHref, DESK_TABS, deskHref, modelHref } from "./nav";
 import {
   ArrangementPlan,
   FOOTPRINT_NAMES,
@@ -242,7 +242,14 @@ async function getJSON<T>(url: string, body?: unknown): Promise<T> {
   return data as T;
 }
 
-export function Desk({ selected }: { selected: string | null }) {
+export function Desk({
+  selected,
+  tab = "check",
+}: {
+  selected: string | null;
+  tab?: string;
+}) {
+  const { user } = useSession();
   const [q, setQ] = useState<Queue | null>(null);
   const [err, setErr] = useState("");
   const [status, setStatus] = useState<string>("open");
@@ -294,7 +301,13 @@ export function Desk({ selected }: { selected: string | null }) {
     return sortItems(shown, sort);
   }, [q, status, series, search, sort]);
 
-  const open = (id: string) => (window.location.hash = `#/desk/${id}`);
+  // what was just done on the card before, shown on the next one (an approval or a rejection
+  // moves on by itself; its message must not vanish with the card)
+  const [flash, setFlash] = useState("");
+  const open = (id: string, done = "") => {
+    setFlash(done);
+    window.location.hash = deskHref(id);
+  };
   const idx = items.findIndex((i) => i.id === selected);
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
@@ -315,14 +328,12 @@ export function Desk({ selected }: { selected: string | null }) {
   if (err)
     return (
       <div className="desk">
-        <DeskTabs active="covers" />
         <p className="d-err">{err}</p>
       </div>
     );
   if (!q)
     return (
       <div className="desk">
-        <DeskTabs active="covers" />
         <p className="d-muted">Loading the desk…</p>
       </div>
     );
@@ -338,7 +349,6 @@ export function Desk({ selected }: { selected: string | null }) {
   ] as const;
   return (
     <div className="desk">
-      <DeskTabs active="covers" />
       <section className="d-top">
         <div className="d-title">
           <h1>Desk</h1>
@@ -357,7 +367,7 @@ export function Desk({ selected }: { selected: string | null }) {
             label="Avg AI score"
             value={q.avg_score == null ? "–" : q.avg_score.toFixed(0)}
           />
-          {q.spend && (
+          {q.spend && user?.role === "admin" && (
             <Kpi
               label="AI spend this month"
               value={`€${q.spend.month_eur.toFixed(2)}`}
@@ -367,7 +377,6 @@ export function Desk({ selected }: { selected: string | null }) {
           )}
         </div>
         <RulesBar canAct={q.can_approve} onChanged={load} />
-        <ProductsUpload onDone={load} />
         <div className="d-pipe" aria-label="pipeline">
           {seg.map(([k, n]) =>
             n ? (
@@ -511,12 +520,16 @@ export function Desk({ selected }: { selected: string | null }) {
             <CardView
               key={selected}
               id={selected}
+              tab={DESK_TABS.some(([t]) => t === tab) ? tab : "check"}
               canAct={q.can_approve}
               reasons={q.reasons}
               picturesMax={q.pictures_max ?? 8}
               onChanged={load}
-              onNext={() =>
-                idx >= 0 && idx + 1 < items.length && open(items[idx + 1].id)
+              flash={flash}
+              onNext={(done) =>
+                idx >= 0 &&
+                idx + 1 < items.length &&
+                open(items[idx + 1].id, `${done}: ${items[idx].code}`)
               }
             />
           ) : (
@@ -582,18 +595,22 @@ function Score({ label, v }: { label: string; v: number | null }) {
 
 function CardView({
   id,
+  tab,
   canAct,
   reasons,
   picturesMax,
   onChanged,
   onNext,
+  flash = "",
 }: {
   id: string;
+  tab: string;
+  flash?: string;
   canAct: boolean;
   reasons: string[];
   picturesMax: number;
   onChanged: () => void;
-  onNext: () => void;
+  onNext: (done: string) => void;
 }) {
   const [card, setCard] = useState<Card | null>(null);
   const [model, setModel] = useState<ModelDetail | null>(null);
@@ -609,8 +626,9 @@ function CardView({
   const [fitNote, setFitNote] = useState("");
   // after sewing: the sizes measured against the check list (ADR-111)
   const [measuring, setMeasuring] = useState(false);
+  const [sewing, setSewing] = useState(false); // the "After sewing" row of the action bar
   const [measured, setMeasured] = useState<Record<string, number>>({});
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState(flash);
   const [allDiffs, setAllDiffs] = useState(false);
   const [allRevs, setAllRevs] = useState(false);
   // "let the AI read it": its job followed here, the outcome shown beside the button
@@ -633,6 +651,7 @@ function CardView({
   useEffect(() => {
     setMeasuring(false);
     setMeasured({});
+    setSewing(false);
   }, [id]);
   useEffect(() => {
     setAiJob(null);
@@ -678,7 +697,7 @@ function CardView({
         setDialog("");
         load();
         onChanged();
-        if (next) setTimeout(onNext, 350);
+        if (next) setTimeout(() => onNext(done), 900);
         return true;
       } catch (e) {
         setMsg(String((e as Error).message ?? e));
@@ -833,12 +852,38 @@ function CardView({
       card.dxf_ok ? "available" : "locked until approved",
     ]);
   }
+  const diffs = [...(g?.differences ?? []), ...(ds?.differences ?? [])];
+  // what happened after the last rejection (a correction, a rebuild, a comment)
+  const since = st.rejected
+    ? st.history.filter(
+        (h) => h.time > st.rejected!.time && h.action !== "reject",
+      )
+    : [];
+  const showAi =
+    canAct &&
+    !arr &&
+    ck.outcome !== "agreed: same" &&
+    st.status !== "approved" &&
+    st.status !== "produced";
+  const checklist = model?.files.includes("checklist.pdf")
+    ? `/api/models/${card.id}/files/checklist.pdf`
+    : null;
+  const counts: Record<string, number | undefined> = {
+    pieces: card.pieces_list.length || undefined,
+    history: st.history.length || undefined,
+  };
+  // the drawing and the 3D stay mounted on every tab (a snapshot for a picture works from any
+  // tab); they are on the screen on Check and Correct
+  const split = tab === "check" || tab === "correct";
   return (
     <article className="d-card">
       <div className="d-card-head">
         <div>
           <h2>{card.code}</h2>
-          <span className="d-id">{card.id}</span>
+          <span className="d-id">
+            {card.id}
+            {card.products?.length ? ` · ${card.products[0]}` : ""}
+          </span>
         </div>
         <div className="d-head-right">
           {ck.outcome && (
@@ -855,38 +900,49 @@ function CardView({
             </>
           )}
           <Pill status={st.status} arrangement={!!arr} />
-          {canAct &&
-            !arr &&
-            ck.outcome !== "agreed: same" &&
-            st.status !== "approved" &&
-            st.status !== "produced" && (
-              <button
-                className={`d-ai ${aiJob ? "busy" : ""}`}
-                disabled={!!aiJob}
-                title="The AI reads the drawing: a proposal (about 1–5 cents), marked 'read by the AI', to approve here"
-                onClick={async () => {
-                  setAiNote("");
-                  try {
-                    const r = await api.aiReadDrawing(card.id);
-                    setAiJob(r.job.id);
-                  } catch (e) {
-                    setAiNote(String((e as Error).message ?? e));
-                  }
-                }}
-              >
-                {aiJob
-                  ? "AI is reading… (about a minute)"
-                  : "Let the AI read it"}
-              </button>
-            )}
-          {arr && (
-            <a className="d-open" href={`#/arrangements/${card.id}`}>
-              Edit arrangement ↗
-            </a>
-          )}
-          <a className="d-open" href={`#/model/${card.id}`}>
-            Open model ↗
+          <a className="d-open" href={modelHref(card.id)}>
+            Open cover ↗
           </a>
+          <details className="d-menu" data-menu>
+            <summary className="d-btn d-ghost d-small">More</summary>
+            <div className="d-menu-list">
+              {showAi && (
+                <button
+                  className={`d-ai ${aiJob ? "busy" : ""}`}
+                  disabled={!!aiJob}
+                  title="The AI reads the drawing: a proposal (about 1–5 cents), marked 'read by the AI', to approve here"
+                  onClick={async (e) => {
+                    (
+                      e.currentTarget.closest("details") as HTMLDetailsElement
+                    ).open = false;
+                    setAiNote("");
+                    try {
+                      const r = await api.aiReadDrawing(card.id);
+                      setAiJob(r.job.id);
+                    } catch (err) {
+                      setAiNote(String((err as Error).message ?? err));
+                    }
+                  }}
+                >
+                  {aiJob
+                    ? "AI is reading… (about a minute)"
+                    : "Let the AI read it"}
+                  <small>about 1–5 cents</small>
+                </button>
+              )}
+              {checklist && (
+                <a href={checklist}>
+                  Check list (PDF)
+                  <small>sizes to measure on the sewn cover</small>
+                </a>
+              )}
+              {arr && <a href={arrangementHref(card.id)}>Edit arrangement ↗</a>}
+              <a href={modelHref(card.id, "pieces")}>Cut pieces and DXF ↗</a>
+              <a href="#/covers/products">
+                Product list ↗<small>upload the workshop's list (Excel)</small>
+              </a>
+            </div>
+          </details>
         </div>
       </div>
       {arr && (
@@ -912,7 +968,26 @@ function CardView({
           {card.second_round}
         </p>
       )}
-      <div className="d-split">
+      <nav className="d-cardtabs" aria-label="Card">
+        {DESK_TABS.map(([t, label]) => (
+          <a
+            key={t}
+            href={deskHref(card.id, t)}
+            className={tab === t ? "on" : ""}
+            aria-current={tab === t ? "page" : undefined}
+          >
+            {label}
+            {counts[t] && <span className="d-chip-n">{counts[t]}</span>}
+          </a>
+        ))}
+      </nav>
+      {measuring && (
+        <section className="d-panel d-measuring">
+          <h3>Measured on the sewn cover</h3>
+          <MeasuredForm id={card.id} onChange={setMeasured} />
+        </section>
+      )}
+      <div className="d-split" hidden={!split}>
         {arr ? (
           <ArrangementFigure arr={arr} />
         ) : (
@@ -945,18 +1020,7 @@ function CardView({
           </figure>
         )}
         <figure className="d-3d">
-          <figcaption>
-            Our cover
-            {model?.files.includes("checklist.pdf") && (
-              <a
-                className="d-link"
-                href={`/api/models/${card.id}/files/checklist.pdf`}
-                title="The workshop's check list: every size to measure on the sewn cover"
-              >
-                Check list (PDF)
-              </a>
-            )}
-          </figcaption>
+          <figcaption>Our cover</figcaption>
           {model ? (
             <Viewer
               id={card.id}
@@ -976,191 +1040,229 @@ function CardView({
       </div>
 
       <div className="d-grid">
-        {card.product_list && <ProductsPanel list={card.product_list} />}
-        <section className="d-panel">
-          <h3>{arr ? "The arrangement" : "What the program read"}</h3>
-          <ul className="d-facts">
-            {facts.map(([k, ok, v]) => (
-              <li key={k}>
-                <i
-                  className={`d-dot ${ok === true ? "ok" : ok === false ? "bad" : "info"}`}
-                />
-                <span>{k}</span>
-                <em>{v}</em>
-              </li>
-            ))}
-          </ul>
-        </section>
-        {!arr && (
-          <section className="d-panel">
-            <h3>What the AIs say</h3>
-            {!g && !ds && <p className="d-muted">Not checked yet.</p>}
-            {g && (
-              <div className="d-ai">
-                <span className="d-ai-who">
-                  Gemini · looks{ck.gemini_second ? " (second look)" : ""}
-                </span>
-                <p>{g.summary}</p>
-              </div>
+        {tab === "check" && (
+          <>
+            {st.status === "rejected" && st.rejected && (
+              <section className="d-panel d-wide d-rejected">
+                <h3>
+                  Rejected by {st.rejected.by}, {when(st.rejected.time)}
+                </h3>
+                {st.rejected.reasons.length > 0 && (
+                  <p>{st.rejected.reasons.join(" · ")}</p>
+                )}
+                {st.rejected.text && <q>{st.rejected.text}</q>}
+                {since.length > 0 && (
+                  <ul className="d-since">
+                    {since.map((h, i) => (
+                      <li key={i}>
+                        Since then:{" "}
+                        <strong>
+                          {h.action === "note" ? "comment" : h.action}
+                        </strong>
+                        {h.by && <> by {h.by}</>} <time>{when(h.time)}</time>
+                        {h.text && <> · {h.text}</>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <a href={deskHref(card.id, "history")}>
+                  The whole history, with the pictures
+                </a>
+              </section>
             )}
-            {ds && (
-              <div className="d-ai">
-                <span className="d-ai-who">DeepSeek · reads the numbers</span>
-                <p>{ds.summary}</p>
-              </div>
-            )}
-            {[...(g?.differences ?? []), ...(ds?.differences ?? [])].length >
-              0 && (
-              <ul className="d-diffs">
-                {[...(g?.differences ?? []), ...(ds?.differences ?? [])]
-                  .slice(0, allDiffs ? undefined : 6)
-                  .map((d, i) => (
-                    <li key={i}>{d}</li>
-                  ))}
+            {card.product_list && <ProductsPanel list={card.product_list} />}
+            <section className="d-panel">
+              <h3>{arr ? "The arrangement" : "What the program read"}</h3>
+              <ul className="d-facts">
+                {facts.map(([k, ok, v]) => (
+                  <li key={k}>
+                    <i
+                      className={`d-dot ${ok === true ? "ok" : ok === false ? "bad" : "info"}`}
+                    />
+                    <span>{k}</span>
+                    <em>{v}</em>
+                  </li>
+                ))}
               </ul>
+            </section>
+            {!arr && (
+              <section className="d-panel">
+                <h3>What the AIs say</h3>
+                {!g && !ds && <p className="d-muted">Not checked yet.</p>}
+                {g && (
+                  <div className="d-verdict">
+                    <span className="d-ai-who">
+                      Gemini · looks{ck.gemini_second ? " (second look)" : ""}
+                    </span>
+                    <p>{g.summary}</p>
+                  </div>
+                )}
+                {ds && (
+                  <div className="d-verdict">
+                    <span className="d-ai-who">
+                      DeepSeek · reads the numbers
+                    </span>
+                    <p>{ds.summary}</p>
+                  </div>
+                )}
+                {diffs.length > 0 && (
+                  <ul className="d-diffs">
+                    {diffs.slice(0, allDiffs ? undefined : 6).map((d, i) => (
+                      <li key={i}>{d}</li>
+                    ))}
+                  </ul>
+                )}
+                {diffs.length > 6 && (
+                  <button
+                    className="d-more"
+                    onClick={() => setAllDiffs(!allDiffs)}
+                  >
+                    {allDiffs ? "Show fewer" : "Show all differences"}
+                  </button>
+                )}
+              </section>
             )}
-            {[...(g?.differences ?? []), ...(ds?.differences ?? [])].length >
-              6 && (
-              <button className="d-more" onClick={() => setAllDiffs(!allDiffs)}>
-                {allDiffs ? "Show fewer" : "Show all differences"}
-              </button>
-            )}
-          </section>
+          </>
         )}
-        <section className="d-panel">
-          <h3>Pieces</h3>
-          <table className="d-table">
-            <tbody>
-              {card.pieces_list.map((p) => (
-                <tr key={p.name}>
-                  <td>{p.name}</td>
-                  <td>×{p.quantity}</td>
-                  <td>
-                    {p.size_mm?.map((x) => Math.round(x / 10)).join(" × ")} cm
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-        <section className="d-panel">
-          <h3>Revisions</h3>
-          {card.revisions.length ? (
-            <table className="d-table">
-              <tbody>
-                {[...card.revisions]
-                  .reverse()
-                  .slice(0, allRevs ? undefined : 4)
-                  .map((r) => (
-                    <tr
-                      key={r.number}
-                      className={
-                        st.preferred_revision === r.number ? "pref" : ""
-                      }
-                    >
-                      <td>r{r.number}</td>
-                      <td>{when(r.time)}</td>
-                      <td>{r.panels} panels</td>
+        {tab === "pieces" && (
+          <>
+            <section className="d-panel">
+              <h3>Pieces</h3>
+              <table className="d-table">
+                <tbody>
+                  {card.pieces_list.map((p) => (
+                    <tr key={p.name}>
+                      <td>{p.name}</td>
+                      <td>×{p.quantity}</td>
                       <td>
-                        {canAct && card.revisions.length > 1 && (
-                          <button
-                            className="d-link"
-                            onClick={() =>
-                              act(
-                                { action: "prefer", n: r.number },
-                                `r${r.number} is the one to cut`,
-                              )
-                            }
-                          >
-                            {st.preferred_revision === r.number
-                              ? "★ to cut"
-                              : "cut this"}
-                          </button>
-                        )}
+                        {p.size_mm?.map((x) => Math.round(x / 10)).join(" × ")}{" "}
+                        cm
                       </td>
                     </tr>
                   ))}
-              </tbody>
-              {card.revisions.length > 4 && (
-                <caption className="d-caption">
-                  <button
-                    className="d-more"
-                    onClick={() => setAllRevs(!allRevs)}
-                  >
-                    {allRevs
-                      ? "Show the last 4"
-                      : `Show all ${card.revisions.length}`}
-                  </button>
-                </caption>
+                </tbody>
+              </table>
+            </section>
+            <section className="d-panel">
+              <h3>Revisions</h3>
+              {card.revisions.length ? (
+                <table className="d-table">
+                  <tbody>
+                    {[...card.revisions]
+                      .reverse()
+                      .slice(0, allRevs ? undefined : 4)
+                      .map((r) => (
+                        <tr
+                          key={r.number}
+                          className={
+                            st.preferred_revision === r.number ? "pref" : ""
+                          }
+                        >
+                          <td>r{r.number}</td>
+                          <td>{when(r.time)}</td>
+                          <td>{r.panels} panels</td>
+                          <td>
+                            {canAct && card.revisions.length > 1 && (
+                              <button
+                                className="d-link"
+                                onClick={() =>
+                                  act(
+                                    { action: "prefer", n: r.number },
+                                    `r${r.number} is the one to cut`,
+                                  )
+                                }
+                              >
+                                {st.preferred_revision === r.number
+                                  ? "★ to cut"
+                                  : "cut this"}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                  {card.revisions.length > 4 && (
+                    <caption className="d-caption">
+                      <button
+                        className="d-more"
+                        onClick={() => setAllRevs(!allRevs)}
+                      >
+                        {allRevs
+                          ? "Show the last 4"
+                          : `Show all ${card.revisions.length}`}
+                      </button>
+                    </caption>
+                  )}
+                </table>
+              ) : (
+                <p className="d-muted">No revisions kept.</p>
               )}
-            </table>
-          ) : (
-            <p className="d-muted">No revisions kept.</p>
-          )}
-        </section>
-        <Corrections
-          id={card.id}
-          canAct={canAct}
-          onChanged={() => {
-            load();
-            onChanged();
-          }}
-          snapshot3d={() => snap.current?.() ?? null}
-          drawingUrl={card.pages ? `/api/desk/${card.id}/page/${page}` : null}
-          picturesMax={picturesMax}
-          paste={!dialog}
-        />
-        {measuring && (
+            </section>
+          </>
+        )}
+        {/* kept mounted on every tab: a correction being written, its sizes and pictures
+            survive a look at Check or History */}
+        <div className="d-correct-host" hidden={tab !== "correct"}>
+          <Corrections
+            id={card.id}
+            canAct={canAct}
+            onChanged={() => {
+              load();
+              onChanged();
+            }}
+            snapshot3d={() => snap.current?.() ?? null}
+            drawingUrl={card.pages ? `/api/desk/${card.id}/page/${page}` : null}
+            picturesMax={picturesMax}
+            paste={!dialog && tab === "correct"}
+          />
+        </div>
+        {tab === "history" && (
           <section className="d-panel d-wide">
-            <h3>Measured on the sewn cover</h3>
-            <MeasuredForm id={card.id} onChange={setMeasured} />
+            <h3>History</h3>
+            <ol className="d-timeline">
+              {[...st.history].reverse().map((h, i) => (
+                <li key={i}>
+                  <span
+                    className={`d-tl-dot a-${h.action.replace(/\s+/g, "-")}`}
+                  />
+                  <strong
+                    className={
+                      h.action.startsWith("changed after") ? "d-tl-warn" : ""
+                    }
+                  >
+                    {h.action === "note" ? "comment" : h.action}
+                  </strong>{" "}
+                  {h.by && <>by {h.by}</>} <time>{when(h.time)}</time>
+                  {h.reasons && h.reasons.length > 0 && (
+                    <em> · {h.reasons.join(", ")}</em>
+                  )}
+                  {h.text && <q>{h.text}</q>}
+                  {h.note && h.fits == null && <em> · {h.note}</em>}
+                  {h.fits != null && (
+                    <em>
+                      {" "}
+                      · {h.fits ? "fits" : "does not fit"} {h.note}
+                    </em>
+                  )}
+                  {h.measured && h.measured.length > 0 && (
+                    <MeasuredSummary rows={h.measured} />
+                  )}
+                  {h.done != null && (
+                    <em> · {h.done ? "produced" : "not produced"}</em>
+                  )}
+                  {h.pictures && h.pictures.length > 0 && (
+                    <PictureThumbs
+                      id={card.id}
+                      names={h.pictures}
+                      onOpen={setZoom}
+                    />
+                  )}
+                </li>
+              ))}
+              {!st.history.length && <li className="d-muted">Nothing yet.</li>}
+            </ol>
           </section>
         )}
-        <section className="d-panel d-wide">
-          <h3>History</h3>
-          <ol className="d-timeline">
-            {[...st.history].reverse().map((h, i) => (
-              <li key={i}>
-                <span
-                  className={`d-tl-dot a-${h.action.replace(/\s+/g, "-")}`}
-                />
-                <strong
-                  className={
-                    h.action.startsWith("changed after") ? "d-tl-warn" : ""
-                  }
-                >
-                  {h.action === "note" ? "comment" : h.action}
-                </strong>{" "}
-                {h.by && <>by {h.by}</>} <time>{when(h.time)}</time>
-                {h.reasons && h.reasons.length > 0 && (
-                  <em> · {h.reasons.join(", ")}</em>
-                )}
-                {h.text && <q>{h.text}</q>}
-                {h.note && h.fits == null && <em> · {h.note}</em>}
-                {h.fits != null && (
-                  <em>
-                    {" "}
-                    · {h.fits ? "fits" : "does not fit"} {h.note}
-                  </em>
-                )}
-                {h.measured && h.measured.length > 0 && (
-                  <MeasuredSummary rows={h.measured} />
-                )}
-                {h.done != null && (
-                  <em> · {h.done ? "produced" : "not produced"}</em>
-                )}
-                {h.pictures && h.pictures.length > 0 && (
-                  <PictureThumbs
-                    id={card.id}
-                    names={h.pictures}
-                    onOpen={setZoom}
-                  />
-                )}
-              </li>
-            ))}
-            {!st.history.length && <li className="d-muted">Nothing yet.</li>}
-          </ol>
-        </section>
       </div>
 
       <div className="d-actions">
@@ -1191,56 +1293,16 @@ function CardView({
             >
               Comment <kbd>c</kbd>
             </button>
-            <label
-              className={`d-check ${st.status === "approved" || st.status === "produced" ? "" : "off"}`}
+            <span className="d-grow" />
+            <button
+              className={`d-btn d-ghost ${sewing || measuring ? "on" : ""}`}
+              aria-expanded={sewing || measuring}
+              data-testid="after-sewing"
+              title="Produced, the fit after sewing and what was measured"
+              onClick={() => setSewing(!(sewing || measuring))}
             >
-              <input
-                type="checkbox"
-                checked={st.status === "produced"}
-                disabled={
-                  !(st.status === "approved" || st.status === "produced")
-                }
-                onChange={(e) =>
-                  act(
-                    { action: "produced", done: e.target.checked },
-                    e.target.checked ? "Marked produced" : "Not produced",
-                  )
-                }
-              />
-              Produced <kbd>p</kbd>
-            </label>
-            <span className="d-fit">
-              <input
-                placeholder="After sewing: note…"
-                value={fitNote}
-                onChange={(e) => setFitNote(e.target.value)}
-              />
-              <button
-                className={`d-btn d-ghost ${measuring ? "on" : ""}`}
-                data-testid="measured-toggle"
-                title="Enter what you measured on the sewn cover against the check list; it is saved with Fits or Does not fit"
-                onClick={() => setMeasuring(!measuring)}
-              >
-                Measured…
-              </button>
-              {[true, false].map((fits) => (
-                <button
-                  key={String(fits)}
-                  className="d-btn d-ghost"
-                  onClick={async () => {
-                    const values = measuring ? measured : {};
-                    const n = Object.keys(values).length;
-                    const ok = await act(
-                      { action: "fit", fits, note: fitNote, measured: values },
-                      n ? `Fit saved, with ${n} measured sizes` : "Fit saved",
-                    );
-                    if (ok && n) setMeasuring(false);
-                  }}
-                >
-                  {fits ? "Fits" : "Does not fit"}
-                </button>
-              ))}
-            </span>
+              After sewing {sewing || measuring ? "▴" : "▾"}
+            </button>
             {st.history.length > 0 && (
               <button
                 className="d-btn d-ghost d-small"
@@ -1248,6 +1310,67 @@ function CardView({
               >
                 Undo <kbd>u</kbd>
               </button>
+            )}
+            {(sewing || measuring) && (
+              <div className="d-sewing">
+                <label
+                  className={`d-check ${st.status === "approved" || st.status === "produced" ? "" : "off"}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={st.status === "produced"}
+                    disabled={
+                      !(st.status === "approved" || st.status === "produced")
+                    }
+                    onChange={(e) =>
+                      act(
+                        { action: "produced", done: e.target.checked },
+                        e.target.checked ? "Marked produced" : "Not produced",
+                      )
+                    }
+                  />
+                  Produced <kbd>p</kbd>
+                </label>
+                <span className="d-fit">
+                  <input
+                    placeholder="After sewing: note…"
+                    value={fitNote}
+                    onChange={(e) => setFitNote(e.target.value)}
+                  />
+                  <button
+                    className={`d-btn d-ghost ${measuring ? "on" : ""}`}
+                    data-testid="measured-toggle"
+                    title="Enter what you measured on the sewn cover against the check list; it is saved with Fits or Does not fit"
+                    onClick={() => setMeasuring(!measuring)}
+                  >
+                    Measured…
+                  </button>
+                  {[true, false].map((fits) => (
+                    <button
+                      key={String(fits)}
+                      className="d-btn d-ghost"
+                      onClick={async () => {
+                        const values = measuring ? measured : {};
+                        const n = Object.keys(values).length;
+                        const ok = await act(
+                          {
+                            action: "fit",
+                            fits,
+                            note: fitNote,
+                            measured: values,
+                          },
+                          n
+                            ? `Fit saved, with ${n} measured sizes`
+                            : "Fit saved",
+                        );
+                        if (ok && n) setMeasuring(false);
+                      }}
+                    >
+                      {fits ? "Fits" : "Does not fit"}
+                    </button>
+                  ))}
+                </span>
+              </div>
             )}
           </>
         )}
@@ -1388,7 +1511,7 @@ function ArrangementFigure({ arr }: { arr: Arrangement }) {
               <span className="d-noimg" />
             )}
             <span className="d-arr-what">
-              <a href={`#/model/${m.model_id}`} title="its own model">
+              <a href={modelHref(m.model_id)} title="its own model">
                 {m.code}
               </a>
               <em>
@@ -1400,7 +1523,7 @@ function ArrangementFigure({ arr }: { arr: Arrangement }) {
                 {m.stale ? " · changed since" : ""}
               </em>
             </span>
-            <a className="d-link" href={`#/desk/${m.model_id}`}>
+            <a className="d-link" href={deskHref(m.model_id)}>
               its Desk card
             </a>
           </li>

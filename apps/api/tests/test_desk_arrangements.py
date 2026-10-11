@@ -236,7 +236,8 @@ def test_the_approvers_digest_lists_arrangements_once(app: Any, tmp_path: Path) 
         "rens@example.com", "rick@example.com", "wouter@example.com"
     ]  # fmt: skip
     assert "opstelling" in mails[0][1]
-    assert "Portofino chaise + 2-seater" in mails[0][2] and "/#/desk/arr-portofino" in mails[0][2]
+    assert "Portofino chaise + 2-seater" in mails[0][2]
+    assert "/#/work/desk/arr-portofino" in mails[0][2]
     mails.clear()
     auth.set_setting(Q.MAIL_KEY, {})  # even when the next digest is due: not twice
     Q.question_mails(auth, params, "https://studio", send, models)

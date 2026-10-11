@@ -72,7 +72,7 @@ async def main() -> None:
 
         # 1. the maker sends it
         _, page = await as_user("vera")
-        await page.goto(f"{URL}/#/arrangements/{NEW}")
+        await page.goto(f"{URL}/#/covers/arrangements/{NEW}")
         status = page.get_by_test_id("arr-desk-status")
         await expect(status).to_contain_text("Not at the Desk yet", timeout=SLOW)
         await expect(page.locator(".arrange-plans button")).to_have_count(3, timeout=SLOW)
@@ -90,40 +90,43 @@ async def main() -> None:
 
         # 2. the approver at the Desk
         ctx, page = await as_user("rens")
-        await page.goto(f"{URL}/#/desk")
+        await page.goto(f"{URL}/#/work/desk")
         await page.locator(".d-chips button", has_text="ARR").click()
         await page.locator(".d-seg-ctl button", has_text="All").click()
         rows = page.locator(".d-list li")
         await expect(rows).to_have_count(3)
         await expect(rows.first).to_contain_text("Ready for approval")
         await expect(page.locator(".d-list")).to_contain_text("portofino 2 + c")
-        await page.goto(f"{URL}/#/desk/{ARR}")
+        await page.goto(f"{URL}/#/work/desk/{ARR}")
         card = page.locator(".d-card")
         await expect(card.get_by_test_id("arr-status")).to_contain_text("Waiting for approval")
         await expect(card.locator("svg.arr-plan polygon")).to_have_count(3)  # 2 members + plan
         members = card.get_by_test_id("arr-members").locator("li")
         await expect(members).to_have_count(2)
         await expect(members.first.locator("a").first).to_have_attribute(
-            "href", "#/model/suns-2-seater-portofino"
+            "href", "#/model/suns-2-seater-portofino/3d"
         )
         await expect(card.locator(".viewer canvas[data-loaded]")).to_be_visible(timeout=SLOW)
         await expect(card.get_by_role("link", name="Check list (PDF)").first).to_be_visible()
+        tabs = card.get_by_role("navigation", name="Card")
+        await tabs.get_by_role("link", name="Pieces & revisions").click()
         await expect(card.get_by_role("heading", name="Pieces", exact=True)).to_be_visible()
+        await tabs.get_by_role("link", name="Check", exact=True).click()
         await page.wait_for_timeout(2500)
         await shot(page, "03-desk-arr-list-and-card")
         await shot(page, "04-desk-arr-card-full", full=True)
         assert await dxf(page, ARR) == 403
         await card.get_by_role("button", name="✓ Approve").click()
         # an approval moves on to the next card; back to this one
-        await expect(page).not_to_have_url(f"{URL}/#/desk/{ARR}", timeout=SLOW)
-        await page.goto(f"{URL}/#/desk/{ARR}")
+        await expect(page).not_to_have_url(f"{URL}/#/work/desk/{ARR}", timeout=SLOW)
+        await page.goto(f"{URL}/#/work/desk/{ARR}")
         await expect(card.get_by_test_id("arr-status")).to_contain_text(
             "Approved by Rens", timeout=SLOW
         )
         assert await dxf(page, ARR) == 200
 
         # 3. changed after approval: back to waiting
-        await page.goto(f"{URL}/#/arrangements/{ARR}")
+        await page.goto(f"{URL}/#/covers/arrangements/{ARR}")
         status = page.get_by_test_id("arr-desk-status")
         await expect(status).to_contain_text("Approved by Rens", timeout=SLOW)
         await shot(page, "05-arrangement-approved", full=True)
@@ -135,12 +138,16 @@ async def main() -> None:
         assert await dxf(page, ARR) == 403
         await expect(page.get_by_text("The cover is ready.")).to_be_visible(timeout=600_000)
         await shot(page, "06-arrangement-changed-after-approval", full=True)
-        await page.goto(f"{URL}/#/desk/{ARR}")
+        await page.goto(f"{URL}/#/work/desk/{ARR}")
         card = page.locator(".d-card")
         await expect(card.get_by_test_id("arr-status")).to_contain_text(
             "Waiting for approval again"
         )
+        await (
+            card.get_by_role("navigation", name="Card").get_by_role("link", name="History").click()
+        )
         await expect(card.locator(".d-timeline")).to_contain_text("changed after approval")
+        await card.get_by_role("navigation", name="Card").get_by_role("link", name="Check").click()
         await expect(card.locator(".d-arr-legend")).to_contain_text("One rectangle")
         await page.wait_for_timeout(2500)
         await shot(page, "07-desk-card-reopened", full=True)
@@ -150,7 +157,7 @@ async def main() -> None:
             viewport={"width": 390, "height": 844}, storage_state=await ctx.storage_state()
         )
         pp = await phone.new_page()
-        await pp.goto(f"{URL}/#/desk/{ARR}")
+        await pp.goto(f"{URL}/#/work/desk/{ARR}")
         await expect(pp.get_by_test_id("arr-members")).to_be_visible(timeout=SLOW)
         await pp.wait_for_timeout(2000)
         await pp.screenshot(path=f"{SHOTS}/08-desk-card-phone.png", full_page=True)

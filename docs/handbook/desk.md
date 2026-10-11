@@ -1,6 +1,6 @@
 # The Desk: approve the drawing covers
 
-**Desk** in the top bar. The AI sorts, people decide (ADR-079).
+**Work → Desk** (the start page of an approver; see [navigation.md](navigation.md)). The AI sorts, people decide (ADR-079).
 
 - **The queue** puts first what needs a person:
   1. covers where Gemini and DeepSeek disagree;
@@ -34,7 +34,11 @@
   - **Fits / does not fit:** after sewing, with a note.
   - **Undo** (`u`) takes back the last step. Use `j` and `k` to go to the next or previous
     cover.
-- **The cutting table's DXF** of a drawing cover downloads only once the cover is approved.
+- **The cutting table's DXF** of a drawing cover downloads only once the current cut is approved.
+  A rebuild that changes the cutting file puts it back to waiting with “changed after approval”
+  in the history. Review it and approve again. A saved revision downloads only if its cutting
+  file was approved at some point. Earlier approvals keep working: their current file is
+  recorded once with “fingerprint recorded for an earlier approval” in the history.
   Before that the model page shows a lock. An admin can force it with `?override=1`, which the
   history keeps.
 - **The AI spend** of this month is shown in the top right (ADR-078).

@@ -408,6 +408,7 @@ export interface User {
   last_login: number | null;
   has_password: boolean;
   invited_until?: number | null;
+  desk_approver?: boolean; // approves at the Desk (admin or desk.approvers): starts on Work → Desk
 }
 
 export interface Approval {

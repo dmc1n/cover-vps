@@ -40,9 +40,8 @@ async def admin_page(browser: Browser, errors: list[str]) -> Page:
     await page.get_by_label("User name").fill("tester")
     await page.get_by_label("Password").fill(PASSWORD)
     await page.get_by_role("button", name="Log in").click()
-    await expect(page.get_by_role("link", name="Models")).to_be_visible()
-    await page.goto(URL + "/#/admin")
-    await page.get_by_role("button", name="B2B customers").click()
+    await expect(page.get_by_role("button", name="Log out")).to_be_visible()
+    await page.goto(URL + "/#/shop/b2b")  # Shop → B2B customers (ADR-122)
     await expect(page.get_by_role("heading", name="B2B customers")).to_be_visible()
     return page
 
@@ -220,7 +219,9 @@ async def main() -> int:  # noqa: PLR0915 - one story, step by step
         await admin.get_by_role("cell", name=re.compile("Tuincentrum De Linde")).click()
         await expect(admin.get_by_text("PO PO-2026-118")).to_be_visible()
         await shot(admin, "18-admin-companies-and-orders")
-        await admin.get_by_role("button", name="Orders", exact=True).click()
+        await (
+            admin.get_by_role("navigation", name="Shop").get_by_role("link", name="Orders").click()
+        )
         await expect(admin.get_by_text("B2B 1 · PO PO-2026-118").first).to_be_visible()
         await shot(admin, "19-admin-orders-flagged")
         await browser.close()
