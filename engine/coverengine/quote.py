@@ -48,6 +48,7 @@ MM2_PER_M2 = 1e6  # param-ok: unit conversion
 PRODUCTS_JSON = Path(__file__).resolve().parents[2] / "config" / "quote_products.json"
 PRODUCTS: dict[str, dict[str, Any]] = {
     k: {"label": v["label"],
+        "group": v.get("group"),  # "bbq": a barbecue (ADR-119); none: furniture
         "fields": {f: tuple(t[:3]) for f, t in v["fields"].items()},
         # a size asked only when a yes/no is ticked (a lounger's headrest, owner 7 Oct 2026)
         "requires": {f: t[3] for f, t in v["fields"].items() if len(t) > 3}}  # noqa: PLR2004
@@ -70,6 +71,7 @@ def options(params: EffectiveParams) -> dict[str, Any]:
         "products": {
             k: {
                 "label": v["label"],
+                "group": v["group"],
                 "fields": [
                     {
                         "key": f,
@@ -112,6 +114,8 @@ def _sizes(
                 raise CoverError(f"{f}: between {lo} and {hi} cm")
         v[f] = x
     ease = _p(params, "quote.ease_cm")  # room on every side, so the cover goes on easily
+    if product.startswith("bbq_"):  # a barbecue: the cover over its own shape (ADR-119)
+        return _bbq_sizes(product, v, params, ease)
     chair = _p(params, "hull.chair_room_mm") / MM_PER_CM
     facts: dict[str, Any] = {"balloons": 0, "middle_cord": False}
     if product == "dining_set":
@@ -173,8 +177,32 @@ def _sizes(
                    "height_cm": v["height_cm"] + ease}, facts  # fmt: skip
 
 
+def _bbq_sizes(product: str, v: dict[str, Any], params: EffectiveParams, ease: float
+               ) -> tuple[str, dict[str, Any], dict[str, Any]]:  # fmt: skip
+    """A barbecue's cover: a cone on a round band, or a hipped roof on a box, fitted over the
+    barbecue built from the customer's sizes with the ease all round (ADR-119)."""
+    from coverengine import bbq
+
+    shape = bbq.cover_shape(product, v)
+    f = bbq.fit(bbq.build(product, v), shape, ease * MM_PER_CM,
+                _p(params, "quote.bbq_slope_min_deg"), _p(params, "quote.bbq_slope_max_deg"),
+                _p(params, "quote.bbq_wall_min_cm") * MM_PER_CM)  # fmt: skip
+    sizes: dict[str, Any] = {"height_cm": f["wall_mm"] / MM_PER_CM,
+                             "rise_cm": f["rise_mm"] / MM_PER_CM}  # fmt: skip
+    if shape == "cone round":
+        sizes["diameter_cm"] = f["diameter_mm"] / MM_PER_CM
+    else:
+        sizes["length_cm"] = f["length_mm"] / MM_PER_CM
+        sizes["depth_cm"] = f["depth_mm"] / MM_PER_CM
+    facts = {"balloons": 0, "middle_cord": False, "slope_deg": f["slope_deg"], "cold_only": True}
+    return shape, sizes, facts
+
+
 def _flat(piece: drawn.Piece) -> shapely.Geometry:
-    """A flat piece laid out in its own plane (all drawn pieces are planar, or a band)."""
+    """A flat piece laid out in its own plane (all drawn pieces are planar, or a band; a cone's
+    sector comes laid flat)."""
+    if piece.flat:
+        return shapely.Polygon(piece.flat).buffer(0)
     pts = np.vstack([np.array(f) for f in piece.faces])
     c = pts.mean(axis=0)
     _, _, vt = np.linalg.svd(pts - c, full_matrices=False)
@@ -277,6 +305,12 @@ def proposal(product: str, given: dict[str, Any], params: EffectiveParams,
         "balloons": facts["balloons"],
         "chair_space": facts.get("chair_space", False),
         "hem_m": round(hem_mm / MM_PER_M, 1),
+        # a barbecue's cover: the roof's slope, and only over a cold barbecue (ADR-119)
+        **(
+            {"roof_slope_deg": facts["slope_deg"], "cold_only": True}
+            if facts.get("cold_only")
+            else {}
+        ),  # fmt: skip
         "colour": colour,
         "price": cost,
         "note": "a proposal from rough sizes; the definitive pattern is made after the order",
@@ -285,7 +319,7 @@ def proposal(product: str, given: dict[str, Any], params: EffectiveParams,
 
 def _sides(shape: str, s: dict[str, Any]) -> list[float]:
     """The sides of the cover (cm) for the vent rule."""
-    if shape == "round":
+    if shape in ("round", "cone round"):
         return [math.pi * s["diameter_cm"]]
     if shape == "L shape":
         x, y, d = s["x_length_cm"], s["y_length_cm"], s["x_arm_depth_cm"]
@@ -347,12 +381,17 @@ def preview_glb(product: str, given: dict[str, Any], params: EffectiveParams) ->
     return glb_bytes(parts)
 
 
+_NEAREST = {"dining_set": "Tafels", "round_set": "Tafels", "sofa": "Sofasets",
+            "corner_sofa": "Sofasets", "lounger": "Ligbedden", "item": None}  # fmt: skip
+
+
 def nearest(
     product: str, given: dict[str, Any], models: Path, top: int = 3
 ) -> list[dict[str, Any]]:
     """The SUNS models nearest in kind and size: their covers are made and tested."""
-    want = {"dining_set": "Tafels", "round_set": "Tafels", "sofa": "Sofasets",
-            "corner_sofa": "Sofasets", "lounger": "Ligbedden", "item": None}[product]  # fmt: skip
+    if product not in _NEAREST:  # a barbecue: its catalogue covers come through matching
+        return []
+    want = _NEAREST[product]
     target = _bbox_cm(product, given)
     out = []
     for d in models.glob("suns-*"):
@@ -381,6 +420,10 @@ def nearest(
 
 def _bbox_cm(product: str, g: dict[str, Any]) -> list[float]:
     f = PRODUCTS[product]["fields"]
+    if product.startswith("bbq_"):
+        from coverengine import bbq
+
+        return bbq.plan_cm(product, {k: g.get(k, d) for k, (d, _, _) in f.items()})
     v = {k: float(g.get(k, d)) for k, (d, lo, _) in f.items() if lo is not None}
     if product == "dining_set":
         dims = [v["table_length_cm"], v["table_width_cm"], v["table_height_cm"]]
@@ -524,6 +567,10 @@ def under_cover(product: str, given: dict[str, Any], params: EffectiveParams) ->
     from coverengine import furniture
 
     full = full_sizes(product, given)
+    if product.startswith("bbq_"):
+        from coverengine import bbq
+
+        return bbq.build(product, full)
     if product in ("dining_set", "round_set") and full.get("chairs"):
         shape, sizes, _ = _sizes(product, given, params)
         room = _p(params, "hull.chair_room_mm") / MM_PER_CM + _p(params, "quote.ease_cm")

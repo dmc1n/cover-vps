@@ -71,7 +71,7 @@ PER_MINUTE = 60  # B2B calls per minute per address
 PER_HOUR_MAILS = 5  # "forgot password" and "request an account" per address per hour
 PERCENT = 100.0
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[a-z]{2,24}$", re.I)
-MODEL_ID = re.compile(r"^suns-[a-z0-9-]{1,120}$")
+MODEL_ID = re.compile(r"^(suns|bbq)-[a-z0-9-]{1,120}$")  # a photo: SUNS or BBQ (ADR-119)
 ACCESSORY_KEYS = ("balloon", "frame")
 
 SCHEMA = """

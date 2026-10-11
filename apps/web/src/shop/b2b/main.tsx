@@ -9,6 +9,7 @@ import { createRoot } from "react-dom/client";
 import "../shop.css";
 import "./b2b.css";
 import { Scene } from "../Scene";
+import { ProductCards } from "../ProductCards";
 
 type T = Record<string, string>;
 interface Field {
@@ -35,7 +36,12 @@ interface Info {
     colours: string[];
     languages: string[];
   };
-  options: { products: Record<string, { label: string; fields: Field[] }> };
+  options: {
+    products: Record<
+      string,
+      { label: string; group?: string | null; fields: Field[] }
+    >;
+  };
 }
 interface Addr {
   id: string | null;
@@ -624,17 +630,13 @@ function Configure({
       <aside className="s-config-panel">
         <h2>{tx.b("tab_configure")}</h2>
         <p className="s-muted">{tx.w("what")}</p>
-        <div className="s-products">
-          {Object.keys(products).map((k) => (
-            <button
-              key={k}
-              className={`s-card ${product === k ? "on" : ""}`}
-              onClick={() => setProduct(k)}
-            >
-              {tx.product(k)}
-            </button>
-          ))}
-        </div>
+        <ProductCards
+          products={products}
+          product={product}
+          setProduct={setProduct}
+          w={(k) => tx.w(k)}
+          name={tx.product}
+        />
         {products[product].fields
           .filter((f) => !f.requires || !!sizes[f.requires])
           .map((f) =>

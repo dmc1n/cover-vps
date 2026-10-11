@@ -18,6 +18,7 @@ import { Suggest, type Suggestion } from "./Suggest";
 import { createRoot } from "react-dom/client";
 import "./shop.css";
 import { Icon } from "./Icons";
+import { ProductCards } from "./ProductCards";
 import { HeroFilm } from "./HeroFilm";
 import type { StoryContent } from "./Story";
 
@@ -88,7 +89,12 @@ interface Info {
     /** an existing cover's delivery promise per language (ADR-118); none: not shown */
     stock_delivery_note?: Record<string, string>;
   };
-  options: { products: Record<string, { label: string; fields: Field[] }> };
+  options: {
+    products: Record<
+      string,
+      { label: string; group?: string | null; fields: Field[] }
+    >;
+  };
 }
 interface RainOption {
   ponds: number;
@@ -812,17 +818,13 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
               }}
             />
             <p className="s-muted">{w("what")}</p>
-            <div className="s-products">
-              {Object.keys(products).map((k) => (
-                <button
-                  key={k}
-                  className={`s-card ${product === k ? "on" : ""}`}
-                  onClick={() => setProduct(k)}
-                >
-                  {tx.product(k)}
-                </button>
-              ))}
-            </div>
+            <ProductCards
+              products={products}
+              product={product}
+              setProduct={setProduct}
+              w={w}
+              name={tx.product}
+            />
             {stock ? (
               // an existing cover (ADR-118): its own name, sizes and price, ordered directly
               <div className="s-stock" aria-busy={!stockQuote}>

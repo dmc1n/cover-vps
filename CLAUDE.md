@@ -12,7 +12,8 @@ and the direction.
 
 ## The business in numbers
 
-- Product: covers for outdoor furniture (chairs, tables, lounge sets, loungers, ...).
+- Product: covers for outdoor furniture (chairs, tables, lounge sets, loungers, ...) and, from
+  ADR-119, for premium barbecues (kamado, gas, pellet, fire tables).
   Tight-fitting by default, with a per-model option to loosen the fit.
 - Catalogue: 200 to 300 furniture models, new ones arrive regularly. Production about 100
   covers per week, in house.
@@ -258,6 +259,10 @@ Arrangements → Send to the Desk; Desk → ARR   an arrangement approved by Ren
                                             approval requires cut.dxf; missing approval fingerprints require reapproval
 COVER_DATA_DIR=~/cover-data uv run python scripts/desk_arrangements.py [--apply] [--only a,b]   the existing arr-* to "ready for approval" (ADR-115)
 apps/web/e2e/arrangements_desk.py           the arrangement → Desk workflow in a real browser (ADR-115; usage in its docstring)
+uv run python scripts/bbq_models.py OUT [--only a,b] [--steps build,cover,check]   premium barbecues as catalogue models in
+                                             staging (bbq-<brand>-<model>): built from published sizes or 3D Warehouse, covered,
+                                             audited and re-measured (ADR-119; list and sources in docs/plans/bbq-covers.md)
+apps/web/e2e/bbq.py                         the configurator's barbecue option in a real browser (ADR-119; usage in its docstring)
 3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs

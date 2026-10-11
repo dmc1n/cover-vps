@@ -469,6 +469,24 @@
    "de": "{n} s — meist in einer Minute fertig",
    "fr": "{n} s — généralement prêt en une minute"
   },
+  "group_furniture": {
+   "nl": "Tuinmeubels",
+   "en": "Garden furniture",
+   "de": "Gartenmöbel",
+   "fr": "Mobilier de jardin"
+  },
+  "group_bbq": {
+   "nl": "Barbecue",
+   "en": "Barbecue",
+   "de": "Grill",
+   "fr": "Barbecue"
+  },
+  "bbq_cold": {
+   "nl": "Leg de hoes alleen over een afgekoelde barbecue: het doek is niet hittebestendig.",
+   "en": "Only put the cover on a barbecue that has cooled down: the fabric is not heat-resistant.",
+   "de": "Zieh die Schutzhülle nur über einen abgekühlten Grill: der Stoff ist nicht hitzebeständig.",
+   "fr": "Ne posez la housse que sur un barbecue refroidi : la toile ne résiste pas à la chaleur."
+  },
   "stock_badge": {
    "nl": "Bestaande hoes uit ons assortiment",
    "en": "An existing cover from our range",
@@ -622,6 +640,66 @@
    "en": "Headrest length",
    "de": "Länge Kopfteil",
    "fr": "Longueur du dossier"
+  },
+  "egg_diameter_cm": {
+   "nl": "Doorsnede van het ei",
+   "en": "Diameter of the egg",
+   "de": "Durchmesser des Eis",
+   "fr": "Diamètre de l'œuf"
+  },
+  "closed_height_cm": {
+   "nl": "Hoogte met deksel dicht",
+   "en": "Height, lid closed",
+   "de": "Höhe bei geschlossenem Deckel",
+   "fr": "Hauteur, couvercle fermé"
+  },
+  "handle_depth_cm": {
+   "nl": "Diepte (handvat tot scharnier)",
+   "en": "Depth (handle to hinge)",
+   "de": "Tiefe (Griff bis Scharnier)",
+   "fr": "Profondeur (poignée à charnière)"
+  },
+  "side_tables": {
+   "nl": "Met zijtafels",
+   "en": "With side tables",
+   "de": "Mit Seitentischen",
+   "fr": "Avec tablettes latérales"
+  },
+  "tables_width_cm": {
+   "nl": "Breedte over de zijtafels",
+   "en": "Width over the side tables",
+   "de": "Breite über die Seitentische",
+   "fr": "Largeur avec les tablettes"
+  },
+  "shelf_height_cm": {
+   "nl": "Hoogte zijtafels",
+   "en": "Side shelf height",
+   "de": "Höhe der Seitenablagen",
+   "fr": "Hauteur des tablettes"
+  },
+  "hood_width_cm": {
+   "nl": "Breedte deksel",
+   "en": "Hood width",
+   "de": "Breite des Deckels",
+   "fr": "Largeur du couvercle"
+  },
+  "lid_length_cm": {
+   "nl": "Lengte deksel",
+   "en": "Lid length",
+   "de": "Länge des Deckels",
+   "fr": "Longueur du couvercle"
+  },
+  "fire_width_cm": {
+   "nl": "Doorsnede of breedte",
+   "en": "Diameter or width",
+   "de": "Durchmesser oder Breite",
+   "fr": "Diamètre ou largeur"
+  },
+  "square": {
+   "nl": "Vierkant of rechthoekig",
+   "en": "Square or oblong",
+   "de": "Quadratisch oder rechteckig",
+   "fr": "Carrée ou rectangulaire"
   }
  },
  "product": {
@@ -648,6 +726,36 @@
   "item": {
    "nl": "Stoel, bijzettafel, hocker",
    "en": "Chair, side table, hocker"
+  },
+  "bbq_kamado": {
+   "nl": "Kamado (ei) in onderstel",
+   "en": "Kamado (egg) in a nest",
+   "de": "Kamado (Ei) im Gestell",
+   "fr": "Kamado (œuf) sur support"
+  },
+  "bbq_kamado_table": {
+   "nl": "Kamado in een tafel",
+   "en": "Kamado in a table",
+   "de": "Kamado in einem Tisch",
+   "fr": "Kamado dans une table"
+  },
+  "bbq_gas": {
+   "nl": "Gasbarbecue met zijtafels",
+   "en": "Gas grill with side shelves",
+   "de": "Gasgrill mit Seitenablagen",
+   "fr": "Barbecue à gaz avec tablettes"
+  },
+  "bbq_pellet": {
+   "nl": "Pelletbarbecue",
+   "en": "Pellet grill",
+   "de": "Pelletgrill",
+   "fr": "Barbecue à pellets"
+  },
+  "bbq_fire_table": {
+   "nl": "Vuurtafel of plancha",
+   "en": "Fire table or plancha",
+   "de": "Feuertisch oder Plancha",
+   "fr": "Table de feu ou plancha"
   }
  },
  "b2b": {

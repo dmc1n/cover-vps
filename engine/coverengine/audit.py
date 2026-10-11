@@ -235,6 +235,10 @@ def fold_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     hull = json.loads((model_dir / "hull.json").read_text(encoding="utf-8"))
     if hull.get("top") != "box":
         return []
+    plan = (hull.get("box") or {}).get("plan") or hull.get("plan")
+    # a round cover: the top is a cone and the skirt a closed band, whose pieces never lie flat
+    # as one (ADR-107: at least two sectors, the skirt strips under their seams; ADR-119)
+    cone = isinstance(plan, dict) and plan.get("kind") == "round"
     panels = json.loads(cut_path.read_text(encoding="utf-8"))["panels"]
     data = np.load(npz)
     faces = np.asarray(data["original_vertex"])[np.asarray(data["faces"])]
@@ -252,7 +256,7 @@ def fold_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     flagged = []
     for a, b in {(min(x, y), max(x, y)) for x, y in zip(la[across], lb[across], strict=True)}:
         pa, pb = panels[int(a)], panels[int(b)]
-        if pa["region"] != pb["region"]:
+        if pa["region"] != pb["region"] or cone:
             continue
         sel = across & (((la == a) & (lb == b)) | ((la == b) & (lb == a)))
         fold = float(np.median(angle[sel]))

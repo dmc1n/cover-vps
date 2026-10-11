@@ -763,13 +763,17 @@ def follow_cover(
         label = np.where(on, label + int(label.max()) + 1, label)
     label = connected(mesh, label)  # a band across a bent piece can fall in two
     folds: list[list[list[float]]] = []
-    if bool(params["seams.fold_merge"]):  # on request: top faces one piece with a fold (ADR-055)
+    gentle = float(params["seams.fold_join_max_deg"])
+    if bool(params["seams.fold_merge"]) or gentle > 0:
+        # on request: top faces one piece with a fold (ADR-055); always: faces on one side that
+        # meet at a gentle fold (ADR-099), as on box covers: the audit asks the same (ADR-119)
         from coverengine.seams import facets
 
         n = np.zeros((int(label.max()) + 1, 3))
         np.add.at(n, label, np.asarray(mesh.face_normals) * np.asarray(mesh.area_faces)[:, None])
         is_top = np.abs(n[:, 2]) >= UPRIGHT_NZ * np.linalg.norm(n, axis=1)
-        label, _, folds = facets.join(mesh, label, is_top, least, usable, longest, True)
+        label, _, folds = facets.join(mesh, label, is_top, least, usable, longest,
+                                      bool(params["seams.fold_merge"]), gentle)  # fmt: skip
         label = np.unique(label, return_inverse=True)[1].ravel().astype(np.int64)
     wet = water(plan, roof, hem, params)
     report = {

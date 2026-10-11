@@ -3854,3 +3854,58 @@ tomorrow'." (Numbered 118: two branches already claim 116.)
   real browser at 1440 and 390 px (screenshots in out/stockorder/).
 - **Better later:** a stock count per cover (the promise only while it is on the shelf); the
   furniture's photo on the card; the customer's colour checked against what is in stock.
+
+## ADR-119 — Covers for premium barbecues: the configurator's BBQ option and BBQ catalogue covers
+
+The owner (11 Oct 2026): "in the new version, also an option for covers for BBQs; research the
+best-selling luxury BBQs (Big Green Egg etc.) — we are a premium cover, so premium products;
+load all these models and make a proposal for a cover." Research and the ranked list:
+docs/plans/bbq-covers.md (Dutch summary) and docs/plans/bbq-covers-research.md (sizes, sources).
+
+- **A cover goes on a cold barbecue.** Acrylic canvas is not heat-proof; the shop says so in
+  every language (`bbq_cold`), the proposal carries `cold_only`. The room under the cover is for
+  handles, thermometers, hinges and the top vent, not for heat.
+- **The configurator (shop and B2B):** five products with `"group": "bbq"` in
+  config/quote_products.json, shown under their own chip ("Barbecue") above the cards
+  (`apps/web/src/shop/ProductCards.tsx`): kamado in a nest (egg diameter, height lid closed,
+  depth handle to hinge, optional side tables and their width), kamado in a table, gas grill
+  with side shelves (width, depth, height, shelf height, hood width), pellet grill (width, depth,
+  height, lid length), fire table or plancha (diameter or width, height, optional square/oblong
+  with its depth). Defaults are the best sellers (BGE Large in nest, BGE Large acacia table,
+  Weber Genesis E-335, Traeger Ironwood, OFYR Classic 85).
+- **The barbecue in 3D** (`coverengine/bbq.py`): one builder per kind from the sizes (egg on a
+  nest with handle, hinge, top vent, EGG Mates; cart, hood, handle bar, shelves; barrel, hopper,
+  shelf; plate on a cone or a square table). The same builders make the catalogue models.
+- **The cover:** a round band with a cone on top (a kamado alone, a round fire table; drawn shape
+  `cone round`: cone sectors laid flat exactly, as many band strips under their seams, ADR-107's
+  round logic) or a box with a hipped roof (all others; `hip box`, all eight pieces flat). Its
+  sizes come from the barbecue's own points plus `quote.ease_cm`; of the roof slopes between
+  `quote.bbq_slope_min_deg` (12.5) and `quote.bbq_slope_max_deg` (30) the one with the least
+  fabric, the walls at least `quote.bbq_wall_min_cm` (35) high for the vents. Every point of the
+  top slopes: water runs off (rule 12; the rain check confirms it, no balloons offered).
+  Vents, drawcord and price by the existing rules and costing.
+- **Matching:** catalogue covers `bbq-<brand>-<model>` (`match.bbq_card`): offered once their
+  Desk status is in `match.drawing_statuses` and cover.json says `"match": {"kind": "bbq_…",
+  "name": "Big Green Egg Large in nest", "families": [...]}`. Their size card is the barbecue's
+  bounding box, and the customer's sizes are measured the same way (the configurator builds the
+  barbecue and takes its box: `bbq.plan_cm`). The shop's `stock_model` accepts `bbq-…`.
+- **The family preset `config/presets/bbq.yaml`:** box top, `hull.clearance_mm` 20 (to confirm),
+  no chair space, no support. Kamados and round fire tables `hull.plan: round`; the others
+  `hull.plan: box` per model (a BBQ cover is a straight box; following the shelves' outline gave
+  a curved hem for 3 cm of fabric).
+- **Two engine fixes found on the way, each covered:**
+  - *Gentle folds on a "follow" plan* (`hull/outline.py`): faces meeting at a fold of at most
+    `seams.fold_join_max_deg` were joined only on box plans, while the audit asks it of every box
+    cover; the follow plan now joins them too. None of the 18 live follow covers fails the
+    audit's check, so none changes.
+  - *A cone's sectors* (`audit.fold_checks`): two sectors of a round top meet at a near-zero fold
+    but never lie flat as one piece; the audit no longer asks to join them (a small round cover,
+    the BGE Large's, fits the roll in one and was flagged).
+- **Staging (`scripts/bbq_models.py`, out/bbq/):** 27 barbecues of the top 25 built, covered and
+  checked twice (audit and fewer_check); BGE Large's egg is a 3D Warehouse model scaled to the
+  published sizes, the Weber Genesis II EP-335 a 3D Warehouse model as modelled, the rest drawn
+  from the published sizes (estimates listed per model in its notes). Not imported live: the main
+  session does that after review.
+- **Better later:** lid-open and folded-shelf variants; a kettle (Weber Master-Touch) and the
+  OFYR Island; measuring the Kamado Joe carts (the maker and the shops differ by 10–17 cm);
+  pricing BBQ catalogue covers from their own pattern rather than the configurator's shape.

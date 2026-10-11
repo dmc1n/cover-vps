@@ -1071,6 +1071,21 @@ p {
   gap: var(--s-2);
   margin: 0 0 var(--s-5);
 }
+/* garden furniture or a barbecue (ADR-119): two chips above the cards */
+.s-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-3);
+}
+.s-groups .s-chip::before {
+  display: none;
+}
+/* a barbecue's cover goes on a cold barbecue only */
+.s-cold {
+  margin: calc(-1 * var(--s-3)) 0 var(--s-4);
+  font-size: 13px;
+}
 .s-card {
   position: relative;
   display: flex;

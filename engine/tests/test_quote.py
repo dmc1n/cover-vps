@@ -12,7 +12,12 @@ PARAMS = Registry.load(None).resolve()
 def test_every_product_gives_a_proposal(product: str) -> None:
     q = quote.proposal(product, {}, PARAMS)
     assert q["pieces"] and q["fabric_m2"] >= q["cover_area_m2"] > 0
-    assert q["roll_m"] > 0 and q["vents"] >= 4  # at least one per side
+    assert q["roll_m"] > 0
+    if q["shape"] == "cone round":  # a small round barbecue cover: one per full metre round it
+        d = q["sizes_cm"]["diameter_cm"]
+        assert q["vents"] == max(1, int(3.14159 * d // 100))
+    else:
+        assert q["vents"] >= 4  # at least one per side
     p = q["price"]
     assert 0 < p["cost_eur"] < p["sale_ex_vat_eur"] < p["sale_eur"]
     # no cut piece wider than the roll
