@@ -390,7 +390,9 @@ export function Viewer({
     const sized =
       typeof ResizeObserver === "undefined"
         ? null
-        : new ResizeObserver(onResize);
+        : // the next frame, not inside the observer: resizing the canvas there makes the
+          // observer report again in the same frame (a "loop" error in Safari)
+          new ResizeObserver(() => requestAnimationFrame(onResize));
     sized?.observe(el);
     renderer.setAnimationLoop(() => {
       // hidden (a Desk card's other tab): no drawing at all; a snapshot draws by itself

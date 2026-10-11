@@ -84,6 +84,7 @@ async def mark(page: Page, tools: list[str], shot: str | None = None) -> None:
         await expect(marker).to_be_visible(timeout=SLOW)
     except AssertionError:
         notes = await page.locator(".d-pics-note").all_text_contents()
+        await page.screenshot(path=f"{SHOTS}/no-marker-{'-'.join(tools)}.png")
         raise AssertionError(f"no marking editor for {tools}; the page says {notes}") from None
     canvas = marker.locator("canvas")
     await expect(canvas).to_be_visible(timeout=SLOW)

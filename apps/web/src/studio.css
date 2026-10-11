@@ -1051,3 +1051,11 @@ nav.subnav .subnav-group {
 .d-correct-host[hidden] {
   display: none;
 }
+/* the decision bar with an open dialog never reaches under the sticky header (its Pictures
+   buttons stay clickable on a tablet, ADR-096) */
+.d-actions {
+  max-height: calc(100vh - var(--top-h) - 16px);
+}
+.d-actions * {
+  scroll-margin-top: calc(var(--top-h) + 8px);
+}
