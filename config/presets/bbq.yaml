@@ -1,0 +1,10 @@
+# Family preset: barbecues (parameter layer 2, ADR-119). A model joins the family with
+# "family": "bbq" in its cover.json; its own settings still win. A barbecue cover goes on a COLD
+# barbecue (acrylic canvas is not heat-proof): the room below is for handles, thermometers and
+# hinges, not for heat.
+hull:
+  top: box                       # flat faces that slope (a kamado: a cone, hull.plan round, ADR-107)
+  clearance_mm: 20               # to confirm: a little more room than furniture (10) over handles,
+                                 # thermometers and hinges, so the cover slides on easily
+  chairs: none                   # never chair space round a barbecue
+  support: none                  # no balloons: the hood or the dome carries the top

@@ -432,3 +432,77 @@ def test_the_3d_files_travel_packed(app: Any) -> None:
     q = c.post("/api/shop/quote", json={"product": "dining_set", "sizes": {}}).json()
     scene = c.get(q["scene"], headers={"accept-encoding": "gzip"})
     assert scene.content[:4] == b"glTF" and "max-age" in scene.headers["cache-control"]
+
+
+def test_a_barbecue_cover_in_the_shop_and_our_own_for_a_big_green_egg(app: Any) -> None:
+    """ADR-119: the barbecues are products of their own; an approved catalogue BBQ cover is
+    offered as "we already make a cover for your Big Green Egg Large in nest"."""
+    import json
+
+    from coverengine import bbq
+    from coverengine import quote as q
+
+    admin = _login(app)
+    admin.put("/api/admin/shop/settings", json={"bbq_enabled": True})  # the owner turned them on
+    c = TestClient(app)
+    info = c.get("/api/shop/info").json()
+    assert info["settings"]["bbq_enabled"] is True
+    assert info["options"]["products"]["bbq_kamado"]["group"] == "bbq"
+    assert info["content"]["ui"]["words"]["bbq_cold"]["de"]
+    own = c.post("/api/shop/quote", json={"product": "bbq_gas", "sizes": {}}).json()
+    assert own["pieces"] == 8 and own["rain"]["options"]["none"]["dry"]
+    assert c.get(own["scene"]).status_code == 200
+    # a Big Green Egg Large in nest of our range, approved at the Desk
+    d = app.state.store.models / "bbq-bge-large-nest"
+    d.mkdir(parents=True)
+    defaults = {k: v for k, (v, _, _) in q.PRODUCTS["bbq_kamado"]["fields"].items()}
+    size = bbq.plan_cm("bbq_kamado", defaults)
+    (d / "cover.json").write_text(json.dumps({"category": "BBQ › Kamado", "match": {
+        "kind": "bbq_kamado", "name": "Big Green Egg Large in nest"}}))  # fmt: skip
+    (d / "model.json").write_text(json.dumps({"size_mm": [size[1] * 10, size[0] * 10,
+                                                          size[2] * 10]}))  # fmt: skip
+    (d / "desk.json").write_text(json.dumps({"status": "approved"}))
+    admin.put("/api/admin/shop/settings", json={"matching": {"mode": "auto"}})
+    r = c.post("/api/shop/match", json={"product": "bbq_kamado", "sizes": defaults}).json()
+    assert r["decision"] == "existing" and r["match"]["name"] == "Big Green Egg Large in nest"
+    stock = c.post("/api/shop/quote", json={"product": "bbq_kamado", "sizes": defaults,
+                                            "stock_model": "bbq-bge-large-nest",
+                                            "match_token": r["token"]}).json()  # fmt: skip
+    assert stock["stock"]["model_id"] == "bbq-bge-large-nest"
+
+
+def test_the_barbecues_stay_off_the_live_shop_until_turned_on(app: Any) -> None:
+    """ADR-119: `bbq_enabled` is off by default: no Barbecue choice, no BBQ quote, match or
+    public API; the preview website (preview.<domain>, through the Worker) always has them."""
+    import json
+
+    c = TestClient(app)
+    info = c.get("/api/shop/info").json()
+    assert info["settings"]["bbq_enabled"] is False
+    assert not [k for k in info["options"]["products"] if k.startswith("bbq_")]
+    assert "sofa" in info["options"]["products"]
+    assert c.post("/api/shop/quote", json={"product": "bbq_gas", "sizes": {}}).status_code == 400
+    assert c.post("/api/shop/match", json={"product": "bbq_kamado", "sizes": {}}).status_code == 400
+    assert c.post("/api/shop/quote", json={"product": "sofa", "sizes": {}}).status_code == 200
+    admin = _login(app)  # the public API (ADR-061) as our own configurator page calls it
+    assert not [k for k in admin.get("/api/public/v1/options").json()["products"]
+                if k.startswith("bbq_")]  # fmt: skip
+    # the preview website, through the Worker with its key: on, so the owner can try them
+    key = admin.post("/api/admin/shop/link-key").json()["key"]
+    preview = TestClient(app, headers={"x-link-key": key, "x-forwarded-host": "preview.example"})
+    pinfo = preview.get("/api/shop/info").json()
+    assert pinfo["settings"]["bbq_enabled"] is True and "bbq_gas" in pinfo["options"]["products"]
+    assert preview.post("/api/shop/quote", json={"product": "bbq_gas"}).status_code == 200
+    # a preview host without the Worker's key, or the live site's host: still off
+    fake = TestClient(app, headers={"x-forwarded-host": "preview.example"})
+    assert fake.post("/api/shop/quote", json={"product": "bbq_gas"}).status_code == 400
+    live = TestClient(app, headers={"x-link-key": key, "x-forwarded-host": "shop.example"})
+    assert live.post("/api/shop/quote", json={"product": "bbq_gas"}).status_code == 400
+    # the preview build's overlay turns the choice on in the page as well
+    root = Path(__file__).resolve().parents[3]
+    overlay = json.loads((root / "apps/site/preview-overlay.json").read_text())
+    assert overlay["settings"]["bbq_enabled"] is True
+    # the owner turns them on: everyone has them
+    admin.put("/api/admin/shop/settings", json={"bbq_enabled": True})
+    assert c.post("/api/shop/quote", json={"product": "bbq_gas"}).status_code == 200
+    assert "bbq_gas" in c.get("/api/shop/info").json()["options"]["products"]

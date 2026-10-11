@@ -3071,6 +3071,17 @@ is public." Handbook: docs/handbook/b2b.md; open questions: QUESTIONS 72.
     "order again" prices every line anew at today's prices.
   - A confirmation goes to the buyer (in their language), the company's e-mail and the alert
     address.
+- **Checkout reliability (11 October 2026):** the client keeps one `idempotency_key` per
+  checkout in session storage and resends it after a failed response. A unique company/key
+  index returns the original order, even if quotes or settings have since changed. The B2B
+  order, studio rows, links and per-line dispatch outbox commit in one SQLite transaction.
+  Additive app.db migrations use the existing PRAGMA/ALTER approach; old orders have no key
+  and are not automatically re-dispatched. Production starts after commit, serially per app,
+  marking each line dispatched only on success. Startup retries pending lines; `produce()`
+  already returns an existing model for a completed production order. A crash during external
+  production work can retry that work: this outbox gives recoverable delivery, not an atomic
+  transaction across SQLite and filesystem/job side effects. A transactional job queue would
+  close that remaining window if needed later.
 - **Online payment for B2B:** a switch is kept (`b2b.online_payment`, off); the order API
   refuses "online" until it is built (one Mollie payment for several order rows needs a
   webhook that handles a group).
@@ -3551,6 +3562,12 @@ search (by look only: no brand recognised) and the comparison.
   small thumbnail with its score; the pick; the final answer), the time and the cost. Nothing
   is kept: the photo lives only for the request, the result goes only to the admin's browser;
   the ledger gets the cost on a line of its own.
+- **Final sizing settings** (11 October 2026): `suggest.final_model` and
+  `suggest.final_thinking` independently configure the final configurator answer. The model
+  stays Gemini Flash and thinking defaults to low; previously this call omitted reasoning
+  effort and used Gemini's default. Its ledger entry is tagged `suggest final`. Global AI
+  defaults and drawing reading keep their existing settings. Fake network tests check both
+  the default and overridden settings and the ledger tag.
 - **The box that stuck out:** while the customer waits (30–60 s) the button says "We zoeken je
   meubel op… (dit kan een minuut duren)". Buttons do not wrap (`.s-btn { white-space: nowrap }`)
   and the box was a grid whose one column grew to that line: the photo field, the link field
@@ -3743,6 +3760,241 @@ models with status "new", unnamed and without a way to send them or to see what 
   gutter, and the fit row did not wrap).
 - **Better later:** the smooth plan drawn from the built cover's own outline; a per-member
   check that the arrangement's pieces still match the member's latest cover.
+- **Approval safety (2026-10-11):** approving an arrangement without `cut.dxf` returns HTTP
+  400 before saving any approval. A missing or null approved cut fingerprint counts as a
+  changed cut file, including before the first build; legacy approvals require fresh approval
+  before the DXF can be downloaded. Regression tests cover both cases.
+
+## ADR-116 — Rens's answers on the drawing covers (9 Oct 2026): shapes read again, a person's vent count kept
+
+Rens answered the drawing questions at the Desk (Questions tab, ~/cover-data/answers-2026-10-09.json).
+Each cover was rebuilt in staging (`out/answers/<model>/`), checked twice (`cover audit`,
+`scripts/fewer_check.py`) and looked at against the drawing (`out/answers/compare/`).
+
+- **Shapes, per model** (`testdata/drawing_shapes/*.json`, built by `scripts/given_build.py`):
+  - D5 (Q4, "the outline does not match the drawing at all"): read again view by view. A 198 x 94 cm
+    rectangle with a half round of radius 99 cm (the full width) centred 94 cm from the back; one
+    slope from the strip (84 cm, 30 cm from the back) to the 40.01 cm front; ends leaning in 10.01 cm
+    from 59 cm walls. Every written size comes back: 193.99 (the back wall's top), 177.98 (the
+    strip), 195.32 at 110.22 cm and 62.35 cm there. Yesterday's "the sizes do not make one surface"
+    was a misreading (the round's centre is at 94 cm, not its start).
+  - S20 (Q5) and S48 (Q11): the arms followed, the seat between them one panel falling from the top
+    of the back (84 / 89 cm) to the seat's front edge (40 / 43 cm), as the Blocchi reference; the
+    arm insides meet it in a line that falls to the front, so water runs off (rule 12). `faces`.
+  - S21 (Q6): the 30-degree bend Rens chose (the drawing's lines measure 40; its 149.78 cm front
+    edge belongs to 40, with 30 the front edge is 159.9 cm).
+  - S37 (Q7): depth 102.1 cm, the straight part 50.65 cm.
+  - S38/S39 (Q8): the front wall's top falls from 59.9 cm to 40.1 cm at the slanted side (the
+    36.4 in line and the 15.80 in on the side view), so the top panel tilts out two ways: one ruled
+    panel, 0.11 % stretch.
+  - S25 (Q14): the profile from the side view (back 62.99, chamfer to 88.6, a 31.02 cm strip, a
+    slope to 62.99 at 95.52 cm, a steeper front face to 40.01 at 120 cm; the live cover had a flat
+    top to 95.52 cm and one slope), hipped ends from the written line lengths, 10 pieces; 5 vents.
+- **General causes, each with a test:**
+  - *A word number inside another word* (`drawing_vectors.VENTS`): "Max Height Air Pocket" was read
+    as "eight air pocket", 8 vents on S20 (the drawing draws 4 arrows). A number before the label
+    must be a word of its own. Swept over the 120 drawings: only S20 changes.
+  - *A join that breaks a seam* (`drawn_merge.merge(..., seam_mm)`): S25's slope and front face, two
+    cone bands at a 13 degree fold, were joined at 0.8 % stretch, which made the front seam 7.5 mm
+    longer than the wall (over the 5 mm fit, the audit failed). A join is now refused when any
+    stretch of the joined piece's outline between two corners changes length by more than
+    `tolerance.cover_mm` flattened (`rim_change`). S43 keeps its joins.
+  - *A count a person decided is kept* (`drawing_route.person_vents`): `vents_total` in
+    drawing_corrections.json or in the shape a person read wins over the reader on every rebuild
+    (C24/C25 9, Q67: the drawings read 7; S25 5); the reader's count stays as `vents_read`. The
+    audit's new *decided vents* check fails a cover asking for another number.
+  - *A free edge in a hip shape* (`drawing_given`, `free`): an outline edge with a wall but no
+    profile of its own, whose rim follows the other planes (D5's round front).
+- **Vents only:** R1–R3 (Q13) `features.vent_align: top` in cover.json (60–82 cm, the top 5 cm under
+  the top seam); C24/C25 (Q67) 9 each, by the rule (ADR-101/110) they land on Rens's circles (two on
+  the long front wall, one in the middle of the short one; C25 the mirror).
+- **Not changed:** S47 (Q10, "leave as it is"); S45 (Q9 "152.4 cm, not 358" against Q57 "358.4 cm
+  round, as now": contradictory, to the owner).
+- **Not done:** the vertical drawstring openings (D5, S38, S39); S25's end walls slope from 63 to
+  40 cm under the hip (the drawing draws them level at 40 cm with the hip rising from there) —
+  the swept builder's hip keeps the back and front edges full length; R1–R3 still fail the audit's
+  balloons check (a table without a balloon, as live).
+
+
+## ADR-117 — Rens's answers of 9 Oct on the SUNS covers: box tops cut to the roll, straight wall tops, a no-cover mark
+
+Rens answered the Desk questions about the SUNS covers rejected on 8 Oct (questions 1–3, 12,
+15–23; ~/cover-data/answers-2026-10-09.json, the latest answer per question). Each cover was
+built again in staging (`out/answers/<model>/`, `scripts/answers_stage.py`), checked twice
+(`cover audit`, `scripts/fewer_check.py`) and looked at next to Rens's marked picture
+(`out/answers/compare/`). Results per cover, with the answer to Rens in Dutch, in
+`out/answers/results.json`. Nothing is replaced live by this change.
+
+**General rules (ADR-055: a rule, a test, an audit check and an AI lesson each).**
+- **A box top wider than the roll is cut into strips** (question 16, the Portofino daybed's
+  1.85 m top). The arrangements and the follow covers already did this; a plain (convex) box
+  cover only reported it. Now the hull step draws lines across every too-wide top face's slope
+  (`hull.json` box.roll_cuts) and the cut splits the piece there after its gentle-fold joins, so
+  the seams run downhill and a join never undoes a split. Test:
+  `test_a_box_top_wider_than_the_roll_is_cut_in_strips`.
+- **Gentle folds on follow covers too** (the Nuna's 10 degree gable stayed two pieces). The
+  ADR-099 join now also runs on a follow cover's flat top faces (and on a model built from its
+  parts' plan, below); its walls, curved round the outline, keep their seams. The audit's
+  *gentle folds* check leaves out pieces that bend more than the limit within themselves (a
+  follow cover's rounded corner is no pair of flat faces: the Fiave L-part was flagged falsely).
+- **A join made at the Desk is a fold in pen** (ADR-082's `part_edits.json`): two flat pieces a
+  person joins get the same FOLD line as the engine's own joins (the Sato bench, question 18).
+- **Creases as seams only for organic covers** (question 19, S53 and S60: "for covers with an
+  organic shape like these, which have curved seams, follow the drawing; not for all covers").
+  `seams.given_crease_deg` is 0 by default; the new family preset `organic`
+  (`config/presets/organic.yaml`) sets 20 and S53/S60 join it with `"family": "organic"`.
+  The rule-13 clash (their front seam is not level) is thereby accepted for this shape type
+  only.
+- **No cover** (question 12, the Portofino daybed with roof): `"no_cover": true` (and
+  `"no_cover_reason"`) at the top of a model's cover.json. The model stays, but the shop's
+  matching (cards, existing covers, similar covers, B2B, photo suggestions, drawing covers)
+  never offers it and the Desk leaves it out of its queue and refuses approve/reject/produced
+  (409); `cover report` counts it as "no cover". Set with `cover model DIR --no-cover yes
+  --no-cover-reason TEXT` or `PUT /api/models/{id}/info`; the studio's list shows a badge.
+  Marking does not make any step run again (stepcache). Tests: `engine/tests/test_no_cover.py`,
+  `apps/api/tests/test_no_cover_api.py`.
+
+**Per model, by hand (the owner's answers "only for these models"):**
+- `seams.straight_wall_tops` (questions 22 and 23, Sorrento 2-seater, Avero 2-seater, Sorrento
+  3-seater with corner): every wall's top edge one straight line from corner to corner. The
+  box's shape stays; the part of a wall above that line goes to the roof pieces as flaps folded
+  down, split by an upright seam under each kink (`hull/hand.py` `straight_tops`). Every piece is
+  flat faces joined along edges, so it lies flat exactly. A real straight top edge with a ridge
+  meeting the wall in its middle cannot be made of flat faces (two planes that meet a wall in
+  one line are one plane), so the ridge stays the box's own.
+- `hull.box_extra_faces` (question 3, the Nuna: "a chamfer instead of a bulge"): faces added by
+  hand to the box as outward directions ("0 1 1" = a 45 degree chamfer at the back), each just
+  clear of the furniture, mirrored on a symmetric cover.
+- `plan_members.json` (question 21, the Vento lounge: "redo it, like the other L covers"): one
+  model built like an arrangement (ADR-095) from its parts' plan rectangles, given by hand in the
+  model's frame: an L with a square inner corner, each arm's top sloping to its own front.
+- `box_shape.json`: a box cover given piece by piece, corner by corner (twisted quads become
+  ruled patches), checked like any cover (furniture inside, water on a height grid, the roll);
+  for an approver's layout no rule can make. Not used live yet; tested.
+- Plain per-model settings: Portofino 2-seater `features.vents_total: 4` (question 15: one vent
+  per long side for this cover; the company rule stays one per full metre); Sato bench
+  `part_edits.json` joining the 10 cm strip to the top (question 18: "one top panel of about 94
+  cm with a fold line"; `seams.fold_join_max_deg` 30, the option's wording, would also have
+  joined the 24 degree back slope, so the join is made by name instead).
+
+**Doubt, to the owner:** the Vento angled 2-seater (question 1). Rens's sloped seam from the
+back ridge down to the front corner makes a hip at the angled end; a flat face through those
+lines passes 15 to 20 cm inside the end's back cushion (82–86 cm high right next to the end
+wall), so it cannot be built as drawn without the cover cutting into the furniture.
+
+**Better later:** a ridge that meets a wall's straight top edge in its middle (twisted roof
+pieces, `box_shape.json`) where a person draws it; the gentle-fold join for arrangements too
+(their approved covers would change, ADR-115); an angled member in `plan_members.json`
+(rectangles only today).
+
+## ADR-118 — An existing cover is ordered directly: its own name, price and delivery promise
+
+The owner (9 Oct 2026, preview): "I chose an existing cover, 'SUNS cover dining tables – Table
+240x100', it fits 100 %, but it still shows the price of making it custom. It should say ORDER
+DIRECTLY! with the right price; in this test version it may also say 'ordered today, delivered
+tomorrow'." (Numbered 118: two branches already claim 116.)
+
+- **Why he saw the custom price:** the stock choice did reach the server and took the stock
+  path (his quotes `44118ff3…` and `d9dce5dd…`, 18:57 and 18:58, carry `stock_model:
+  drawing-t10`). But the price list was only in the draft (published at 18:59), and
+  `stock_discount_pct` was not set, so the stock price was the configurator's price for that
+  cover's own sizes: € 1 368,95, to the cent the custom quote for 240 × 100 with chairs (the
+  chairs' height decides the cover, not the table's 86 cm ceiling). And the page showed both
+  the same way: "Total", pieces, m², "Order". After publishing, the same quote gives € 849 (the
+  fixed B2C price; checked on a scratch copy of the live data). Also found: a custom quote still
+  on its way could overwrite the stock one (no abort), and while the stock quote loaded the old
+  custom price stayed on screen; both fixed.
+- **The existing-cover state:** with a stock model chosen, the configurator shows a green card
+  instead of the size sliders and the made-to-measure price: the badge "Bestaande hoes uit ons
+  assortiment", the cover's own name, "Past op 240 × 100 cm, tafelhoogte tot 86 cm", "Prijs van
+  deze hoes, incl. btw" with its price (a "with N % off" line only when the discount made it),
+  the delivery promise, a large **Bestel direct** button and "← Op maat laten maken". Nothing
+  about pieces, m² or made to measure; the vents box is hidden (the cover comes as it is made;
+  the quote is asked with vents on). The price is shown only for a quote that belongs to the
+  current choice (`quote.stock.model_id === stock`); a stale answer is aborted.
+- **The quote** (`/api/shop/quote`) returns `stock.size_cm`, `height_max`, `price_source`
+  (`fixed`: the published B2C fixed price; `stock`: the configurator's for its sizes minus
+  `stock_discount_pct`), `discount_pct` and `price_eur`. A published fixed price is not
+  indicative (`price.indicative` false). A fixed price only in the draft is never sold.
+- **Delivery promise:** shop setting `stock_delivery_note` (text per language, Admin → Shop
+  settings; empty = hidden, the default on the live shop). Public settings carry only the
+  languages that have a text. Shown only for existing covers (configurator, checkout, thanks),
+  never for made-to-measure ones, which have a production time. The preview sets it in
+  `apps/site/preview-overlay.json`: "Vandaag besteld, morgen in huis" / "Ordered today,
+  delivered tomorrow" / "Heute bestellt, morgen geliefert" / "Commandé aujourd'hui, livré demain".
+- **Checkout and order:** the checkout is titled "Bestel direct" with "Bestaande hoes: <name>"
+  and the promise; the order stores `stock` (model, name, sizes, price and its source), the
+  answer and the status page name the existing cover, the thanks says it is an existing cover
+  from our range, and the staff mail says "EXISTING COVER <name> (<model>)".
+- **Tests:** `apps/api/tests/test_shop_stock_order.py` (stock quote = fixed price, custom quote
+  differs; draft price not sold; the setting; the order); `apps/web/e2e/stock_order.py` in a
+  real browser at 1440 and 390 px (screenshots in out/stockorder/).
+- **Better later:** a stock count per cover (the promise only while it is on the shelf); the
+  furniture's photo on the card; the customer's colour checked against what is in stock.
+
+## ADR-119 — Covers for premium barbecues: the configurator's BBQ option and BBQ catalogue covers
+
+The owner (11 Oct 2026): "in the new version, also an option for covers for BBQs; research the
+best-selling luxury BBQs (Big Green Egg etc.) — we are a premium cover, so premium products;
+load all these models and make a proposal for a cover." Research and the ranked list:
+docs/plans/bbq-covers.md (Dutch summary) and docs/plans/bbq-covers-research.md (sizes, sources).
+
+- **Off on the live shop until the prices are set** (the coordinator, 11 Oct 2026: the provisional
+  costing gives about €475 for a kamado cover and €880 for a gas-grill cover, the makers' own cost
+  €45–240). Shop setting `bbq_enabled` (default off, Admin → Shop settings): off, the shop's and
+  B2B's options, quotes, matching, the B2B catalogue and the public API (ADR-061) have no
+  barbecues; a BBQ product is refused as unknown. The preview website always has them: a
+  request through the Worker's key from a `preview.` host (`shop.bbq_on`), and
+  apps/site/preview-overlay.json sets `bbq_enabled` for the page. The photo suggestion offers
+  furniture only (`quote.FURNITURE`).
+- **A cover goes on a cold barbecue.** Acrylic canvas is not heat-proof; the shop says so in
+  every language (`bbq_cold`), the proposal carries `cold_only`. The room under the cover is for
+  handles, thermometers, hinges and the top vent, not for heat.
+- **The configurator (shop and B2B):** five products with `"group": "bbq"` in
+  config/quote_products.json, shown under their own chip ("Barbecue") above the cards
+  (`apps/web/src/shop/ProductCards.tsx`): kamado in a nest (egg diameter, height lid closed,
+  depth handle to hinge, optional side tables and their width), kamado in a table, gas grill
+  with side shelves (width, depth, height, shelf height, hood width), pellet grill (width, depth,
+  height, lid length), fire table or plancha (diameter or width, height, optional square/oblong
+  with its depth). Defaults are the best sellers (BGE Large in nest, BGE Large acacia table,
+  Weber Genesis E-335, Traeger Ironwood, OFYR Classic 85).
+- **The barbecue in 3D** (`coverengine/bbq.py`): one builder per kind from the sizes (egg on a
+  nest with handle, hinge, top vent, EGG Mates; cart, hood, handle bar, shelves; barrel, hopper,
+  shelf; plate on a cone or a square table). The same builders make the catalogue models.
+- **The cover:** a round band with a cone on top (a kamado alone, a round fire table; drawn shape
+  `cone round`: cone sectors laid flat exactly, as many band strips under their seams, ADR-107's
+  round logic) or a box with a hipped roof (all others; `hip box`, all eight pieces flat). Its
+  sizes come from the barbecue's own points plus `quote.ease_cm`; of the roof slopes between
+  `quote.bbq_slope_min_deg` (12.5) and `quote.bbq_slope_max_deg` (30) the one with the least
+  fabric, the walls at least `quote.bbq_wall_min_cm` (35) high for the vents. Every point of the
+  top slopes: water runs off (rule 12; the rain check confirms it, no balloons offered).
+  Vents, drawcord and price by the existing rules and costing.
+- **Matching:** catalogue covers `bbq-<brand>-<model>` (`match.bbq_card`): offered once their
+  Desk status is in `match.drawing_statuses` and cover.json says `"match": {"kind": "bbq_…",
+  "name": "Big Green Egg Large in nest", "families": [...]}`. Their size card is the barbecue's
+  bounding box, and the customer's sizes are measured the same way (the configurator builds the
+  barbecue and takes its box: `bbq.plan_cm`). The shop's `stock_model` accepts `bbq-…`.
+- **The family preset `config/presets/bbq.yaml`:** box top, `hull.clearance_mm` 20 (to confirm),
+  no chair space, no support. Kamados and round fire tables `hull.plan: round`; the others
+  `hull.plan: box` per model (a BBQ cover is a straight box; following the shelves' outline gave
+  a curved hem for 3 cm of fabric).
+- **Two engine fixes found on the way, each covered:**
+  - *Gentle folds on a "follow" plan* (`hull/outline.py`): faces meeting at a fold of at most
+    `seams.fold_join_max_deg` were joined only on box plans, while the audit asks it of every box
+    cover; the follow plan now joins them too. None of the 18 live follow covers fails the
+    audit's check, so none changes.
+  - *A cone's sectors* (`audit.fold_checks`): two sectors of a round top meet at a near-zero fold
+    but never lie flat as one piece; the audit no longer asks to join them (a small round cover,
+    the BGE Large's, fits the roll in one and was flagged).
+- **Staging (`scripts/bbq_models.py`, out/bbq/):** 27 barbecues of the top 25 built, covered and
+  checked twice (audit and fewer_check); BGE Large's egg is a 3D Warehouse model scaled to the
+  published sizes, the Weber Genesis II EP-335 a 3D Warehouse model as modelled, the rest drawn
+  from the published sizes (estimates listed per model in its notes). Not imported live: the main
+  session does that after review.
+- **Better later:** lid-open and folded-shelf variants; a kettle (Weber Master-Touch) and the
+  OFYR Island; measuring the Kamado Joe carts (the maker and the shops differ by 10–17 cm);
+  pricing BBQ catalogue covers from their own pattern rather than the configurator's shape.
+
 
 ## ADR-120 — The scroll page all our own: rain drawn in time, the chapters and clips rendered from our data
 

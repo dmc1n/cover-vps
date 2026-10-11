@@ -235,6 +235,10 @@ def fold_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     hull = json.loads((model_dir / "hull.json").read_text(encoding="utf-8"))
     if hull.get("top") != "box":
         return []
+    plan = (hull.get("box") or {}).get("plan") or hull.get("plan")
+    # a round cover: the top is a cone and the skirt a closed band, whose pieces never lie flat
+    # as one (ADR-107: at least two sectors, the skirt strips under their seams; ADR-119)
+    cone = isinstance(plan, dict) and plan.get("kind") == "round"
     panels = json.loads(cut_path.read_text(encoding="utf-8"))["panels"]
     data = np.load(npz)
     faces = np.asarray(data["original_vertex"])[np.asarray(data["faces"])]
@@ -249,10 +253,21 @@ def fold_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     angle = np.degrees(np.arccos(np.clip(np.einsum("ij,ij->i", n[pairs[:, 0]], n[pairs[:, 1]]),
                                          -1.0, 1.0)))  # fmt: skip
     roll = float(params["roll.usable_width_mm"])
+    # a piece that bends more than the limit within itself is a curved wall (a follow cover's
+    # rounded corner, ADR-107), not flat faces: its facets meet at small angles everywhere, and
+    # the seam beside it is a corner seam (Fiave L-part, 9 Oct 2026; ADR-117)
+    mean = np.zeros((int(labels.max()) + 1, 3))
+    np.add.at(mean, labels, n * mesh.area_faces[:, None])
+    mean /= np.maximum(np.linalg.norm(mean, axis=1, keepdims=True), 1e-9)
+    spread = np.zeros(len(mean))
+    np.maximum.at(spread, labels, np.degrees(np.arccos(np.clip(
+        np.einsum("ij,ij->i", n, mean[labels]), -1.0, 1.0))))  # fmt: skip
     flagged = []
     for a, b in {(min(x, y), max(x, y)) for x, y in zip(la[across], lb[across], strict=True)}:
         pa, pb = panels[int(a)], panels[int(b)]
-        if pa["region"] != pb["region"]:
+        if pa["region"] != pb["region"] or cone:
+            continue
+        if max(spread[int(a)], spread[int(b)]) > limit:
             continue
         sel = across & (((la == a) & (lb == b)) | ((la == b) & (lb == a)))
         fold = float(np.median(angle[sel]))
@@ -371,6 +386,18 @@ def drawing_checks(model_dir: Path) -> list[dict[str, Any]]:
                 if not str(p["name"]).startswith("vent-"))  # fmt: skip
         out.append(_check("piece count", n <= MANY_PIECES, f"{n} pieces"
                           + ("" if n <= MANY_PIECES else " (a broken shape?)")))  # fmt: skip
+    from coverengine.drawing_given import load as given_shape
+    from coverengine.drawing_route import person_vents
+
+    fixes = model_dir / "drawing_corrections.json"
+    decided = person_vents(given_shape(model_dir),
+                           json.loads(fixes.read_text()) if fixes.is_file() else {})  # fmt: skip
+    cj = model_dir / "cover.json"
+    if decided and cj.is_file():  # Rens, 9 Oct 2026: a person's count survives a rebuild (ADR-116)
+        have = (json.loads(cj.read_text(encoding="utf-8")).get("parameters", {})
+                .get("features", {}).get("vents_total"))  # fmt: skip
+        out.append(_check("decided vents", have == decided,
+                          f"{have} vents asked, {decided} decided by a person"))  # fmt: skip
     if not ref.is_file():
         return out
     from coverengine.drawing_vectors import back_angle

@@ -108,6 +108,12 @@ SHOP_DEFAULTS: dict[str, Any] = {
         "choice_pct": None,
         "stock_discount_pct": None,
     },  # fmt: skip
+    # an existing cover's delivery promise per language (ADR-118); empty: not shown. Never shown
+    # for a made-to-measure cover, which has a production time
+    "stock_delivery_note": {"nl": "", "en": "", "de": "", "fr": ""},
+    # the barbecues in the configurator, its quotes, matching and B2B (ADR-119): off until the
+    # owner has set their prices; the preview site (preview.<domain>) always has them
+    "bbq_enabled": False,
     "fit_mail": {"enabled": False, "days": 14},
     # ADR-066: the website runs elsewhere (its own domain, on Cloudflare) and reaches this
     # server through a key; closed: the shop here answers only the website and colleagues
@@ -388,6 +394,22 @@ def link_ok(auth: Any, request: Request) -> bool:
     hashes = [stored] if isinstance(stored, str) else list(stored)  # one per Worker
     given = hashlib.sha256(key.encode()).hexdigest()
     return bool(key) and any(h and secrets.compare_digest(given, str(h)) for h in hashes)
+
+
+def bbq_on(auth: Any, request: Request) -> bool:
+    """The barbecues are offered (ADR-119): the shop setting `bbq_enabled`, or a request from the
+    preview website (the Worker's key, its host preview.<domain>) so the owner can try them."""
+    s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
+    if s.get("bbq_enabled"):
+        return True
+    host = request.headers.get("x-forwarded-host", "")
+    return host.startswith("preview.") and link_ok(auth, request)
+
+
+def bbq_refused(product: str, auth: Any, request: Request) -> None:
+    """A barbecue asked for while they are off: as an unknown product."""
+    if product.startswith("bbq_") and not bbq_on(auth, request):
+        raise HTTPException(400, f"unknown product {product!r}")
 
 
 def shop_root(auth: Any, request: Request) -> str:
@@ -893,7 +915,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         return {"draft": site.read("draft")}
 
     # ---- the shop (public) ------------------------------------------------------------------
-    def public_settings() -> dict[str, Any]:
+    def public_settings(request: Request | None = None) -> dict[str, Any]:
         s = settings()
         p = shop_params(auth)
         return {
@@ -914,6 +936,12 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             "indicative": bool(prices.current(auth).get("indicative", True)),
             "languages": site_languages(auth),
             "matching": str(p["match.mode"]),
+            "bbq_enabled": request is not None and bbq_on(auth, request),
+            "stock_delivery_note": {
+                k: str(v).strip()
+                for k, v in (s["stock_delivery_note"] or {}).items()
+                if str(v or "").strip()
+            },  # fmt: skip
         }
 
     @app.get("/api/shop/info")
@@ -923,7 +951,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         content = site.read("draft" if draft else "live")
         content["legal"] = shop_legal.texts(content, settings()["company"])  # drafts (ADR-103)
         return {"content": content, "preview": bool(draft),
-                "settings": public_settings(), "options": q.options(shop_params(auth))}  # fmt: skip
+                "settings": public_settings(request),
+                "options": q.options(shop_params(auth), bbq_on(auth, request))}  # fmt: skip
 
     def _stock(model_id: str, product: str, p: Any) -> dict[str, Any]:
         """A cover of our range for this furniture: a SUNS cover, or a drawing cover while it is
@@ -952,11 +981,12 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         except CoverError as exc:
             raise HTTPException(400, str(exc)) from None
         fixed = costing.fixed_price(ps, stock["model_id"], "b2c") if stock else None
+        off = 0.0
         if fixed:  # the consumer list's fixed price for this cover wins (ADR-098, ADR-113)
             full["price"]["sale_eur"] = fixed["gross_eur"]
         elif stock:  # an existing cover: its own sizes, and the stock discount (when set)
-            off = settings()["matching"].get("stock_discount_pct") or 0
-            full["price"]["sale_eur"] = round(full["price"]["sale_eur"] * (1 - float(off) / 100), 2)  # noqa: PLR2004 - percent
+            off = float(settings()["matching"].get("stock_discount_pct") or 0)
+            full["price"]["sale_eur"] = round(full["price"]["sale_eur"] * (1 - off / 100), 2)  # noqa: PLR2004 - percent
         extra = 0.0  # the support is sold next to the cover, at the consumer price list's price
         if req.support == "balloons":
             extra = full["balloons"] * costing.accessory_price(ps, "balloon", "b2c")["gross_eur"]
@@ -970,7 +1000,13 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                 (quotes / f"{qid}-{support}.glb").write_bytes(water)
         record = {"time": time.time(), "input": req.model_dump(), "quote": full, "rain": rain,
                   "support_eur": round(extra, 2),
-                  "stock": ({"model_id": stock["model_id"], "name": stock["name"]}
+                  # an existing cover (ADR-118): its own sizes and where its price comes from,
+                  # the published fixed B2C price or the configurator's minus the discount
+                  "stock": ({"model_id": stock["model_id"], "name": stock["name"],
+                             "size_cm": stock["size_cm"],
+                             "height_max": bool(stock.get("height_max")),
+                             "price_source": "fixed" if fixed else "stock",
+                             "discount_pct": off, "price_eur": full["price"]["sale_eur"]}
                             if stock else None),
                   "match_token": req.match_token}  # fmt: skip
         (quotes / f"{qid}.json").write_text(json.dumps(record), encoding="utf-8")
@@ -982,7 +1018,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             "sizes_cm": full["sizes_cm"], "support": req.support,
             "price": {"cover_eur": full["price"]["sale_eur"], "support_eur": round(extra, 2),
                       "total_eur": round(full["price"]["sale_eur"] + extra, 2),
-                      "indicative": full["price"]["placeholder_prices"]},
+                      # a published fixed price is a real price, not an estimate (ADR-118)
+                      "indicative": bool(full["price"]["placeholder_prices"]) and not fixed},
             "rain": rain, "near": q.nearest(req.product, given, store.models)[:1],
             "scene": f"/api/shop/scene/{qid}.glb", "stock": record["stock"],
         }  # fmt: skip
@@ -990,6 +1027,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     @app.post("/api/shop/quote")
     def shop_quote(req: ShopQuote, request: Request) -> dict[str, Any]:
         limit(request)
+        bbq_refused(req.product, auth, request)
         return _quote(req)
 
     @app.get("/api/shop/scene/{qid}.glb")
@@ -1031,8 +1069,10 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         shipping = float(ship.get("eur") or 0)
         total = round(record["quote"]["price"]["sale_eur"] + record["support_eur"] + shipping, 2)
         token = secrets.token_urlsafe(18)
+        # an existing cover (ADR-118): the order names the model and the price it was sold at
+        stock = record.get("stock")
         data = {"customer": req.model_dump(), "quote": record, "shipping_eur": shipping,
-                "lang": req.lang}  # fmt: skip
+                "lang": req.lang, "stock": stock}  # fmt: skip
         with sqlite3.connect(auth.path) as db:
             cur = db.execute(
                 "INSERT INTO orders (created, token, status, email, data, total_eur, updated) "
@@ -1057,10 +1097,15 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                     db.execute("UPDATE orders SET mollie_id=? WHERE id=?", (pay["id"], oid))
             except Exception as exc:  # noqa: BLE001 - the order stays; payment can follow
                 notify(f"Order {oid}: Mollie refused the payment", str(exc))
-        notify(f"New order {oid}: EUR {total}", f"{req.name} <{req.email}>\n{status_url}\n"
-               f"{json.dumps(record['quote']['sizes_cm'])}\n(admin page, Orders)")  # fmt: skip
+        what = (f"EXISTING COVER {stock['name']} ({stock['model_id']}), "
+                f"EUR {record['quote']['price']['sale_eur']}" if stock
+                else json.dumps(record["quote"]["sizes_cm"]))  # fmt: skip
+        notify(f"New order {oid}: EUR {total}" + (" (existing cover)" if stock else ""),
+               f"{req.name} <{req.email}>\n{status_url}\n{what}\n(admin page, Orders)")  # fmt: skip
         return {"order": oid, "status_url": status_url, "checkout_url": checkout,
-                "total_eur": total, "status": "awaiting_payment"}  # fmt: skip
+                "total_eur": total, "status": "awaiting_payment",
+                "stock": {"model_id": stock["model_id"], "name": stock["name"]}
+                if stock else None}  # fmt: skip
 
     @app.get("/api/shop/order/{token}")
     def shop_order_status(token: str) -> dict[str, Any]:
@@ -1072,7 +1117,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         d = json.loads(row["data"])
         return {"order": row["id"], "status": row["status"], "total_eur": row["total_eur"],
                 "created": row["created"], "product": d["quote"]["quote"]["product"],
-                "colour": d["quote"]["quote"]["colour"]}  # fmt: skip
+                "colour": d["quote"]["quote"]["colour"],
+                "stock": (d["quote"].get("stock") or {}).get("name")}  # fmt: skip
 
     @app.post("/api/shop/mollie")
     async def mollie_webhook(request: Request) -> dict[str, Any]:
@@ -1112,6 +1158,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
 
         limit(request)
         no_bots(req.website)
+        bbq_refused(req.product, auth, request)
         p = shop_params(auth)
         mode = str(p["match.mode"])
         email = (req.email or "").strip()

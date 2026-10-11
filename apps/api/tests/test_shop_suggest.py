@@ -378,6 +378,53 @@ class _Reply:
         pass
 
 
+@pytest.mark.parametrize("thinking", [None, "high"])
+def test_final_sizing_sends_its_settings_and_tags_the_ledger(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, thinking: str | None
+) -> None:
+    import urllib.request
+
+    import coverengine.ai
+    from coverengine.params import Registry
+
+    monkeypatch.setenv("COVER_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(coverengine.ai, "_key", lambda provider: "test-key")
+    sent: list[Any] = []
+
+    def urlopen(req: Any, timeout: float = 0) -> _Reply:
+        sent.append(json.loads(req.data))
+        return _Reply(
+            {
+                "choices": [{"message": {"content": '{"product": "table"}'}}],
+                "usage": {"prompt_tokens": 1000, "completion_tokens": 200},
+            }
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    trial = (
+        {}
+        if thinking is None
+        else {
+            "suggest.final_thinking": thinking,
+            "suggest.final_model": "gemini-3.1-pro-preview",
+        }
+    )
+    p = Registry.load(None).resolve(trial=trial)
+    before = {k: p[k] for k in ("ai.model", "ai.reasoning_effort", "ai.vision_model")}
+    assert sg.ask(p, [_png()], None, "nl") == {"product": "table"}
+    assert sent[0]["reasoning_effort"] == (thinking or "low")
+    assert sent[0]["model"] == p["suggest.final_model"]
+    assert {k: p[k] for k in before} == before
+    rows = [
+        json.loads(line)
+        for f in (tmp_path / "usage").glob("*.jsonl")
+        for line in f.read_text().splitlines()
+    ]
+    assert len(rows) == 1
+    assert rows[0]["what"] == "suggest final"
+    assert rows[0]["model"] == p["suggest.final_model"]
+
+
 def test_every_gemini_call_and_each_search_query_is_in_the_ledger(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

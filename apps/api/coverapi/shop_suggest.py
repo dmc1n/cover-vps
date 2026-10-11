@@ -349,11 +349,12 @@ def ask(
 
     from coverengine.ai import ask_parts
     from coverengine.params import Registry
-    from coverengine.quote import PRODUCTS
+    from coverengine.quote import FURNITURE as PRODUCTS
 
     vision = Registry.load(None).resolve(trial={
         "ai.provider": str(params["ai.vision_provider"]),
-        "ai.model": str(params["ai.vision_model"]),
+        "ai.model": str(params["suggest.final_model"]),
+        "ai.reasoning_effort": str(params["suggest.final_thinking"]),
         "ai.base_url": str(params["ai.vision_base_url"]),
         "ai.timeout_s": int(params["suggest.ai_timeout_s"])})  # fmt: skip
     system = SYSTEM.replace("__PRODUCTS__", _products_text(PRODUCTS)).replace(
@@ -371,7 +372,7 @@ def ask(
         parts.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b}"}})
     if not parts:
         raise SuggestError("give a photo or a link")
-    ans = ask_parts(vision, system, parts)
+    ans = ask_parts(vision, system, parts, note="suggest final")
     ans.pop("_usage", None)
     return ans
 
@@ -475,7 +476,7 @@ def identify(params: Any, png: bytes, names: list[str] | None = None) -> dict[st
     """What the photo shows (ADR-092): product type, brand and model when recognisable,
     materials, distinctive features, estimated sizes and the queries to search with. `names`:
     what the search by image's matching pictures and pages are called (ADR-112)."""
-    from coverengine.quote import PRODUCTS
+    from coverengine.quote import FURNITURE as PRODUCTS
 
     n = int(params["suggest.queries"])  # type: ignore[arg-type]
     keys = "; ".join(f"{k} ({v['label']})" for k, v in PRODUCTS.items())
@@ -945,7 +946,7 @@ def _traced(c: dict[str, Any], pg: dict[str, Any]) -> dict[str, Any]:
 def proposal(ans: dict[str, Any]) -> dict[str, Any]:
     """The AI's answer checked against the configurator: a known product, every size within its
     range (clipped and flagged), and which sizes the customer must check."""
-    from coverengine.quote import PRODUCTS
+    from coverengine.quote import FURNITURE as PRODUCTS
 
     product = str(ans.get("product") or "")
     if product not in PRODUCTS:

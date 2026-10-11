@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from coverengine.catalogue import no_cover
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from drawing_features import pdfs, slug  # noqa: E402
 
@@ -54,8 +56,8 @@ def main() -> int:
     n_desk = n_check = 0
     for code, pdf in pdfs(a.pdfs).items():
         model = a.models / slug(code)
-        if not (model / "cover.json").is_file():
-            continue
+        if not (model / "cover.json").is_file() or no_cover(model):
+            continue  # no cover, or one that needs none (not on the Desk)
         desk = _read(model / "desk.json")
         desk.setdefault("code", code)
         desk.setdefault("pdf", str(pdf.resolve()))

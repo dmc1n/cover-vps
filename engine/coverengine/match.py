@@ -18,6 +18,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from coverengine.catalogue import is_no_cover
 from coverengine.params import EffectiveParams
 
 MM_PER_CM = 10.0  # param-ok: units
@@ -85,13 +86,17 @@ def card(
     """A catalogue cover's size card: kind, the furniture's size (length ≥ width, height), the
     side of an L, whether it covers chairs, and how its drape went. A drawing cover has one only
     while it is offered: approved or produced at the Desk, its kind known and not in doubt
-    (match_drawings, ADR-114)."""
+    (match_drawings, ADR-114). A model marked "no cover" has none (Rens, 9 Oct 2026)."""
     if model_dir.name.startswith("drawing-"):
         return drawing_card(model_dir, listing, p, shared)
+    if model_dir.name.startswith("bbq-"):
+        return bbq_card(model_dir, p)
     try:
         cover = json.loads((model_dir / "cover.json").read_text())
         size = json.loads((model_dir / "model.json").read_text())["size_mm"]
     except (OSError, ValueError, KeyError):
+        return None
+    if is_no_cover(cover):
         return None
     category = str(cover.get("category") or "").split(" › ")[-1]
     s = sorted([size[0] / MM_PER_CM, size[1] / MM_PER_CM])[::-1] + [size[2] / MM_PER_CM]
@@ -158,6 +163,48 @@ def drawing_card(
     }
 
 
+def bbq_card(model_dir: Path, p: EffectiveParams | None = None) -> dict[str, Any] | None:
+    """A barbecue cover of our range (ADR-119): offered once its Desk status is one of
+    `match.drawing_statuses` (approved or produced) and its cover.json names the configurator
+    product it answers to, `"match": {"kind": "bbq_kamado", "name": "Big Green Egg Large in a
+    nest"}`. Its sizes are the barbecue's own bounding box, as the configurator measures the
+    customer's (handles, hinges and shelves included)."""
+    from coverengine import match_drawings as md
+
+    params = p if p is not None else _defaults()
+    try:
+        cover = json.loads((model_dir / "cover.json").read_text())
+        size = json.loads((model_dir / "model.json").read_text())["size_mm"]
+    except (OSError, ValueError, KeyError):
+        return None
+    if is_no_cover(cover):
+        return None
+    m = cover.get("match") or {}
+    kind = str(m.get("kind") or "")
+    if not kind.startswith("bbq_"):
+        return None
+    try:
+        status = json.loads((model_dir / "desk.json").read_text()).get("status")
+    except (OSError, ValueError):
+        status = None
+    if status not in md.statuses(params):
+        return None
+    s = sorted([size[0] / MM_PER_CM, size[1] / MM_PER_CM])[::-1] + [size[2] / MM_PER_CM]
+    return {
+        "model_id": model_dir.name,
+        "name": str(m.get("name") or _pretty(model_dir.name.removeprefix("bbq-"))),
+        "category": "BBQ",
+        "kind": kind,
+        "size_cm": [round(x, 1) for x in s],
+        "side": None,
+        "chairs": None,
+        "photo": (model_dir / "product.jpg").is_file(),
+        "drape": None,
+        "families": [str(f).lower() for f in m.get("families") or []],
+        "source": "bbq",
+    }
+
+
 def _drawing_stamp(dirs: list[Path]) -> float:
     """The newest change to what decides a drawing cover's card (a Desk decision, a person's
     match.kind, the product list, the model)."""
@@ -168,6 +215,17 @@ def _drawing_stamp(dirs: list[Path]) -> float:
                 newest = max(newest, (d / f).stat().st_mtime)
             except OSError:
                 pass
+    return newest
+
+
+def _cover_stamp(dirs: list[Path]) -> float:
+    """The newest change to a model's cover.json (its category, a "no cover" mark)."""
+    newest = 0.0
+    for d in dirs:
+        try:
+            newest = max(newest, (d / "cover.json").stat().st_mtime)
+        except OSError:
+            pass
     return newest
 
 
@@ -184,8 +242,11 @@ def cards(
 
     dirs = sorted(models.glob("suns-*"))
     drawings = sorted(models.glob("drawing-*"))
+    bbqs = sorted(models.glob("bbq-*"))  # barbecue covers (ADR-119)
     stamp = (str(models), len(dirs), max((d.stat().st_mtime for d in dirs), default=0.0),
+             _cover_stamp(dirs),  # a model marked "no cover" (or its category changed)
              len(drawings), _drawing_stamp(drawings), str((listing or {}).get("stamp")),
+             len(bbqs), _drawing_stamp(bbqs),
              json.dumps(kinds or {}, sort_keys=True),
              None if p is None else (str(p["match.drawing_statuses"]),
                                      float(p["match.drawing_size_tol_cm"]),
@@ -199,7 +260,7 @@ def cards(
             c["suits"] = [s["model_id"] for s in suns if s["kind"] == c["kind"] and any(
                 f in s["model_id"].split("-") for f in c["families"])]  # fmt: skip
         _CACHE["stamp"] = stamp
-        _CACHE["cards"] = suns + drawn
+        _CACHE["cards"] = suns + drawn + [c for d in bbqs if (c := bbq_card(d, params))]
     out: list[dict[str, Any]] = _CACHE["cards"]
     return out
 
@@ -282,10 +343,19 @@ def match(
     }
 
 
-def fields_for(product: str, size_cm: list[float]) -> dict[str, int]:
+def fields_for(product: str, size_cm: list[float]) -> dict[str, Any]:
     """A catalogue cover's sizes as the configurator's fields (to price that cover)."""
     from coverengine.quote import PRODUCTS
 
+    spec = PRODUCTS.get(product, {}).get("fields", {})
+    if product.startswith("bbq_"):  # a barbecue's own fields (ADR-119)
+        from coverengine import bbq
+
+        out: dict[str, Any] = bbq.fields(product, size_cm)
+        for k, v in out.items():
+            if k in spec and spec[k][1] is not None:
+                out[k] = int(round(min(max(float(v), spec[k][1]), spec[k][2])))
+        return out
     length, width, height = (round(x) for x in size_cm)
     fields: dict[str, int] = {
         "dining_set": {"table_length_cm": length, "table_width_cm": width,
@@ -294,7 +364,6 @@ def fields_for(product: str, size_cm: list[float]) -> dict[str, int]:
         "sofa": {"length_cm": length, "depth_cm": width, "back_height_cm": height},
         "corner_sofa": {"long_side_cm": length, "short_side_cm": width, "back_height_cm": height},
     }.get(product, {"length_cm": length, "width_cm": width, "height_cm": height})  # fmt: skip
-    spec = PRODUCTS.get(product, {}).get("fields", {})
     for k, v in fields.items():  # within what the configurator builds (a 420 cm table: 400)
         if k in spec and spec[k][1] is not None:
             fields[k] = int(min(max(v, spec[k][1]), spec[k][2]))

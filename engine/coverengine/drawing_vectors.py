@@ -156,14 +156,16 @@ def outline_shape(pdf: Path) -> dict[str, Any] | None:
 WORD_NUMBERS = dict(zip("one two three four five six seven eight nine ten eleven twelve".split(),
                         range(1, 13), strict=True))  # fmt: skip
 # fmt: skip
+# a number before the label, never the end of another word: "Max Height Air Pocket" on S20 was
+# read as "eight air pocket" (8 vents; the drawing draws 4 arrows)
 VENTS = re.compile(
-    r"(?<![\d.,])(\d{1,2}|"
+    r"(?<![\d.,A-Za-z])(\d{1,2}|"
     + "|".join(WORD_NUMBERS)
     + r")\s*(?:x\s*)?air\s*-?(?:pockets?|vents?)\b",
     re.I,
 )
 VENTS_PER_SIDE = re.compile(r"air\s*-?(?:pockets?|vents?)\s+(" + "|".join(WORD_NUMBERS)
-                            + r")\s+sides?", re.I)  # fmt: skip
+                            + r")\s+sides?\b", re.I)  # fmt: skip
 VENT_PLACE = re.compile(r"air\s*-?(?:pockets?|vents?)\s+at\s+(?:the\s+)?(middle|top|bottom)", re.I)
 
 

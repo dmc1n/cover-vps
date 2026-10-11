@@ -12,7 +12,8 @@ and the direction.
 
 ## The business in numbers
 
-- Product: covers for outdoor furniture (chairs, tables, lounge sets, loungers, ...).
+- Product: covers for outdoor furniture (chairs, tables, lounge sets, loungers, ...) and, from
+  ADR-119, for premium barbecues (kamado, gas, pellet, fire tables).
   Tight-fitting by default, with a per-model option to loosen the fit.
 - Catalogue: 200 to 300 furniture models, new ones arrive regularly. Production about 100
   covers per week, in house.
@@ -204,6 +205,7 @@ cover export models/<id>/ [--save-version]   finished pieces → cut.dxf, cut.sv
                                              (a revision in revisions/<n>/ when cut.dxf changed)
 cover hull|cut|flatten|export ... [--force]  a step skips itself when nothing it depends on changed (ADR-080)
 cover model models/<id>/ [--family F --status S --tags a,b --notes ...]   catalogue info, revisions
+cover model models/<id>/ --no-cover yes|no [--no-cover-reason TEXT]   needs no cover: not in the shop, not on the Desk (ADR-117)
 cover batch [--family F | --ids a,b] [--steps hull,cut,flatten,export] [--set ...]  many models, what changed
 cover improve models/<id>/ [--rounds 4]      take seam proposals while they lower the worst stretch
 cover report [--models DIR --tag T --out DIR]  catalogue report: every model ready / check / failed
@@ -222,8 +224,11 @@ uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT   the Desk picture's r
 uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   drawing, old and new cover side by side
 uv run python scripts/vents_compare.py OUT.png --old DIR --new DIR [--pics ...]   a cover's vents before/after, with the Desk's marked pictures (ADR-101)
 uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--staged DIR]   covers with inner walls rebuilt in staging, vents on the front walls, checked twice (ADR-110)
+uv run python scripts/answers_stage.py SPECS.json --out out/answers [--only a,b]   covers rebuilt in staging from the Desk's answers
+                                             (cover.json changes, per-model files), audit + re-measure + compare picture (ADR-117)
 uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--only a,b]   drawing covers from a shape a person read
-                                             (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102)
+                                             (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102;
+                                             a person's vents_total there or in drawing_corrections.json survives a rebuild, ADR-116)
 COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py [--out out/matchcards]   approved drawing covers as existing covers:
                                              kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114)
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
@@ -245,7 +250,9 @@ COVER_DATA_DIR=~/cover-data uv run python scripts/questions.py new|ack|done ID "
 apps/web/e2e/questions.py                   the Questions tab in a real browser, Edge with office policies (ADR-109)
 apps/web/e2e/b2c.py                         the public consumer shop, desktop and 390 px, through the Worker (ADR-103)
 apps/web/e2e/suggest_layout.py              the configurator's photo/link box in Chromium, WebKit, Firefox at 4 widths (ADR-112)
+apps/web/e2e/stock_order.py                 an existing cover ordered directly: card, price, delivery promise, checkout (ADR-118)
 Admin → Photo test                          a photo suggestion step by step: image search, identification, searches, scores (ADR-112)
+                                             final sizing uses suggest.final_model/final_thinking; ledger: "suggest final"
 
 node apps/web/e2e/site_serve.mjs [--port N]  this build of the website locally, data from the preview (ADR-106)
 apps/web/e2e/site_rain.py | site_3d.py | site_perf.py   the website: rain keeps falling, 3D loads lean, timings (ADR-106)
@@ -254,12 +261,17 @@ Prices & costing → Channels → Import prices (Excel)   a price list as fixed 
 COVER_DATA_DIR=~/cover-data uv run python scripts/prices_import.py FILE [--channel b2c] [--incl-vat|--ex-vat] [--json OUT] [--apply]
                                              the same matching report; --apply writes the draft, never publishes (ADR-113)
 apps/web/e2e/priceimport.py                 the import in a real browser (sample: e2e/priceimport_sheet.py; usage in its docstring)
-<website>/b2b, Admin → B2B customers        the B2B shop: business logins, own prices ex VAT, orders on account (ADR-104)
+<website>/b2b, Admin → B2B customers        the B2B shop: business logins, own prices ex VAT, orders on account with atomic checkout, retry keys and restart dispatch recovery (ADR-104)
 apps/web/e2e/b2b.py                         the B2B shop in a real browser (ADR-104; usage in its docstring)
 apps/web/e2e/measure.py                     Measure, Vent sizes, the check list and measured fits in a real browser (ADR-111)
 Arrangements → Send to the Desk; Desk → ARR   an arrangement approved by Rens or Wout; a change reopens it; DXF after approval (ADR-115)
+                                            approval requires cut.dxf; missing approval fingerprints require reapproval
 COVER_DATA_DIR=~/cover-data uv run python scripts/desk_arrangements.py [--apply] [--only a,b]   the existing arr-* to "ready for approval" (ADR-115)
 apps/web/e2e/arrangements_desk.py           the arrangement → Desk workflow in a real browser (ADR-115; usage in its docstring)
+uv run python scripts/bbq_models.py OUT [--only a,b] [--steps build,cover,check]   premium barbecues as catalogue models in
+                                             staging (bbq-<brand>-<model>): built from published sizes or 3D Warehouse, covered,
+                                             audited and re-measured (ADR-119; list and sources in docs/plans/bbq-covers.md)
+apps/web/e2e/bbq.py                         the configurator's barbecue option in a real browser (ADR-119; usage in its docstring)
 3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes
 cover testsheet --out DIR                   M0 machine test sheet DXFs
@@ -278,6 +290,10 @@ make backup     push the data directory to R2 with rclone
 cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build
 cd apps/site && npm test | npm run check     the Worker's tests (security headers, no studio routes) and typecheck (ADR-103)
 ```
+
+Staging scripts validate output roots and model destinations with
+`coverengine.staging.guard_staging_output` before writes. Live `models/` and
+`~/cover-data/models` (including symlink aliases and ancestors) must never be staging outputs.
 
 ## How to work in this repo (instructions for Claude Code)
 

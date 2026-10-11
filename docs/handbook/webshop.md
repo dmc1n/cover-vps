@@ -16,6 +16,28 @@ under `/b2b`.
 
 An address the shop does not know shows "this page does not exist" (a real 404).
 
+## Barbecues (ADR-119)
+
+**Off on the live shop until you set their prices:** Admin → **Shop settings** →
+`bbq_enabled`. While it is off, the shop, B2B and the public API show no barbecues; the preview
+site (preview.<domain>) always shows them, so you can try them there.
+
+Above the product cards the configurator has two choices: **Tuinmeubels** and **Barbecue**.
+Under Barbecue: a kamado (egg) in a nest, with or without side tables; a kamado in a table; a
+gas grill with side shelves; a pellet grill; a fire table or plancha (round or square). The
+customer gives the barbecue's sizes with the lid closed; the 3D view shows a barbecue of that
+shape under the cover. The cover is a round band with a cone on top (a kamado alone, a round
+fire table) or a box with a hipped roof (all others): every part of the top slopes at least
+`quote.bbq_slope_min_deg`, so water runs off. The page says plainly that a cover goes on a
+**cold** barbecue only (the canvas is not heat-proof).
+
+"We already make a cover for your Big Green Egg Large in nest": a BBQ cover of our catalogue
+(a `bbq-…` model) is offered once Rens or Wout approve it at the Desk and its cover.json says
+which product it answers to: `"match": {"kind": "bbq_kamado", "name": "Big Green Egg Large in
+nest"}`. The B2B shop has the same products and lists the approved BBQ covers in its
+catalogue. The products, their fields and ranges are in `config/quote_products.json`
+(`"group": "bbq"`); the words in `config/shop_ui.json`.
+
 ## The legal pages: drafts until you approve them
 
 Each legal page shows a draft that starts with a red **CONCEPT — TER GOEDKEURING** line, in

@@ -118,7 +118,7 @@ def listing(folder: Path) -> dict[str, Any] | None:
     return found
 
 
-STOCK_MODEL = r"^(suns|drawing)-[a-z0-9-]{1,120}$"  # a cover of our range: SUNS or drawing
+STOCK_MODEL = r"^(suns|drawing|bbq)-[a-z0-9-]{1,120}$"  # a cover of our range: SUNS, drawing or BBQ
 
 
 def for_data(data: Path) -> dict[str, Any] | None:

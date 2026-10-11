@@ -134,13 +134,18 @@ def install(app: FastAPI, auth: Any, quotes_dir: Path, models_dir: Path) -> None
 
     @app.get("/api/public/v1/options")
     def options(request: Request) -> dict[str, Any]:
+        from coverapi.shop import bbq_on
+
         caller(request)
-        return q.options(params())
+        return q.options(params(), bbq_on(auth, request))  # barbecues once on (ADR-119)
 
     @app.post("/api/public/v1/quote")
     def make_quote(req: QuoteRequest, request: Request) -> dict[str, Any]:
+        from coverapi.shop import bbq_refused
+
         who = caller(request)
         limit(request)
+        bbq_refused(req.product, auth, request)
         p = params()
         given = {**req.sizes, "vents": req.vents, "colour": req.colour}
         try:

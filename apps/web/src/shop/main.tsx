@@ -18,6 +18,7 @@ import { Suggest, type Suggestion } from "./Suggest";
 import { createRoot } from "react-dom/client";
 import "./shop.css";
 import { Icon } from "./Icons";
+import { ProductCards } from "./ProductCards";
 import { HeroFilm } from "./HeroFilm";
 import type { StoryContent } from "./Story";
 
@@ -85,8 +86,17 @@ interface Info {
     indicative: boolean;
     languages: string[];
     matching: "shadow" | "auto";
+    /** the barbecues offered (ADR-119): off on the live shop until their prices are set */
+    bbq_enabled?: boolean;
+    /** an existing cover's delivery promise per language (ADR-118); none: not shown */
+    stock_delivery_note?: Record<string, string>;
   };
-  options: { products: Record<string, { label: string; fields: Field[] }> };
+  options: {
+    products: Record<
+      string,
+      { label: string; group?: string | null; fields: Field[] }
+    >;
+  };
 }
 interface RainOption {
   ponds: number;
@@ -121,7 +131,18 @@ interface Quote {
     } | null;
   };
   scene: string;
-  stock: { model_id: string; name: string } | null;
+  stock: Stock | null;
+}
+/** an existing cover in a quote (ADR-114, ADR-118): its own sizes and where its price comes from */
+interface Stock {
+  model_id: string;
+  name: string;
+  size_cm?: number[];
+  /** the height is a ceiling: any table lower than the cover fits under it */
+  height_max?: boolean;
+  /** "fixed": the published consumer price; "stock": the computed one minus the discount */
+  price_source?: "fixed" | "stock";
+  discount_pct?: number;
 }
 interface MatchSize {
   size: string;
@@ -428,6 +449,26 @@ function Indicative({ tx }: { tx: Tx }) {
   );
 }
 
+// An existing cover's delivery promise in this language (English when missing), or "" (ADR-118).
+function deliveryNote(info: Info, lang: string): string {
+  const n = info.settings.stock_delivery_note ?? {};
+  return (n[lang] ?? n.en ?? "").trim();
+}
+
+// The furniture an existing cover fits: "240 × 100 cm, table height up to 86 cm" (ADR-118).
+function stockSize(s: Stock, product: string, tx: Tx): string {
+  const c = (s.size_cm ?? []).map((x) => Math.round(x));
+  if (c.length < 3) return "";
+  if (product === "round_set")
+    return (
+      `Ø ${c[0]} cm` +
+      (s.height_max ? `, ${tx.w("stock_height_max", { cm: c[2] })}` : "")
+    );
+  if (s.height_max)
+    return `${c[0]} × ${c[1]} cm, ${tx.w("stock_height_max", { cm: c[2] })}`;
+  return `${c[0]} × ${c[1]} × ${c[2]} cm`;
+}
+
 // A field people never see or reach; a bot that fills every field is refused (ADR-103).
 function Trap({ value, set }: { value: string; set: (v: string) => void }) {
   return (
@@ -650,6 +691,9 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   }, [product, products, start]);
   useEffect(() => {
     if (!Object.keys(sizes).length) return;
+    // only the newest answer counts: a custom quote still on its way must never overwrite the
+    // existing cover's (ADR-118)
+    const ctl = new AbortController();
     const t = setTimeout(async () => {
       setBusy(true);
       setError("");
@@ -657,11 +701,12 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
         const r = await fetch("/api/shop/quote", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: ctl.signal,
           body: JSON.stringify({
             product,
             sizes,
             colour,
-            vents,
+            vents: stock ? true : vents, // an existing cover comes as it is made
             support,
             stock_model: stock,
             match_token: stock ? matchToken : null,
@@ -669,15 +714,22 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail ?? r.status);
-        setQuote(data);
+        if (!ctl.signal.aborted) setQuote(data);
       } catch (e) {
-        setError(String(e).replace(/^Error: /, ""));
+        if (!ctl.signal.aborted) setError(String(e).replace(/^Error: /, ""));
       } finally {
-        setBusy(false);
+        if (!ctl.signal.aborted) setBusy(false);
       }
     }, 400);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ctl.abort();
+    };
   }, [product, sizes, colour, vents, support, stock, matchToken]);
+  // the quote on screen belongs to what is chosen now: an existing cover or a custom one
+  const fresh = (quote?.stock?.model_id ?? null) === stock;
+  const stockQuote = stock && fresh ? quote : null;
+  const note = deliveryNote(info, lang);
 
   // how solid the cover is drawn (the owner, 6 Oct 2026: "too dark, a slider for the
   // transparency"); remembered per browser
@@ -768,22 +820,61 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
               }}
             />
             <p className="s-muted">{w("what")}</p>
-            <div className="s-products">
-              {Object.keys(products).map((k) => (
-                <button
-                  key={k}
-                  className={`s-card ${product === k ? "on" : ""}`}
-                  onClick={() => setProduct(k)}
-                >
-                  {tx.product(k)}
-                </button>
-              ))}
-            </div>
-            {stock && quote?.stock ? (
-              <div className="s-match existing">
-                <p className="s-match-pct">
-                  {w("match_chosen", { name: quote.stock.name })}
-                </p>
+            <ProductCards
+              products={products}
+              bbq={!!info.settings.bbq_enabled}
+              product={product}
+              setProduct={setProduct}
+              w={w}
+              name={tx.product}
+            />
+            {stock ? (
+              // an existing cover (ADR-118): its own name, sizes and price, ordered directly
+              <div className="s-stock" aria-busy={!stockQuote}>
+                <span className="s-stock-badge">{w("stock_badge")}</span>
+                {stockQuote?.stock ? (
+                  <>
+                    <h2 className="s-stock-name">{stockQuote.stock.name}</h2>
+                    {stockSize(stockQuote.stock, product, tx) && (
+                      <p className="s-stock-size">
+                        {w("stock_fits", {
+                          size: stockSize(stockQuote.stock, product, tx),
+                        })}
+                      </p>
+                    )}
+                    <div className="s-stock-price">
+                      <span>{w("stock_price")}</span>
+                      <strong>{euro(stockQuote.price.total_eur, lang)}</strong>
+                      {stockQuote.stock.price_source === "stock" &&
+                      (stockQuote.stock.discount_pct ?? 0) > 0 ? (
+                        <small>
+                          {w("stock_discount", {
+                            pct: stockQuote.stock.discount_pct ?? 0,
+                          })}
+                        </small>
+                      ) : null}
+                    </div>
+                    {note && (
+                      <p className="s-stock-delivery">
+                        <Icon name="truck" /> {note}
+                      </p>
+                    )}
+                    {stockQuote.price.indicative && <Indicative tx={tx} />}
+                    <button
+                      className="s-btn wide s-stock-order"
+                      onClick={() => setStep("checkout")}
+                    >
+                      {w("order_direct")} →
+                    </button>
+                  </>
+                ) : error ? (
+                  <p className="s-error">{error}</p>
+                ) : (
+                  <div className="s-skeleton" role="status">
+                    <span />
+                    <span />
+                  </div>
+                )}
                 <button
                   className="s-link"
                   onClick={() => {
@@ -873,15 +964,17 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
               ))}
               <span>{colour}</span>
             </div>
-            <label className="s-check">
-              <input
-                type="checkbox"
-                checked={vents}
-                onChange={(e) => setVents(e.target.checked)}
-              />{" "}
-              {w("vents")}
-            </label>
-            {quote && (
+            {!stock && (
+              <label className="s-check">
+                <input
+                  type="checkbox"
+                  checked={vents}
+                  onChange={(e) => setVents(e.target.checked)}
+                />{" "}
+                {w("vents")}
+              </label>
+            )}
+            {quote && !stock && fresh && (
               <div className="s-price">
                 <span>{w("total")}</span>
                 <strong>{euro(quote.price.total_eur, lang)}</strong>
@@ -946,7 +1039,18 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
             >
               ← {w("configure")}
             </button>
-            <h2>{w("order")}</h2>
+            <h2>{w(quote.stock ? "order_direct" : "order")}</h2>
+            {quote.stock && (
+              // the order is an existing cover: say which, and when it comes (ADR-118)
+              <div className="s-stock-line">
+                <strong>{w("stock_named", { name: quote.stock.name })}</strong>
+                {note && (
+                  <span>
+                    <Icon name="truck" /> {note}
+                  </span>
+                )}
+              </div>
+            )}
             {(
               ["name", "email", "phone", "street", "postcode", "city"] as const
             ).map((k) => (
@@ -1012,7 +1116,23 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
         {done && (
           <div className="s-done">
             <h2>{w("thanks")}</h2>
-            <p>{w("thanks_text")}</p>
+            {quote?.stock ? (
+              <>
+                <p>{w("thanks_stock")}</p>
+                <p className="s-stock-line">
+                  <strong>
+                    {w("stock_named", { name: quote.stock.name })}
+                  </strong>
+                  {note && (
+                    <span>
+                      <Icon name="truck" /> {note}
+                    </span>
+                  )}
+                </p>
+              </>
+            ) : (
+              <p>{w("thanks_text")}</p>
+            )}
             <a className="s-btn" href={done.status_url}>
               {w("status")} →
             </a>
@@ -1058,6 +1178,8 @@ function OrderStatus({ token, tx }: { token: string; tx: Tx }) {
         total_eur: number;
         product: string;
         colour: string;
+        /** an existing cover: its name (ADR-118) */
+        stock?: string | null;
       }
     | null
     | false
@@ -1084,7 +1206,10 @@ function OrderStatus({ token, tx }: { token: string; tx: Tx }) {
         {tx.w("status")} #{o.order}
       </h1>
       <p className="s-muted">
-        {tx.product(o.product)} · {o.colour} · {euro(o.total_eur, tx.lang)}
+        {o.stock
+          ? tx.w("stock_named", { name: o.stock })
+          : tx.product(o.product)}{" "}
+        · {o.colour} · {euro(o.total_eur, tx.lang)}
       </p>
       <ol className="s-track">
         {steps.map((s, i) => (

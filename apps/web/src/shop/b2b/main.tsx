@@ -9,6 +9,7 @@ import { createRoot } from "react-dom/client";
 import "../shop.css";
 import "./b2b.css";
 import { Scene } from "../Scene";
+import { ProductCards } from "../ProductCards";
 
 type T = Record<string, string>;
 interface Field {
@@ -30,12 +31,19 @@ interface Info {
     };
   };
   settings: {
+    /** the barbecues offered (ADR-119) */
+    bbq_enabled?: boolean;
     company: Record<string, string>;
     logo_url: string;
     colours: string[];
     languages: string[];
   };
-  options: { products: Record<string, { label: string; fields: Field[] }> };
+  options: {
+    products: Record<
+      string,
+      { label: string; group?: string | null; fields: Field[] }
+    >;
+  };
 }
 interface Addr {
   id: string | null;
@@ -190,8 +198,14 @@ function makeTx(info: Info, lang: string): Tx {
   const ui = info.content.ui;
   const t = (x: T | undefined) => (x ? (x[lang] ?? x.en ?? x.nl ?? "") : "");
   const fill = (s: string, vars: Record<string, string | number>) =>
-    Object.entries(vars).reduce((a, [k, v]) => a.split(`{${k}}`).join(String(v)), s);
-  const money = new Intl.NumberFormat(lang, { style: "currency", currency: "EUR" });
+    Object.entries(vars).reduce(
+      (a, [k, v]) => a.split(`{${k}}`).join(String(v)),
+      s,
+    );
+  const money = new Intl.NumberFormat(lang, {
+    style: "currency",
+    currency: "EUR",
+  });
   return {
     lang,
     b: (key, vars = {}) => fill(t(ui.b2b?.[key]) || key, vars),
@@ -230,7 +244,13 @@ function Login({ tx, onIn }: { tx: Tx; onIn: (me: Me) => void }) {
           e.preventDefault();
           setError("");
           try {
-            onIn(await api<Me>("POST", "login", { email, password, lang: tx.lang }));
+            onIn(
+              await api<Me>("POST", "login", {
+                email,
+                password,
+                lang: tx.lang,
+              }),
+            );
           } catch (err) {
             setError((err as Error).message);
           }
@@ -406,7 +426,9 @@ function SetPassword({
   token: string;
   onIn: (me: Me) => void;
 }) {
-  const [who, setWho] = useState<{ email: string; company: string } | null>(null);
+  const [who, setWho] = useState<{ email: string; company: string } | null>(
+    null,
+  );
   const [bad, setBad] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -428,7 +450,9 @@ function SetPassword({
               e.preventDefault();
               setError("");
               try {
-                const me = await api<Me>("POST", `token/${token}`, { password });
+                const me = await api<Me>("POST", `token/${token}`, {
+                  password,
+                });
                 window.history.replaceState(null, "", ROOT);
                 onIn(me);
               } catch (err) {
@@ -441,7 +465,13 @@ function SetPassword({
               <br />
               <span className="s-muted">{who.email}</span>
             </p>
-            <input type="email" hidden readOnly autoComplete="username" value={who.email} />
+            <input
+              type="email"
+              hidden
+              readOnly
+              autoComplete="username"
+              value={who.email}
+            />
             <label className="b-field">
               <span>{tx.b("password")}</span>
               <input
@@ -484,7 +514,9 @@ function PriceBox({
       </span>
       <strong>{tx.eur(quote.price.unit_eur)}</strong>
       <small>
-        {quote.price.source === "company_fixed" ? `${tx.b("fixed_price")} · ` : ""}
+        {quote.price.source === "company_fixed"
+          ? `${tx.b("fixed_price")} · `
+          : ""}
         {quote.pieces} {tx.w("pieces")} · {quote.cover_area_m2} m²
         {quote.price.support_eur
           ? ` · ${tx.w(quote.support)} ${tx.eur(quote.price.support_eur)}`
@@ -499,7 +531,9 @@ function PriceBox({
             min={1}
             max={999}
             value={qty}
-            onChange={(e) => setQty(Math.max(1, Math.min(999, Number(e.target.value) || 1)))}
+            onChange={(e) =>
+              setQty(Math.max(1, Math.min(999, Number(e.target.value) || 1)))
+            }
           />
         </label>
         <button
@@ -548,7 +582,13 @@ function Configure({
       setError("");
       try {
         setQuote(
-          await api<Quote>("POST", "quote", { product, sizes, colour, vents, support }),
+          await api<Quote>("POST", "quote", {
+            product,
+            sizes,
+            colour,
+            vents,
+            support,
+          }),
         );
       } catch (e) {
         setError((e as Error).message);
@@ -559,7 +599,9 @@ function Configure({
     return () => clearTimeout(t);
   }, [product, sizes, colour, vents, support]);
   const rain = quote?.rain;
-  const supports = Object.entries(rain?.options ?? {}).filter(([k]) => k !== "frame");
+  const supports = Object.entries(rain?.options ?? {}).filter(
+    ([k]) => k !== "frame",
+  );
   return (
     <section className="s-config b-config">
       <div className="s-config-view">
@@ -590,17 +632,14 @@ function Configure({
       <aside className="s-config-panel">
         <h2>{tx.b("tab_configure")}</h2>
         <p className="s-muted">{tx.w("what")}</p>
-        <div className="s-products">
-          {Object.keys(products).map((k) => (
-            <button
-              key={k}
-              className={`s-card ${product === k ? "on" : ""}`}
-              onClick={() => setProduct(k)}
-            >
-              {tx.product(k)}
-            </button>
-          ))}
-        </div>
+        <ProductCards
+          products={products}
+          bbq={!!info.settings.bbq_enabled}
+          product={product}
+          setProduct={setProduct}
+          w={(k) => tx.w(k)}
+          name={tx.product}
+        />
         {products[product].fields
           .filter((f) => !f.requires || !!sizes[f.requires])
           .map((f) =>
@@ -609,7 +648,9 @@ function Configure({
                 <input
                   type="checkbox"
                   checked={!!sizes[f.key]}
-                  onChange={(e) => setSizes({ ...sizes, [f.key]: e.target.checked })}
+                  onChange={(e) =>
+                    setSizes({ ...sizes, [f.key]: e.target.checked })
+                  }
                 />{" "}
                 {tx.field(f.key)}
               </label>
@@ -636,7 +677,9 @@ function Configure({
                   min={f.min}
                   max={f.max ?? undefined}
                   value={Number(sizes[f.key] ?? f.default)}
-                  onChange={(e) => setSizes({ ...sizes, [f.key]: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setSizes({ ...sizes, [f.key]: Number(e.target.value) })
+                  }
                 />
               </label>
             ),
@@ -655,10 +698,16 @@ function Configure({
           <span>{colour}</span>
         </div>
         <label className="s-check">
-          <input type="checkbox" checked={vents} onChange={(e) => setVents(e.target.checked)} />{" "}
+          <input
+            type="checkbox"
+            checked={vents}
+            onChange={(e) => setVents(e.target.checked)}
+          />{" "}
           {tx.w("vents")}
         </label>
-        {quote && <PriceBox tx={tx} quote={quote} onAdd={(n) => onAdd(quote, n)} />}
+        {quote && (
+          <PriceBox tx={tx} quote={quote} onAdd={(n) => onAdd(quote, n)} />
+        )}
         {error && <p className="s-error">{error}</p>}
       </aside>
     </section>
@@ -705,7 +754,8 @@ function Catalogue({
   const shown = (items ?? []).filter(
     (i) =>
       (!kind || i.kind === kind) &&
-      (!find || `${i.name} ${i.model_id}`.toLowerCase().includes(find.toLowerCase())),
+      (!find ||
+        `${i.name} ${i.model_id}`.toLowerCase().includes(find.toLowerCase())),
   );
   return (
     <section className="b-page">
@@ -720,7 +770,10 @@ function Catalogue({
           value={find}
           onChange={(e) => setFind(e.target.value)}
         />
-        <button className={`s-chip ${kind === "" ? "on" : ""}`} onClick={() => setKind("")}>
+        <button
+          className={`s-chip ${kind === "" ? "on" : ""}`}
+          onClick={() => setKind("")}
+        >
           {tx.b("all")}
         </button>
         {kinds.map((k) => (
@@ -743,13 +796,18 @@ function Catalogue({
           >
             <button className="b-item-head" onClick={() => setOpen(i)}>
               {i.photo ? (
-                <img src={`/api/b2b/catalogue/${i.model_id}.jpg`} alt="" loading="lazy" />
+                <img
+                  src={`/api/b2b/catalogue/${i.model_id}.jpg`}
+                  alt=""
+                  loading="lazy"
+                />
               ) : (
                 <div className="b-noimg">{tx.product(i.kind)}</div>
               )}
               <strong>{i.name}</strong>
               <span className="s-muted">
-                {tx.product(i.kind)} · {i.size_cm.map((x) => Math.round(x)).join(" × ")} cm
+                {tx.product(i.kind)} ·{" "}
+                {i.size_cm.map((x) => Math.round(x)).join(" × ")} cm
               </span>
               {i.fixed_eur !== null ? (
                 <span className="b-fixed">
@@ -774,7 +832,11 @@ function Catalogue({
                   <span>{colour}</span>
                 </div>
                 {quote ? (
-                  <PriceBox tx={tx} quote={quote} onAdd={(n) => onAdd(quote, n)} />
+                  <PriceBox
+                    tx={tx}
+                    quote={quote}
+                    onAdd={(n) => onAdd(quote, n)}
+                  />
                 ) : (
                   <p className="s-muted">…</p>
                 )}
@@ -800,6 +862,12 @@ function Cart({
   setLines: (l: Line[]) => void;
   onOrdered: () => void;
 }) {
+  const [checkoutKey] = useState(() => {
+    const storageKey = `b2b-checkout-${me.user.email}`;
+    const key = sessionStorage.getItem(storageKey) || crypto.randomUUID();
+    sessionStorage.setItem(storageKey, key);
+    return key;
+  });
   const [po, setPo] = useState("");
   const [note, setNote] = useState("");
   const [addressId, setAddressId] = useState<string>("");
@@ -840,11 +908,15 @@ function Cart({
               {lines.map((l, i) => (
                 <tr key={`${l.quote.id}-${i}`}>
                   <td>
-                    <strong>{l.quote.label ?? tx.product(l.quote.product)}</strong>
+                    <strong>
+                      {l.quote.label ?? tx.product(l.quote.product)}
+                    </strong>
                     <br />
                     <span className="s-muted">
                       {l.quote.colour} · {sizesText(l.quote.sizes_cm)} cm
-                      {l.quote.support !== "none" ? ` · ${tx.w(l.quote.support)}` : ""}
+                      {l.quote.support !== "none"
+                        ? ` · ${tx.w(l.quote.support)}`
+                        : ""}
                     </span>
                   </td>
                   <td>{tx.eur(l.quote.price.unit_eur)}</td>
@@ -860,7 +932,13 @@ function Cart({
                         setLines(
                           lines.map((x, j) =>
                             j === i
-                              ? { ...x, qty: Math.max(1, Math.min(999, Number(e.target.value) || 1)) }
+                              ? {
+                                  ...x,
+                                  qty: Math.max(
+                                    1,
+                                    Math.min(999, Number(e.target.value) || 1),
+                                  ),
+                                }
                               : x,
                           ),
                         )
@@ -892,7 +970,11 @@ function Cart({
                     "POST",
                     "order",
                     {
-                      lines: lines.map((l) => ({ quote_id: l.quote.id, qty: l.qty })),
+                      idempotency_key: checkoutKey,
+                      lines: lines.map((l) => ({
+                        quote_id: l.quote.id,
+                        qty: l.qty,
+                      })),
                       address_id: addressId || null,
                       po,
                       note,
@@ -900,6 +982,7 @@ function Cart({
                     },
                     me.csrf,
                   );
+                  sessionStorage.removeItem(`b2b-checkout-${me.user.email}`);
                   setDone(r);
                   onOrdered();
                 } catch (err) {
@@ -911,29 +994,41 @@ function Cart({
             >
               <label className="b-field">
                 <span>{tx.b("po")}</span>
-                <input value={po} maxLength={60} onChange={(e) => setPo(e.target.value)} />
+                <input
+                  value={po}
+                  maxLength={60}
+                  onChange={(e) => setPo(e.target.value)}
+                />
               </label>
               <label className="b-field">
                 <span>{tx.b("deliver_to")}</span>
-                <select value={addressId} onChange={(e) => setAddressId(e.target.value)}>
+                <select
+                  value={addressId}
+                  onChange={(e) => setAddressId(e.target.value)}
+                >
                   {addresses.map((a) => (
                     <option key={a.id ?? ""} value={a.id ?? ""}>
-                      {a.id ? a.label || a.name : tx.b("invoice_address")}: {a.street},{" "}
-                      {a.city} {a.country}
+                      {a.id ? a.label || a.name : tx.b("invoice_address")}:{" "}
+                      {a.street}, {a.city} {a.country}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="b-field">
                 <span>{tx.b("note")}</span>
-                <textarea value={note} onChange={(e) => setNote(e.target.value)} />
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
               </label>
               <p className="b-account">✓ {tx.b("on_account")}</p>
               <button className="s-btn wide" disabled={busy || short}>
                 {tx.b("place_order")} →
               </button>
               {short && (
-                <p className="s-error">{tx.b("min_order", { eur: tx.eur(s.min_order_eur) })}</p>
+                <p className="s-error">
+                  {tx.b("min_order", { eur: tx.eur(s.min_order_eur) })}
+                </p>
               )}
               {error && <p className="s-error">{error}</p>}
             </form>
@@ -1028,7 +1123,15 @@ function Orders({
   );
 }
 
-function Addresses({ tx, me, onSaved }: { tx: Tx; me: Me; onSaved: () => void }) {
+function Addresses({
+  tx,
+  me,
+  onSaved,
+}: {
+  tx: Tx;
+  me: Me;
+  onSaved: () => void;
+}) {
   const empty: Addr = {
     id: null,
     label: "",
@@ -1044,7 +1147,12 @@ function Addresses({ tx, me, onSaved }: { tx: Tx; me: Me; onSaved: () => void })
   const save = async (next: Addr[]) => {
     setMsg("");
     try {
-      const r = await api<{ addresses: Addr[] }>("PUT", "addresses", { addresses: next }, me.csrf);
+      const r = await api<{ addresses: Addr[] }>(
+        "PUT",
+        "addresses",
+        { addresses: next },
+        me.csrf,
+      );
       setList(r.addresses);
       setMsg(tx.b("saved"));
       onSaved();
@@ -1077,7 +1185,10 @@ function Addresses({ tx, me, onSaved }: { tx: Tx; me: Me; onSaved: () => void })
               <br />
               {a.postcode} {a.city} {a.country}
             </p>
-            <button className="s-link" onClick={() => save(list.filter((x) => x.id !== a.id))}>
+            <button
+              className="s-link"
+              onClick={() => save(list.filter((x) => x.id !== a.id))}
+            >
               {tx.b("remove")}
             </button>
           </div>
@@ -1163,7 +1274,13 @@ function Account({ tx, me, onOut }: { tx: Tx; me: Me; onOut: () => void }) {
         }}
       >
         <h3>{tx.b("change_password")}</h3>
-        <input type="email" hidden readOnly autoComplete="username" value={me.user.email} />
+        <input
+          type="email"
+          hidden
+          readOnly
+          autoComplete="username"
+          value={me.user.email}
+        />
         <label className="b-field">
           <span>{tx.b("old_password")}</span>
           <input
@@ -1192,7 +1309,8 @@ function Account({ tx, me, onOut }: { tx: Tx; me: Me; onOut: () => void }) {
   );
 }
 
-type Tab = "catalogue" | "configure" | "cart" | "orders" | "addresses" | "account";
+type Tab =
+  "catalogue" | "configure" | "cart" | "orders" | "addresses" | "account";
 
 function Shop({
   info,
@@ -1210,7 +1328,14 @@ function Shop({
   const key = `b2b-cart:${me.user.email}`;
   const [tab, setTab] = useState<Tab>(() => {
     const h = window.location.hash.slice(1) as Tab;
-    return ["catalogue", "configure", "cart", "orders", "addresses", "account"].includes(h)
+    return [
+      "catalogue",
+      "configure",
+      "cart",
+      "orders",
+      "addresses",
+      "account",
+    ].includes(h)
       ? h
       : "catalogue";
   });
@@ -1237,27 +1362,46 @@ function Shop({
     window.history.replaceState(null, "", `#${t}`);
     window.scrollTo(0, 0);
   };
-  const add = (q: Quote, qty: number) => setLines([...lines, { quote: q, qty }]);
+  const add = (q: Quote, qty: number) =>
+    setLines([...lines, { quote: q, qty }]);
   const count = lines.reduce((a, l) => a + l.qty, 0);
   return (
     <>
       <nav className="b-tabs">
         <span className="b-who">
-          {tx.b("welcome", { name: me.user.name || me.company.name })} · {me.company.name}
+          {tx.b("welcome", { name: me.user.name || me.company.name })} ·{" "}
+          {me.company.name}
         </span>
-        {(["catalogue", "configure", "cart", "orders", "addresses", "account"] as Tab[]).map(
-          (t) => (
-            <button key={t} className={tab === t ? "on" : ""} onClick={() => go(t)}>
-              {tx.b(`tab_${t}`)}
-              {t === "cart" && count > 0 ? ` (${count})` : ""}
-            </button>
-          ),
-        )}
+        {(
+          [
+            "catalogue",
+            "configure",
+            "cart",
+            "orders",
+            "addresses",
+            "account",
+          ] as Tab[]
+        ).map((t) => (
+          <button
+            key={t}
+            className={tab === t ? "on" : ""}
+            onClick={() => go(t)}
+          >
+            {tx.b(`tab_${t}`)}
+            {t === "cart" && count > 0 ? ` (${count})` : ""}
+          </button>
+        ))}
       </nav>
       {tab === "catalogue" && <Catalogue info={info} tx={tx} onAdd={add} />}
       {tab === "configure" && <Configure info={info} tx={tx} onAdd={add} />}
       {tab === "cart" && (
-        <Cart tx={tx} me={me} lines={lines} setLines={setLines} onOrdered={() => setLines([])} />
+        <Cart
+          tx={tx}
+          me={me}
+          lines={lines}
+          setLines={setLines}
+          onOrdered={() => setLines([])}
+        />
       )}
       {tab === "orders" && (
         <Orders
@@ -1278,7 +1422,8 @@ function Shop({
 function App() {
   const [info, setInfo] = useState<Info | null>(null);
   const [me, setMe] = useState<Me | null | undefined>(undefined);
-  const page = window.location.pathname.replace(/\/+$/, "").split(/\/b2b\/?/)[1] ?? "";
+  const page =
+    window.location.pathname.replace(/\/+$/, "").split(/\/b2b\/?/)[1] ?? "";
   const loadMe = useCallback(
     () =>
       api<Me>("GET", "me")
@@ -1300,7 +1445,8 @@ function App() {
       return "";
     }
   });
-  const want = lang || me?.user.lang || navigator.language.slice(0, 2).toLowerCase();
+  const want =
+    lang || me?.user.lang || navigator.language.slice(0, 2).toLowerCase();
   const use = langs.includes(want) ? want : langs[0];
   const tx = useMemo(() => (info ? makeTx(info, use) : null), [info, use]);
   useEffect(() => {

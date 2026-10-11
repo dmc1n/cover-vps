@@ -109,7 +109,9 @@ def test_an_approved_drawing_cover_is_offered_and_sold(app: Any) -> None:
     q = c.post("/api/shop/quote", json={"product": "dining_set", "sizes": sizes,
                                         "stock_model": "drawing-t1",
                                         "match_token": r["token"]}).json()  # fmt: skip
-    assert q["stock"] == {"model_id": "drawing-t1", "name": name}
+    assert {k: q["stock"][k] for k in ("model_id", "name")} == {"model_id": "drawing-t1",
+                                                                  "name": name}  # fmt: skip
+    assert q["stock"]["price_source"] == "stock" and q["stock"]["discount_pct"] == 10
     own = c.post("/api/shop/quote", json={"product": "dining_set", "sizes": {
         "table_length_cm": 340, "table_width_cm": 100, "table_height_cm": 86}}).json()  # fmt: skip
     assert q["price"]["cover_eur"] == round(own["price"]["cover_eur"] * 0.9, 2)  # stock rule

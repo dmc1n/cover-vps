@@ -39,6 +39,9 @@ ROUND_SEGMENTS = 96  # param-ok: the circle as this many straight bits
 class Piece:
     name: str
     faces: list[Face]
+    # the piece laid flat (mm), when its faces are not in one plane but it is developable (a
+    # cone's sector, ADR-119); None: flat as it is, or a band
+    flat: list[tuple[float, float]] | None = None
 
 
 def _poly(face: Face) -> tuple[np.ndarray, np.ndarray]:
@@ -452,7 +455,74 @@ def _slab(u: np.ndarray, lo: float, hi: float) -> list[tuple[float, float]]:
     return [tuple(lo * u - v), tuple(hi * u - v), tuple(hi * u + v), tuple(lo * u + v)]
 
 
+def cone_round(p: dict[str, Any], roll_mm: float) -> list[Piece]:
+    """A round band with a cone on top (ADR-119: a kamado, a round fire table): the cone in equal
+    sectors whose seams run straight down from the apex, as few as fit the roll (at least two:
+    a cone is no flat disc), the band in as many strips, their seams under the sectors' seams.
+    Each sector is laid flat exactly (a cone is developable)."""
+    import shapely
+
+    r, h, rise = _cm(p, "diameter_cm") / 2, _cm(p, "height_cm"), _cm(p, "rise_cm", 0)
+    slant = math.hypot(r, rise)
+    n = 2
+    while True:
+        k = ROUND_SEGMENTS // n
+        arc = [(slant * math.cos(t * r / slant), slant * math.sin(t * r / slant))
+               for t in np.linspace(0, 2 * math.pi / n, k + 1)]  # fmt: skip
+        flat = [(0.0, 0.0), *arc]
+        rect = np.asarray(shapely.Polygon(flat).minimum_rotated_rectangle.exterior.coords)
+        narrow = min(np.linalg.norm(rect[1] - rect[0]), np.linalg.norm(rect[2] - rect[1]))
+        if narrow <= roll_mm or n >= ROUND_SEGMENTS // 4:  # param-ok: at most 24 sectors
+            break
+        n = next(m for m in range(n + 1, ROUND_SEGMENTS + 1) if ROUND_SEGMENTS % m == 0)
+    angles = np.linspace(0, 2 * math.pi, ROUND_SEGMENTS, endpoint=False)
+    ring = [(r * math.cos(t), r * math.sin(t)) for t in angles]
+    apex = (0.0, 0.0, h + rise)
+    per = ROUND_SEGMENTS // n
+    pieces = []
+    for s in range(n):
+        idx = [(s * per + i) % ROUND_SEGMENTS for i in range(per + 1)]
+        faces = [[apex, (*ring[a], h), (*ring[b], h)] for a, b in zip(idx, idx[1:], strict=False)]
+        pieces.append(Piece(f"top-{s + 1}", faces, flat=flat))
+    for s in range(n):
+        idx = [(s * per + i) % ROUND_SEGMENTS for i in range(per + 1)]
+        faces = [[(*ring[a], 0.0), (*ring[b], 0.0), (*ring[b], h), (*ring[a], h)]
+                 for a, b in zip(idx, idx[1:], strict=False)]  # fmt: skip
+        pieces.append(Piece(f"band-{s + 1}", faces))
+    return pieces
+
+
+def hip_box(p: dict[str, Any], roll: float = math.inf) -> list[Piece]:
+    """A box with a hipped roof (ADR-119: a gas or pellet grill, a kamado with side tables or in
+    a table): four walls to the eaves, the roof rising `rise_cm` to a ridge along the long side,
+    every roof face at the same slope, so water runs off all round (rule 12). All pieces flat."""
+    x, y, h = _cm(p, "length_cm"), _cm(p, "depth_cm"), _cm(p, "height_cm")
+    rise = _cm(p, "rise_cm", 0)
+    if y > x:  # the ridge along the long side
+        x, y = y, x
+    b = y / 2
+    top = h + rise
+    r0, r1 = (b, b, top), (x - b, b, top)
+    one = x - 2 * b < 1e-6  # param-ok: a square box: the ridge is a point (a pyramid)
+    back = [(0, 0, h), (x, 0, h), r1] if one else [(0, 0, h), (x, 0, h), r1, r0]
+    front = [(0, y, h), r0, (x, y, h)] if one else [(0, y, h), r0, r1, (x, y, h)]
+    return [
+        Piece("roof-back", [back]),
+        Piece("roof-front", [front]),
+        Piece("roof-left", [[(0, 0, h), r0, (0, y, h)]]),
+        Piece("roof-right", [[(x, 0, h), (x, y, h), r1]]),
+        Piece("back", [[(0, 0, 0), (x, 0, 0), (x, 0, h), (0, 0, h)]]),
+        Piece("front", [[(0, y, 0), (0, y, h), (x, y, h), (x, y, 0)]]),
+        Piece("left", [[(0, 0, 0), (0, 0, h), (0, y, h), (0, y, 0)]]),
+        Piece("right", [[(x, 0, 0), (x, y, 0), (x, y, h), (x, 0, h)]]),
+    ]
+
+
 def build(shape: str, params: dict[str, Any], roll_mm: float) -> list[Piece]:
+    if shape == "cone round":
+        return cone_round(params, roll_mm)
+    if shape == "hip box":
+        return hip_box(params, roll_mm)
     if shape == "box":
         return box(params, roll_mm)
     if shape == "sloped box":

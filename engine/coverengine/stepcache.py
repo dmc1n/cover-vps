@@ -32,7 +32,15 @@ from coverengine.params import EffectiveParams
 STEPS_DIR = "steps"
 # what each step reads from the steps before it, and what it must leave behind
 INPUTS = {
-    "hull": ("model.glb", "parts.json", "kind.json", "cover.json", "arrangement.json"),
+    "hull": (
+        "model.glb",
+        "parts.json",
+        "kind.json",
+        "cover.json",
+        "arrangement.json",
+        "box_shape.json",
+        "plan_members.json",
+    ),
     "cut": (
         "hull.glb",
         "hull.json",
@@ -53,7 +61,7 @@ OUTPUTS = {
 }
 # what in cover.json is not compared as a file: the catalogue notes no step reads (the Desk and
 # the catalogue change them often), and the parameters, compared value by value as they are read
-NOT_INPUTS = ("status", "tags", "notes", "info", "parameters")
+NOT_INPUTS = ("status", "tags", "notes", "info", "parameters", "no_cover", "no_cover_reason")
 
 _engine_hash: str | None = None
 

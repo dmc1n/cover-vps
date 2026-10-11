@@ -32,6 +32,10 @@ daily digest. An approval records the cut file's fingerprint and the placement (
 plan); a later change to either reopens it ("changed after approval", back to waiting), so an
 approved arrangement never changes silently. Its cutting-table DXF waits for the approval
 whatever `desk.gate_scope` says (`desk.gate_arrangements`).
+
+No cover (Rens, 9 Oct 2026, question 12): a model marked `"no_cover": true` in its cover.json is
+kept but needs no cover, so it is not in the queue, an arrangement so marked is not announced,
+and only a note or an undo is taken for it (`refuse_no_cover`).
 """
 
 from __future__ import annotations
@@ -45,6 +49,7 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+from coverengine.catalogue import no_cover
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -67,6 +72,7 @@ ARRANGEMENT_PREFIX = "arr-"
 ARRANGEMENT_JSON = "arrangement.json"  # as coverengine.arrange
 WAITING = "ai-checked"  # an arrangement sent to the Desk: ready for approval (ADR-115)
 DONE = ("approved", "produced")
+NO_COVER_ACTIONS = ("note", "undo")  # all a model that needs no cover takes at the Desk
 
 
 class Action(BaseModel):
@@ -183,6 +189,7 @@ def brief(d: Path) -> dict[str, Any]:
         "scores": sc,
         "tags": cover.get("tags") or [],
         "catalogue": cover.get("status", "draft"),
+        "no_cover": no_cover(d),
         "pieces": count,
         "vents": vents,
         "products": product_labels(d),  # the workshop's product list (ADR-091)
@@ -206,6 +213,12 @@ def approver(user: Any, params: Any) -> bool:
     names = {n.strip().lower() for n in str(params["desk.approvers"]).split(",") if n.strip()}
     first = (user.name or "").strip().split(" ")[0].lower()
     return user.active and (user.username.lower() in names or first in names)
+
+
+def refuse_no_cover(d: Path, action: str) -> None:
+    """A model that needs no cover is not approved, rejected or produced at the Desk."""
+    if action not in NO_COVER_ACTIONS and no_cover(d):
+        raise HTTPException(409, f"{d.name} needs no cover (not on the Desk): nothing to {action}")
 
 
 def dxf_allowed(d: Path, params: Any) -> bool:
@@ -247,10 +260,10 @@ def _placement(d: Path) -> dict[str, Any]:
 
 def _changed_since_approval(d: Path, st: dict[str, Any]) -> list[str]:
     """What changed in an approved arrangement since its approval: its cut file, its placement.
-    Empty when nothing did (or nothing was recorded, as before ADR-115)."""
+    A missing approved cut fingerprint always requires a fresh approval."""
     ok = st.get("approved") or {}
     out = []
-    if ok.get("cut") and ok["cut"] != cut_fingerprint(d):
+    if not ok.get("cut") or ok["cut"] != cut_fingerprint(d):
         out.append("the cut file")
     if ok.get("placement") and ok["placement"] != _placement(d):
         out.append("the members or the plan")
@@ -298,6 +311,7 @@ def send_arrangement(d: Path, user: Any, learning: Path, note: str = "") -> dict
     """Its maker sends a built arrangement to the Desk: ready for approval."""
     if not is_arrangement(d):
         raise HTTPException(400, "not an arrangement")
+    refuse_no_cover(d, "send")
     if not ((d / "finished.json").is_file() and (d / "cut.dxf").is_file()):
         raise HTTPException(409, "build the cover first, then send it to the Desk")
     who = user.name or user.username
@@ -356,7 +370,7 @@ def arrangements_to_announce(models: Path) -> list[dict[str, Any]]:
     """Arrangements sent to the Desk and not yet in the approvers' digest (ADR-115)."""
     out = []
     for d in sorted(models.glob(ARRANGEMENT_PREFIX + "*")):
-        if not is_arrangement(d):
+        if not is_arrangement(d) or no_cover(d):
             continue
         st = state(d)
         sent = st.get("sent") or {}
@@ -533,6 +547,7 @@ def picture_paths(d: Path, names: list[str], base: Path) -> list[str]:
 def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
     from coverengine.catalogue import revisions, set_info
 
+    refuse_no_cover(d, a.action)
     pictures: list[str] = []
     if a.pictures:
         if a.action not in WITH_PICTURES:
@@ -547,10 +562,15 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
         who = user.name or user.username
         entry: dict[str, Any] = {"action": a.action, "by": who, "time": now}
         if a.action == "approve":
+            cut = cut_fingerprint(d) if is_arrangement(d) else None
+            if is_arrangement(d) and cut is None:
+                raise HTTPException(
+                    400, "Build the arrangement's cutting file before approving it."
+                )
             st["status"] = "approved"
             st["approved"] = {"by": who, "time": now}
             if is_arrangement(d):  # what the approval is for (ADR-115)
-                st["approved"] |= {"cut": cut_fingerprint(d), "placement": _placement(d)}
+                st["approved"] |= {"cut": cut, "placement": _placement(d)}
             st.pop("rejected", None)
         elif a.action == "reject":
             bad = [r for r in a.reasons if r not in REASONS]
@@ -852,7 +872,8 @@ def install(app: FastAPI, store: Any) -> None:
     def queue(request: Request, scope: str = "all") -> dict[str, Any]:
         user = current_user(request)
         params = Registry.load(None).resolve()
-        dirs = sorted(p for p in Path(store.models).iterdir() if (p / "cover.json").is_file())
+        dirs = sorted(p for p in Path(store.models).iterdir()
+                      if (p / "cover.json").is_file() and not no_cover(p))  # fmt: skip
         if scope == "arrangements":
             dirs = [p for p in dirs if is_arrangement(p)]
         elif scope != "all":
@@ -992,6 +1013,7 @@ def install(app: FastAPI, store: Any) -> None:
         user = current_user(request)
         if not approver(user, Registry.load(None).resolve()):
             raise HTTPException(403, "only Rens, Rick, Wouter (desk.approvers) or an admin")
+        refuse_no_cover(folder(model_id), "correct")
         out = correct(folder(model_id), fb, user, store.root)
         out["job"] = submit(model_id, out["steps"])
         return out
@@ -1039,7 +1061,8 @@ def install(app: FastAPI, store: Any) -> None:
         row = learned.write_rule(req.group, req.key, req.value, who,
                                  "made the rule at the Desk", store.root)  # fmt: skip
         models = Path(store.models)
-        covers = [d for d in sorted(models.iterdir()) if (d / "cover.json").is_file()]
+        covers = [d for d in sorted(models.iterdir())
+                  if (d / "cover.json").is_file() and not no_cover(d)]  # fmt: skip
         members = [d for d in covers if learned.group_of(d) == req.group]
         jobs: list[Any] = []
         for d in members:

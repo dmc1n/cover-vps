@@ -132,6 +132,7 @@ iframe.pdf { width: 100%; height: 80vh; border: 1px solid var(--line); border-ra
 .badge { margin-left: 6px; font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--line); }
 .badge.model { background: var(--accent-soft); } .badge.changed { background: var(--warn-soft); } .badge.trial { background: var(--warn-soft); }
 .badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.no-cover { background: var(--line); color: var(--muted); font-style: italic; }
 .warnings li { margin: 4px 0; font-size: 14px; }
 pre { background: var(--olive-deep); color: var(--cream); padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; max-height: 300px; }
 @media (max-width: 700px) {

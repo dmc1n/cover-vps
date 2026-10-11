@@ -78,5 +78,45 @@
     "check": "The audit's chairs check and engine/tests/test_outline.py::test_a_chair_is_no_table.",
     "applies_to": "box",
     "ai_model": "owner"
+  },
+  {
+    "time": 1791993600,
+    "model_id": "drawing-d5",
+    "complaint": "The outline of the generated cover does not match the drawing at all (Rens, 9 Oct 2026, QUESTIONS 4); also S20, S38/S39, S48, S25 rejected on shape.",
+    "cause": "Drawings were read as one familiar block (a box, an L, a slope across the width) instead of view by view: D5 is a rectangle with a half round of the full width centred where the straight sides end, one slope from the strip over the round front, ends that lean in; S38/S39 have a front corner lower than the other (the top tilts two ways); S20/S48 have arms with a seat between them.",
+    "rule": "Read every written size and check that the shape gives each one back (D5: 193.99, 177.98, 195.32 at 110.22 and 62.35 all come out of one hip shape). A round front with no height of its own follows the slope (hip free edges). Arms are followed and the seat between them is one panel falling to its front edge (rule 12). Heights are read per corner, not one front height.",
+    "check": "engine/tests/test_drawing_given.py (free round front, arms with a spanned seat, a slanted front wall); every drawing_shape.json builds and fits the roll.",
+    "applies_to": "drawing",
+    "ai_model": "owner"
+  },
+  {
+    "time": 1791720000,
+    "model_id": "suns-daybed-portofino",
+    "complaint": "The top panel (1.85 m) does not fit the 1.48 m roll: split the panel (Rens at the Desk, 9 Oct 2026, question 16).",
+    "cause": "Only the arrangements' and the follow covers' tops were cut into strips when wider than the roll; a plain (convex) box cover kept a too-wide top face as one piece and only reported it.",
+    "rule": "Every box cover's top face wider than the roll is cut across its slope into strips whose seams run downhill (hull.json box.roll_cuts), after the gentle-fold joins, so no piece is wider than the roll.",
+    "check": "scripts/fewer_check.py and the audit's pieces check (a piece wider than the roll fails); engine/tests/test_answers_box.py::test_a_box_top_wider_than_the_roll_is_cut_in_strips.",
+    "applies_to": "box",
+    "ai_model": "approver"
+  },
+  {
+    "time": 1791720000,
+    "model_id": "suns-lounge-nuna-lounge-chair",
+    "complaint": "Follow the top view; at the side a chamfer instead of a bulge (Rens, 9 Oct 2026, question 3); a gentle gable on a follow cover was two pieces.",
+    "cause": "A follow cover (ADR-107) kept every top face as a piece: the gentle-fold join of ADR-099 ran only on convex box covers, and the audit took a curved wall's own facets for gentle folds.",
+    "rule": "A follow cover's flat top faces at a fold of at most seams.fold_join_max_deg are one piece with a fold line, as on any box cover; its curved walls keep their seams. A chamfer the approver asks for is a face added by hand (hull.box_extra_faces), never a curved cover.",
+    "check": "The audit's gentle folds check (curved pieces left out); engine/tests/test_answers_box.py.",
+    "applies_to": "box",
+    "ai_model": "approver"
+  },
+  {
+    "time": 1791720000,
+    "model_id": "2026-07-cover-s53-rc-v1",
+    "complaint": "For covers with an organic shape like S53 and S60, which have curved seams, follow the drawing; not for all covers (Rens, 9 Oct 2026, question 19).",
+    "cause": "ADR-100 made the cover model's own creases the seams for every given cover surface (seams.given_crease_deg 20 as the company default).",
+    "rule": "Creases as seams only for organic covers: seams.given_crease_deg is 0 by default and 20 in the family preset 'organic' (config/presets/organic.yaml); a cover joins it with \"family\": \"organic\".",
+    "check": "engine/tests/test_given_creases.py::test_creases_only_for_organic_covers.",
+    "applies_to": "given",
+    "ai_model": "approver"
   }
 ]

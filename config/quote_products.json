@@ -1,5 +1,5 @@
 {
- "_about": "What a customer can cover in the webshop configurator (ADR-061): per product its label and fields [default, min, max] in cm (min null: a yes/no). Edit freely; the API and the configurator follow. A fourth value names the yes/no field a size belongs to (asked only when that is ticked: a lounger's headrest, owner 7 Oct 2026).",
+ "_about": "What a customer can cover in the webshop configurator (ADR-061): per product its label and fields [default, min, max] in cm (min null: a yes/no). Edit freely; the API and the configurator follow. A fourth value names the yes/no field a size belongs to (asked only when that is ticked: a lounger's headrest, owner 7 Oct 2026). A product with \"group\": \"bbq\" is a barbecue (ADR-119): the shop shows it under its own heading and fits the cover over the barbecue's own shape.",
  "dining_set": {
   "label": "Dining set (table and chairs)",
   "fields": {
@@ -154,6 +154,153 @@
     80,
     30,
     150
+   ]
+  }
+ },
+ "bbq_kamado": {
+  "label": "Kamado (egg) in a nest",
+  "group": "bbq",
+  "fields": {
+   "egg_diameter_cm": [
+    56,
+    30,
+    90
+   ],
+   "closed_height_cm": [
+    114,
+    40,
+    170
+   ],
+   "handle_depth_cm": [
+    72,
+    35,
+    120
+   ],
+   "side_tables": [
+    false,
+    null,
+    null
+   ],
+   "tables_width_cm": [
+    132,
+    60,
+    230,
+    "side_tables"
+   ]
+  }
+ },
+ "bbq_kamado_table": {
+  "label": "Kamado in a table",
+  "group": "bbq",
+  "fields": {
+   "table_length_cm": [
+    152,
+    60,
+    250
+   ],
+   "table_width_cm": [
+    64,
+    50,
+    120
+   ],
+   "table_height_cm": [
+    79,
+    40,
+    110
+   ],
+   "egg_diameter_cm": [
+    56,
+    30,
+    90
+   ],
+   "closed_height_cm": [
+    125,
+    60,
+    190
+   ]
+  }
+ },
+ "bbq_gas": {
+  "label": "Gas grill with side shelves",
+  "group": "bbq",
+  "fields": {
+   "width_cm": [
+    156,
+    50,
+    250
+   ],
+   "depth_cm": [
+    69,
+    40,
+    120
+   ],
+   "closed_height_cm": [
+    122,
+    60,
+    160
+   ],
+   "shelf_height_cm": [
+    92,
+    40,
+    120
+   ],
+   "hood_width_cm": [
+    88,
+    40,
+    180
+   ]
+  }
+ },
+ "bbq_pellet": {
+  "label": "Pellet grill",
+  "group": "bbq",
+  "fields": {
+   "width_cm": [
+    150,
+    60,
+    220
+   ],
+   "depth_cm": [
+    64,
+    40,
+    120
+   ],
+   "closed_height_cm": [
+    122,
+    60,
+    170
+   ],
+   "lid_length_cm": [
+    90,
+    40,
+    160
+   ]
+  }
+ },
+ "bbq_fire_table": {
+  "label": "Fire table or plancha",
+  "group": "bbq",
+  "fields": {
+   "fire_width_cm": [
+    85,
+    50,
+    200
+   ],
+   "height_cm": [
+    100,
+    40,
+    130
+   ],
+   "square": [
+    false,
+    null,
+    null
+   ],
+   "depth_cm": [
+    100,
+    50,
+    200,
+    "square"
    ]
   }
  }

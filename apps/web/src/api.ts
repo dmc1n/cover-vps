@@ -114,6 +114,9 @@ export interface ModelBrief {
   status: Status;
   tags: string[];
   notes: string;
+  /** kept, but needs no cover: not in the shop, not on the Desk (Rens, 9 Oct 2026) */
+  no_cover?: boolean;
+  no_cover_reason?: string;
   steps_done: Step[];
   files: string[];
   size_mm?: number[];
@@ -303,7 +306,16 @@ export const api = {
   setInfo: (
     id: string,
     info: Partial<
-      Pick<ModelBrief, "family" | "category" | "status" | "tags" | "notes">
+      Pick<
+        ModelBrief,
+        | "family"
+        | "category"
+        | "status"
+        | "tags"
+        | "notes"
+        | "no_cover"
+        | "no_cover_reason"
+      >
     >,
   ) =>
     fetch(`/api/models/${id}/info`, {
