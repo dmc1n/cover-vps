@@ -45,7 +45,7 @@ import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
 import { SettingsArea } from "./SettingsArea";
 import { Viewer } from "./Viewer";
-import { installUnsavedGuard } from "./unsaved";
+import { installUnsavedGuard, mayLeave } from "./unsaved";
 import {
   allowed,
   deskHref,
@@ -67,7 +67,18 @@ import {
 function useHash(): string {
   const [hash, setHash] = useState(window.location.hash);
   useEffect(() => {
-    const on = () => setHash(window.location.hash);
+    let shown = window.location.hash;
+    // Back / Forward with unsaved edits asks too; staying puts the address back
+    const on = () => {
+      const next = window.location.hash;
+      if (next === shown) return;
+      if (!mayLeave(next)) {
+        window.history.pushState(null, "", shown || "#/");
+        return;
+      }
+      shown = next;
+      setHash(next);
+    };
     window.addEventListener("hashchange", on);
     window.addEventListener("popstate", on);
     return () => {

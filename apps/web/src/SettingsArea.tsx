@@ -420,10 +420,12 @@ function Source({
 function Control({
   f,
   value,
+  saved,
   onChange,
 }: {
   f: Field;
   value: unknown;
+  saved?: unknown; // the stored value (a secret shows it shortened)
   onChange: (v: unknown) => void;
 }) {
   const kind = f.kind ?? "text";
@@ -465,7 +467,8 @@ function Control({
         {f.unit && <span className="muted">{f.unit}</span>}
       </span>
     );
-  if (kind === "secret") return <Secret value={value} onChange={onChange} />;
+  if (kind === "secret")
+    return <Secret value={value} saved={saved} onChange={onChange} />;
   return (
     <input
       type={kind === "email" ? "email" : "text"}
@@ -479,26 +482,39 @@ function Control({
 /** A stored secret: shown shortened as the server sends it; Replace gives an empty field. */
 function Secret({
   value,
+  saved,
   onChange,
 }: {
   value: unknown;
+  saved: unknown; // the stored key, shortened by the server, as last loaded or saved
   onChange: (v: unknown) => void;
 }) {
-  const [stored] = useState(String(value ?? ""));
+  const stored = String(saved ?? "");
+  const now = String(value ?? "");
   const [editing, setEditing] = useState(false);
+  // after a save the form reloads: a new stored value ends the replacing
+  useEffect(() => setEditing(false), [stored]);
   if (!editing)
     return (
       <span className="secret">
-        <code>{stored || "not set"}</code>
-        <button
-          type="button"
-          className="sm"
-          onClick={() => {
-            setEditing(true); // the stored key stays until a new one is typed
-          }}
-        >
+        <code>
+          {now === "" && stored
+            ? "removed (Save to confirm)"
+            : stored || "not set"}
+        </code>
+        <button type="button" className="sm" onClick={() => setEditing(true)}>
           {stored ? "Replace" : "Set"}
         </button>
+        {stored && now !== "" && (
+          <button type="button" className="sm" onClick={() => onChange("")}>
+            Remove
+          </button>
+        )}
+        {stored && now === "" && (
+          <button type="button" className="sm" onClick={() => onChange(stored)}>
+            Keep it
+          </button>
+        )}
       </span>
     );
   return (
@@ -506,7 +522,7 @@ function Secret({
       <input
         type="password"
         autoComplete="off"
-        value={String(value ?? "") === stored ? "" : String(value ?? "")}
+        value={now === stored ? "" : now}
         placeholder="test_… or live_…"
         onChange={(e) => onChange(e.target.value || stored)}
       />
@@ -582,6 +598,7 @@ function ShopForm({
           <Control
             f={f}
             value={get(draft, f.key)}
+            saved={get(state.settings, f.key)}
             onChange={(v) => setDraft(put(draft, f.key, v))}
           />
         </Row>

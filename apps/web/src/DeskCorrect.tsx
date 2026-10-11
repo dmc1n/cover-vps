@@ -2,6 +2,8 @@
 // the vents, a size read wrong, a shape that is missing. Each correction is saved on the cover,
 // recalculated at once and kept as a test case; the same correction on several covers of a
 // group is proposed as the group's rule (RulesBar, on top of the Desk).
+import { deskHref } from "./nav";
+import { useUnsaved } from "./unsaved";
 import { useCallback, useEffect, useState } from "react";
 import { PictureTray, uploadPictures, type Pending } from "./DeskPictures";
 
@@ -106,6 +108,12 @@ export function Corrections({
   const [chips, setChips] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [pics, setPics] = useState<Pending[]>([]);
+  // a correction being written: leaving the cover asks first (its own tabs keep it, ADR-122)
+  useUnsaved(
+    `correct:${id}`,
+    pics.length > 0 || text.trim() !== "",
+    deskHref(id),
+  );
   const load = useCallback(
     () =>
       call<CorrectView>(`/api/desk/${id}/correct`)

@@ -1200,7 +1200,9 @@ function CardView({
             </section>
           </>
         )}
-        {tab === "correct" && (
+        {/* kept mounted on every tab: a correction being written, its sizes and pictures
+            survive a look at Check or History */}
+        <div className="d-correct-host" hidden={tab !== "correct"}>
           <Corrections
             id={card.id}
             canAct={canAct}
@@ -1211,9 +1213,9 @@ function CardView({
             snapshot3d={() => snap.current?.() ?? null}
             drawingUrl={card.pages ? `/api/desk/${card.id}/page/${page}` : null}
             picturesMax={picturesMax}
-            paste={!dialog}
+            paste={!dialog && tab === "correct"}
           />
-        )}
+        </div>
         {tab === "history" && (
           <section className="d-panel d-wide">
             <h3>History</h3>

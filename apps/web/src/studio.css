@@ -1034,3 +1034,12 @@ nav.subnav .subnav-group {
     display: none;
   }
 }
+
+.d-correct-host {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 14px;
+}
+.d-correct-host[hidden] {
+  display: none;
+}
