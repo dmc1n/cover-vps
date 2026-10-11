@@ -204,6 +204,7 @@ cover export models/<id>/ [--save-version]   finished pieces → cut.dxf, cut.sv
                                              (a revision in revisions/<n>/ when cut.dxf changed)
 cover hull|cut|flatten|export ... [--force]  a step skips itself when nothing it depends on changed (ADR-080)
 cover model models/<id>/ [--family F --status S --tags a,b --notes ...]   catalogue info, revisions
+cover model models/<id>/ --no-cover yes|no [--no-cover-reason TEXT]   needs no cover: not in the shop, not on the Desk (ADR-117)
 cover batch [--family F | --ids a,b] [--steps hull,cut,flatten,export] [--set ...]  many models, what changed
 cover improve models/<id>/ [--rounds 4]      take seam proposals while they lower the worst stretch
 cover report [--models DIR --tag T --out DIR]  catalogue report: every model ready / check / failed
@@ -222,6 +223,8 @@ uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT   the Desk picture's r
 uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   drawing, old and new cover side by side
 uv run python scripts/vents_compare.py OUT.png --old DIR --new DIR [--pics ...]   a cover's vents before/after, with the Desk's marked pictures (ADR-101)
 uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--staged DIR]   covers with inner walls rebuilt in staging, vents on the front walls, checked twice (ADR-110)
+uv run python scripts/answers_stage.py SPECS.json --out out/answers [--only a,b]   covers rebuilt in staging from the Desk's answers
+                                             (cover.json changes, per-model files), audit + re-measure + compare picture (ADR-117)
 uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--only a,b]   drawing covers from a shape a person read
                                              (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102;
                                              a person's vents_total there or in drawing_corrections.json survives a rebuild, ADR-116)

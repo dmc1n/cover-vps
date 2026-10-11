@@ -272,9 +272,20 @@ def _cmd_model(args: argparse.Namespace) -> int:
         changes["tags"] = [t for t in args.tags.split(",")]
     if args.notes is not None:
         changes["notes"] = args.notes
+    if args.no_cover_reason is not None:  # a reason marks the model, unless told otherwise
+        if args.no_cover == "no":
+            print("error: a no-cover reason goes with --no-cover yes", file=sys.stderr)
+            return 2
+        changes["no_cover"] = True
+        changes["no_cover_reason"] = args.no_cover_reason
+    if args.no_cover is not None:
+        changes["no_cover"] = args.no_cover == "yes"
     doc = set_info(args.model, changes) if changes else info(args.model)
     tags = ", ".join(doc["tags"]) or "-"
     print(f"{args.model.name}: family {doc['family'] or '-'}, status {doc['status']}, tags {tags}")
+    if doc["no_cover"]:
+        reason = f": {doc['no_cover_reason']}" if doc["no_cover_reason"] else ""
+        print(f"  no cover (not in the shop, not on the Desk){reason}")
     if doc["notes"]:
         print(f"  notes: {doc['notes']}")
     for r in revisions(args.model)[-args.revisions :] if args.revisions else []:
@@ -554,6 +565,9 @@ def _cmd_report(args: argparse.Namespace) -> int:
     if args.tag:
         dirs = [d for d in dirs if args.tag in info(d)["tags"]]
     rows = [grade(d) for d in dirs if (d / "model.json").is_file() or (d / "cover.json").is_file()]
+    for r in rows:  # kept but needs no cover: listed as such, not as failed (and not in the PDF)
+        if r.get("no_cover"):
+            r.update(grade="no cover", reasons=[r.get("no_cover_reason") or "needs no cover"])
     args.out.mkdir(parents=True, exist_ok=True)
     fields = ["id", "grade", "family", "status", "panels", "max_stretch_pct", "max_ease_mm",
               "max_wiggle_mm", "roll_length_mm", "proposals", "reasons"]  # fmt: skip
@@ -564,11 +578,13 @@ def _cmd_report(args: argparse.Namespace) -> int:
             w.writerow([("; ".join(r[f]) if f == "reasons" else r.get(f, "")) for f in fields])
     from coverengine.export.report import write_report
 
-    write_report(args.out / "catalogue.pdf", rows, args.title or args.models.name)
+    covered = [r for r in rows if r["grade"] != "no cover"]
+    write_report(args.out / "catalogue.pdf", covered, args.title or args.models.name)
     counts = {g: sum(r["grade"] == g for r in rows) for g in ("ready", "check", "failed")}
+    none = f", {len(rows) - len(covered)} need no cover" if len(rows) > len(covered) else ""
     print(
         f"{len(rows)} models: {counts['ready']} ready, {counts['check']} to check, "
-        f"{counts['failed']} failed -> {args.out / 'catalogue.pdf'}, catalogue.csv"
+        f"{counts['failed']} failed{none} -> {args.out / 'catalogue.pdf'}, catalogue.csv"
     )
     return 0
 
@@ -807,6 +823,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--status", choices=["draft", "checked", "production"])
     p.add_argument("--tags", help="comma-separated tags ('' for none)")
     p.add_argument("--notes", help="notes for the machine operator")
+    p.add_argument("--no-cover", choices=["yes", "no"],
+                   help="yes: needs no cover (not in the shop, not on the Desk)")  # fmt: skip
+    p.add_argument("--no-cover-reason", help="why it needs no cover (implies --no-cover yes)")
     p.add_argument("--revisions", type=int, default=SHOW_REVISIONS, help="show the last N")
     p.set_defaults(handler=_cmd_model)
 

@@ -138,12 +138,14 @@ def join(
     max_length: float,
     fold_merge: bool,
     gentle_deg: float = 0.0,
+    joinable: NDArray[np.bool_] | None = None,
 ) -> tuple[NDArray[np.int64], list[str], list[list[list[float]]]]:
     """New labels: slivers joined into a neighbour, faces on the same side meeting at a fold of
     at most `gentle_deg` joined (0: never), and (fold_merge) top faces joined while they
     fit the roll. `top[r]` says whether flat face r is part of the top. Returns the labels,
     what was done (in words) and the folds: the two 3D ends of every edge that is now inside a
-    piece."""
+    piece. `joinable[r]` (default all): whether flat face r may take part in a gentle-fold join
+    (a follow cover's curved walls may not, ADR-117)."""
     regions = [int(r) for r in np.unique(label)]
     facets = {r: _facet(hull, r, np.flatnonzero(label == r), bool(top[r])) for r in regions}
     pairs = np.asarray(hull.face_adjacency)
@@ -211,7 +213,7 @@ def join(
     for angle, a, b in sorted(
         (fold_deg(facets[a], facets[b]), a, b)
         for (a, b) in shared
-        if facets[a].top == facets[b].top
+        if facets[a].top == facets[b].top and (joinable is None or (joinable[a] and joinable[b]))
     ):
         if angle > gentle_deg:
             break

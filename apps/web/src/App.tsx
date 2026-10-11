@@ -325,6 +325,14 @@ function ModelList() {
                 </td>
                 <td title={m.reasons.join("\n")}>
                   <span className={`badge grade-${m.grade}`}>{m.grade}</span>
+                  {m.no_cover && (
+                    <span
+                      className="badge no-cover"
+                      title={m.no_cover_reason || "not in the shop, not on the Desk"}
+                    >
+                      no cover
+                    </span>
+                  )}
                 </td>
                 <td className="nowrap">
                   {m.category ? m.category.split(" › ")[1] : ""}

@@ -350,7 +350,10 @@ def preview_glb(product: str, given: dict[str, Any], params: EffectiveParams) ->
 def nearest(
     product: str, given: dict[str, Any], models: Path, top: int = 3
 ) -> list[dict[str, Any]]:
-    """The SUNS models nearest in kind and size: their covers are made and tested."""
+    """The SUNS models nearest in kind and size: their covers are made and tested (a model
+    marked "no cover" is never one of them)."""
+    from coverengine.catalogue import is_no_cover
+
     want = {"dining_set": "Tafels", "round_set": "Tafels", "sofa": "Sofasets",
             "corner_sofa": "Sofasets", "lounger": "Ligbedden", "item": None}[product]  # fmt: skip
     target = _bbox_cm(product, given)
@@ -360,6 +363,8 @@ def nearest(
             cover = json.loads((d / "cover.json").read_text())
             size = json.loads((d / "model.json").read_text())["size_mm"]
         except (OSError, ValueError, KeyError):
+            continue
+        if is_no_cover(cover):
             continue
         cat = str(cover.get("category") or "").split(" › ")[-1]
         if want and cat != want:

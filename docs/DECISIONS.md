@@ -3810,6 +3810,77 @@ Each cover was rebuilt in staging (`out/answers/<model>/`), checked twice (`cove
   balloons check (a table without a balloon, as live).
 
 
+## ADR-117 — Rens's answers of 9 Oct on the SUNS covers: box tops cut to the roll, straight wall tops, a no-cover mark
+
+Rens answered the Desk questions about the SUNS covers rejected on 8 Oct (questions 1–3, 12,
+15–23; ~/cover-data/answers-2026-10-09.json, the latest answer per question). Each cover was
+built again in staging (`out/answers/<model>/`, `scripts/answers_stage.py`), checked twice
+(`cover audit`, `scripts/fewer_check.py`) and looked at next to Rens's marked picture
+(`out/answers/compare/`). Results per cover, with the answer to Rens in Dutch, in
+`out/answers/results.json`. Nothing is replaced live by this change.
+
+**General rules (ADR-055: a rule, a test, an audit check and an AI lesson each).**
+- **A box top wider than the roll is cut into strips** (question 16, the Portofino daybed's
+  1.85 m top). The arrangements and the follow covers already did this; a plain (convex) box
+  cover only reported it. Now the hull step draws lines across every too-wide top face's slope
+  (`hull.json` box.roll_cuts) and the cut splits the piece there after its gentle-fold joins, so
+  the seams run downhill and a join never undoes a split. Test:
+  `test_a_box_top_wider_than_the_roll_is_cut_in_strips`.
+- **Gentle folds on follow covers too** (the Nuna's 10 degree gable stayed two pieces). The
+  ADR-099 join now also runs on a follow cover's flat top faces (and on a model built from its
+  parts' plan, below); its walls, curved round the outline, keep their seams. The audit's
+  *gentle folds* check leaves out pieces that bend more than the limit within themselves (a
+  follow cover's rounded corner is no pair of flat faces: the Fiave L-part was flagged falsely).
+- **A join made at the Desk is a fold in pen** (ADR-082's `part_edits.json`): two flat pieces a
+  person joins get the same FOLD line as the engine's own joins (the Sato bench, question 18).
+- **Creases as seams only for organic covers** (question 19, S53 and S60: "for covers with an
+  organic shape like these, which have curved seams, follow the drawing; not for all covers").
+  `seams.given_crease_deg` is 0 by default; the new family preset `organic`
+  (`config/presets/organic.yaml`) sets 20 and S53/S60 join it with `"family": "organic"`.
+  The rule-13 clash (their front seam is not level) is thereby accepted for this shape type
+  only.
+- **No cover** (question 12, the Portofino daybed with roof): `"no_cover": true` (and
+  `"no_cover_reason"`) at the top of a model's cover.json. The model stays, but the shop's
+  matching (cards, existing covers, similar covers, B2B, photo suggestions, drawing covers)
+  never offers it and the Desk leaves it out of its queue and refuses approve/reject/produced
+  (409); `cover report` counts it as "no cover". Set with `cover model DIR --no-cover yes
+  --no-cover-reason TEXT` or `PUT /api/models/{id}/info`; the studio's list shows a badge.
+  Marking does not make any step run again (stepcache). Tests: `engine/tests/test_no_cover.py`,
+  `apps/api/tests/test_no_cover_api.py`.
+
+**Per model, by hand (the owner's answers "only for these models"):**
+- `seams.straight_wall_tops` (questions 22 and 23, Sorrento 2-seater, Avero 2-seater, Sorrento
+  3-seater with corner): every wall's top edge one straight line from corner to corner. The
+  box's shape stays; the part of a wall above that line goes to the roof pieces as flaps folded
+  down, split by an upright seam under each kink (`hull/hand.py` `straight_tops`). Every piece is
+  flat faces joined along edges, so it lies flat exactly. A real straight top edge with a ridge
+  meeting the wall in its middle cannot be made of flat faces (two planes that meet a wall in
+  one line are one plane), so the ridge stays the box's own.
+- `hull.box_extra_faces` (question 3, the Nuna: "a chamfer instead of a bulge"): faces added by
+  hand to the box as outward directions ("0 1 1" = a 45 degree chamfer at the back), each just
+  clear of the furniture, mirrored on a symmetric cover.
+- `plan_members.json` (question 21, the Vento lounge: "redo it, like the other L covers"): one
+  model built like an arrangement (ADR-095) from its parts' plan rectangles, given by hand in the
+  model's frame: an L with a square inner corner, each arm's top sloping to its own front.
+- `box_shape.json`: a box cover given piece by piece, corner by corner (twisted quads become
+  ruled patches), checked like any cover (furniture inside, water on a height grid, the roll);
+  for an approver's layout no rule can make. Not used live yet; tested.
+- Plain per-model settings: Portofino 2-seater `features.vents_total: 4` (question 15: one vent
+  per long side for this cover; the company rule stays one per full metre); Sato bench
+  `part_edits.json` joining the 10 cm strip to the top (question 18: "one top panel of about 94
+  cm with a fold line"; `seams.fold_join_max_deg` 30, the option's wording, would also have
+  joined the 24 degree back slope, so the join is made by name instead).
+
+**Doubt, to the owner:** the Vento angled 2-seater (question 1). Rens's sloped seam from the
+back ridge down to the front corner makes a hip at the angled end; a flat face through those
+lines passes 15 to 20 cm inside the end's back cushion (82–86 cm high right next to the end
+wall), so it cannot be built as drawn without the cover cutting into the furniture.
+
+**Better later:** a ridge that meets a wall's straight top edge in its middle (twisted roof
+pieces, `box_shape.json`) where a person draws it; the gentle-fold join for arrangements too
+(their approved covers would change, ADR-115); an angled member in `plan_members.json`
+(rectangles only today).
+
 ## ADR-118 — An existing cover is ordered directly: its own name, price and delivery promise
 
 The owner (9 Oct 2026, preview): "I chose an existing cover, 'SUNS cover dining tables – Table

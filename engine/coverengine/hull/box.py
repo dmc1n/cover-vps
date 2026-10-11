@@ -328,6 +328,25 @@ def choose(
     return int(rule["pieces"]), "rule", why
 
 
+def extra_faces(params: EffectiveParams) -> list[Array]:
+    """`hull.box_extra_faces`: the outward directions of faces added by hand ("x y z; ...")."""
+    from coverengine.errors import CoverError
+
+    out = []
+    for item in str(params["hull.box_extra_faces"]).split(";"):
+        if not item.strip():
+            continue
+        try:
+            n = np.array([float(c) for c in item.replace(",", " ").split()], np.float64)
+        except ValueError as exc:
+            raise CoverError(f"hull.box_extra_faces: {item!r} is not three numbers") from exc
+        if n.shape != (3,) or np.linalg.norm(n) == 0 or n[2] < -UPRIGHT_NZ:
+            raise CoverError(f"hull.box_extra_faces: {item!r} is not an outward direction "
+                             "(x y z, not pointing down)")  # fmt: skip
+        out.append(n / np.linalg.norm(n))
+    return out
+
+
 def mesh_of(box: Box, planes: list[Array]) -> trimesh.Trimesh:
     """The box surface without its bottom, in triangles of at most EDGE_MM."""
     solid = box.solid(planes)
@@ -359,6 +378,7 @@ def box_hull(
     rows = options(box, sets, model)
     pieces, by, why = choose(rows, params, product)
     planes = next(s for s in sets if len(s) - 1 == pieces)
+    planes = planes + [box.plane(m) for n in extra_faces(params) for m in box.mirror(n)]
     planes = drain(box, planes, _p(params, "hull.min_slope_deg"))
     mesh = mesh_of(box, planes)
     warnings = []
