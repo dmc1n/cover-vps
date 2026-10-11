@@ -72,3 +72,17 @@ def test_vents_without_a_number_are_counted_from_their_arrows(tmp_path: Path) ->
     doc.save(tmp_path / "v.pdf")
     got = features(tmp_path / "v.pdf")
     assert (got["vents_total"], got["vents_from"]) == (3, "arrows")
+
+
+def test_a_word_number_inside_another_word_is_no_vent_count(tmp_path: Path) -> None:
+    """S20 (Rens, 9 Oct 2026): "Max Height Air Pocket" was read as "eight air pocket", 8 vents,
+    where the drawing draws 4 arrows. A number before the label is a word of its own."""
+    from coverengine.drawing_vectors import VENTS, features
+
+    assert [m.group(1) for m in VENTS.finditer("33.07in Max Height Air Pocket")] == []
+    assert [m.group(1) for m in VENTS.finditer("Max Height 4 Air Pocket")] == ["4"]
+    assert [m.group(1) for m in VENTS.finditer("eight air vents")] == ["eight"]
+    doc = pymupdf.open()
+    doc.new_page().insert_text((60, 500), "Max Height Air Pocket")
+    doc.save(tmp_path / "s20.pdf")
+    assert features(tmp_path / "s20.pdf")["vents_from"] != "written"

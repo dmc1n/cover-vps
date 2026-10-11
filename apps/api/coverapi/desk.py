@@ -247,10 +247,10 @@ def _placement(d: Path) -> dict[str, Any]:
 
 def _changed_since_approval(d: Path, st: dict[str, Any]) -> list[str]:
     """What changed in an approved arrangement since its approval: its cut file, its placement.
-    Empty when nothing did (or nothing was recorded, as before ADR-115)."""
+    A missing approved cut fingerprint always requires a fresh approval."""
     ok = st.get("approved") or {}
     out = []
-    if ok.get("cut") and ok["cut"] != cut_fingerprint(d):
+    if not ok.get("cut") or ok["cut"] != cut_fingerprint(d):
         out.append("the cut file")
     if ok.get("placement") and ok["placement"] != _placement(d):
         out.append("the members or the plan")
@@ -547,10 +547,15 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
         who = user.name or user.username
         entry: dict[str, Any] = {"action": a.action, "by": who, "time": now}
         if a.action == "approve":
+            cut = cut_fingerprint(d) if is_arrangement(d) else None
+            if is_arrangement(d) and cut is None:
+                raise HTTPException(
+                    400, "Build the arrangement's cutting file before approving it."
+                )
             st["status"] = "approved"
             st["approved"] = {"by": who, "time": now}
             if is_arrangement(d):  # what the approval is for (ADR-115)
-                st["approved"] |= {"cut": cut_fingerprint(d), "placement": _placement(d)}
+                st["approved"] |= {"cut": cut, "placement": _placement(d)}
             st.pop("rejected", None)
         elif a.action == "reject":
             bad = [r for r in a.reasons if r not in REASONS]

@@ -21,6 +21,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+from coverengine.staging import guard_staging_output
+
 
 def _pieces(model: Path) -> int | None:
     fin = model / "finished.json"
@@ -39,6 +41,7 @@ def main() -> int:
     ap.add_argument("--only")
     ap.add_argument("--workers", type=int, default=2)
     a = ap.parse_args()
+    guard_staging_output(a.out, a.models)
     a.out.mkdir(parents=True, exist_ok=True)
     only = set(a.only.split(",")) if a.only else None
     jobs = []
@@ -47,6 +50,7 @@ def main() -> int:
         if only and name not in only:
             continue
         src, dst = a.models / name, a.out / name
+        guard_staging_output(dst, src)
         if dst.exists():
             shutil.rmtree(dst)
         shutil.copytree(src, dst, ignore=shutil.ignore_patterns("revisions", "desk-cache"))
