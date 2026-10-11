@@ -1008,7 +1008,7 @@ def shot_cut(a, d, reel):
     dirv = Vector((*(a1 - a0), 0)).normalized()
     side = Vector((-dirv.y, dirv.x, 0))
     head.rotation_euler.z = math.atan2(dirv.y, dirv.x)
-    cam, aim = camera(55, 4.0, portrait=True)
+    cam, aim = camera(55, 5.6, portrait=True)
     run = 0.9  # metres the knife cuts in the clip
     total = float(np.linalg.norm(a1 - start))
 
@@ -1018,8 +1018,8 @@ def shot_cut(a, d, reel):
         live.data.bevel_factor_end = max(frac, 1e-3)
         p = Vector(path3[0]).lerp(Vector(path3[1]), frac)
         head.location = p
-        cam.location = p - dirv * 0.75 - side * 0.65 + Vector((0, 0, 0.5))
-        aim.location = p + dirv * 0.12 + Vector((0, 0, 0.03))
+        cam.location = p - dirv * 0.38 - side * 0.32 + Vector((0, 0, 0.2))
+        aim.location = p + dirv * 0.05 + Vector((0, 0, 0.012))
 
     return frame
 
@@ -1054,7 +1054,7 @@ def shot_vent(a, d, reel):
     set_points(cov, draped(d))
     vents = reel.get("vents", [])
     v = next((x for x in vents if x["piece"] == "skirt-left"), vents[0])
-    vent_hood(v, hood_material(a.assets, *v["size"]))
+    vent_hood(v, hood_material(a.assets, *v["size"]), depth=0.075)
     c, n = Vector(v["centre"]), Vector(v["normal"])
     side = Vector(v["up"]).cross(n).normalized()
     cam, aim = camera(70, 3.5, portrait=True)
@@ -1062,7 +1062,7 @@ def shot_vent(a, d, reel):
     def frame(f, n_):
         k = ease((f - 1) / (n_ - 1))
         sweep = -0.5 + 0.7 * k
-        cam.location = c + n * 0.6 + side * (0.25 + 0.3 * sweep) + Vector((0, 0, -0.11))
+        cam.location = c + n * 0.55 + side * (0.42 + 0.25 * sweep) + Vector((0, 0, -0.12))
         aim.location = c + Vector((0, 0, -0.07))
 
     return frame
@@ -1200,7 +1200,7 @@ def ibiza_scene(a: argparse.Namespace):
     bg.inputs["Strength"].default_value = 0.45
     link(nt, sky.outputs[0], bg.inputs["Color"])
     sun = bpy.data.lights.new("sun", "SUN")
-    sun.energy, sun.angle = 4.5, math.radians(1.0)
+    sun.energy, sun.angle = 6.5, math.radians(1.0)
     sun.color = (1.0, 0.8, 0.6)
     so = bpy.data.objects.new("sun", sun)
     el, az = math.radians(9.0), math.radians(SUN_AZ)
