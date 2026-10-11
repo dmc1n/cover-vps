@@ -800,6 +800,12 @@ function Cart({
   setLines: (l: Line[]) => void;
   onOrdered: () => void;
 }) {
+  const [checkoutKey] = useState(() => {
+    const storageKey = `b2b-checkout-${me.user.email}`;
+    const key = sessionStorage.getItem(storageKey) || crypto.randomUUID();
+    sessionStorage.setItem(storageKey, key);
+    return key;
+  });
   const [po, setPo] = useState("");
   const [note, setNote] = useState("");
   const [addressId, setAddressId] = useState<string>("");
@@ -892,6 +898,7 @@ function Cart({
                     "POST",
                     "order",
                     {
+                      idempotency_key: checkoutKey,
                       lines: lines.map((l) => ({ quote_id: l.quote.id, qty: l.qty })),
                       address_id: addressId || null,
                       po,
@@ -900,6 +907,7 @@ function Cart({
                     },
                     me.csrf,
                   );
+                  sessionStorage.removeItem(`b2b-checkout-${me.user.email}`);
                   setDone(r);
                   onOrdered();
                 } catch (err) {

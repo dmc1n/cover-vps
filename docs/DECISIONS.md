@@ -3071,6 +3071,17 @@ is public." Handbook: docs/handbook/b2b.md; open questions: QUESTIONS 72.
     "order again" prices every line anew at today's prices.
   - A confirmation goes to the buyer (in their language), the company's e-mail and the alert
     address.
+- **Checkout reliability (11 October 2026):** the client keeps one `idempotency_key` per
+  checkout in session storage and resends it after a failed response. A unique company/key
+  index returns the original order, even if quotes or settings have since changed. The B2B
+  order, studio rows, links and per-line dispatch outbox commit in one SQLite transaction.
+  Additive app.db migrations use the existing PRAGMA/ALTER approach; old orders have no key
+  and are not automatically re-dispatched. Production starts after commit, serially per app,
+  marking each line dispatched only on success. Startup retries pending lines; `produce()`
+  already returns an existing model for a completed production order. A crash during external
+  production work can retry that work: this outbox gives recoverable delivery, not an atomic
+  transaction across SQLite and filesystem/job side effects. A transactional job queue would
+  close that remaining window if needed later.
 - **Online payment for B2B:** a switch is kept (`b2b.online_payment`, off); the order API
   refuses "online" until it is built (one Mollie payment for several order rows needs a
   webhook that handles a group).

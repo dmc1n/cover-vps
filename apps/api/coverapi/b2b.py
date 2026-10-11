@@ -33,6 +33,8 @@ import secrets
 import sqlite3
 import threading
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -219,6 +221,7 @@ class LineIn(BaseModel):
 
 
 class OrderIn(BaseModel):
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=128)
     lines: list[LineIn] = Field(min_length=1, max_length=100)
     address_id: str | None = Field(default=None, max_length=40)  # none: the invoice address
     po: str = Field(default="", max_length=60)
@@ -274,6 +277,18 @@ class Store:
         self._lock = threading.Lock()
         with self._db() as db:
             db.executescript(SCHEMA)
+            # app.db migrations follow the shop's additive PRAGMA/ALTER approach.
+            have = {r[1] for r in db.execute("PRAGMA table_info(b2b_orders)")}
+            if "idempotency_key" not in have:
+                db.execute("ALTER TABLE b2b_orders ADD COLUMN idempotency_key TEXT")
+            db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS b2b_checkout_key "
+                "ON b2b_orders(company_id, idempotency_key)"
+            )
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS b2b_dispatch ("
+                "order_id INTEGER PRIMARY KEY, dispatched INTEGER NOT NULL DEFAULT 0)"
+            )
 
     def _db(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
@@ -527,16 +542,43 @@ class Store:
             )
 
     # orders
-    def add_order(self, row: dict[str, Any]) -> int:
-        with self._lock, self._db() as db:
-            cur = db.execute(
-                "INSERT INTO b2b_orders (created, company_id, user_id, po, note, address, lines, "
-                "net_eur, vat_eur, gross_eur, payment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (time.time(), row["company_id"], row["user_id"], row["po"], row["note"],
-                 json.dumps(row["address"]), json.dumps(row["lines"]), row["net_eur"],
-                 row["vat_eur"], row["gross_eur"], row["payment"]),
-            )  # fmt: skip
-            return int(cur.lastrowid or 0)
+    def checkout(self, cid: int, key: str, c: sqlite3.Connection) -> dict[str, Any] | None:
+        row = c.execute(
+            "SELECT * FROM b2b_orders WHERE company_id=? AND idempotency_key=?", (cid, key)
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "order": row["id"],
+            "net_eur": row["net_eur"],
+            "vat_eur": row["vat_eur"],
+            "gross_eur": row["gross_eur"],
+            "lines": json.loads(row["lines"]),
+            "address": json.loads(row["address"]),
+            "po": row["po"],
+        }
+
+    def add_order(self, row: dict[str, Any], key: str, db: sqlite3.Connection) -> int:
+        cur = db.execute(
+            "INSERT INTO b2b_orders (created, company_id, user_id, po, note, address, lines, "
+            "net_eur, vat_eur, gross_eur, payment, idempotency_key) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                time.time(),
+                row["company_id"],
+                row["user_id"],
+                row["po"],
+                row["note"],
+                json.dumps(row["address"]),
+                json.dumps(row["lines"]),
+                row["net_eur"],
+                row["vat_eur"],
+                row["gross_eur"],
+                row["payment"],
+                key,
+            ),
+        )
+        return int(cur.lastrowid or 0)
 
     def order_lines(self, bid: int, cid: int) -> list[dict[str, Any]] | None:
         with self._db() as db:
@@ -552,10 +594,6 @@ class Store:
                 (cid,),
             ).fetchone()
         return int(n[0]), round(float(n[1]), 2)
-
-    def set_lines(self, bid: int, lines: list[dict[str, Any]]) -> None:
-        with self._lock, self._db() as db:
-            db.execute("UPDATE b2b_orders SET lines=? WHERE id=?", (json.dumps(lines), bid))
 
     def orders(self, cid: int | None = None, limit: int = 200) -> list[dict[str, Any]]:
         """The company's B2B orders (all, for the admin), newest first, with the status of
@@ -1027,6 +1065,13 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
     def place(
         req: OrderIn, user: dict[str, Any], company: dict[str, Any], request: Request
     ) -> dict[str, Any]:
+        key = req.idempotency_key
+        if not key or not key.strip():
+            raise HTTPException(400, "a checkout idempotency_key is required")
+        with db._db() as c:
+            original = db.checkout(company["id"], key, c)
+        if original is not None:
+            return original
         s = settings()
         ps = prices.current(auth)
         if req.payment == "online" and not s["online_payment"]:
@@ -1065,10 +1110,6 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         if not (addr.get("street") and addr.get("city")):
             raise HTTPException(400, "please give a delivery address")
         vat = round(net * vat_pct(ps, company) / PERCENT, 2)
-        bid = db.add_order({"company_id": company["id"], "user_id": user["id"],
-                            "po": req.po.strip(), "note": req.note.strip(), "address": addr,
-                            "lines": lines, "net_eur": net, "vat_eur": vat,
-                            "gross_eur": round(net + vat, 2), "payment": "account"})  # fmt: skip
         # each line an order of the studio's own, flagged B2B: the same way into production
         customer_doc = {
             "name": addr.get("name") or company["name"], "email": user["email"],
@@ -1077,7 +1118,17 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
             "note": req.note, "terms": True, "lang": req.lang, "company": company["name"],
             "vat_number": company.get("vat_number") or "",
         }  # fmt: skip
-        with sqlite3.connect(auth.path) as c:
+        with sqlite3.connect(auth.path, timeout=10) as c:
+            c.row_factory = sqlite3.Row
+            c.execute("BEGIN IMMEDIATE")
+            original = db.checkout(company["id"], key, c)
+            if original is not None:
+                return original
+            bid = db.add_order({"company_id": company["id"], "user_id": user["id"],
+                                "po": req.po.strip(), "note": req.note.strip(), "address": addr,
+                                "lines": lines, "net_eur": net, "vat_eur": vat,
+                                "gross_eur": round(net + vat, 2),
+                                "payment": "account"}, key, c)  # fmt: skip
             for i, (line, rec) in enumerate(zip(lines, records, strict=True)):
                 data = {"customer": customer_doc, "quote": rec, "shipping_eur": 0.0,
                         "lang": req.lang,
@@ -1093,33 +1144,53 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
                      line["total_eur"], time.time()),
                 )  # fmt: skip
                 line["order_id"] = int(cur.lastrowid or 0)
-        db.set_lines(bid, lines)
+                c.execute("INSERT INTO b2b_dispatch(order_id) VALUES (?)", (line["order_id"],))
+            c.execute("UPDATE b2b_orders SET lines=? WHERE id=?", (json.dumps(lines), bid))
         auth.log(who(user), "b2b order", {"order": bid, "lines": len(lines), "net_eur": net,
                                           "po": req.po})  # fmt: skip
-        produce_later([x["order_id"] for x in lines])
+        produce_later()
         doc = {"order": bid, "net_eur": net, "vat_eur": vat, "gross_eur": round(net + vat, 2),
                "lines": lines, "address": addr, "po": req.po.strip()}  # fmt: skip
         confirm_mails(doc, user, company, req.lang, s)
         return doc
 
-    def produce_later(order_ids: list[int]) -> None:
-        """An order on account goes into production like a paid one (shop.produce), in the
-        background so the customer is not kept waiting."""
-        if not settings()["auto_produce"]:
-            return
-        produce = getattr(app.state, "shop_produce", None)
-        if produce is None:
+    dispatch_lock = threading.Lock()
+
+    def produce_later() -> None:
+        """Drain the committed outbox. Failed/interrupted lines remain for restart recovery."""
+        if not settings()["auto_produce"] or getattr(app.state, "shop_produce", None) is None:
             return
 
         def run() -> None:
-            for oid in order_ids:
-                try:
-                    produce(oid)
-                except Exception as exc:  # noqa: BLE001 - the studio is told; the order stays
-                    studio_mail(f"B2B order line {oid}: not into production",
-                                f"{exc}\nAdmin → Orders → Into production.")  # fmt: skip
+            with dispatch_lock:
+                with sqlite3.connect(auth.path) as c:
+                    pending = c.execute(
+                        "SELECT order_id FROM b2b_dispatch WHERE dispatched=0"
+                    ).fetchall()
+                for (oid,) in pending:
+                    try:
+                        app.state.shop_produce(oid)
+                        with sqlite3.connect(auth.path) as c:
+                            c.execute(
+                                "UPDATE b2b_dispatch SET dispatched=1 WHERE order_id=?", (oid,)
+                            )
+                    except Exception as exc:  # noqa: BLE001 - retain the pending line
+                        studio_mail(
+                            f"B2B order line {oid}: not into production",
+                            f"{exc}\nAdmin → Orders → Into production.",
+                        )
 
         threading.Thread(target=run, daemon=True, name="b2b-produce").start()
+
+    previous_lifespan = app.router.lifespan_context
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI) -> AsyncIterator[Any]:
+        async with previous_lifespan(application) as state:
+            produce_later()
+            yield state
+
+    app.router.lifespan_context = lifespan
 
     def confirm_mails(
         doc: dict[str, Any], user: dict[str, Any], company: dict[str, Any], lang: str,
