@@ -6,7 +6,7 @@
 // ADR-106: the rest of the frames load only once the story comes near the screen, so they do
 // not share the line with the first screen.
 //
-// ADR-116: the pictures carry no falling rain (only the wet look, which may follow the scroll);
+// ADR-120: the pictures carry no falling rain (only the wet look, which may follow the scroll);
 // every falling drop is RainLayer's, drawn by the clock, so it falls the same whether the visitor
 // stands still or scrolls either way. An upright screen loads the set's upright pictures
 // (`<set>m-001.webp`: 600 × 900 cut round the cover at full sharpness) when there are any.

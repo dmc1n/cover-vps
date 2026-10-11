@@ -1,4 +1,4 @@
-"""The scroll story's picture set from rendered frames (ADR-071, ADR-116): 360 WEBP pictures for
+"""The scroll story's picture set from rendered frames (ADR-071, ADR-120): 360 WEBP pictures for
 the desktop (`NAME-001.webp` …, 1600 × 900) and for upright screens (`NAMEm-001.webp`: 600 × 900
 cut round the cover, which the render frames at 0.6 of the width: what a phone shows of a wide
 picture, at full sharpness), plus a strip to look at the set at a glance.

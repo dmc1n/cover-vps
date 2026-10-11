@@ -47,7 +47,7 @@ def args() -> argparse.Namespace:
     ap.add_argument(
         "--no-drops",
         action="store_true",
-        help="no falling rain in the pictures: the page draws it in time (ADR-116)",
+        help="no falling rain in the pictures: the page draws it in time (ADR-120)",
     )
     return ap.parse_args(sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else [])
 
