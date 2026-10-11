@@ -132,7 +132,10 @@ async def landed(page: Page, want: str) -> bool:
 async def shot(page: Page, width: int, name: str) -> None:
     os.makedirs(f"{SHOTS}/{width}", exist_ok=True)
     await page.wait_for_timeout(600)
-    await page.screenshot(path=f"{SHOTS}/{width}/{name}.png", full_page=True, timeout=120_000)
+    try:
+        await page.screenshot(path=f"{SHOTS}/{width}/{name}.png", full_page=True, timeout=120_000)
+    except Exception:  # noqa: BLE001 - a long page with software WebGL: the screen only
+        await page.screenshot(path=f"{SHOTS}/{width}/{name}.png", timeout=120_000)
 
 
 async def header_one_line(page: Page, where: str) -> None:
@@ -298,7 +301,10 @@ async def main() -> int:
                         await as_other(page, user, w)
                 except Exception as exc:  # noqa: BLE001 - one role's failure, the rest still run
                     problems.append(f"{user} {w}: {type(exc).__name__}: {exc}"[:400])
-                    await page.screenshot(path=f"{SHOTS}/fail-{user}-{w}.png")
+                    try:
+                        await page.screenshot(path=f"{SHOTS}/fail-{user}-{w}.png", timeout=60_000)
+                    except Exception:  # noqa: BLE001 - the failure is already recorded
+                        pass
                 await ctx.close()
         await browser.close()
     print("\n".join(["", "PROBLEMS:", *problems]) if problems else "\nall good")

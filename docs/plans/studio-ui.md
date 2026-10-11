@@ -566,9 +566,18 @@ approvals, no workshop role, the defaults read-only, the start pages as below.
   under Mail; secrets masked with Replace; unsaved-edit warnings; the API's rights unchanged.
   Not taken: merging Users & rights with Logins & audit log into one tab (the owner named them
   as two tabs).
+- **Codex's adversarial review of the branch** found three things, all fixed: the Mollie key's
+  *Keep* could write an empty key after a first save (the control now follows the stored,
+  shortened key, with an explicit *Remove*); a correction being written was lost when the Desk
+  card's tab changed (Corrections now stays mounted, and leaving the cover with one asks);
+  Back/Forward skipped the unsaved-edits question (now asked, and the address restored).
 - **Checks:** `apps/web/e2e/uinav.py` (every menu item per role, every old address, a cover's
   and a card's tabs, 1440 and 820 px, screenshots in `out/uinew/`); the existing browser checks
-  follow the new addresses.
+  follow the new addresses and pass on scratch copies: desk_pictures (Chromium, WebKit, Firefox
+  at 1440 and 820, and Edge with the office policies), questions (the same four), measure,
+  prices, priceimport, arrangements_desk. b2b: the admin's part (Shop → B2B customers, invite,
+  a fixed price) passes; the buyer's catalogue stays empty on the scratch copies at hand (no
+  published B2B list), which this change does not touch.
 
 ### Inventory: every screen, action and field, and where it is now
 

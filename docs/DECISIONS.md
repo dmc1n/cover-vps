@@ -4082,6 +4082,12 @@ layout now, decide what I can decide, keep business choices as they are, and con
   and a card's 4 tabs, the header on one line, at 1440 and 820 px, with screenshots
   (out/uinew/). desk_pictures, questions, measure, prices, priceimport, arrangements_desk, b2b
   and flow follow the new addresses.
+- **Codex:** a second opinion on the plan (taken: an admin's remembered start page, Photo test
+  under Shop → Tools, nothing buried above the tabs, quick Vents/Dimensions toggles, 40 px touch
+  targets, secrets masked with Replace, unsaved-edit guards; not taken: Users & rights and Logins
+  & audit log as one tab, since the owner named two) and an adversarial review of the branch
+  (fixed: the Mollie key's Keep after a first save, a correction lost on a card tab change,
+  Back/Forward past unsaved edits).
 - **Not done (owner questions or later steps):** one approval (Q2), the workshop role and page
   (Q4), owner-editable defaults (Q5, step 4), one approver list (step 3), Dutch UI (Q1: stays
   English), Covers merged into one filter row and the search over everything (steps 8–9).
