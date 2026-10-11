@@ -577,7 +577,9 @@ approvals, no workshop role, the defaults read-only, the start pages as below.
   at 1440 and 820, and Edge with the office policies), questions (the same four), measure,
   prices, priceimport, arrangements_desk. b2b: the admin's part (Shop → B2B customers, invite,
   a fixed price) passes; the buyer's catalogue stays empty on the scratch copies at hand (no
-  published B2B list), which this change does not touch.
+  published B2B list), which this change does not touch. `make e2e` (flow.py) follows the new
+  tabs up to the approval of the definitive drawing, which fails on the test chair in the API
+  ("cannot save with zero pages", the stamped PDF), unrelated to the layout: to look at.
 
 ### Inventory: every screen, action and field, and where it is now
 
