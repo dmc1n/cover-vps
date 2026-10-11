@@ -66,7 +66,7 @@ def surface(pieces: list[Any], shape: str, params: EffectiveParams) -> trimesh.S
     stretch = float(params["drawn.merge_max_stretch_pct"])  # type: ignore[arg-type]
     if shape in JOINABLE:
         parts = merge(parts, roll_mm(params), float(params["drawn.merge_fold_deg"]),  # type: ignore[arg-type]
-                      stretch)  # fmt: skip
+                      stretch, seam_mm=float(params["tolerance.cover_mm"]))  # type: ignore[arg-type]  # fmt: skip
     # no slivers, whoever made the seams (ADR-097)
     joined = absorb_slivers(parts, float(params["seams.min_piece_width_mm"]), roll_mm(params),  # type: ignore[arg-type]
                             stretch)  # fmt: skip
@@ -362,6 +362,17 @@ def ai_read(pdf: Path, params: EffectiveParams, code: str) -> dict[str, Any]:
             "reasons": []}  # fmt: skip
 
 
+def person_vents(given: dict[str, Any] | None, corrections: dict[str, Any]) -> int | None:
+    """The vent count a person decided for this drawing cover, which a rebuild keeps (ADR-116):
+    `vents_total` in the shape a person read (drawing_shape.json) or in drawing_corrections.json.
+    The reader's count stays in drawing_features.json as `vents_read`."""
+    for doc in (corrections, given or {}):
+        n = doc.get("vents_total")
+        if n:
+            return int(n)
+    return None
+
+
 def _write(path: Path, doc: Any) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(doc, indent=1, default=str) + "\n", encoding="utf-8")
@@ -391,13 +402,19 @@ def build(
         shutil.copyfile(pdf, ref)
     code = code or model_dir.name.removeprefix("drawing-").upper()
     feats = features(ref)
-    _write(model_dir / "drawing_features.json", feats)
     fixes = model_dir / "drawing_corrections.json"
-    corrections = json.loads(fixes.read_text()).get("sizes") if fixes.is_file() else None
+    fix_doc = json.loads(fixes.read_text()) if fixes.is_file() else {}
+    corrections = fix_doc.get("sizes")
     given = None if ai else drawing_given.load(model_dir)
+    person = person_vents(given, fix_doc)
+    if person:  # a person's count wins over the reader's (Rens, 9 Oct 2026: C24/C25 9, S25 5)
+        feats["vents_read"], feats["vents_total"] = feats.get("vents_total"), person
+        feats["vents_from"] = "a person"
+    _write(model_dir / "drawing_features.json", feats)
     res: dict[str, Any]
     if given is not None:  # a person read the shape from the drawing (drawing_shape.json)
-        join = (float(params["drawn.merge_fold_deg"]), float(params["drawn.merge_max_stretch_pct"]))  # type: ignore[arg-type]
+        join = (float(params["drawn.merge_fold_deg"]), float(params["drawn.merge_max_stretch_pct"]),  # type: ignore[arg-type]
+                float(params["tolerance.cover_mm"]))  # type: ignore[arg-type]  # fmt: skip
         res = {"status": "built", "reader": "given", "shape": "given",
                "pieces": drawing_given.build(given, roll_mm(params),
                                              float(params["seams.max_skirt_panel_mm"]), join),  # type: ignore[arg-type]

@@ -16,7 +16,9 @@ The kinds, sizes in cm, x along the back, y towards the front, z up:
   each rising and then level or falling, so each class is the lowest of straight lines). This
   is the Blocchi family (D1, D2, D5, D6, S26, S27): a back chamfer, a flat strip, a long slope
   to the front, and ends that lean in. The seams fall where one plane meets the next, so they
-  are straight lines (on a round front, a cone);
+  are straight lines (on a round front, a cone). `free`: classes of edges with a wall but no
+  profile of their own, whose rim follows the other edges' planes (D5: one straight slope from
+  the back over a half-round front, the rim 40 cm in the middle and higher at the sides);
 - "faces": flat pieces given corner by corner (`pieces`: {name: [[[x, y, z], ...], ...]});
 - "angled": two arms of one cross-section meeting at an angle (S21, an angled sofa);
 - "revolve": a round cover from a side view (`profile`: [[radius, height], ...] from the hem up
@@ -59,11 +61,11 @@ def build(
     spec: dict[str, Any],
     roll_mm: float,
     wall_max_mm: float = 0.0,
-    join: tuple[float, float] | None = None,
+    join: tuple[float, ...] | None = None,
 ) -> list[Piece]:
-    """The pieces of a shape a person read from the drawing. `join` (fold degrees, stretch %):
-    a swept shape's own seams are joined where there is no crease (ADR-076) before the level
-    skirt is cut, so the skirt seam stays."""
+    """The pieces of a shape a person read from the drawing. `join` (fold degrees, stretch %[,
+    the most a seam may change length, mm]): a swept shape's own seams are joined where there
+    is no crease (ADR-076) before the level skirt is cut, so the skirt seam stays."""
     from coverengine import drawn, plan_profile
 
     kind = str(spec.get("shape"))
@@ -89,7 +91,9 @@ def build(
     return pieces
 
 
-def _joined(pieces: list[Piece], roll_mm: float, fold_deg: float, stretch: float) -> list[Piece]:
+def _joined(
+    pieces: list[Piece], roll_mm: float, fold_deg: float, stretch: float, seam_mm: float = math.inf
+) -> list[Piece]:
     """The pieces joined where they meet without a crease, back as pieces (drawn coordinates:
     drawn.scene turns y round, so it is turned back here)."""
     from coverengine.drawn import scene
@@ -98,7 +102,7 @@ def _joined(pieces: list[Piece], roll_mm: float, fold_deg: float, stretch: float
     sc = scene(pieces)
     parts = [(str(n), sc.geometry[sc.graph[n][1]]) for n in sc.graph.nodes_geometry]
     out = []
-    for name, m in merge(parts, roll_mm, fold_deg, stretch):
+    for name, m in merge(parts, roll_mm, fold_deg, stretch, seam_mm=seam_mm):
         tri = m.vertices[m.faces]
         out.append(Piece(name, [[(float(x), -float(y), float(z)) for x, y, z in t] for t in tri]))
     return out
@@ -237,9 +241,10 @@ def _planes(p: dict[str, Any]) -> tuple[np.ndarray, list[str], list[int], list[d
     groups = _groups(plan, classes)
     profiles = {k: _lines(v) for k, v in p["profiles"].items()}
     open_ = set(p.get("open") or [])  # edges with no profile and no wall (a mitre)
+    free = set(p.get("free") or [])  # edges with a wall but no profile of their own (D5's round)
     planes = []
     for i in range(len(plan)):
-        if classes[i] in open_:
+        if classes[i] in open_ or classes[i] in free:
             continue
         a, b = plan[i], plan[(i + 1) % len(plan)]
         t = (b - a) / np.linalg.norm(b - a)

@@ -22,6 +22,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from coverengine.staging import guard_staging_output
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -39,9 +41,11 @@ def _vents(d: Path) -> list[dict]:
 
 def sweep(model: str, models: Path, out: Path, staged: Path | None) -> dict:
     src, dst = models / model, out / model
+    guard_staging_output(out, models)
+    guard_staging_output(dst, src)
     if dst.exists():
         shutil.rmtree(dst)
-    shutil.copytree(src, dst, symlinks=True)
+    shutil.copytree(src, dst)
     log = dst / "innerwalls.log"
     res: dict = {"model": model, "vents_before": len(_vents(src))}
     cov = dst / "cover.json"
@@ -118,6 +122,7 @@ def main() -> int:
     ids = [r["model"] for r in json.loads(a.list.read_text())]
     if a.only:
         ids = [m for m in ids if m in a.only.split(",")]
+    guard_staging_output(a.out, a.models)
     a.out.mkdir(parents=True, exist_ok=True)
     path = a.out / "results.json"
     done = {r["model"]: r for r in json.loads(path.read_text())} if path.is_file() else {}

@@ -180,6 +180,22 @@ def test_the_audit_flags_an_angled_drawing_built_as_a_square_l(tmp_path: Path) -
     assert not {c["check"]: c for c in drawing_checks(model)}["piece count"]["ok"]
 
 
+def test_the_audit_flags_a_rebuild_that_lost_a_decided_vent_count(tmp_path: Path) -> None:
+    """C24/C25 (Rens, 9 Oct 2026): 9 vents decided by a person; a cover asking for the
+    reader's 7 fails the audit."""
+    from coverengine.audit import drawing_checks
+
+    model = tmp_path / "drawing-c24"
+    model.mkdir()
+    (model / "drawing_corrections.json").write_text(json.dumps({"vents_total": 9}))
+    cover = {"parameters": {"features": {"vents_total": 7}}}
+    (model / "cover.json").write_text(json.dumps(cover))
+    assert not {c["check"]: c for c in drawing_checks(model)}["decided vents"]["ok"]
+    cover["parameters"]["features"]["vents_total"] = 9
+    (model / "cover.json").write_text(json.dumps(cover))
+    assert {c["check"]: c for c in drawing_checks(model)}["decided vents"]["ok"]
+
+
 def test_heights_are_read_from_upright_sizes_when_the_drawing_does_not_name_them(
     tmp_path: Path,
 ) -> None:
@@ -225,6 +241,8 @@ def test_an_angled_sofa_meets_on_the_mitre_with_its_front_inside_the_bend() -> N
     """S21: two 188 cm arms meeting at 140 degrees, 105 cm deep: the front edge of each arm is
     188 - 105 tan 20 = 149.78 cm, as the drawing writes; nothing folds over at the corner."""
     spec = json.loads((SHAPES / "drawing-s21.json").read_text())
+    assert spec["params"]["bend_deg"] == 30.0  # Rens's choice (9 Oct, QUESTIONS 6)
+    spec["params"]["bend_deg"] = 40.0  # the drawing's own lines, which its front edge belongs to
     pieces = dg.build(spec, ROLL)
     front = _pts(pieces, "a-wall-front-1")
     top = front[np.isclose(front[:, 2], 400.1, atol=0.5)]
@@ -254,3 +272,55 @@ def test_the_skirt_is_cut_where_one_wall_meets_the_next() -> None:
     assert len(upper) == 4
     for p in upper:
         assert min(q[2] for f in p.faces for q in f) == pytest.approx(200.0)
+
+
+def test_a_free_round_front_follows_the_slope() -> None:
+    """D5 (Rens, 9 Oct 2026: "the outline does not match the drawing at all"): a 198 x 94 cm
+    plan with a half round of radius 99 cm, one slope from the strip to the 40.01 cm front, the
+    round front without a profile of its own (`free`): its rim is 40.01 cm in the middle and
+    62.35 cm where the leaning end faces stop, 110.22 cm from the back; the back wall's top is
+    193.99 cm wide and the strip 177.98 cm, as the drawing writes."""
+    spec = json.loads((SHAPES / "drawing-d5.json").read_text())
+    pieces = dg.build(spec, ROLL)
+    rim = _pts(pieces, "wall-round-3")
+    top = rim[rim[:, 2] > 1.0]
+    assert top[:, 1].max() == pytest.approx(1930.0, abs=1.0)  # 193 cm deep
+    assert top[np.argmax(top[:, 1]), 2] == pytest.approx(400.1, abs=1.0)
+    assert top[:, 2].max() == pytest.approx(623.5, abs=3.0)
+    side = _pts(pieces, "side-1-1")
+    assert side[:, 1].max() == pytest.approx(1102.2, abs=5.0)
+    back = _pts(pieces, "wall-back-1")
+    high = back[np.isclose(back[:, 2], 640.1, atol=0.5)]
+    assert high[:, 0].max() - high[:, 0].min() == pytest.approx(1939.9, abs=2.0)
+    strip = _pts(pieces, "top-1")
+    assert strip[:, 0].max() - strip[:, 0].min() == pytest.approx(1779.8, abs=2.0)
+
+
+def test_arms_followed_and_the_seat_spanned_by_one_slope() -> None:
+    """S20 and S48 (Rens, 9 Oct 2026, QUESTIONS 5 and 11): the arms are followed, the seat
+    between them is one panel falling from the top of the back to the seat's front edge, so
+    water runs off to the front (rule 12); the arm insides meet it in a line that falls too."""
+    for name, back_z, front_z in (("drawing-s20-bora-not-ordered", 840.0, 400.0),
+                                  ("drawing-s48", 890.0, 430.0)):  # fmt: skip
+        spec = json.loads((SHAPES / f"{name}.json").read_text())
+        pieces = dg.build(spec, ROLL)
+        seat = _pts(pieces, "seat")
+        assert seat[:, 2].max() == pytest.approx(back_z, abs=1.0)
+        assert seat[:, 2].min() == pytest.approx(front_z, abs=1.0)
+        front = seat[np.isclose(seat[:, 1], seat[:, 1].max())]
+        assert np.allclose(front[:, 2], front_z, atol=1.0)  # the front edge level
+        inside = _pts(pieces, "arm-inside-left")
+        low = inside[np.argmin(inside[:, 2])]
+        assert low[1] == pytest.approx(seat[:, 1].max(), abs=1.0)  # its lowest point at the front
+
+
+def test_a_front_wall_whose_top_runs_at_a_slant() -> None:
+    """S38/S39 (Rens, 9 Oct 2026, QUESTIONS 8): the front wall's top falls from 59.9 cm to
+    40.1 cm at the slanted side, so the top panel tilts out to two sides; S39 is the mirror."""
+    for name in ("drawing-s38", "drawing-s39"):
+        spec = json.loads((SHAPES / f"{name}.json").read_text())
+        pieces = dg.build(spec, ROLL)
+        front = _pts(pieces, "front")
+        top = front[front[:, 2] > 1.0]
+        assert (round(top[:, 2].min() / MM, 1), round(top[:, 2].max() / MM, 1)) == (40.1, 59.9)
+        assert any(p.name == "slope" for p in pieces)  # one panel, a ruled patch

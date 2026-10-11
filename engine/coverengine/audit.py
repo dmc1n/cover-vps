@@ -382,6 +382,18 @@ def drawing_checks(model_dir: Path) -> list[dict[str, Any]]:
                 if not str(p["name"]).startswith("vent-"))  # fmt: skip
         out.append(_check("piece count", n <= MANY_PIECES, f"{n} pieces"
                           + ("" if n <= MANY_PIECES else " (a broken shape?)")))  # fmt: skip
+    from coverengine.drawing_given import load as given_shape
+    from coverengine.drawing_route import person_vents
+
+    fixes = model_dir / "drawing_corrections.json"
+    decided = person_vents(given_shape(model_dir),
+                           json.loads(fixes.read_text()) if fixes.is_file() else {})  # fmt: skip
+    cj = model_dir / "cover.json"
+    if decided and cj.is_file():  # Rens, 9 Oct 2026: a person's count survives a rebuild (ADR-116)
+        have = (json.loads(cj.read_text(encoding="utf-8")).get("parameters", {})
+                .get("features", {}).get("vents_total"))  # fmt: skip
+        out.append(_check("decided vents", have == decided,
+                          f"{have} vents asked, {decided} decided by a person"))  # fmt: skip
     if not ref.is_file():
         return out
     from coverengine.drawing_vectors import back_angle

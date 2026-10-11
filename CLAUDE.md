@@ -226,7 +226,8 @@ uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--stag
 uv run python scripts/answers_stage.py SPECS.json --out out/answers [--only a,b]   covers rebuilt in staging from the Desk's answers
                                              (cover.json changes, per-model files), audit + re-measure + compare picture (ADR-117)
 uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--only a,b]   drawing covers from a shape a person read
-                                             (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102)
+                                             (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102;
+                                             a person's vents_total there or in drawing_corrections.json survives a rebuild, ADR-116)
 COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py [--out out/matchcards]   approved drawing covers as existing covers:
                                              kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114)
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
@@ -256,6 +257,7 @@ apps/web/e2e/priceimport.py                 the import in a real browser (sample
 apps/web/e2e/b2b.py                         the B2B shop in a real browser (ADR-104; usage in its docstring)
 apps/web/e2e/measure.py                     Measure, Vent sizes, the check list and measured fits in a real browser (ADR-111)
 Arrangements → Send to the Desk; Desk → ARR   an arrangement approved by Rens or Wout; a change reopens it; DXF after approval (ADR-115)
+                                            approval requires cut.dxf; missing approval fingerprints require reapproval
 COVER_DATA_DIR=~/cover-data uv run python scripts/desk_arrangements.py [--apply] [--only a,b]   the existing arr-* to "ready for approval" (ADR-115)
 apps/web/e2e/arrangements_desk.py           the arrangement → Desk workflow in a real browser (ADR-115; usage in its docstring)
 3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
@@ -276,6 +278,10 @@ make backup     push the data directory to R2 with rclone
 cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build
 cd apps/site && npm test | npm run check     the Worker's tests (security headers, no studio routes) and typecheck (ADR-103)
 ```
+
+Staging scripts validate output roots and model destinations with
+`coverengine.staging.guard_staging_output` before writes. Live `models/` and
+`~/cover-data/models` (including symlink aliases and ancestors) must never be staging outputs.
 
 ## How to work in this repo (instructions for Claude Code)
 

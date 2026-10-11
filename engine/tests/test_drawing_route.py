@@ -110,3 +110,25 @@ def test_when_the_ai_says_the_shape_does_not_fit_nothing_is_built(
     doc = build(pdf, model, Registry.load(None).resolve(), code="S97", log=lambda s: None,
                 ai=True)  # fmt: skip
     assert doc["status"] == NEEDS_PERSON and not (model / "cut.dxf").exists()
+
+
+def test_a_vent_count_a_person_decided_survives_a_rebuild(tmp_path: Path) -> None:
+    """C24/C25 (Rens, 9 Oct 2026: both 9, the drawings read 7) and S25 (5): a count a person
+    decided, in drawing_corrections.json or the shape a person read, wins over the reader's on
+    every rebuild; the reader's own count is kept beside it."""
+    from coverengine.drawing_route import person_vents
+
+    assert person_vents(None, {}) is None
+    assert person_vents({"vents_total": 5}, {}) == 5
+    assert person_vents({"vents_total": 5}, {"vents_total": 9}) == 9
+    pdf = _kidney_pdf(tmp_path / "cover 999 - S99.pdf")
+    model = tmp_path / "models" / "drawing-s99"
+    model.mkdir(parents=True)
+    (model / "drawing_corrections.json").write_text(json.dumps({"vents_total": 6}))
+    doc = build(pdf, model, Registry.load(None).resolve(), code="S99", log=lambda s: None)
+    assert doc["features"]["vents_total"] == 6 and doc["features"]["vents_read"] == 4
+    assert doc["features"]["vents_from"] == "a person"
+    cover = json.loads((model / "cover.json").read_text())
+    assert cover["parameters"]["features"]["vents_total"] == 6
+    fin = json.loads((model / "finished.json").read_text())
+    assert sum(p["quantity"] for p in fin["pieces"] if p["name"] == "vent-hood") == 6

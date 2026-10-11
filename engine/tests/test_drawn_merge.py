@@ -51,3 +51,33 @@ def test_a_piece_is_never_joined_past_the_roll() -> None:
                                 (900, (i + 1) * 1000, 800), (0, (i + 1) * 1000, 800)))
              for i in range(2)]  # fmt: skip
     assert len(merge(parts, 800.0, 15.0, 1.0)) == 2  # 900 wide in its narrowest: over the roll
+
+
+def test_a_join_that_would_change_a_seam_beyond_the_fit_tolerance_is_refused() -> None:
+    """S25 (Rens, 9 Oct 2026): a curved sofa's slope and front face, two cone bands with a 13
+    degree fold, joined at 0.8 % stretch made the front seam 7.5 mm longer than the wall it is
+    sewn to. With the fit tolerance (tolerance.cover_mm, 5 mm) as the limit they stay two."""
+    import json
+    from pathlib import Path
+
+    from coverengine import drawing_given as dg
+
+    shapes = Path(__file__).resolve().parents[2] / "testdata" / "drawing_shapes"
+    spec = json.loads((shapes / "drawing-s25.json").read_text())
+    loose = dg.build(spec, 1450.0, 3000.0, (15.0, 1.0))
+    kept = dg.build(spec, 1450.0, 3000.0, (15.0, 1.0, 5.0))
+    tops = lambda ps: sorted(p.name for p in ps if p.name.startswith("top-"))  # noqa: E731
+    assert len(tops(loose)) == 3  # without the limit two bands are joined
+    assert tops(kept) == ["top-1-1", "top-1-2", "top-1-3", "top-1-4"]  # as the drawing draws
+
+
+def test_a_flat_join_keeps_its_outline() -> None:
+    """Two flat faces joined along a fold lie flat exactly: the outline keeps its length."""
+    from coverengine.drawn_merge import flat_ok
+
+    a = _quad((0, 0, 0), (400, 0, 0), (400, 300, 0), (0, 300, 0))
+    b = _quad((0, 300, 0), (400, 300, 0), (400, 600, 30), (0, 600, 30))
+    both = trimesh.util.concatenate([a, b])
+    both.merge_vertices()
+    ok, stretch = flat_ok(both, 1.0, 1420.0, 0.5)
+    assert ok and stretch < 0.01

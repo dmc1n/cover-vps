@@ -3743,6 +3743,60 @@ models with status "new", unnamed and without a way to send them or to see what 
   gutter, and the fit row did not wrap).
 - **Better later:** the smooth plan drawn from the built cover's own outline; a per-member
   check that the arrangement's pieces still match the member's latest cover.
+- **Approval safety (2026-10-11):** approving an arrangement without `cut.dxf` returns HTTP
+  400 before saving any approval. A missing or null approved cut fingerprint counts as a
+  changed cut file, including before the first build; legacy approvals require fresh approval
+  before the DXF can be downloaded. Regression tests cover both cases.
+
+## ADR-116 — Rens's answers on the drawing covers (9 Oct 2026): shapes read again, a person's vent count kept
+
+Rens answered the drawing questions at the Desk (Questions tab, ~/cover-data/answers-2026-10-09.json).
+Each cover was rebuilt in staging (`out/answers/<model>/`), checked twice (`cover audit`,
+`scripts/fewer_check.py`) and looked at against the drawing (`out/answers/compare/`).
+
+- **Shapes, per model** (`testdata/drawing_shapes/*.json`, built by `scripts/given_build.py`):
+  - D5 (Q4, "the outline does not match the drawing at all"): read again view by view. A 198 x 94 cm
+    rectangle with a half round of radius 99 cm (the full width) centred 94 cm from the back; one
+    slope from the strip (84 cm, 30 cm from the back) to the 40.01 cm front; ends leaning in 10.01 cm
+    from 59 cm walls. Every written size comes back: 193.99 (the back wall's top), 177.98 (the
+    strip), 195.32 at 110.22 cm and 62.35 cm there. Yesterday's "the sizes do not make one surface"
+    was a misreading (the round's centre is at 94 cm, not its start).
+  - S20 (Q5) and S48 (Q11): the arms followed, the seat between them one panel falling from the top
+    of the back (84 / 89 cm) to the seat's front edge (40 / 43 cm), as the Blocchi reference; the
+    arm insides meet it in a line that falls to the front, so water runs off (rule 12). `faces`.
+  - S21 (Q6): the 30-degree bend Rens chose (the drawing's lines measure 40; its 149.78 cm front
+    edge belongs to 40, with 30 the front edge is 159.9 cm).
+  - S37 (Q7): depth 102.1 cm, the straight part 50.65 cm.
+  - S38/S39 (Q8): the front wall's top falls from 59.9 cm to 40.1 cm at the slanted side (the
+    36.4 in line and the 15.80 in on the side view), so the top panel tilts out two ways: one ruled
+    panel, 0.11 % stretch.
+  - S25 (Q14): the profile from the side view (back 62.99, chamfer to 88.6, a 31.02 cm strip, a
+    slope to 62.99 at 95.52 cm, a steeper front face to 40.01 at 120 cm; the live cover had a flat
+    top to 95.52 cm and one slope), hipped ends from the written line lengths, 10 pieces; 5 vents.
+- **General causes, each with a test:**
+  - *A word number inside another word* (`drawing_vectors.VENTS`): "Max Height Air Pocket" was read
+    as "eight air pocket", 8 vents on S20 (the drawing draws 4 arrows). A number before the label
+    must be a word of its own. Swept over the 120 drawings: only S20 changes.
+  - *A join that breaks a seam* (`drawn_merge.merge(..., seam_mm)`): S25's slope and front face, two
+    cone bands at a 13 degree fold, were joined at 0.8 % stretch, which made the front seam 7.5 mm
+    longer than the wall (over the 5 mm fit, the audit failed). A join is now refused when any
+    stretch of the joined piece's outline between two corners changes length by more than
+    `tolerance.cover_mm` flattened (`rim_change`). S43 keeps its joins.
+  - *A count a person decided is kept* (`drawing_route.person_vents`): `vents_total` in
+    drawing_corrections.json or in the shape a person read wins over the reader on every rebuild
+    (C24/C25 9, Q67: the drawings read 7; S25 5); the reader's count stays as `vents_read`. The
+    audit's new *decided vents* check fails a cover asking for another number.
+  - *A free edge in a hip shape* (`drawing_given`, `free`): an outline edge with a wall but no
+    profile of its own, whose rim follows the other planes (D5's round front).
+- **Vents only:** R1–R3 (Q13) `features.vent_align: top` in cover.json (60–82 cm, the top 5 cm under
+  the top seam); C24/C25 (Q67) 9 each, by the rule (ADR-101/110) they land on Rens's circles (two on
+  the long front wall, one in the middle of the short one; C25 the mirror).
+- **Not changed:** S47 (Q10, "leave as it is"); S45 (Q9 "152.4 cm, not 358" against Q57 "358.4 cm
+  round, as now": contradictory, to the owner).
+- **Not done:** the vertical drawstring openings (D5, S38, S39); S25's end walls slope from 63 to
+  40 cm under the hip (the drawing draws them level at 40 cm with the hip rising from there) —
+  the swept builder's hip keeps the back and front edges full length; R1–R3 still fail the audit's
+  balloons check (a table without a balloon, as live).
 
 ## ADR-117 — Rens's answers of 9 Oct on the SUNS covers: box tops cut to the roll, straight wall tops, a no-cover mark
 

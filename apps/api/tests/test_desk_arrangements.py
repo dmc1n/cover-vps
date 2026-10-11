@@ -139,6 +139,41 @@ def test_the_dxf_only_once_approved(app: Any, tmp_path: Path) -> None:
     assert desk.dxf_allowed(d, {**on, "desk.gate_arrangements": False}) is True
 
 
+def test_unbuilt_arrangement_cannot_be_approved(app: Any, tmp_path: Path) -> None:
+    rens = login(app, "rens")
+    d = tmp_path / "data/models/arr-unbuilt"
+    before = (d / "cover.json").read_text()
+    r = rens.post("/api/desk/arr-unbuilt", json={"action": "approve"})
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Build the arrangement's cutting file before approving it."
+    assert not (d / "desk.json").exists()
+    assert (d / "cover.json").read_text() == before
+    (d / "cut.dxf").write_text("0\nEOF\n")
+    assert rens.get("/api/models/arr-unbuilt/files/cut.dxf").status_code == 403
+    r = rens.post("/api/desk/arr-unbuilt", json={"action": "approve"})
+    assert r.status_code == 200
+    assert rens.get("/api/models/arr-unbuilt/files/cut.dxf").status_code == 200
+
+
+@pytest.mark.parametrize("missing", [True, False], ids=["missing", "none"])
+def test_approval_without_cut_fingerprint_blocks_first_build(
+    app: Any, tmp_path: Path, missing: bool
+) -> None:
+    rens = login(app, "rens")
+    d = tmp_path / "data/models/arr-unbuilt"
+    st: dict[str, Any] = {"status": "approved", "approved": {"by": "Rens", "time": 1}}
+    if not missing:
+        st["approved"]["cut"] = None
+    (d / "desk.json").write_text(json.dumps(st))
+    assert "the cut file" in desk._changed_since_approval(d, st)
+    (d / "cut.dxf").write_text("0\nEOF\n")
+    assert "the cut file" in desk._changed_since_approval(d, st)
+    assert desk.dxf_allowed(d, desk._settings()) is False
+    assert rens.get("/api/models/arr-unbuilt/files/cut.dxf").status_code == 403
+    assert rens.get("/api/desk/arr-unbuilt").json()["status"] == "ai-checked"
+    assert "approved" not in json.loads((d / "desk.json").read_text())
+
+
 def test_a_change_after_approval_reopens_it(app: Any, tmp_path: Path) -> None:
     vera, rens = login(app, "vera"), login(app, "rens")
     d = tmp_path / "data/models/arr-portofino"

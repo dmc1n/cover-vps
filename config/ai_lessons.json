@@ -80,6 +80,16 @@
     "ai_model": "owner"
   },
   {
+    "time": 1791993600,
+    "model_id": "drawing-d5",
+    "complaint": "The outline of the generated cover does not match the drawing at all (Rens, 9 Oct 2026, QUESTIONS 4); also S20, S38/S39, S48, S25 rejected on shape.",
+    "cause": "Drawings were read as one familiar block (a box, an L, a slope across the width) instead of view by view: D5 is a rectangle with a half round of the full width centred where the straight sides end, one slope from the strip over the round front, ends that lean in; S38/S39 have a front corner lower than the other (the top tilts two ways); S20/S48 have arms with a seat between them.",
+    "rule": "Read every written size and check that the shape gives each one back (D5: 193.99, 177.98, 195.32 at 110.22 and 62.35 all come out of one hip shape). A round front with no height of its own follows the slope (hip free edges). Arms are followed and the seat between them is one panel falling to its front edge (rule 12). Heights are read per corner, not one front height.",
+    "check": "engine/tests/test_drawing_given.py (free round front, arms with a spanned seat, a slanted front wall); every drawing_shape.json builds and fits the roll.",
+    "applies_to": "drawing",
+    "ai_model": "owner"
+  },
+  {
     "time": 1791720000,
     "model_id": "suns-daybed-portofino",
     "complaint": "The top panel (1.85 m) does not fit the 1.48 m roll: split the panel (Rens at the Desk, 9 Oct 2026, question 16).",
