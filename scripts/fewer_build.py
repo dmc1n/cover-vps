@@ -77,7 +77,13 @@ def merge_one(src: Path, out: Path, always: bool = False) -> dict[str, Any]:
         tags & {"swept", "outline", "views", "isofit"}
     )
     if joinable:
-        parts = merge(parts, roll_mm(params), float(params["drawn.merge_fold_deg"]), stretch)  # type: ignore[arg-type]
+        parts = merge(
+            parts,
+            roll_mm(params),
+            float(params["drawn.merge_fold_deg"]),
+            stretch,  # type: ignore[arg-type]
+            seam_mm=float(params["tolerance.cover_mm"]),
+        )  # type: ignore[arg-type]
     parts = absorb_slivers(
         parts, float(params["seams.min_piece_width_mm"]), roll_mm(params), stretch
     )  # type: ignore[arg-type]

@@ -223,7 +223,8 @@ uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   dra
 uv run python scripts/vents_compare.py OUT.png --old DIR --new DIR [--pics ...]   a cover's vents before/after, with the Desk's marked pictures (ADR-101)
 uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--staged DIR]   covers with inner walls rebuilt in staging, vents on the front walls, checked twice (ADR-110)
 uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--only a,b]   drawing covers from a shape a person read
-                                             (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102)
+                                             (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102;
+                                             a person's vents_total there or in drawing_corrections.json survives a rebuild, ADR-116)
 COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py [--out out/matchcards]   approved drawing covers as existing covers:
                                              kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114)
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)

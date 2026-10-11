@@ -38,7 +38,8 @@ def one(model: Path, dry: bool) -> dict[str, Any]:
     params = Registry.load(None).resolve()
     parts = model_parts(model / "model.glb")
     out = merge(parts, roll_mm(), float(params["drawn.merge_fold_deg"]),  # type: ignore[arg-type]
-                float(params["drawn.merge_max_stretch_pct"]))  # type: ignore[arg-type]  # fmt: skip
+                float(params["drawn.merge_max_stretch_pct"]),  # type: ignore[arg-type]
+                seam_mm=float(params["tolerance.cover_mm"]))  # type: ignore[arg-type]  # fmt: skip
     res: dict[str, Any] = {"model": model.name, "before": len(parts), "after": len(out)}
     if len(out) >= len(parts):
         res["status"] = "kept: nothing to join"
