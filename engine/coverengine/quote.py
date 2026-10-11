@@ -388,7 +388,10 @@ _NEAREST = {"dining_set": "Tafels", "round_set": "Tafels", "sofa": "Sofasets",
 def nearest(
     product: str, given: dict[str, Any], models: Path, top: int = 3
 ) -> list[dict[str, Any]]:
-    """The SUNS models nearest in kind and size: their covers are made and tested."""
+    """The SUNS models nearest in kind and size: their covers are made and tested (a model
+    marked "no cover" is never one of them)."""
+    from coverengine.catalogue import is_no_cover
+
     if product not in _NEAREST:  # a barbecue: its catalogue covers come through matching
         return []
     want = _NEAREST[product]
@@ -399,6 +402,8 @@ def nearest(
             cover = json.loads((d / "cover.json").read_text())
             size = json.loads((d / "model.json").read_text())["size_mm"]
         except (OSError, ValueError, KeyError):
+            continue
+        if is_no_cover(cover):
             continue
         cat = str(cover.get("category") or "").split(" › ")[-1]
         if want and cat != want:

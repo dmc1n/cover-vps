@@ -253,10 +253,21 @@ def fold_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     angle = np.degrees(np.arccos(np.clip(np.einsum("ij,ij->i", n[pairs[:, 0]], n[pairs[:, 1]]),
                                          -1.0, 1.0)))  # fmt: skip
     roll = float(params["roll.usable_width_mm"])
+    # a piece that bends more than the limit within itself is a curved wall (a follow cover's
+    # rounded corner, ADR-107), not flat faces: its facets meet at small angles everywhere, and
+    # the seam beside it is a corner seam (Fiave L-part, 9 Oct 2026; ADR-117)
+    mean = np.zeros((int(labels.max()) + 1, 3))
+    np.add.at(mean, labels, n * mesh.area_faces[:, None])
+    mean /= np.maximum(np.linalg.norm(mean, axis=1, keepdims=True), 1e-9)
+    spread = np.zeros(len(mean))
+    np.maximum.at(spread, labels, np.degrees(np.arccos(np.clip(
+        np.einsum("ij,ij->i", n, mean[labels]), -1.0, 1.0))))  # fmt: skip
     flagged = []
     for a, b in {(min(x, y), max(x, y)) for x, y in zip(la[across], lb[across], strict=True)}:
         pa, pb = panels[int(a)], panels[int(b)]
         if pa["region"] != pb["region"] or cone:
+            continue
+        if max(spread[int(a)], spread[int(b)]) > limit:
             continue
         sel = across & (((la == a) & (lb == b)) | ((la == b) & (lb == a)))
         fold = float(np.median(angle[sel]))

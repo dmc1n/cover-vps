@@ -4,6 +4,10 @@ pattern revisions, and comparing two pattern sets.
 - Family: names a preset `config/presets/<family>.yaml` (parameter layer 2), so a change to a
   family applies to every model of it that does not set the value itself.
 - Status: draft (being worked on), checked (patterns looked over), production (cut from).
+- No cover (`"no_cover": true`, optional `"no_cover_reason"` text, at the top of cover.json): a
+  model we keep but make no cover for (Rens, 9 Oct 2026, question 12). Never offered in the
+  shops (not as an existing or similar cover either) and never on the Desk; `no_cover()` and
+  `is_no_cover()` are the one place that reads it.
 - Revisions: every export keeps its pattern.json, finished.json, cut.dxf and the model's
   cover.json and seams.json in `revisions/<n>/`, listed in `revisions/index.json`.
 """
@@ -13,6 +17,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -22,26 +27,58 @@ from coverengine.params.registry import list_families, read_cover_definition
 STATUSES = ("draft", "checked", "production")
 REVISIONS = "revisions"
 KEPT = ("pattern.json", "finished.json", "cut.dxf", "cover.json", "seams.json")
-INFO_FIELDS = ("family", "category", "status", "tags", "notes")
+NO_COVER = "no_cover"
+NO_COVER_REASON = "no_cover_reason"
+INFO_FIELDS = ("family", "category", "status", "tags", "notes", NO_COVER, NO_COVER_REASON)
+
+
+def is_no_cover(cover: Mapping[str, Any] | None) -> bool:
+    """Whether an already read cover.json marks its model as needing no cover."""
+    return bool(cover) and (cover or {}).get(NO_COVER) is True
+
+
+def no_cover(model_dir: Path) -> bool:
+    """Whether the model needs no cover (`"no_cover": true` in its cover.json): kept in the
+    studio, never offered in the shops nor listed on the Desk. A missing or unreadable
+    cover.json is an ordinary model."""
+    try:
+        return is_no_cover(read_cover_definition(model_dir))
+    except (OSError, ValueError, CoverError):
+        return False
 
 
 def info(model_dir: Path) -> dict[str, Any]:
     cover = read_cover_definition(model_dir)
+    none = is_no_cover(cover)
     return {
         "family": cover.get("family"),
         "category": cover.get("category"),
         "status": cover.get("status", "draft"),
         "tags": list(cover.get("tags", [])),
         "notes": cover.get("notes", ""),
+        "no_cover": none,
+        "no_cover_reason": str(cover.get(NO_COVER_REASON) or "") if none else "",
     }
 
 
 def set_info(model_dir: Path, changes: dict[str, Any]) -> dict[str, Any]:
-    """Change family, category, status, tags or notes in the model's cover.json (everything
-    else kept)."""
+    """Change family, category, status, tags, notes or the no-cover mark in the model's
+    cover.json (everything else kept). `no_cover` false removes the mark and its reason; a
+    reason is only kept next to the mark."""
     unknown = set(changes) - set(INFO_FIELDS)
     if unknown:
         raise CoverError(f"unknown field(s): {', '.join(sorted(unknown))}")
+    changes = dict(changes)
+    if NO_COVER in changes:
+        if changes[NO_COVER] is None:
+            del changes[NO_COVER]
+        elif not isinstance(changes[NO_COVER], bool):
+            raise CoverError("no_cover must be true or false")
+        elif not changes[NO_COVER]:
+            changes[NO_COVER] = None  # removed below, with its reason
+            changes[NO_COVER_REASON] = None
+    if changes.get(NO_COVER_REASON) is not None:
+        changes[NO_COVER_REASON] = str(changes[NO_COVER_REASON]).strip()
     if "status" in changes and changes["status"] not in STATUSES:
         raise CoverError(f"status must be one of {', '.join(STATUSES)}")
     family = changes.get("family")
@@ -61,6 +98,8 @@ def set_info(model_dir: Path, changes: dict[str, Any]) -> dict[str, Any]:
             doc.pop(key, None)
         else:
             doc[key] = value
+    if not is_no_cover(doc):
+        doc.pop(NO_COVER_REASON, None)
     path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     return info(model_dir)
 

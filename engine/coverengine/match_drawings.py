@@ -28,6 +28,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from coverengine.catalogue import is_no_cover, no_cover
 from coverengine.params import EffectiveParams
 
 MM_PER_CM = 10.0  # param-ok: units
@@ -380,6 +381,7 @@ def review(model_dir: Path, p: EffectiveParams, listing: Mapping[str, Any] | Non
     unknown = kind in (None, "none")
     doubtful = bool(doubts) and not override.get("kind")
     in_status = status in offer
+    none = is_no_cover(cover)  # kept, but needs no cover (Rens, 9 Oct 2026): never offered
     return {
         "model_id": model_dir.name,
         "codes": [c.upper() for c in mine],
@@ -401,8 +403,9 @@ def review(model_dir: Path, p: EffectiveParams, listing: Mapping[str, Any] | Non
         "labels": labels,
         "doubts": list(dict.fromkeys(doubts)),
         "confirmed": bool(override.get("kind")),
-        "offered": in_status and not unknown and not doubtful,
-        "why_not": (None if in_status and not unknown and not doubtful else
+        "offered": in_status and not unknown and not doubtful and not none,
+        "why_not": (None if in_status and not unknown and not doubtful and not none else
+                    "no cover" if none else
                     f"Desk status {status}" if not in_status else
                     "kind unknown" if unknown else "doubtful: confirm with match.kind"),
     }  # fmt: skip
@@ -413,7 +416,7 @@ def owners(models: Path, p: EffectiveParams) -> dict[str, list[str]]:
     offer = statuses(p)
     out: dict[str, list[str]] = {}
     for d in sorted(models.glob("drawing-*")):
-        if _read(d / "desk.json").get("status") in offer:
+        if _read(d / "desk.json").get("status") in offer and not no_cover(d):
             for c in codes(d):
                 out.setdefault(c, []).append(d.name)
     return out

@@ -353,7 +353,8 @@ def ask(
 
     vision = Registry.load(None).resolve(trial={
         "ai.provider": str(params["ai.vision_provider"]),
-        "ai.model": str(params["ai.vision_model"]),
+        "ai.model": str(params["suggest.final_model"]),
+        "ai.reasoning_effort": str(params["suggest.final_thinking"]),
         "ai.base_url": str(params["ai.vision_base_url"]),
         "ai.timeout_s": int(params["suggest.ai_timeout_s"])})  # fmt: skip
     system = SYSTEM.replace("__PRODUCTS__", _products_text(PRODUCTS)).replace(
@@ -371,7 +372,7 @@ def ask(
         parts.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b}"}})
     if not parts:
         raise SuggestError("give a photo or a link")
-    ans = ask_parts(vision, system, parts)
+    ans = ask_parts(vision, system, parts, note="suggest final")
     ans.pop("_usage", None)
     return ans
 

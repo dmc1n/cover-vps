@@ -44,3 +44,10 @@ uv run cover batch --ids model-a,model-b --steps flatten,export
 
 It lists per model which pieces changed by more than 1 mm. In the web app: tick the models in
 the list and press **Run these**.
+
+## Models that need no cover
+
+Some furniture needs no cover (the Portofino daybed with its own roof). Mark it instead of
+deleting it: `uv run cover model models/<id> --no-cover yes --no-cover-reason "has its own
+roof"` (or `--no-cover no` to undo). The model stays in the studio with a "no cover" badge, but
+the shop never offers it and the Desk leaves it out (ADR-117).

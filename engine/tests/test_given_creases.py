@@ -30,3 +30,16 @@ def test_a_smooth_surface_keeps_the_usual_seams() -> None:
     keep = dome.triangles_center[:, 2] > 0
     half = trimesh.Trimesh(dome.vertices, dome.faces[keep], process=True)
     assert _crease_regions(half, 20.0) is None
+
+
+def test_creases_only_for_organic_covers() -> None:
+    """Rens, 9 Oct 2026 (Desk question 19, ADR-117): follow the cover model's own creases for
+    organic covers with curved seams (S53, S60), not for every cover: off by default, on in the
+    family preset `organic`."""
+    from coverengine.params.registry import Registry, family_preset
+
+    reg = Registry.load()
+    assert float(reg.resolve()["seams.given_crease_deg"]) == 0
+    organic = family_preset("organic")
+    assert organic is not None
+    assert float(reg.resolve(preset=organic)["seams.given_crease_deg"]) == 20

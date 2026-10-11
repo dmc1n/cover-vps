@@ -74,6 +74,7 @@ BOX_SCRAP_SHARE = 0.002  # param-ok: flat bits smaller than this share of the co
 CORNER_SHARE = 0.02  # param-ok: geometric tolerance
 SIMPLIFY_MM = 1.0  # param-ok: outline tolerance for finding its corners
 BOX_UPRIGHT_NZ = 0.1  # param-ok: geometric rule  # proposed seams accepted by cover improve
+FLAT_FACE_DEG = 1.0  # param-ok: a piece whose faces turn less than this is flat
 MM_PER_CM = 10.0  # param-ok: unit conversion
 # Smoothing a jittery wall seam in place: passes, and how far a face may turn (cosine).
 SMOOTH_PASSES = 30  # param-ok: iterations
@@ -522,20 +523,29 @@ def _box_cut(
             _p(params, "seams.fold_join_max_deg"),
         )
         label = np.unique(label, return_inverse=True)[1].astype(np.int64)
+        label = _roll_split(model_dir, hull, label)
     else:  # a cover drawn in parts by the program (ADR-107): the folds it made
         hull_json = model_dir / "hull.json"
         if hull_json.is_file():
             plan = (json.loads(hull_json.read_text(encoding="utf-8")).get("box") or {}).get("plan")
             folds = list((plan or {}).get("folds_mm") or [])
+            if (plan or {}).get("kind") == "follow" or (plan or {}).get("members_file"):
+                # its flat top faces: gentle folds too (a follow cover, ADR-107; a model built
+                # from its parts' plan, ADR-117)
+                label, more, more_folds = _follow_gentle(hull, label, params)
+                joined += more
+                folds += more_folds
     # the people's corrections at the Desk: join pieces, split a piece (ADR-082)
     from coverengine import learned
 
     edit_notes: list[str] = []
     edits = learned.read_edits(model_dir)
     if edits:
+        before = label
         label, edit_notes = learned.apply_edits(
             np.asarray(hull.triangles_center), np.asarray(hull.face_adjacency), label, edits
         )
+        folds = folds + _joined_folds(hull, before, label)
     # a region's direction is its area-weighted normal (thin slivers have noisy normals)
     weighted = np.zeros((label.max() + 1, 3))
     np.add.at(weighted, label, hull.face_normals * hull.area_faces[:, None])
@@ -570,6 +580,75 @@ def _box_cut(
     result.report["folds_mm"] = folds  # the 3D ends of every fold, drawn in pen (ADR-055)
     result.report["part_edits"] = edit_notes  # what the Desk's piece edits did (ADR-082)
     return result
+
+
+def _follow_gentle(
+    hull: trimesh.Trimesh, label: NDArray[np.int64], params: EffectiveParams
+) -> tuple[NDArray[np.int64], list[str], list[list[list[float]]]]:
+    """A follow cover's flat top faces meeting at a gentle fold are one piece with a fold line,
+    as on any box cover (ADR-099); its walls (curved round the outline) keep their seams. The
+    Nuna's 10 degree gable was two pieces (9 Oct 2026; ADR-117)."""
+    from coverengine.seams import facets
+
+    k = int(label.max()) + 1
+    weighted = np.zeros((k, 3))
+    np.add.at(weighted, label, hull.face_normals * hull.area_faces[:, None])
+    unit = weighted / np.maximum(np.linalg.norm(weighted, axis=1, keepdims=True), 1e-9)
+    spread = np.zeros(k)
+    np.maximum.at(spread, label, np.degrees(np.arccos(np.clip(
+        np.einsum("ij,ij->i", hull.face_normals, unit[label]), -1.0, 1.0))))  # fmt: skip
+    top = np.abs(unit[:, 2]) >= BOX_UPRIGHT_NZ
+    flat = spread < FLAT_FACE_DEG
+    roll = _p(params, "roll.usable_width_mm") - 2 * _p(params, "stitching.allowance_mm")
+    new, notes, folds = facets.join(
+        hull, label, top, 0.0, roll, _p(params, "seams.max_skirt_panel_mm"), False,
+        _p(params, "seams.fold_join_max_deg"), top & flat,
+    )  # fmt: skip
+    return np.unique(new, return_inverse=True)[1].astype(np.int64), notes, folds
+
+
+def _joined_folds(
+    hull: trimesh.Trimesh, before: NDArray[np.int64], after: NDArray[np.int64]
+) -> list[list[list[float]]]:
+    """The folds a person's join made (ADR-082 edits): every straight edge between two flat
+    pieces that are now one, its two 3D ends, drawn in pen like the engine's own folds
+    (Sato bench, Desk question 18: "one top panel with a fold line"; ADR-117)."""
+    pairs = np.asarray(hull.face_adjacency)
+    ends = np.sort(np.asarray(hull.face_adjacency_edges), axis=1)
+    a, b = before[pairs[:, 0]], before[pairs[:, 1]]
+    joined = (a != b) & (after[pairs[:, 0]] == after[pairs[:, 1]])
+    out = []
+    for key in sorted({(min(x, y), max(x, y)) for x, y in zip(a[joined], b[joined], strict=True)}):
+        sel = joined & (((a == key[0]) & (b == key[1])) | ((a == key[1]) & (b == key[0])))
+        pts = hull.vertices[np.unique(ends[sel])]
+        d = pts - pts.mean(axis=0)
+        t = d @ np.linalg.svd(d, full_matrices=False)[2][0]
+        out.append([[round(float(c), 2) for c in pts[int(np.argmin(t))]],
+                    [round(float(c), 2) for c in pts[int(np.argmax(t))]]])  # fmt: skip
+    return out
+
+
+def _roll_split(
+    model_dir: Path, hull: trimesh.Trimesh, label: NDArray[np.int64]
+) -> NDArray[np.int64]:
+    """A box top wider than the roll split along the lines the hull step drew across its slope
+    (hull.json box.roll_cuts, ADR-117): strips whose seams run downhill."""
+    from coverengine.hull.outline import SAME_FACE, connected
+
+    hull_json = model_dir / "hull.json"
+    if not hull_json.is_file():
+        return label
+    cuts = (json.loads(hull_json.read_text(encoding="utf-8")).get("box") or {}).get("roll_cuts")
+    if not cuts:
+        return label
+    centres = np.asarray(hull.triangles_center)[:, :2]
+    normals = np.asarray(hull.face_normals)
+    for c in cuts:
+        on = (normals @ np.asarray(c["normal"]) > SAME_FACE) & (
+            centres @ np.asarray(c["across"]) > float(c["at_mm"])
+        )
+        label = np.where(on, label + int(label.max()) + 1, label)
+    return connected(hull, label)
 
 
 def _seam_wiggle(cut: CutMesh, seam_id: str) -> float:

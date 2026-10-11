@@ -145,7 +145,11 @@ def ask(params: EffectiveParams, system: str, user: str) -> dict[str, Any]:
 
 
 def ask_parts(
-    params: EffectiveParams, system: str, user: str | list[dict[str, Any]]
+    params: EffectiveParams,
+    system: str,
+    user: str | list[dict[str, Any]],
+    *,
+    note: str | None = None,
 ) -> dict[str, Any]:
     """`user`: text, or a list of parts (text and pictures, OpenAI style)."""
     provider = str(params["ai.provider"])
@@ -183,7 +187,12 @@ def ask_parts(
     if not isinstance(doc, dict):
         raise CoverError("the AI's answer was not one JSON object")
     doc["_usage"] = reply.get("usage", {})
-    spend.record(params, str(params["ai.model"]), doc["_usage"], system[:LEDGER_NOTE])
+    spend.record(
+        params,
+        str(params["ai.model"]),
+        doc["_usage"],
+        note if note is not None else system[:LEDGER_NOTE],
+    )
     return doc
 
 
