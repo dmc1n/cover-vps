@@ -1,6 +1,7 @@
 # The studio's layout: tighter and clearer (proposal, 11 Oct 2026)
 
-Status: **proposal, waiting for the owner's go.** Nothing in the live studio has changed. This
+Status: **proposal, waiting for the owner's go.** Nothing in the live studio has changed. Audited
+release: v1.30.0 (main has moved on since, e.g. ADR-116; the layout findings still hold). This
 document, the clickable prototype and the audit scripts are on the branch `studio-ui-audit`.
 
 ## Samenvatting voor Rick
@@ -104,6 +105,8 @@ zelf wilt kunnen veranderen.
 - **The prototype's shots**: `apps/web/e2e/uiaudit_proto.py` → `out/uiaudit/after/` (1440 and
   820, light and dark).
 - The screenshots are not in git (the repository is public and they show drawings and covers).
+- Not captured: at 820 px the reject dialog and the drape view (software WebGL in the container
+  timed out on those two long pages; the 1440 px shots show them) and the viewer's login.
 
 ## 2. Inventory
 
@@ -112,9 +115,9 @@ zelf wilt kunnen veranderen.
 | person | role in the app | what for | how often |
 |---|---|---|---|
 | Rick (owner) | admin, may approve | everything; prices, shop, orders, settings, follow-up of questions and rejections | daily |
-| Rens | approver (Desk) | approve / reject / comment drawing covers and arrangements; answer questions | daily, on a laptop and a tablet |
+| Rens | approver (Desk) | approve / reject / comment drawing covers and arrangements; answer questions | daily (the Desk checks are run on laptop and iPad widths) |
 | Wout | approver (Desk) | the same as Rens; arrangements | weekly |
-| Workshop | today: no own login (uses Rens's or Rick's) | check list, measure the sewn cover, fits / does not fit, DXF | per cover sewn (≈ 100/week in production) |
+| Workshop | no workshop role today: saving a measured fit needs approver rights | check list, measure the sewn cover, fits / does not fit, DXF | per cover sewn (≈ 100/week in production) |
 | Editors (Eddy, colleagues) | editor | upload models, build arrangements, draft website text | occasionally |
 | Viewer | viewer | look and download | rarely |
 
@@ -247,8 +250,11 @@ Ranked by how much they cost the people who use the studio daily (Rens, Rick, th
 9. **Three visual systems.** Studio (Poppins + Fraunces, cream/olive, pill buttons), Desk and
    Questions (Work Sans, grey/green, own dark mode), shop (ADR-105 tokens). Five font families
    loaded from Google Fonts. Dark mode only on the Desk.
-10. **Tablet (820 px).** The header wraps; the Desk card stacks into a very long page (3,671 px);
-    Shop settings and Prices tables need horizontal care; the 3D toolbar wraps into three rows.
+10. **Tablet (820 px).** The header wraps; the Desk card stacks into a very long page (3,671 px
+    for S45, 42 buttons); Shop settings grows to 3,959 px, a cover's Settings tab to 3,493 px,
+    Prices to 2,737 px; the 3D toolbar wraps into three rows (with a drape: Rain, Simulate again,
+    Back to the design, Water, Drape again on a row of their own). Counts per page:
+    `out/uiaudit/counts-1440.json`, `counts-820.json`.
 11. **Noise.** *Since the run before* shows `null → value` for every new default; Downloads lists
     ≈ 40 files, half without explanation; notes can show raw JSON; IDs (`drawing-c27`,
     `165cbbc3-…glb`) where a name would do.
