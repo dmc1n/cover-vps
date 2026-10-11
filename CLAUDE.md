@@ -274,6 +274,10 @@ cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the webs
 cd apps/site && npm test | npm run check     the Worker's tests (security headers, no studio routes) and typecheck (ADR-103)
 ```
 
+Staging scripts validate output roots and model destinations with
+`coverengine.staging.guard_staging_output` before writes. Live `models/` and
+`~/cover-data/models` (including symlink aliases and ancestors) must never be staging outputs.
+
 ## How to work in this repo (instructions for Claude Code)
 
 - You are the only developer. Decide technical matters yourself (libraries within the stack,

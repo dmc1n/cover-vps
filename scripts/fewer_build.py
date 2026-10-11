@@ -21,6 +21,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+from coverengine.staging import guard_staging_output
+
 PDFS = Path.home() / "cover-data/uploads/20261001-112212"
 COPY = (
     "model.glb",
@@ -54,6 +56,8 @@ def _pieces(model: Path) -> int | None:
 
 def merge_one(src: Path, out: Path, always: bool = False) -> dict[str, Any]:
     """A live cover's own parts joined and slivers absorbed, calculated in `out`."""
+    guard_staging_output(out, src)
+
     import trimesh
     from coverengine.drawing_route import JOINABLE, roll_mm
     from coverengine.drawn_merge import absorb_slivers, merge, model_parts
@@ -125,6 +129,7 @@ def main() -> int:
     ap.add_argument("--always", action="store_true", help="calculate even when nothing joins")
     ap.add_argument("--one-merge", help=argparse.SUPPRESS)
     a = ap.parse_args()
+    guard_staging_output(a.out, a.models)
     a.out.mkdir(parents=True, exist_ok=True)
     if a.one_merge:
         res = merge_one(a.models / a.one_merge, a.out / a.one_merge, a.always)
@@ -133,6 +138,7 @@ def main() -> int:
     jobs: list[tuple[str, list[str]]] = []
     for code in a.codes.split(",") if a.codes else []:
         model = a.out / f"drawing-{code.lower()}"
+        guard_staging_output(model)
         if model.exists():
             shutil.rmtree(model)
         jobs.append(
@@ -154,6 +160,7 @@ def main() -> int:
         skip = set(a.skip.split(",")) if a.skip else set()
         names = sorted(p.name for p in a.models.glob("drawing-*") if p.name not in skip)
     for name in names:
+        guard_staging_output(a.out / name, a.models / name)
         if (a.out / name).exists():
             shutil.rmtree(a.out / name)
         jobs.append(
