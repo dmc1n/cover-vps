@@ -18,6 +18,7 @@
       "sew": "/media/sew2.mp4",
       "pack": "/media/pack-sand.mp4",
       "frames": "/media/story4-"
-    }
+    },
+    "bbq_enabled": true
   }
 }

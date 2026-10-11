@@ -86,6 +86,8 @@ interface Info {
     indicative: boolean;
     languages: string[];
     matching: "shadow" | "auto";
+    /** the barbecues offered (ADR-119): off on the live shop until their prices are set */
+    bbq_enabled?: boolean;
     /** an existing cover's delivery promise per language (ADR-118); none: not shown */
     stock_delivery_note?: Record<string, string>;
   };
@@ -820,6 +822,7 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
             <p className="s-muted">{w("what")}</p>
             <ProductCards
               products={products}
+              bbq={!!info.settings.bbq_enabled}
               product={product}
               setProduct={setProduct}
               w={w}

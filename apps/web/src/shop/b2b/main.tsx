@@ -31,6 +31,8 @@ interface Info {
     };
   };
   settings: {
+    /** the barbecues offered (ADR-119) */
+    bbq_enabled?: boolean;
     company: Record<string, string>;
     logo_url: string;
     colours: string[];
@@ -632,6 +634,7 @@ function Configure({
         <p className="s-muted">{tx.w("what")}</p>
         <ProductCards
           products={products}
+          bbq={!!info.settings.bbq_enabled}
           product={product}
           setProduct={setProduct}
           w={(k) => tx.w(k)}

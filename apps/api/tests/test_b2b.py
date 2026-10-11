@@ -327,3 +327,28 @@ def test_restart_recovers_committed_undispatched_lines(app: Any) -> None:
     with TestClient(restarted):
         _drained(restarted)
     assert len(produced) == 1
+
+
+def test_b2b_has_the_barbecues_only_once_they_are_on(app: Any) -> None:
+    """ADR-119: an approved BBQ cover and BBQ quotes in B2B only with `bbq_enabled`."""
+    import json
+
+    admin = _admin(app)
+    dealer, _ = _dealer(app, admin)
+    d = app.state.store.models / "bbq-bge-large-nest"
+    d.mkdir(parents=True)
+    (d / "cover.json").write_text(
+        json.dumps({"match": {"kind": "bbq_kamado", "name": "BGE Large in nest"}})
+    )
+    (d / "model.json").write_text(json.dumps({"size_mm": [560, 720, 1140]}))
+    (d / "desk.json").write_text(json.dumps({"status": "approved"}))
+
+    def ids() -> list[str]:
+        return [i["model_id"] for i in dealer.get("/api/b2b/catalogue").json()["items"]]
+
+    assert "bbq-bge-large-nest" not in ids()
+    q = {"product": "bbq_gas", "rain": False}
+    assert dealer.post("/api/b2b/quote", json=q).status_code == 400
+    admin.put("/api/admin/shop/settings", json={"bbq_enabled": True})
+    assert "bbq-bge-large-nest" in ids()
+    assert dealer.post("/api/b2b/quote", json=q).status_code == 200

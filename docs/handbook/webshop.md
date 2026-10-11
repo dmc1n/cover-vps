@@ -18,6 +18,10 @@ An address the shop does not know shows "this page does not exist" (a real 404).
 
 ## Barbecues (ADR-119)
 
+**Off on the live shop until you set their prices:** Admin → **Shop settings** →
+`bbq_enabled`. While it is off, the shop, B2B and the public API show no barbecues; the preview
+site (preview.<domain>) always shows them, so you can try them there.
+
 Above the product cards the configurator has two choices: **Tuinmeubels** and **Barbecue**.
 Under Barbecue: a kamado (egg) in a nest, with or without side tables; a kamado in a table; a
 gas grill with side shelves; a pellet grill; a fire table or plancha (round or square). The

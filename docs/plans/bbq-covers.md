@@ -172,6 +172,9 @@ The BGE with EGG Mates keeps a small scrap piece at a 3° fold.
 
 ## The configurator option (ADR-119)
 
+**Off on the live shop and B2B until the owner sets the prices** (shop setting `bbq_enabled`, default off;
+the preview site always has it on).
+
 There is a **Garden furniture | Barbecue** choice above the product cards, in the shop and in
 B2B. The ranges are in `config/quote_products.json` (the defaults are the best sellers):
 

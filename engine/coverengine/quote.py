@@ -55,6 +55,8 @@ PRODUCTS: dict[str, dict[str, Any]] = {
     for k, v in json.loads(PRODUCTS_JSON.read_text(encoding="utf-8")).items()
     if not k.startswith("_")
 }  # fmt: skip
+# the furniture alone (the photo suggestion offers no barbecues yet, ADR-119)
+FURNITURE = {k: v for k, v in PRODUCTS.items() if v["group"] != "bbq"}
 
 
 def _p(params: EffectiveParams, key: str) -> float:
@@ -65,8 +67,9 @@ def colours(params: EffectiveParams) -> list[str]:
     return [c.strip() for c in str(params["quote.colours"]).split(",") if c.strip()]
 
 
-def options(params: EffectiveParams) -> dict[str, Any]:
-    """What the configurator shows: the products, their fields and the options."""
+def options(params: EffectiveParams, bbq: bool = True) -> dict[str, Any]:
+    """What the configurator shows: the products, their fields and the options. `bbq` False:
+    without the barbecues (the shop's `bbq_enabled` is off, ADR-119)."""
     return {
         "products": {
             k: {
@@ -85,6 +88,7 @@ def options(params: EffectiveParams) -> dict[str, Any]:
                 ],  # fmt: skip
             }
             for k, v in PRODUCTS.items()
+            if bbq or v["group"] != "bbq"
         },
         "options": {
             "vents": True,

@@ -109,6 +109,9 @@ SHOP_DEFAULTS: dict[str, Any] = {
     # an existing cover's delivery promise per language (ADR-118); empty: not shown. Never shown
     # for a made-to-measure cover, which has a production time
     "stock_delivery_note": {"nl": "", "en": "", "de": "", "fr": ""},
+    # the barbecues in the configurator, its quotes, matching and B2B (ADR-119): off until the
+    # owner has set their prices; the preview site (preview.<domain>) always has them
+    "bbq_enabled": False,
     "fit_mail": {"enabled": False, "days": 14},
     # ADR-066: the website runs elsewhere (its own domain, on Cloudflare) and reaches this
     # server through a key; closed: the shop here answers only the website and colleagues
@@ -372,6 +375,22 @@ def link_ok(auth: Any, request: Request) -> bool:
     hashes = [stored] if isinstance(stored, str) else list(stored)  # one per Worker
     given = hashlib.sha256(key.encode()).hexdigest()
     return bool(key) and any(h and secrets.compare_digest(given, str(h)) for h in hashes)
+
+
+def bbq_on(auth: Any, request: Request) -> bool:
+    """The barbecues are offered (ADR-119): the shop setting `bbq_enabled`, or a request from the
+    preview website (the Worker's key, its host preview.<domain>) so the owner can try them."""
+    s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
+    if s.get("bbq_enabled"):
+        return True
+    host = request.headers.get("x-forwarded-host", "")
+    return host.startswith("preview.") and link_ok(auth, request)
+
+
+def bbq_refused(product: str, auth: Any, request: Request) -> None:
+    """A barbecue asked for while they are off: as an unknown product."""
+    if product.startswith("bbq_") and not bbq_on(auth, request):
+        raise HTTPException(400, f"unknown product {product!r}")
 
 
 def shop_root(auth: Any, request: Request) -> str:
@@ -877,7 +896,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         return {"draft": site.read("draft")}
 
     # ---- the shop (public) ------------------------------------------------------------------
-    def public_settings() -> dict[str, Any]:
+    def public_settings(request: Request | None = None) -> dict[str, Any]:
         s = settings()
         p = shop_params(auth)
         return {
@@ -898,6 +917,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             "indicative": bool(prices.current(auth).get("indicative", True)),
             "languages": site_languages(auth),
             "matching": str(p["match.mode"]),
+            "bbq_enabled": request is not None and bbq_on(auth, request),
             "stock_delivery_note": {
                 k: str(v).strip()
                 for k, v in (s["stock_delivery_note"] or {}).items()
@@ -912,7 +932,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         content = site.read("draft" if draft else "live")
         content["legal"] = shop_legal.texts(content, settings()["company"])  # drafts (ADR-103)
         return {"content": content, "preview": bool(draft),
-                "settings": public_settings(), "options": q.options(shop_params(auth))}  # fmt: skip
+                "settings": public_settings(request),
+                "options": q.options(shop_params(auth), bbq_on(auth, request))}  # fmt: skip
 
     def _stock(model_id: str, product: str, p: Any) -> dict[str, Any]:
         """A cover of our range for this furniture: a SUNS cover, or a drawing cover while it is
@@ -987,6 +1008,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     @app.post("/api/shop/quote")
     def shop_quote(req: ShopQuote, request: Request) -> dict[str, Any]:
         limit(request)
+        bbq_refused(req.product, auth, request)
         return _quote(req)
 
     @app.get("/api/shop/scene/{qid}.glb")
@@ -1117,6 +1139,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
 
         limit(request)
         no_bots(req.website)
+        bbq_refused(req.product, auth, request)
         p = shop_params(auth)
         mode = str(p["match.mode"])
         email = (req.email or "").strip()

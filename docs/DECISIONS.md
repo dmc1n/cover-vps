@@ -3939,6 +3939,14 @@ best-selling luxury BBQs (Big Green Egg etc.) — we are a premium cover, so pre
 load all these models and make a proposal for a cover." Research and the ranked list:
 docs/plans/bbq-covers.md (Dutch summary) and docs/plans/bbq-covers-research.md (sizes, sources).
 
+- **Off on the live shop until the prices are set** (the coordinator, 11 Oct 2026: the provisional
+  costing gives about €475 for a kamado cover and €880 for a gas-grill cover, the makers' own cost
+  €45–240). Shop setting `bbq_enabled` (default off, Admin → Shop settings): off, the shop's and
+  B2B's options, quotes, matching, the B2B catalogue and the public API (ADR-061) have no
+  barbecues; a BBQ product is refused as unknown. The preview website always has them: a
+  request through the Worker's key from a `preview.` host (`shop.bbq_on`), and
+  apps/site/preview-overlay.json sets `bbq_enabled` for the page. The photo suggestion offers
+  furniture only (`quote.FURNITURE`).
 - **A cover goes on a cold barbecue.** Acrylic canvas is not heat-proof; the shop says so in
   every language (`bbq_cold`), the proposal carries `cold_only`. The room under the cover is for
   handles, thermometers, hinges and the top vent, not for heat.

@@ -733,7 +733,16 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
 
     from coverapi import mailer, match_list, prices
     from coverapi.security import SESSION_COOKIE, _address, _https, require
-    from coverapi.shop import SHOP_DEFAULTS, SHOP_SETTING, link_ok, merged, shop_params, shop_root
+    from coverapi.shop import (
+        SHOP_DEFAULTS,
+        SHOP_SETTING,
+        bbq_on,
+        bbq_refused,
+        link_ok,
+        merged,
+        shop_params,
+        shop_root,
+    )
 
     db = Store(auth.path)
     app.state.b2b = db
@@ -961,7 +970,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         _, company = customer(request)
         ps = prices.current(auth)
         channel = channel_of(ps, company)
-        products = set(q.options(shop_params(auth))["products"])
+        products = set(q.options(shop_params(auth), bbq_on(auth, request))["products"])
         items = []
         for c in mt.cards(store.models, None, match_list.for_data(data)):
             if c["kind"] not in products:
@@ -1035,6 +1044,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
     def b2b_quote(req: QuoteIn, request: Request) -> dict[str, Any]:
         limit(request)
         _, company = customer(request)
+        bbq_refused(req.product, auth, request)
         return make_quote(req, company)
 
     @app.get("/api/b2b/scene/{qid}.glb")

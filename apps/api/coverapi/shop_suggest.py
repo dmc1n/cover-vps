@@ -349,7 +349,7 @@ def ask(
 
     from coverengine.ai import ask_parts
     from coverengine.params import Registry
-    from coverengine.quote import PRODUCTS
+    from coverengine.quote import FURNITURE as PRODUCTS
 
     vision = Registry.load(None).resolve(trial={
         "ai.provider": str(params["ai.vision_provider"]),
@@ -476,7 +476,7 @@ def identify(params: Any, png: bytes, names: list[str] | None = None) -> dict[st
     """What the photo shows (ADR-092): product type, brand and model when recognisable,
     materials, distinctive features, estimated sizes and the queries to search with. `names`:
     what the search by image's matching pictures and pages are called (ADR-112)."""
-    from coverengine.quote import PRODUCTS
+    from coverengine.quote import FURNITURE as PRODUCTS
 
     n = int(params["suggest.queries"])  # type: ignore[arg-type]
     keys = "; ".join(f"{k} ({v['label']})" for k, v in PRODUCTS.items())
@@ -946,7 +946,7 @@ def _traced(c: dict[str, Any], pg: dict[str, Any]) -> dict[str, Any]:
 def proposal(ans: dict[str, Any]) -> dict[str, Any]:
     """The AI's answer checked against the configurator: a known product, every size within its
     range (clipped and flagged), and which sizes the customer must check."""
-    from coverengine.quote import PRODUCTS
+    from coverengine.quote import FURNITURE as PRODUCTS
 
     product = str(ans.get("product") or "")
     if product not in PRODUCTS:

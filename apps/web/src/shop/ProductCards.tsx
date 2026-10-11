@@ -6,15 +6,19 @@ export function ProductCards({
   setProduct,
   w,
   name,
+  bbq,
 }: {
   products: Record<string, { group?: string | null }>;
   product: string;
   setProduct: (k: string) => void;
   w: (key: string) => string;
   name: (key: string) => string;
+  /** the barbecues are on (the shop setting bbq_enabled, ADR-119) */
+  bbq: boolean;
 }) {
   const groupOf = (k: string) => products[k]?.group ?? "furniture";
-  const groups = [...new Set(Object.keys(products).map(groupOf))];
+  const keys = Object.keys(products).filter((k) => bbq || groupOf(k) !== "bbq");
+  const groups = [...new Set(keys.map(groupOf))];
   const current = groupOf(product);
   return (
     <>
@@ -27,8 +31,7 @@ export function ProductCards({
               aria-selected={g === current}
               className={`s-chip ${g === current ? "on" : ""}`}
               onClick={() =>
-                g !== current &&
-                setProduct(Object.keys(products).find((k) => groupOf(k) === g)!)
+                g !== current && setProduct(keys.find((k) => groupOf(k) === g)!)
               }
             >
               {w(`group_${g}`)}
@@ -37,7 +40,7 @@ export function ProductCards({
         </div>
       )}
       <div className="s-products">
-        {Object.keys(products)
+        {keys
           .filter((k) => groupOf(k) === current)
           .map((k) => (
             <button
