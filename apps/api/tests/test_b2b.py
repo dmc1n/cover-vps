@@ -3,6 +3,8 @@ studio's lock-outs, prices ex VAT from the company's price list (and its own fix
 orders on account into the studio's production flow, and nothing for anyone not logged in."""
 
 import json
+import sqlite3
+import time
 from pathlib import Path
 from typing import Any
 
@@ -150,7 +152,8 @@ def test_an_order_on_account_goes_to_the_studio_orders_flagged_b2b(app: Any) -> 
     a = dealer.post("/api/b2b/quote", json={"product": "item", "rain": False}).json()
     stock = {"product": "dining_set", "rain": False, "stock_model": "suns-dining-table-a-240"}
     b = dealer.post("/api/b2b/quote", json=stock).json()
-    body = {"lines": [{"quote_id": a["id"], "qty": 3}, {"quote_id": b["id"], "qty": 1}],
+    body = {"idempotency_key": "checkout-main",
+            "lines": [{"quote_id": a["id"], "qty": 3}, {"quote_id": b["id"], "qty": 1}],
             "address_id": addr["id"], "po": "PO-2026-118", "lang": "nl"}  # fmt: skip
     # without the CSRF token from the session, no order
     no_csrf = TestClient(app, cookies=dealer.cookies)
@@ -184,11 +187,17 @@ def test_an_order_on_account_goes_to_the_studio_orders_flagged_b2b(app: Any) -> 
     assert admin.get(f"/api/admin/b2b/orders?company={cid}").json()["orders"][0]["id"] == o["order"]
     # a minimum order
     admin.put("/api/admin/b2b/settings", json={"min_order_eur": 100000})
-    small = dealer.post("/api/b2b/order", json={"lines": [{"quote_id": a["id"], "qty": 1}]})
+    small = dealer.post(
+        "/api/b2b/order",
+        json={"idempotency_key": "checkout-other", "lines": [{"quote_id": a["id"], "qty": 1}]},
+    )
     assert small.status_code == 400 and "minimum" in small.json()["detail"]
     # another company cannot order this company's prices
     other, _ = _dealer(app, admin, "buyer@other.example", name="Other BV")
-    stolen = other.post("/api/b2b/order", json={"lines": [{"quote_id": a["id"], "qty": 1}]})
+    stolen = other.post(
+        "/api/b2b/order",
+        json={"idempotency_key": "checkout-other", "lines": [{"quote_id": a["id"], "qty": 1}]},
+    )
     assert stolen.status_code == 404
 
 
@@ -240,3 +249,81 @@ def test_the_b2b_page_is_served_and_never_indexed(tmp_path: Path) -> None:
     r = TestClient(a).get("/shop/b2b/welcome/abc")
     assert r.text == "<html>b2b</html>" and "noindex" in r.headers["x-robots-tag"]
     assert TestClient(a).get("/shop/de/b2b").status_code == 200  # the shop's own page, not ours
+
+
+def _checkout(dealer: TestClient, key: str = "checkout-test") -> dict[str, Any]:
+    q = dealer.post("/api/b2b/quote", json={"product": "item", "rain": False}).json()
+    return {"idempotency_key": key, "lines": [{"quote_id": q["id"], "qty": 1}]}
+
+
+def _drained(app: Any) -> None:
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        with sqlite3.connect(app.state.auth.path) as c:
+            if not c.execute("SELECT 1 FROM b2b_dispatch WHERE dispatched=0").fetchone():
+                return
+        time.sleep(0.01)
+    pytest.fail("production outbox did not drain")
+
+
+def test_checkout_rolls_back_all_rows_on_middle_failure(app: Any) -> None:
+    dealer, _ = _dealer(app, _admin(app))
+    body = _checkout(dealer)
+    body["lines"] *= 2
+    with sqlite3.connect(app.state.auth.path) as c:
+        c.execute(
+            "CREATE TRIGGER fail_second_line BEFORE INSERT ON orders "
+            "WHEN (SELECT COUNT(*) FROM orders)=1 "
+            "BEGIN SELECT RAISE(ABORT, 'injected failure'); END"
+        )
+    with pytest.raises(sqlite3.IntegrityError, match="injected failure"):
+        dealer.post("/api/b2b/order", json=body)
+    with sqlite3.connect(app.state.auth.path) as c:
+        for table in ("orders", "b2b_orders", "b2b_dispatch"):
+            assert c.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+        c.execute("DROP TRIGGER fail_second_line")
+    assert not app.state.produced
+    assert dealer.post("/api/b2b/order", json=body).status_code == 200
+    _drained(app)
+
+
+def test_checkout_retry_returns_original_without_dispatching_twice(app: Any) -> None:
+    admin = _admin(app)
+    dealer, _ = _dealer(app, admin)
+    body = _checkout(dealer)
+    missing = {k: v for k, v in body.items() if k != "idempotency_key"}
+    assert dealer.post("/api/b2b/order", json=missing).status_code == 400
+    first = dealer.post("/api/b2b/order", json=body)
+    assert first.status_code == 200
+    _drained(app)
+    n = len(app.state.mails)
+    # Returning the original must not depend on quotes or today's minimum order.
+    (app.state.store.root / "b2b_quotes" / f"{body['lines'][0]['quote_id']}.json").unlink()
+    admin.put("/api/admin/b2b/settings", json={"min_order_eur": 100000})
+    assert dealer.post("/api/b2b/order", json=body).json() == first.json()
+    assert len(app.state.produced) == 1 and len(app.state.mails) == n
+    with sqlite3.connect(app.state.auth.path) as c:
+        assert c.execute("SELECT COUNT(*) FROM b2b_orders").fetchone()[0] == 1
+        assert c.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 1
+    admin.put("/api/admin/b2b/settings", json={"min_order_eur": 0})
+    other, _ = _dealer(app, admin, "other@dealer.example")
+    assert (
+        other.post("/api/b2b/order", json=_checkout(other)).json()["order"] != first.json()["order"]
+    )
+    _drained(app)
+
+
+def test_restart_recovers_committed_undispatched_lines(app: Any) -> None:
+    dealer, _ = _dealer(app, _admin(app))
+    app.state.shop_produce = None  # commit succeeds, but dispatch cannot start
+    first = dealer.post("/api/b2b/order", json=_checkout(dealer)).json()
+    assert not app.state.produced
+    restarted = create_app(app.state.store.root, login_required=True)
+    produced: list[int] = []
+    restarted.state.shop_produce = produced.append
+    with TestClient(restarted):
+        _drained(restarted)
+    assert produced == [first["lines"][0]["order_id"]]
+    with TestClient(restarted):
+        _drained(restarted)
+    assert len(produced) == 1

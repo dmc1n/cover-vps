@@ -249,7 +249,7 @@ Prices & costing → Channels → Import prices (Excel)   a price list as fixed 
 COVER_DATA_DIR=~/cover-data uv run python scripts/prices_import.py FILE [--channel b2c] [--incl-vat|--ex-vat] [--json OUT] [--apply]
                                              the same matching report; --apply writes the draft, never publishes (ADR-113)
 apps/web/e2e/priceimport.py                 the import in a real browser (sample: e2e/priceimport_sheet.py; usage in its docstring)
-<website>/b2b, Admin → B2B customers        the B2B shop: business logins, own prices ex VAT, orders on account (ADR-104)
+<website>/b2b, Admin → B2B customers        the B2B shop: business logins, own prices ex VAT, orders on account with atomic checkout, retry keys and restart dispatch recovery (ADR-104)
 apps/web/e2e/b2b.py                         the B2B shop in a real browser (ADR-104; usage in its docstring)
 apps/web/e2e/measure.py                     Measure, Vent sizes, the check list and measured fits in a real browser (ADR-111)
 Arrangements → Send to the Desk; Desk → ARR   an arrangement approved by Rens or Wout; a change reopens it; DXF after approval (ADR-115)
