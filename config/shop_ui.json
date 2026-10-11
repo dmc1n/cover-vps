@@ -199,7 +199,9 @@
   },
   "match_custom_cta": {
    "nl": "Op maat laten maken",
-   "en": "Have it made to measure"
+   "en": "Have it made to measure",
+   "de": "Nach Maß anfertigen lassen",
+   "fr": "Faire fabriquer sur mesure"
   },
   "match_chosen": {
    "nl": "Gekozen: bestaande hoes {name}",
@@ -466,6 +468,54 @@
    "en": "{n} s — usually done within a minute",
    "de": "{n} s — meist in einer Minute fertig",
    "fr": "{n} s — généralement prêt en une minute"
+  },
+  "stock_badge": {
+   "nl": "Bestaande hoes uit ons assortiment",
+   "en": "An existing cover from our range",
+   "de": "Fertige Schutzhülle aus unserem Sortiment",
+   "fr": "Housse existante de notre gamme"
+  },
+  "stock_fits": {
+   "nl": "Past op {size}",
+   "en": "Fits {size}",
+   "de": "Passt auf {size}",
+   "fr": "Convient pour {size}"
+  },
+  "stock_height_max": {
+   "nl": "tafelhoogte tot {cm} cm",
+   "en": "table height up to {cm} cm",
+   "de": "Tischhöhe bis {cm} cm",
+   "fr": "hauteur de table jusqu'à {cm} cm"
+  },
+  "stock_price": {
+   "nl": "Prijs van deze hoes, incl. btw",
+   "en": "Price of this cover, incl. VAT",
+   "de": "Preis dieser Schutzhülle, inkl. MwSt.",
+   "fr": "Prix de cette housse, TVA incluse"
+  },
+  "stock_discount": {
+   "nl": "met {pct} % korting op een bestaande hoes",
+   "en": "with {pct} % off an existing cover",
+   "de": "mit {pct} % Rabatt auf eine fertige Schutzhülle",
+   "fr": "avec {pct} % de remise sur une housse existante"
+  },
+  "order_direct": {
+   "nl": "Bestel direct",
+   "en": "Order now",
+   "de": "Direkt bestellen",
+   "fr": "Commander directement"
+  },
+  "stock_named": {
+   "nl": "Bestaande hoes: {name}",
+   "en": "Existing cover: {name}",
+   "de": "Fertige Schutzhülle: {name}",
+   "fr": "Housse existante : {name}"
+  },
+  "thanks_stock": {
+   "nl": "Je bestelling van een bestaande hoes uit ons assortiment is ontvangen. Je krijgt een bevestiging per e-mail; de betaalgegevens volgen.",
+   "en": "We have your order for an existing cover from our range. You get a confirmation by e-mail; the payment details follow.",
+   "de": "Wir haben deine Bestellung einer fertigen Schutzhülle aus unserem Sortiment. Du bekommst eine Bestätigung per E-Mail; die Zahlungsdaten folgen.",
+   "fr": "Nous avons reçu votre commande d'une housse existante de notre gamme. Vous recevez une confirmation par e-mail ; les informations de paiement suivent."
   }
  },
  "status": {

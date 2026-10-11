@@ -2,6 +2,12 @@
   "content": {},
   "settings": {
     "home_story": true,
+    "stock_delivery_note": {
+      "nl": "Vandaag besteld, morgen in huis",
+      "en": "Ordered today, delivered tomorrow",
+      "de": "Heute bestellt, morgen geliefert",
+      "fr": "Commandé aujourd'hui, livré demain"
+    },
     "story_media": {
       "hero": "/media/hero-kota1-h264.mp4",
       "hero_av1": "/media/hero-kota1-av1.mp4",

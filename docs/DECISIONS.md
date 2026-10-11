@@ -3743,3 +3743,48 @@ models with status "new", unnamed and without a way to send them or to see what 
   gutter, and the fit row did not wrap).
 - **Better later:** the smooth plan drawn from the built cover's own outline; a per-member
   check that the arrangement's pieces still match the member's latest cover.
+
+## ADR-118 — An existing cover is ordered directly: its own name, price and delivery promise
+
+The owner (9 Oct 2026, preview): "I chose an existing cover, 'SUNS cover dining tables – Table
+240x100', it fits 100 %, but it still shows the price of making it custom. It should say ORDER
+DIRECTLY! with the right price; in this test version it may also say 'ordered today, delivered
+tomorrow'." (Numbered 118: two branches already claim 116.)
+
+- **Why he saw the custom price:** the stock choice did reach the server and took the stock
+  path (his quotes `44118ff3…` and `d9dce5dd…`, 18:57 and 18:58, carry `stock_model:
+  drawing-t10`). But the price list was only in the draft (published at 18:59), and
+  `stock_discount_pct` was not set, so the stock price was the configurator's price for that
+  cover's own sizes: € 1 368,95, to the cent the custom quote for 240 × 100 with chairs (the
+  chairs' height decides the cover, not the table's 86 cm ceiling). And the page showed both
+  the same way: "Total", pieces, m², "Order". After publishing, the same quote gives € 849 (the
+  fixed B2C price; checked on a scratch copy of the live data). Also found: a custom quote still
+  on its way could overwrite the stock one (no abort), and while the stock quote loaded the old
+  custom price stayed on screen; both fixed.
+- **The existing-cover state:** with a stock model chosen, the configurator shows a green card
+  instead of the size sliders and the made-to-measure price: the badge "Bestaande hoes uit ons
+  assortiment", the cover's own name, "Past op 240 × 100 cm, tafelhoogte tot 86 cm", "Prijs van
+  deze hoes, incl. btw" with its price (a "with N % off" line only when the discount made it),
+  the delivery promise, a large **Bestel direct** button and "← Op maat laten maken". Nothing
+  about pieces, m² or made to measure; the vents box is hidden (the cover comes as it is made;
+  the quote is asked with vents on). The price is shown only for a quote that belongs to the
+  current choice (`quote.stock.model_id === stock`); a stale answer is aborted.
+- **The quote** (`/api/shop/quote`) returns `stock.size_cm`, `height_max`, `price_source`
+  (`fixed`: the published B2C fixed price; `stock`: the configurator's for its sizes minus
+  `stock_discount_pct`), `discount_pct` and `price_eur`. A published fixed price is not
+  indicative (`price.indicative` false). A fixed price only in the draft is never sold.
+- **Delivery promise:** shop setting `stock_delivery_note` (text per language, Admin → Shop
+  settings; empty = hidden, the default on the live shop). Public settings carry only the
+  languages that have a text. Shown only for existing covers (configurator, checkout, thanks),
+  never for made-to-measure ones, which have a production time. The preview sets it in
+  `apps/site/preview-overlay.json`: "Vandaag besteld, morgen in huis" / "Ordered today,
+  delivered tomorrow" / "Heute bestellt, morgen geliefert" / "Commandé aujourd'hui, livré demain".
+- **Checkout and order:** the checkout is titled "Bestel direct" with "Bestaande hoes: <name>"
+  and the promise; the order stores `stock` (model, name, sizes, price and its source), the
+  answer and the status page name the existing cover, the thanks says it is an existing cover
+  from our range, and the staff mail says "EXISTING COVER <name> (<model>)".
+- **Tests:** `apps/api/tests/test_shop_stock_order.py` (stock quote = fixed price, custom quote
+  differs; draft price not sold; the setting; the order); `apps/web/e2e/stock_order.py` in a
+  real browser at 1440 and 390 px (screenshots in out/stockorder/).
+- **Better later:** a stock count per cover (the promise only while it is on the shelf); the
+  furniture's photo on the card; the customer's colour checked against what is in stock.
