@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Blender 4.2 (Cycles, CPU) in the Playwright image, which has the X libraries the host lacks
-# (ADR-108, ADR-114). Gentle on the shared server: nice 19, at most CPUS cores and MEM memory,
+# (ADR-108, ADR-116). Gentle on the shared server: nice 19, at most CPUS cores and MEM memory,
 # one render at a time. The container runs as you, so its files are yours; paths under /home/dev
 # are the same inside and out.
 #

@@ -1,4 +1,4 @@
-"""The scroll story's chapters and the website's clips, path-traced from our own data (ADR-114).
+"""The scroll story's chapters and the website's clips, path-traced from our own data (ADR-116).
 
 The same scene parts as the start film (render_hero.py: the stone terrace, the Kota sofa, the
 sand Coverlast with its real stitching, the rain check's paths), one shot per call:
@@ -1008,7 +1008,7 @@ def shot_cut(a, d, reel):
     dirv = Vector((*(a1 - a0), 0)).normalized()
     side = Vector((-dirv.y, dirv.x, 0))
     head.rotation_euler.z = math.atan2(dirv.y, dirv.x)
-    cam, aim = camera(85, 4.0, portrait=True)
+    cam, aim = camera(55, 4.0, portrait=True)
     run = 0.9  # metres the knife cuts in the clip
     total = float(np.linalg.norm(a1 - start))
 
@@ -1018,8 +1018,8 @@ def shot_cut(a, d, reel):
         live.data.bevel_factor_end = max(frac, 1e-3)
         p = Vector(path3[0]).lerp(Vector(path3[1]), frac)
         head.location = p
-        cam.location = p - dirv * 0.62 - side * 0.5 + Vector((0, 0, 0.26))
-        aim.location = p + dirv * 0.04
+        cam.location = p - dirv * 0.75 - side * 0.65 + Vector((0, 0, 0.5))
+        aim.location = p + dirv * 0.12 + Vector((0, 0, 0.03))
 
     return frame
 
@@ -1062,8 +1062,8 @@ def shot_vent(a, d, reel):
     def frame(f, n_):
         k = ease((f - 1) / (n_ - 1))
         sweep = -0.5 + 0.7 * k
-        cam.location = c + n * 0.55 + side * (0.25 + 0.3 * sweep) + Vector((0, 0, -0.2))
-        aim.location = c + Vector((0, 0, -0.09))
+        cam.location = c + n * 0.6 + side * (0.25 + 0.3 * sweep) + Vector((0, 0, -0.11))
+        aim.location = c + Vector((0, 0, -0.07))
 
     return frame
 
@@ -1226,11 +1226,11 @@ def ibiza_scene(a: argparse.Namespace):
         return m
 
     # the sea, far below the terrace, to the horizon
-    sea = rh.simple("sea", "0d2f3f", 0.06)
+    sea = rh.simple("sea", "1b4a5e", 0.22)
     sn = sea.node_tree
     sb = sn.nodes["Principled BSDF"]
     sb.inputs["IOR"].default_value = 1.33
-    sb.inputs["Specular IOR Level"].default_value = 0.6
+    sb.inputs["Specular IOR Level"].default_value = 0.35
     tc = node(sn, "ShaderNodeTexCoord")
     mp = node(sn, "ShaderNodeMapping")
     mp.inputs["Scale"].default_value = (0.06, 0.18, 0.06)
@@ -1265,8 +1265,8 @@ def ibiza_scene(a: argparse.Namespace):
     bpy.ops.object.transform_apply(scale=True)
     fl.data.materials.append(floor_mat)
     white = rh.pbr("lime", a.assets / "white_stucco", 2.0, tint=(1.15, 1.12, 1.06, 1), normal=0.8)
-    rh.box("parapet", (0.5, 2.55, 0.42), (14, 0.34, 0.84), white)
-    rh.box("cap", (0.5, 2.55, 0.865), (14.1, 0.4, 0.05), white)
+    rh.box("parapet", (0.5, 2.55, 0.3), (14, 0.34, 0.6), white)
+    rh.box("cap", (0.5, 2.55, 0.625), (14.1, 0.4, 0.05), white)
     rh.box("backwall", (-6.6, -1.0, 1.6), (0.4, 7.0, 3.2), white)
     rh.box("sidewall", (0.5, -4.6, 1.6), (14, 0.4, 3.2), white)
     # the pergola: four posts, two beams, slats; its shade falls across the terrace

@@ -51,5 +51,5 @@ Note column.
 | Blender 4.2 LTS | GPL-3.0-or-later | renders the website's films offline (ADR-065, ADR-071, ADR-108); not shipped |
 | FFmpeg (static build, libaom, libx264) | GPL-3.0 | encodes the films offline (ADR-108); not shipped |
 | Poly Haven assets: HDRIs *hotel_rooftop_balcony*, *kloofendal_overcast*; textures *stretch_poplin*, *large_grey_tiles*, *white_plaster_02*, *concrete_floor_02*; model *potted_plant_04* | CC0-1.0 | the hero film's light, weave, stone, plaster and plant (`scripts/film/hero_assets.py`, ADR-108) |
-| Poly Haven assets for the story and the clips: textures *terracotta_floor_tiles*, *white_stucco*, *rough_wood*; models *potted_plant_01*, *island_tree_02* | CC0-1.0 | the villa on Ibiza and the clips (`scripts/film/hero_assets.py`, ADR-114) |
-| Work Sans (Google Fonts, `WorkSans[wght].ttf`) | OFL-1.1 | the dimension lines in the rendered story (fetched to the film assets, not in the repo; ADR-114) |
+| Poly Haven assets for the story and the clips: textures *terracotta_floor_tiles*, *white_stucco*, *rough_wood*; models *potted_plant_01*, *island_tree_02* | CC0-1.0 | the villa on Ibiza and the clips (`scripts/film/hero_assets.py`, ADR-116) |
+| Work Sans (Google Fonts, `WorkSans[wght].ttf`) | OFL-1.1 | the dimension lines in the rendered story (fetched to the film assets, not in the repo; ADR-116) |

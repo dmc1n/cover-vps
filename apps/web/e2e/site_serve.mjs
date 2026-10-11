@@ -8,7 +8,7 @@
 //
 // --settings is laid over the shop settings in /api/shop/info, to look at a page the way the live
 // website shows it (for example the landing page without the scroll story). --media serves
-// /media/<file> from a local folder first (renders not yet on the website, ADR-114).
+// /media/<file> from a local folder first (renders not yet on the website, ADR-116).
 //
 // Used by apps/web/e2e/site_perf.py and site_rain.py.
 import { createServer } from "node:http";
@@ -110,7 +110,7 @@ async function media(req, res, path, size) {
 createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   try {
-    // media rendered here and not yet on the website (ADR-114): served from --media first
+    // media rendered here and not yet on the website (ADR-116): served from --media first
     if (MEDIA && /^\/media\/[a-z0-9_-]+\.[a-z0-9]+$/.test(url.pathname)) {
       const local = join(MEDIA, url.pathname.slice(7));
       const s = await stat(local).catch(() => null);

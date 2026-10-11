@@ -36,7 +36,7 @@ export function HeroFilm({
 }: {
   media: HeroMedia;
   className?: string;
-  /** fetch nothing, not even the poster, until the film comes near the screen (ADR-114) */
+  /** fetch nothing, not even the poster, until the film comes near the screen (ADR-116) */
   lazy?: boolean;
 }) {
   const film = Boolean(media.h264 || media.av1);

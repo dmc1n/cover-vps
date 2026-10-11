@@ -1,4 +1,4 @@
-// All the falling rain over the story's rain chapter, drawn in time (ADR-106, ADR-114).
+// All the falling rain over the story's rain chapter, drawn in time (ADR-106, ADR-116).
 //
 // The rendered frames (ADR-071) are scrubbed by the scroll, so anything baked into them moves
 // only when the visitor scrolls: baked drops stood still while reading and rose when scrolling
