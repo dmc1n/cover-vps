@@ -8,8 +8,10 @@
 //
 // ADR-121: the pictures carry no falling rain (only the wet look, which may follow the scroll);
 // every falling drop is RainLayer's, drawn by the clock, so it falls the same whether the visitor
-// stands still or scrolls either way. An upright screen loads the set's upright pictures
-// (`<set>m-001.webp`: 600 × 900 cut round the cover at full sharpness) when there are any.
+// stands still or scrolls either way. An upright screen shows the 960 × 900 cut round the cover
+// across its width, above the caption, on a soft blur of the picture (filled, it showed only a
+// hand's breadth of the cover); it loads the set's upright cuts (`<set>u-001.webp`) when there
+// are any.
 // Visitors who asked for less motion get one still per chapter (its last picture, all its work
 // done) and no falling rain.
 import { useCallback, useEffect, useRef } from "react";
@@ -27,10 +29,11 @@ const RAIN_FULL = 0.872;
 /** the still per chapter for less motion: the chapter's last picture */
 export const keyFrame = (chapter: number) =>
   Math.round(((chapter + 1) * FRAMES) / CHAPTERS) - 1;
-/** the upright screen's pictures beside a set: /media/story6- → /media/story6m- */
-export const smallSet = (base: string) => base.replace(/-$/, "m-");
-// an upright screen (a phone, a tablet held upright) shows only a narrow cut of a wide
-// picture: it takes that cut at full sharpness, a third of the bytes
+/** the upright screen's pictures beside a set: /media/story6- → /media/story6u- */
+export const smallSet = (base: string) => base.replace(/-$/, "u-");
+// an upright screen (a phone, a tablet held upright) shows the cut round the cover, 960 of the
+// 1600 pixels, across its width: it loads just that cut, at full sharpness
+const UPRIGHT_CUT = 960;
 const upright = () => window.innerHeight > window.innerWidth * 1.2;
 
 export function StoryFrames({
@@ -146,10 +149,34 @@ export function StoryFrames({
         const k = Math.max(W / img.width, H / img.height);
         const w = img.width * k;
         const h = img.height * k;
-        // (a portrait picture of the phone's set is already cut round the cover)
-        const focus = img.width < img.height ? 0.5 : FOCUS;
+        // (a picture of the upright set is already cut round the cover)
+        const focus = img.width < 1200 ? 0.5 : FOCUS;
         const x = Math.min(0, Math.max(W - w, W / 2 - focus * w));
-        ctx.drawImage(img, x, (H - h) / 2, w, h);
+        if (H > W * 1.2) {
+          // an upright screen: filled, the picture would show a hand's breadth of the cover;
+          // instead its cut round the cover across the full width, in the upper half above
+          // the caption, on a soft blur of itself
+          const f = W / Math.min(img.width, UPRIGHT_CUT);
+          ctx.filter = "blur(28px) brightness(0.92)";
+          ctx.drawImage(img, x, (H - h) / 2, w, h);
+          ctx.filter = "none";
+          const top = Math.round(H * 0.07);
+          const left = Math.min(
+            Math.max(focus * img.width - W / f / 2, 0),
+            img.width - W / f,
+          );
+          ctx.drawImage(
+            img,
+            left,
+            0,
+            W / f,
+            img.height,
+            0,
+            top,
+            W,
+            img.height * f,
+          );
+        } else ctx.drawImage(img, x, (H - h) / 2, w, h);
         shown = n;
       }
       requestAnimationFrame(draw);

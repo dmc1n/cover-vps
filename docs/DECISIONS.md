@@ -4135,3 +4135,26 @@ the scroll steps." Later that day: one more film, the cover at a villa on Ibiza 
   - Memory: Blender's exact limit surface on the sewn cover took 5.4 GB per cover
     (OpenSubdiv's patch tables); without it (`lean()`) 0.8 GB, the look the same. Wide shots
     use the stitching picture at half size.
+- **What was made** (CPU, nice 19, one render at a time; ~48 s a story picture, ~35 s a clip
+  frame, ~63 s an Ibiza frame):
+  - `story6-001…360.webp` (12.2 MB, 34 KB each) and `story6u-` (the 960 × 900 cut for upright
+    screens, 7.0 MB): the six chapters of storyboard 2. `story5-`/`story5u-`: the old studio set
+    with the rain chapter re-rendered without drops (the interim fix).
+  - Clips, 720 × 900, AV1 + H.264 about 1.1 MB each, posters: `work-cut-1`, `work-sew-1`,
+    `work-vent-1`, `work-fit-1`, `work-runoff-1`, `work-range-1`; the closing film
+    `villa-ibiza1` (1600 × 900 AV1 2.8 MB, 1280 × 720 H.264 2.9 MB, 6.6 s).
+  - The preview reads them from `apps/site/preview-overlay.json` (`story_media`). Until the
+    studio's next release the live content still lists the old work items (measuring, cutting,
+    sewing, delivering): cutting, sewing and delivering show our clips, measuring keeps the old
+    clip; the new items (vents, made to measure, rain, our range) and the villa's words come
+    with the release (content defaults).
+- **On a phone** the story drew the wide picture filled, which showed a hand's breadth of the
+  cover; it now shows the cut round the cover across the width above the caption, on a soft blur
+  of itself (`StoryFrames.tsx`).
+- **Checks:** `site_rain.py` green against `story5` and `story6`; `site_3d.py` green; the
+  Worker's tests and typecheck, the web typecheck, prettier, `make test`.
+- **Not yet as good as photographs:** the knife head in the cutting clip is a simple shape and
+  out of focus; the vent's hood reads as a soft flap; the catalogue covers other than the Kota
+  (the Sato lounger's drape sags into the seat, the Savona set is a box); the Ibiza light is
+  flat and the sea pale. Real footage of the cutting table, the sewing machine, a vent and a
+  fitted cover at a customer's would lift these most.

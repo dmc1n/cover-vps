@@ -1,7 +1,7 @@
 """The scroll story's picture set from rendered frames (ADR-071, ADR-121): 360 WEBP pictures for
-the desktop (`NAME-001.webp` …, 1600 × 900) and for upright screens (`NAMEm-001.webp`: 600 × 900
-cut round the cover, which the render frames at 0.6 of the width: what a phone shows of a wide
-picture, at full sharpness), plus a strip to look at the set at a glance.
+the desktop (`NAME-001.webp` …, 1600 × 900) and for upright screens (`NAMEu-001.webp`: the 960 × 900
+cut round the cover, which the render frames at 0.6 of the width; a phone shows it across its
+width above the caption, at full sharpness), plus a strip to look at the set at a glance.
 
 From the six chapters of render_reel.py (each 60 PNG frames, st1-0001.png …):
 
@@ -29,7 +29,7 @@ from PIL import Image
 FRAMES = 360
 CHAPTERS = 6
 FULL = 1600
-UPRIGHT = (600, 900)  # the cut for upright screens, in pictures of FULL width
+UPRIGHT = (960, 900)  # the cut for upright screens, in pictures of FULL width
 FOCUS = 0.6  # where the cover sits across the picture (StoryFrames.tsx's FOCUS)
 
 
@@ -79,7 +79,7 @@ def main() -> None:
         cw, ch = UPRIGHT
         x0 = min(max(round(FOCUS * FULL - cw / 2), 0), FULL - cw)
         y0 = max((im.height - ch) // 2, 0)
-        dst = a.out / f"{a.name}m-{n:03d}.webp"
+        dst = a.out / f"{a.name}u-{n:03d}.webp"
         im.crop((x0, y0, x0 + cw, y0 + ch)).save(dst, quality=a.quality, method=6)
         total["phone"] += dst.stat().st_size
         if n % 12 == 0:
