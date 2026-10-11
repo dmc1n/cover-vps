@@ -99,3 +99,20 @@ with one proposal, and to 8 % after taking the next two.
 
 A seam line may run on past the seam it meets: the part inside the next piece is not cut.
 
+
+## Box covers shaped for one model (ADR-117)
+
+For a box cover the approver wants laid out differently, four per-model tools; each is checked
+like any cover (furniture inside, water runs off, every piece on the roll):
+
+- **Straight wall tops** (`seams.straight_wall_tops: true` in cover.json): the top edge of every
+  wall is one straight line from corner to corner. The cover keeps its shape; the bit of wall
+  above that line is sewn to the roof piece as a flap folded down, with a short upright seam
+  under each corner of the roof. Used for the SUNS Sorrento and Avero sofas.
+- **Extra faces** (`hull.box_extra_faces`, e.g. `"0 1 1"`): a chamfer where the approver draws
+  one, given as the direction the face looks to (x to the right, y to the back, z up).
+- **Parts' plan** (`plan_members.json` in the model's folder): a corner sofa in one file built
+  like an arrangement, from the plan rectangles of its parts (an L with a square inner corner).
+- **Pieces by hand** (`box_shape.json`): every piece corner by corner in mm.
+
+A box top wider than the roll is always cut into strips whose seams run downhill.

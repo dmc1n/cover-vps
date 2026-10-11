@@ -78,5 +78,35 @@
     "check": "The audit's chairs check and engine/tests/test_outline.py::test_a_chair_is_no_table.",
     "applies_to": "box",
     "ai_model": "owner"
+  },
+  {
+    "time": 1791720000,
+    "model_id": "suns-daybed-portofino",
+    "complaint": "The top panel (1.85 m) does not fit the 1.48 m roll: split the panel (Rens at the Desk, 9 Oct 2026, question 16).",
+    "cause": "Only the arrangements' and the follow covers' tops were cut into strips when wider than the roll; a plain (convex) box cover kept a too-wide top face as one piece and only reported it.",
+    "rule": "Every box cover's top face wider than the roll is cut across its slope into strips whose seams run downhill (hull.json box.roll_cuts), after the gentle-fold joins, so no piece is wider than the roll.",
+    "check": "scripts/fewer_check.py and the audit's pieces check (a piece wider than the roll fails); engine/tests/test_answers_box.py::test_a_box_top_wider_than_the_roll_is_cut_in_strips.",
+    "applies_to": "box",
+    "ai_model": "approver"
+  },
+  {
+    "time": 1791720000,
+    "model_id": "suns-lounge-nuna-lounge-chair",
+    "complaint": "Follow the top view; at the side a chamfer instead of a bulge (Rens, 9 Oct 2026, question 3); a gentle gable on a follow cover was two pieces.",
+    "cause": "A follow cover (ADR-107) kept every top face as a piece: the gentle-fold join of ADR-099 ran only on convex box covers, and the audit took a curved wall's own facets for gentle folds.",
+    "rule": "A follow cover's flat top faces at a fold of at most seams.fold_join_max_deg are one piece with a fold line, as on any box cover; its curved walls keep their seams. A chamfer the approver asks for is a face added by hand (hull.box_extra_faces), never a curved cover.",
+    "check": "The audit's gentle folds check (curved pieces left out); engine/tests/test_answers_box.py.",
+    "applies_to": "box",
+    "ai_model": "approver"
+  },
+  {
+    "time": 1791720000,
+    "model_id": "2026-07-cover-s53-rc-v1",
+    "complaint": "For covers with an organic shape like S53 and S60, which have curved seams, follow the drawing; not for all covers (Rens, 9 Oct 2026, question 19).",
+    "cause": "ADR-100 made the cover model's own creases the seams for every given cover surface (seams.given_crease_deg 20 as the company default).",
+    "rule": "Creases as seams only for organic covers: seams.given_crease_deg is 0 by default and 20 in the family preset 'organic' (config/presets/organic.yaml); a cover joins it with \"family\": \"organic\".",
+    "check": "engine/tests/test_given_creases.py::test_creases_only_for_organic_covers.",
+    "applies_to": "given",
+    "ai_model": "approver"
   }
 ]

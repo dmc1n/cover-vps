@@ -49,6 +49,8 @@ class InfoRequest(BaseModel):
     status: str | None = None
     tags: list[str] | None = None
     notes: str | None = None
+    no_cover: bool | None = None  # true: kept, but not in the shop and not on the Desk
+    no_cover_reason: str | None = None
 
 
 class BatchRequest(BaseModel):

@@ -1,0 +1,8 @@
+{
+ "read": "Rens, Desk question 21 (9 Oct 2026): the Vento lounge (an L-shaped corner sofa in one file) built like the other L covers: its two arms' plan rectangles (mm, the model's frame, from the furniture's height map), each arm's top sloping to its own front, the inner corner square",
+ "footprint": "follow",
+ "rects": [
+  [[-1478, 343], [1478, 343], [1478, 1457], [-1478, 1457]],
+  [[322, -1457], [1478, -1457], [1478, 343], [322, 343]]
+ ]
+}

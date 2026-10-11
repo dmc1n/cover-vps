@@ -35,6 +35,11 @@ hull:                            # the cover surface (drape hull)
   box_ai: false                  # true: the AI chooses the number of pieces instead (a paid call each time)
   box_max_pieces: 10             # box cover: options tried, up to this many pieces
   box_volume_slack_pct: 5        # box cover without AI: extra volume allowed over the tightest box
+  box_extra_faces: ""            # per model: box faces added by hand, each the outward direction
+                                 # "x y z" (any length), ";" between them, e.g. "0 1 1" a 45 degree
+                                 # chamfer at the back (-y is the front); each face just clear of
+                                 # the furniture, its mirror images too on a symmetric cover (Rens,
+                                 # 9 Oct 2026, the Nuna: "a chamfer instead of a bulge"; ADR-117)
   plan: auto                     # auto | box | round | follow   a box cover's plan seen from above
                                  # (Rens, 8 Oct 2026; ADR-107): round = a round top (cone on the
                                  # support) on a round skirt; follow = walls on the furniture's own
@@ -95,10 +100,16 @@ seams:
                                  # skirt) that meet at a fold this gentle are one piece with a
                                  # fold line in pen, if it fits the roll (Rens, 8 Oct 2026: gable
                                  # tops of 10 degrees "can become one panel"; ADR-099); 0 = never
-  given_crease_deg: 20           # a cover surface of its own (hull.top: given): its creases
+  given_crease_deg: 0            # a cover surface of its own (hull.top: given): its creases
                                  # sharper than this are the seams, the pieces are what they
                                  # enclose (Rens, 8 Oct 2026: "follow the original model's
-                                 # seams"; ADR-100); 0 = the usual skirt and top seams
+                                 # seams"; ADR-100); 0 = the usual skirt and top seams. Not for
+                                 # every cover (Rens, 9 Oct 2026, ADR-117): organic covers with
+                                 # curved seams get 20 from config/presets/organic.yaml
+  straight_wall_tops: false      # per model (box covers): every wall's top edge one straight line
+                                 # from corner to corner; the wall above it goes to the roof pieces
+                                 # as folded-down flaps (Rens, 9 Oct 2026, the SUNS Sorrento and
+                                 # Avero sofas, "by hand for these models"; ADR-117)
   fold_merge: false              # true (per model, on the owner's request, ADR-055): neighbouring
                                  # top faces that lie flat together on the roll are one piece,
                                  # a fold line in pen instead of a seam

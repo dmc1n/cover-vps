@@ -18,6 +18,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from coverengine.catalogue import is_no_cover
 from coverengine.params import EffectiveParams
 
 MM_PER_CM = 10.0  # param-ok: units
@@ -85,13 +86,15 @@ def card(
     """A catalogue cover's size card: kind, the furniture's size (length ≥ width, height), the
     side of an L, whether it covers chairs, and how its drape went. A drawing cover has one only
     while it is offered: approved or produced at the Desk, its kind known and not in doubt
-    (match_drawings, ADR-114)."""
+    (match_drawings, ADR-114). A model marked "no cover" has none (Rens, 9 Oct 2026)."""
     if model_dir.name.startswith("drawing-"):
         return drawing_card(model_dir, listing, p, shared)
     try:
         cover = json.loads((model_dir / "cover.json").read_text())
         size = json.loads((model_dir / "model.json").read_text())["size_mm"]
     except (OSError, ValueError, KeyError):
+        return None
+    if is_no_cover(cover):
         return None
     category = str(cover.get("category") or "").split(" › ")[-1]
     s = sorted([size[0] / MM_PER_CM, size[1] / MM_PER_CM])[::-1] + [size[2] / MM_PER_CM]
@@ -171,6 +174,17 @@ def _drawing_stamp(dirs: list[Path]) -> float:
     return newest
 
 
+def _cover_stamp(dirs: list[Path]) -> float:
+    """The newest change to a model's cover.json (its category, a "no cover" mark)."""
+    newest = 0.0
+    for d in dirs:
+        try:
+            newest = max(newest, (d / "cover.json").stat().st_mtime)
+        except OSError:
+            pass
+    return newest
+
+
 def cards(
     models: Path,
     kinds: dict[str, str] | None = None,
@@ -185,6 +199,7 @@ def cards(
     dirs = sorted(models.glob("suns-*"))
     drawings = sorted(models.glob("drawing-*"))
     stamp = (str(models), len(dirs), max((d.stat().st_mtime for d in dirs), default=0.0),
+             _cover_stamp(dirs),  # a model marked "no cover" (or its category changed)
              len(drawings), _drawing_stamp(drawings), str((listing or {}).get("stamp")),
              json.dumps(kinds or {}, sort_keys=True),
              None if p is None else (str(p["match.drawing_statuses"]),

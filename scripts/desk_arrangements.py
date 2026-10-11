@@ -27,6 +27,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+from coverengine.catalogue import no_cover
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps" / "api"))
 
@@ -46,6 +48,9 @@ def plan(models: Path, only: set[str] | None = None) -> list[tuple[Path, str, st
         if only and d.name not in only:
             continue
         if not desk.is_arrangement(d) or not (d / "cover.json").is_file():
+            continue
+        if no_cover(d):
+            out.append((d, "skip", "needs no cover (not on the Desk)"))
             continue
         if not ((d / "finished.json").is_file() and (d / "cut.dxf").is_file()):
             out.append((d, "skip", "no cover built yet"))

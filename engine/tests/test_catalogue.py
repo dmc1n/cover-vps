@@ -50,6 +50,8 @@ def test_info_keeps_the_rest_of_cover_json(tmp_path: Path) -> None:
         "status": "checked",
         "tags": ["lounge", "sofa"],
         "notes": "hi",
+        "no_cover": False,  # an ordinary model (the mark: test_no_cover.py)
+        "no_cover_reason": "",
     }
     doc = json.loads((d / "cover.json").read_text())
     assert doc["parameters"] == {"hull": {"clearance_mm": 12}}

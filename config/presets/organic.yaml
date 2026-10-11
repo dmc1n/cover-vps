@@ -1,0 +1,8 @@
+# Family preset: organic covers (parameter layer 2, CLAUDE.md "Parameters"). A cover model of
+# its own (hull.top: given) with an organic shape and curved seams, like the customer covers S53
+# and S60. A model joins with "family": "organic" in its cover.json; its own settings still win.
+seams:
+  given_crease_deg: 20           # Rens, 9 Oct 2026 (Desk question 19): for covers with an organic
+                                 # shape like S53 and S60, which have curved seams, follow the
+                                 # drawing (the model's own creases sharper than this are the
+                                 # seams); not for all covers (ADR-117, ADR-100)

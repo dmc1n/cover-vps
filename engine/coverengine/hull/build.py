@@ -44,6 +44,7 @@ IntArray = NDArray[np.int64]
 
 FORMAT_VERSION = 1
 HULL_GLB, HULL_JSON, PREVIEW_GLB = "hull.glb", "hull.json", "preview.glb"
+PLAN_MEMBERS = "plan_members.json"  # a model's parts' plan rectangles, built as an arrangement
 HULL_PARTS = "hull_parts.npy"  # per face of hull.glb: the drawn piece (given covers drawn in parts)
 # Taubin smoothing filter coefficients (lambda, mu): the classic volume-preserving pair.
 TAUBIN = (0.5, 0.53)  # param-ok: filter coefficients, not a setting
@@ -303,6 +304,9 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
 
     hem = _p(params, "hull.hem_height_mm")
     model = trimesh.Trimesh(v, f, process=False)
+    by_hand = _hand(model_dir, model, v, f, params)
+    if by_hand is not None:
+        return by_hand
     # everything above the hem, with the furniture cut off at hem height: a slanting leg is one
     # long triangle from the floor up, with no corner points between (Basta 340: the cover was
     # 4 cm short at each end)
@@ -331,6 +335,14 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
     if planned is not None:
         return planned
     mesh, box, warnings, planes, solid = box_hull(points, model, params, product)
+    if bool(params["seams.straight_wall_tops"]):  # by hand for a model (ADR-117)
+        from coverengine.hull.hand import straight_tops
+
+        convex = solid.solid(planes)
+        if convex is not None:
+            straight = _hand(model_dir, model, v, f, params, straight_tops(convex, hem), box)
+            assert straight is not None
+            return straight
     from coverengine.arrange import ARRANGEMENT_JSON
 
     # an arrangement's plan is chosen on its page (ADR-095): the smoothed box stays the box
@@ -342,6 +354,12 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
         box = {**box, "pieces": int(parts.max()) + 1, "plan": plan_report}
     else:
         parts = None
+        if not arranged:  # a top face wider than the roll: cut lines downhill (ADR-117)
+            mesh, cuts, missed = _roll_cuts(mesh, params)
+            if cuts:
+                box = {**box, "roll_cuts": cuts}
+            if missed:
+                warnings.append(f"{missed} cut(s) of a top wider than the roll could not be made")
     if blocks or held:  # chairs and balloons widen the box on purpose: not a bay to follow
         warnings = [w for w in warnings if "far from a box" not in w]
     report = _plain_report(model_dir, mesh, v, f, params, "box", warnings)
@@ -359,6 +377,73 @@ def _box(model_dir: Path, v: Array, f: IntArray, params: EffectiveParams) -> Hul
     if keep:
         _remember(model_dir, keep)
     report["chairs"] = seated
+    return Hull(mesh, report, warnings, parts=parts)
+
+
+def _roll_cuts(
+    mesh: trimesh.Trimesh, params: EffectiveParams
+) -> tuple[trimesh.Trimesh, list[dict[str, Any]], int]:
+    """A convex box's top faces wider than the roll (rule 5) get lines across their slope, so
+    the cut can make them strips whose seams run downhill, as the arrangements' and the
+    follow covers' tops (Rens, 9 Oct 2026, the Portofino daybed's 1.85 m top; ADR-117). The
+    shape does not change; the cut step (seams/build.py) splits the piece along these lines
+    after its gentle-fold joins, so a join never undoes a split."""
+    from coverengine.hull.outline import SHIFTS_MM, cut
+    from coverengine.hull.plan import _wide_tops, flat_parts
+
+    usable = _p(params, "roll.usable_width_mm") - 2 * _p(params, "stitching.allowance_mm")
+    label = flat_parts(mesh)
+    n_face = np.asarray(mesh.face_normals)
+    made: list[dict[str, Any]] = []
+    missed = 0
+    for r, across, at_ in _wide_tops(mesh, label, usable):
+        own = (n_face[label == r] * np.asarray(mesh.area_faces)[label == r, None]).sum(axis=0)
+        own /= np.linalg.norm(own)
+        for x in at_:
+            for shift in SHIFTS_MM:  # a cut through a point already there tears: a hair beside
+                done = cut(mesh, across, x + shift)
+                if done is not mesh:
+                    mesh = done
+                    made.append({"normal": [round(float(c), 6) for c in own],
+                                 "across": [round(float(c), 6) for c in across],
+                                 "at_mm": round(float(x + shift), 3)})  # fmt: skip
+                    break
+            else:
+                missed += 1
+    if made:
+        from coverengine.hull.box import EDGE_MM
+
+        v, f = trimesh.remesh.subdivide_to_size(mesh.vertices, mesh.faces, max_edge=EDGE_MM)
+        mesh = trimesh.Trimesh(v, f, process=True)
+    return mesh, made, missed
+
+
+def _hand(
+    model_dir: Path,
+    model: trimesh.Trimesh,
+    v: Array,
+    f: IntArray,
+    params: EffectiveParams,
+    spec: dict[str, Any] | None = None,
+    box: dict[str, Any] | None = None,
+) -> Hull | None:
+    """A box cover shaped by hand for this model (box_shape.json), or the box's own faces cut
+    with straight wall tops (`spec` given, seams.straight_wall_tops; ADR-117); None without."""
+    from coverengine.hull import hand
+
+    spec = spec if spec is not None else hand.load(model_dir)
+    if spec is None:
+        return None
+    mesh, parts, made, warnings = hand.hand_cover(spec, model, params)
+    report = _plain_report(model_dir, mesh, v, f, params, "box", warnings)
+    report["drainage"] = made["drainage"]
+    pieces = int(parts.max()) + 1
+    by = "hand" if box is None else "straight wall tops"
+    report["box"] = {"options": [], **(box or {}), "pieces": pieces, "chosen": pieces,
+                     "chosen_by": by, "reason": f"{by}: {made.get('read') or ''}",
+                     "plan": made}  # fmt: skip
+    report["support"] = None
+    report["chairs"] = None
     return Hull(mesh, report, warnings, parts=parts)
 
 
@@ -401,27 +486,38 @@ def _arrangement_plan(
     from coverengine import arrange
     from coverengine.hull import plan
 
-    if not (model_dir / arrange.ARRANGEMENT_JSON).is_file():
+    members_file = model_dir / PLAN_MEMBERS
+    own_parts = members_file.is_file() and not (model_dir / arrange.ARRANGEMENT_JSON).is_file()
+    if (model_dir / arrange.ARRANGEMENT_JSON).is_file():
+        doc = arrange.read(model_dir)
+        rects = arrange.plan_rects(doc)
+        # the arrangement's frame is the model's frame (imported in mm, Z up, not moved);
+        # centre them on each other anyway, in case the import placed it differently
+        pts = np.asarray([p for r in rects for p in r], np.float64)
+        lo, hi = model.bounds
+        shift = (lo[:2] + hi[:2]) / 2 - (pts.min(axis=0) + pts.max(axis=0)) / 2
+        rects = [[[x + shift[0], y + shift[1]] for x, y in r] for r in rects]
+        why = "the members' plan (ADR-095)"
+    elif own_parts:
+        # one piece of furniture built like an arrangement: its parts' plan rectangles given
+        # by hand in the model's own frame (a corner sofa in one file, ADR-117)
+        doc = json.loads(members_file.read_text(encoding="utf-8"))
+        rects = [[[float(x), float(y)] for x, y in r] for r in doc["rects"]]
+        why = f"its parts' plan ({PLAN_MEMBERS}, ADR-117)"
+    else:
         return None
-    doc = arrange.read(model_dir)
     footprint = arrange.footprint_of(doc, params)
     if footprint == "smooth":
         return None
-    rects = arrange.plan_rects(doc)
-    # the arrangement's frame is the model's frame (imported in mm, Z up, not moved); centre
-    # them on each other anyway, in case the import placed it differently
-    pts = np.asarray([p for r in rects for p in r], np.float64)
-    lo, hi = model.bounds
-    shift = (lo[:2] + hi[:2]) / 2 - (pts.min(axis=0) + pts.max(axis=0)) / 2
-    rects = [[[x + shift[0], y + shift[1]] for x, y in r] for r in rects]
     built = plan.build(points, rects, footprint, float(doc.get("gap_mm") or 0.0), params)
     v, f = np.asarray(model.vertices), np.asarray(model.faces)
     report = _plain_report(model_dir, built.mesh, v, f, params, "box", built.warnings)
     report["drainage"] = built.report["drainage"]
     pieces = int(built.parts.max()) + 1
     report["box"] = {"pieces": pieces, "chosen": pieces, "chosen_by": "plan",
-                     "reason": f"footprint {footprint}: the members' plan (ADR-095)",
-                     "options": [], "plan": built.report}  # fmt: skip
+                     "reason": f"footprint {footprint}: {why}",
+                     "options": [],
+                     "plan": {**built.report, "members_file": own_parts}}  # fmt: skip
     report["support"] = None
     return Hull(built.mesh, report, built.warnings, parts=built.parts)
 
