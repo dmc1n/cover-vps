@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cover Studio prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="proto.css" />
+</head>
+<body>
+<!-- A static, clickable prototype of the proposed studio layout (docs/plans/studio-ui.md).
+     No backend: every number and name below is an example. Open this file in a browser. -->
+<div class="top">
+  <div class="top-row">
+    <a class="brand" href="#/"><span class="mark">S</span><b>Cover Studio</b></a>
+    <nav class="sections" id="sections" aria-label="Sections"></nav>
+    <span class="spacer"></span>
+    <span class="search" title="Search covers, codes, products, orders, settings (press /)">⌕ <span>Search everything…</span><kbd>/</kbd></span>
+    <a class="iconbtn" href="#/guide" title="Guide: how Cover Studio works">?</a>
+    <button class="me" id="me" title="Rick · admin · may approve">R</button>
+  </div>
+  <nav class="subnav" id="subnav" aria-label="Pages in this section"></nav>
+</div>
+<div class="popover hide" id="mepop">
+  <div class="who"><b>Rick</b><div class="muted small">rick · admin · may approve</div></div>
+  <hr />
+  <a href="#/account">My account and password</a>
+  <button data-theme="toggle">Light / dark</button>
+  <hr />
+  <a href="#/settings/users">Users &amp; rights</a>
+  <hr />
+  <button>Log out</button>
+</div>
+<main id="main"></main>
+<div class="role-switch" title="Prototype only: see the studio as another person">
+  View as
+  <select id="role">
+    <option value="admin">Rick (admin, approves)</option>
+    <option value="approver">Rens (editor, approves)</option>
+    <option value="editor">Eddy (editor)</option>
+    <option value="workshop">Workshop (viewer)</option>
+  </select>
+</div>
+<script src="proto.js"></script>
+</body>
+</html>
