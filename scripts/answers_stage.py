@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from coverengine.staging import guard_staging_output
 
 ROOT = Path(__file__).resolve().parent.parent
 LIVE = Path("/home/dev/cover-pattern-engine/models")
@@ -67,6 +68,7 @@ def _pieces(d: Path) -> list[dict[str, Any]]:
 def stage(spec: dict[str, Any], out: Path, models: Path) -> dict[str, Any]:
     model = spec["model"]
     src, dst = models / model, out / model
+    guard_staging_output(dst, src)
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst, symlinks=True, ignore=shutil.ignore_patterns("revisions"))
@@ -257,6 +259,7 @@ def main() -> int:
     specs = json.loads(a.specs.read_text())
     if a.only:
         specs = [s for s in specs if s["model"] in a.only.split(",")]
+    guard_staging_output(a.out, a.models)
     a.out.mkdir(parents=True, exist_ok=True)
     path = a.out / "stage.json"
     done = {r["model"]: r for r in json.loads(path.read_text())} if path.is_file() else {}
