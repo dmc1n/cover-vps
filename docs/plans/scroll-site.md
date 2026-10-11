@@ -55,7 +55,7 @@ website can show it, and it is honest.
 - **Modal GPU (L4)** for the heavy renders: the film, later scroll sequences rendered in Blender
   instead of live 3D where that looks better.
 
-## Storyboard 2: everything our own render (9 October 2026, ADR-120)
+## Storyboard 2: everything our own render (9 October 2026, ADR-121)
 
 The owner (9 Oct): "only when scrolling we still have the static rain; the animation is much
 better — make the animations further down yourself too, so everything is based on our own

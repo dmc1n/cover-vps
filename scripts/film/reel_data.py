@@ -1,4 +1,4 @@
-"""The scroll story's and the clips' extra data (ADR-120), next to hero_data.py's output.
+"""The scroll story's and the clips' extra data (ADR-121), next to hero_data.py's output.
 
 `reel.json` in the hero data folder:
 

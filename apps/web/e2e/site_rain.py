@@ -1,4 +1,4 @@
-"""The rain on the scroll page falls, always down, and never stands still (ADR-106, ADR-120).
+"""The rain on the scroll page falls, always down, and never stands still (ADR-106, ADR-121).
 
 The owner (8 Oct 2026): "the rain on the scroll page stops moving"; (9 Oct): "when scrolling we
 still have the static rain". The story's pictures are scrubbed by the scroll, so a drop baked

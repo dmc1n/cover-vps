@@ -33,7 +33,7 @@ export interface StoryContent {
   chapters: { title: T; text: T }[];
   work: { title: T; items: { clip: string; title: T; text: T }[] };
   numbers: { title: T; items: { value: number; suffix: string; label: T }[] };
-  /** the closing film (ADR-120): the cover at home, in the sun */
+  /** the closing film (ADR-121): the cover at home, in the sun */
   villa?: { title: T; text: T };
 }
 

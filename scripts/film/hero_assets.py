@@ -22,7 +22,7 @@ TEXTURES = {
     "large_grey_tiles": ("2k", ["Diffuse", "nor_gl", "Rough"]),
     "white_plaster_02": ("2k", ["Diffuse", "nor_gl", "Rough"]),
     "concrete_floor_02": ("2k", ["Diffuse", "nor_gl", "Rough"]),
-    # the villa on Ibiza (render_reel.py, ADR-120)
+    # the villa on Ibiza (render_reel.py, ADR-121)
     "terracotta_floor_tiles": ("2k", ["Diffuse", "nor_gl", "Rough"]),
     "white_stucco": ("2k", ["Diffuse", "nor_gl", "Rough"]),
     "rough_wood": ("2k", ["Diffuse", "nor_gl", "Rough"]),

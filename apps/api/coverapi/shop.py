@@ -98,7 +98,7 @@ SHOP_DEFAULTS: dict[str, Any] = {
     "home_story": False,  # the scroll story as the home page (on: live; preview.<domain> always)
     "story_model": "suns-2-seater-kota",  # the catalogue model the scroll story shows (ADR-067)
     # the scroll story's media (/media/<file>): the film, the frames, a clip per work item (and
-    # <clip>_av1, <clip>_poster), the closing villa film (ADR-120)
+    # <clip>_av1, <clip>_poster), the closing villa film (ADR-121)
     "story_media": {"hero": "", "rain": "", "measure": "", "cut": "", "sew": "", "pack": ""},
     "notify_email": "",
     "languages": "nl,en,de,fr",
@@ -327,7 +327,7 @@ CONTENT_DEFAULTS["story"] = {
     ],
     "work": {
         "title": {"nl": "Zo werken we", "en": "How we work"},
-        # ADR-120: every clip our own render of our own data (scripts/film/render_reel.py)
+        # ADR-121: every clip our own render of our own data (scripts/film/render_reel.py)
         "items": [
             {"clip": "cut", "title": {"nl": "Snijden", "en": "Cutting"},
              "text": {"nl": "De snijtafel snijdt de stukken die onze software tekende, en schrijft "

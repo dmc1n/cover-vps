@@ -12,7 +12,7 @@
     uv run python scripts/film/hero_encode.py FRAMES OUT [--name hero-kota1] [--ffmpeg PATH]
         [--max-mb 3.8] [--pattern 'cut-*.png' --av1-size 720:900 --h264-size 720:900]
 
-A clip of render_reel.py (ADR-120) is one shot: --pattern picks its frames.
+A clip of render_reel.py (ADR-121) is one shot: --pattern picks its frames.
 
 NAME is new for every render: the website's edge keeps /media files for a day (ADR-071), and
 the studio serves only names of letters, digits, - and _ (no second dot).

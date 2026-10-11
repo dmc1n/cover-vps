@@ -3996,13 +3996,13 @@ docs/plans/bbq-covers.md (Dutch summary) and docs/plans/bbq-covers-research.md (
   pricing BBQ catalogue covers from their own pattern rather than the configurator's shape.
 
 
-## ADR-120 — The scroll page all our own: rain drawn in time, the chapters and clips rendered from our data
+## ADR-121 — The scroll page all our own: rain drawn in time, the chapters and clips rendered from our data
 
 The owner (9 October 2026): "the website looks much better, only when scrolling we still have
 the static rain; the animation is much better — please make the animations further down
 yourself too, so everything is based on our own material; then we can also make animations for
 the scroll steps." Later that day: one more film, the cover at a villa on Ibiza over the sea.
-(Numbered 120: 109–119 were taken on main meanwhile.)
+(Numbered 121: 109–120 were taken on main meanwhile.)
 
 - **The static rain, the cause.** The rain chapter is rendered pictures (ADR-071) that the
   scroll scrubs. Its falling drops were baked into the pictures (a particle system with motion
