@@ -144,7 +144,10 @@ def notify(subject: str, text: str) -> str:
 
 
 def main() -> int:
-    state = json.loads(STATE.read_text()) if STATE.is_file() else {}
+    try:  # an empty or broken state (the full disk of 12 Oct 2026 left 0 bytes) starts afresh
+        state = json.loads(STATE.read_text()) if STATE.is_file() else {}
+    except (OSError, ValueError):
+        state = {}
     now = time.time()
     bad = checks()
     host = socket.gethostname()
@@ -159,7 +162,9 @@ def main() -> int:
         how = notify(f"Cover Studio: solved: {state[name]['text']}", f"On {host}: solved.\n")
         lines.append(f"{time.ctime()} SOLVED {name}: {state[name]['text']} ({how})")
         del state[name]
-    STATE.write_text(json.dumps(state, indent=1))
+    tmp = STATE.with_suffix(".tmp")  # written whole, then swapped in: never half a file
+    tmp.write_text(json.dumps(state, indent=1))
+    tmp.replace(STATE)
     if lines:
         with LOG.open("a") as fh:
             fh.write("\n".join(lines) + "\n")
