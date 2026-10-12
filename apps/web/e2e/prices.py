@@ -112,12 +112,16 @@ async def main() -> int:
         prices = page.get_by_test_id("cover-prices")
         await expect(prices.locator("tr[data-channel=b2b]")).to_contain_text("calculated")
         await page.get_by_label("b2b fixed price").fill("999")
+        await page.get_by_label("b2c fixed price").fill("777")
         await (
             prices.locator("tr[data-channel=b2b]")
             .get_by_role("button", name="Save in draft")
             .click()
         )
         await expect(page.get_by_text("saved in the draft")).to_be_visible()
+        # a price typed in the other channel is kept, not saved, when one channel is saved
+        await expect(page.get_by_label("b2c fixed price")).to_have_value("777")
+        await page.get_by_label("b2c fixed price").fill("")
         bar = page.get_by_test_id("draft-bar")
         await expect(bar).to_contain_text("1 fixed-price change")
         await expect(prices.locator("tr[data-channel=b2b]")).to_contain_text("€ 999.00")

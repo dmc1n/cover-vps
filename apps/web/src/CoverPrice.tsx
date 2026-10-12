@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CoverPrices, ModelDetail, prices } from "./api";
 import { deskHref, modelHref, questionHref } from "./nav";
+import { useUnsaved } from "./unsaved";
 import { CostingSheet } from "./Prices";
 import type { Question } from "./Questions";
 import { useSession } from "./Session";
@@ -160,16 +161,35 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
       .then((x) => {
         setC(x);
         setErr("");
-        setTyped({});
-        setMoves(null);
+        setMoves(null); // typed prices stay: only a saved channel's field is cleared
         if (!x.draft) setSet("current");
       })
       .catch((e) => setErr(String(e)));
   }, [id]);
   useEffect(() => {
     setC(null);
+    setTyped({});
     if (user?.role !== "viewer") load();
   }, [load, user?.role]);
+  // a typed price not saved in the draft yet: leaving the cover asks first (Codex)
+  const fixedNow = (k: string) =>
+    c
+      ? c.draft
+        ? c.channels[k]?.fixed_draft
+        : c.channels[k]?.fixed_live
+      : null;
+  const unsaved = Object.entries(typed).some(
+    ([k, v]) => v.trim() !== "" && Number(v) !== fixedNow(k),
+  );
+  useUnsaved("cover-price", unsaved, modelHref(id, "price"));
+  /** after a save: forget the field only while it still holds what was saved */
+  const saved = (k: string, value: string) =>
+    setTyped((t) => {
+      if (t[k] !== value) return t;
+      const next = { ...t };
+      delete next[k];
+      return next;
+    });
   if (user?.role === "viewer")
     return (
       <p className="muted">
@@ -380,17 +400,19 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                           }
                           onClick={() =>
                             run(async () => {
+                              const value = typed[k];
                               const r = await prices.setFixed(
                                 id,
                                 k,
-                                Number(typed[k]),
+                                Number(value),
                                 c.revision,
                               );
+                              saved(k, value);
                               load();
                               return r.errors.length
                                 ? "Saved in the draft, but the draft has errors: " +
                                     r.errors.join("; ")
-                                : `${k.toUpperCase()} fixed price ${eur(Number(typed[k]))} (${vat}) saved in the draft — not live until it is published.`;
+                                : `${k.toUpperCase()} fixed price ${eur(Number(value))} (${vat}) saved in the draft — not live until it is published.`;
                             })
                           }
                         >
@@ -403,6 +425,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                             onClick={() =>
                               run(async () => {
                                 await prices.setFixed(id, k, null, c.revision);
+                                saved(k, typed[k]);
                                 load();
                                 return `${k.toUpperCase()} fixed price removed in the draft: the calculated price applies once published.`;
                               })
