@@ -210,8 +210,8 @@ async def main() -> int:  # noqa: PLR0915 - one story, step by step
         await npage.get_by_role("button", name="Versturen").click()
         await expect(npage.get_by_text("Bedankt!")).to_be_visible()
 
-        await admin.reload()
-        await admin.get_by_role("button", name="B2B customers").click()
+        await admin.reload()  # Shop → B2B customers is a page of its own since ADR-122
+        await expect(admin.get_by_role("heading", name="B2B customers")).to_be_visible()
         await expect(admin.get_by_role("heading", name="Requests (1)")).to_be_visible()
         await shot(admin, "17-admin-request")
         await admin.get_by_role("button", name="Approve and invite").click()

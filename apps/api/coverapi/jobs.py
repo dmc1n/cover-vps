@@ -7,9 +7,12 @@ is kept with the model (ADR-059)."""
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import queue
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -142,19 +145,31 @@ class Jobs:
                     args.append("--force")
             step["status"], step["started"] = "running", time.time()
             self._write(doc)
-            proc = subprocess.run(
-                [sys.executable, "-m", "coverengine.cli", *args],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            step["log"] = (proc.stdout + proc.stderr)[-LOG_TAIL:]
+            timeout_s, as_mb, cpu_s = job_limits()
+            # limits.job_* (ADR-123): one runaway step ends, not the server; its own process
+            # group, so a step's helpers end with it
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "coverapi.limited", str(as_mb), str(cpu_s),
+                 "coverengine.cli", *args],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                start_new_session=True,
+            )  # fmt: skip
+            try:
+                out, err = proc.communicate(timeout=timeout_s or None)
+                code = proc.returncode
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(proc.pid, signal.SIGKILL)
+                out, err = proc.communicate()
+                err += f"\nerror: took longer than {timeout_s} s (limits.job_timeout_s)"
+                code = -1
+            step["log"] = (out + err)[-LOG_TAIL:]
             step["finished"] = time.time()
-            step["status"] = "done" if proc.returncode == 0 else "failed"
+            step["status"] = "done" if code == 0 else "failed"
             self._write(doc)
-            if proc.returncode != 0:
+            if code != 0:
                 doc["status"] = "failed"
-                doc["error"] = _last_error(proc.stderr) or f"cover {name} failed"
+                doc["error"] = _last_error(err) or _killed(code) or f"cover {name} failed"
                 self._write(doc)
                 return
         doc["status"], doc["finished"] = "done", time.time()
@@ -163,6 +178,25 @@ class Jobs:
         # not after a trial run, which is not saved
         if self.drape_after_export and "export" in spec.steps and not spec.trial:
             self.submit(JobSpec(spec.model_id, ["drape"], {}))
+
+
+def job_limits() -> tuple[int, int, int]:
+    """(wall seconds, address space MiB, CPU seconds) for one step; 0: no limit."""
+    from coverengine.params import Registry
+
+    p = Registry.load(None).resolve()
+    timeout = int(p["limits.job_timeout_s"])  # type: ignore[arg-type]
+    # CPU time: the wall time on every core; a backstop for a step that spins without end
+    return timeout, int(p["limits.job_memory_mb"]), timeout * (os.cpu_count() or 1)  # type: ignore[arg-type]
+
+
+def _killed(code: int) -> str | None:
+    """A step ended by a signal: say which limit it likely met."""
+    if code in (-signal.SIGXCPU, -signal.SIGKILL):
+        return "the step was stopped: it used more CPU time than limits.job_timeout_s allows"
+    if code == -signal.SIGSEGV:
+        return "the step crashed (perhaps out of memory: limits.job_memory_mb)"
+    return None
 
 
 def _yaml(value: Any) -> str:

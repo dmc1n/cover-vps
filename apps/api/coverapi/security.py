@@ -238,12 +238,24 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
             auth.log(user, "login", address)
             _set_cookie(response, token, request)
             return {"user": user.public()}
+        if not mailer.configured(auth):
+            # fail closed (ADR-123): the login code is on, but no mail server is set; a password
+            # alone is not enough. On the server: `cover-users invite <name>` (a link that sets
+            # a new password and logs in) or `cover-users two-factor off`.
+            auth.log(user, "login refused: login code on, no mail server", address)
+            raise HTTPException(
+                503, "the login code cannot be mailed (no mail server set): ask an admin to "
+                "use cover-users on the server"
+            )  # fmt: skip
         if not user.email:
             auth.log(user, "login refused: no e-mail for the code", address)
             raise HTTPException(
                 403, "your account has no e-mail address for the login code: ask an admin"
             )
-        cid, code = auth.challenge(user, address)
+        try:
+            cid, code = auth.challenge(user, address)
+        except AuthError as exc:  # too many codes this hour
+            raise HTTPException(exc.status, str(exc)) from None
         try:
             mailer.send(
                 auth, user.email, f"Cover Studio login code: {code}",
@@ -277,7 +289,9 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
         return {"user": user.public()}
 
     def _two_factor() -> bool:
-        return bool(auth.setting(TWO_FACTOR_KEY, True)) and mailer.configured(auth)
+        """The login code is on (the default); without a mail server a login is refused,
+        never let through on the password alone (ADR-123)."""
+        return bool(auth.setting(TWO_FACTOR_KEY, True))
 
     def _set_cookie(response: Response, token: str, request: Request) -> None:
         response.set_cookie(

@@ -16,6 +16,7 @@ The firewall (ufw) allows SSH, 80 and 443. fail2ban bans SSH password guessers.
 sudo systemctl status cover-web          # is the app running
 sudo systemctl restart cover-web         # after an update of the code
 journalctl -u cover-web -n 100           # the app's log
+caddy validate --config deploy/Caddyfile --adapter caddyfile   # check a change first (no sudo)
 sudo systemctl reload caddy              # after a change of deploy/Caddyfile (copy it first)
 tail /var/log/caddy/covers.log           # who visited
 sudo fail2ban-client status sshd         # banned addresses
@@ -83,3 +84,30 @@ bij elke wissel dezelfde.
 - Terug naar een bepaalde versie: `scripts/rollback.sh v1.0.0`; welke er zijn:
   `scripts/rollback.sh --list`.
 - Welke versie live is: de adminpagina, tab System ("Release (live)"), met de laatste wissels.
+
+## Limits that protect the server (ADR-123)
+
+- **Request sizes.** Caddy refuses a request body over 2 MiB, except on the logged-in upload
+  routes (3D models, drawings, references, product and price lists, Desk and question pictures,
+  the photo test: 2 GiB) and the shop's photo routes (40 MiB). The app checks each route's own
+  limit again before it reads anything (`limits.body_mb`, `limits.upload_mb`, and the routes'
+  own caps); too large is answered 413 by the app (502 by Caddy 2.6).
+- **Pictures and PDFs** are checked by their size in pixels before they are decoded
+  (`limits.image_max_mp`, 40 megapixels; a large phone JPEG is decoded at half or quarter size).
+  A drawing has at most `limits.pdf_max_pages` pages; a reference zip at most
+  `limits.zip_max_files` files and `limits.zip_max_mb` unpacked; a product or price list at
+  most `limits.sheet_max_rows` rows and `limits.sheet_max_cells` cells.
+- **Background jobs**: each step (import, hull, ..., drape) stops after `limits.job_timeout_s`
+  (4 hours) and may reserve at most `limits.job_memory_mb` (12 GiB); the job then shows why. A
+  207 MB STEP (the Blocchi sofa) runs every step well inside both.
+- **Old price proposals** in `shop_quotes`, `b2b_quotes` and `quotes` go after
+  `limits.quotes_keep_days` (60) unless an order or request names them: `scripts/housekeeping.sh`
+  daily, by hand `COVER_DATA_DIR=~/cover-data uv run python scripts/quotes_clean.py --dry-run`.
+- **The access log** keeps no keys or tokens: the `X-Link-Key` and `X-Api-Key` headers and the
+  Referer are left out, and the tokens in order, fit, match, invite and reset links and in
+  `?preview=`, `?link=`, `?key=`, `?token=` are written as REDACTED. Caddy 2.6 cannot set the
+  log file's mode, so once: `sudo chmod 0640 /var/log/caddy/covers.log` (rolled files keep it).
+- **Settings no model can change**: the AI's addresses and every spending cap and visitor limit
+  are marked `[server-only]` in `config/defaults.yaml`; a cover's settings, a trial run, a
+  learned rule or the web app cannot set them (400), and an AI key is only ever sent to its own
+  provider (api.deepseek.com, generativelanguage.googleapis.com).

@@ -8,9 +8,10 @@
 - request: the customer asks for the cover; it is stored and mailed.
 
 A webshop's server calls it with an API key (X-Api-Key, made on the admin page). Our own
-configurator page (#/configure, also in an iframe) calls it from our own address without a
-key. Every address is limited to QUOTES_PER_MINUTE. Nothing internal can be reached here: no
-models, no patterns, no users. The internal cost price is only on the admin page.
+configurator page (#/configure) calls it with a colleague's login; nothing else is let in (no
+Origin or Referer, ADR-123). Every address is limited to QUOTES_PER_MINUTE. Nothing internal
+can be reached here: no models, no patterns, no users. The internal cost price is only on the
+admin page.
 """
 
 from __future__ import annotations
@@ -94,25 +95,26 @@ def install(app: FastAPI, auth: Any, quotes_dir: Path, models_dir: Path) -> None
         return Registry.load(None).resolve()
 
     def caller(request: Request) -> str:
-        """'key:<name>' for a webshop with a valid key, 'site' for our own pages; else 401."""
+        """'key:<name>' for a webshop with a valid key, 'site' for a logged-in colleague (our
+        own configurator page); else 401. No Origin or Referer counts (ADR-123): both are easy
+        to fake from a script."""
+        from coverapi.security import SESSION_COOKIE
+
         key = request.headers.get("x-api-key")
         if key:
             for k in auth.setting(KEYS_SETTING, []) or []:
                 if secrets.compare_digest(k["hash"], hash_key(key)):
                     return f"key:{k['name']}"
             raise HTTPException(401, "unknown API key")
-        origin = request.headers.get("origin") or request.headers.get("referer") or ""
-        host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
-        if origin and host and host in origin:
+        if auth.session_user(request.cookies.get(SESSION_COOKIE)) is not None:
             return "site"
-        if not origin and request.method == "GET":
-            return "site"  # a plain GET (the preview file in a viewer)
         raise HTTPException(401, "an API key is needed (X-Api-Key)")
 
     def limit(request: Request) -> None:
+        from coverapi.ratelimit import visitor_key
         from coverapi.security import _address
 
-        now, a = time.time(), _address(request)
+        now, a = time.time(), visitor_key(_address(request))
         times = recent[a]
         while times and now - times[0] > 60:  # noqa: PLR2004 - a minute
             times.popleft()
@@ -146,6 +148,10 @@ def install(app: FastAPI, auth: Any, quotes_dir: Path, models_dir: Path) -> None
         who = caller(request)
         limit(request)
         bbq_refused(req.product, auth, request)
+        from coverapi.ratelimit import quote_cap
+
+        if not quote_cap(app).hit():  # all visitors together (limits.quotes_per_minute, ADR-123)
+            raise HTTPException(429, "many prices are asked just now; please try again soon")
         p = params()
         given = {**req.sizes, "vents": req.vents, "colour": req.colour}
         try:

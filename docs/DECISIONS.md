@@ -4166,3 +4166,69 @@ first frees room for the new archive plus 20 GB (never removing the newest 2) or
 FAILED in last_backup.txt; the watchdog mails a failed backup and warns at 25 % free disk.
 `scripts/housekeeping.sh` (cron 03:30) removes safety copies older than 14 days and release folders
 beyond the newest 8 (never the current one).
+
+## ADR-123 — Security fixes from the audit of 12 Oct 2026
+
+A Claude + Codex audit found ten holes; the owner approved fixing them all. Each fix is the
+smallest change that closes the hole without changing anything for a legitimate user, and each
+has a test (`apps/api/tests/test_hardening.py`, `engine/tests/test_server_only.py`, and in the
+B2B, Desk and security tests).
+
+1. **Server-only settings.** A comment mark `[server-only]` in `config/defaults.yaml` (on a key
+   or a whole section) makes a key settable only by the program itself
+   (`Registry.resolve(server=...)`): the AI's `base_url`/`vision_base_url`, `spend.*`, the
+   visitor limits and fees of `suggest.*`, and the new `limits.*`. A family preset, a learned
+   rule, a model's `cover.json`, `--set`, a trial or the web app get a ParamError (400). The
+   AI key is sent only to its provider's own https host (`ai.KEY_HOSTS`: api.deepseek.com,
+   generativelanguage.googleapis.com), whatever the setting says.
+2. **Learned rules**: the group is a strict slug (`learned.GROUP_SLUG`) and a known family
+   preset or a group some cover has; the rules file resolves inside `learning/rules/`; the
+   value is coerced by the registry (server-only keys refused).
+3. **Request sizes**: Caddy has three walls (2 MiB default; 2 GiB for the logged-in upload
+   routes; 40 MiB for the shop's photo routes); the app's pure-ASGI `bodylimit.BodyLimit`
+   refuses a Content-Length over the route's own limit with 413 before anything parses it, and
+   counts a chunked body. A test keeps the Caddyfile's routes and the app's upload routes equal.
+   The access log drops X-Link-Key, X-Api-Key and Referer and redacts link tokens. Caddy 2.6.2
+   has no log `mode` (it ignores unknown subdirectives silently), so the file mode is set once
+   by hand.
+4. **Decompression bombs**: `coverengine.safeimage.open_image` reads the size from the header,
+   refuses over `limits.image_max_mp` (40 MP), makes Pillow's bomb warning an error and decodes
+   a JPEG at 1/2–1/8 scale where that keeps it under the cap (a 48 MP phone photo works).
+   Uploaded drawings: at most `limits.pdf_max_pages` pages, each page within the pixel cap at
+   `limits.pdf_render_dpi`; renders in the API use `safe_dpi`.
+5. **The old webshop API** (`/api/public/v1`) needs a valid X-Api-Key or a colleague's
+   session; the Origin/Referer substring check is gone (any script can send those). The iframe
+   configurator for anonymous visitors is therefore retired (no key, no embed address and no
+   request were ever recorded on the server). With the website link closed the API is behind
+   the website gate unless a key is sent.
+6. **Old proposals** go after `limits.quotes_keep_days` (60) unless an order or a request
+   names them (a B2C order keeps its own copy of the proposal in orders.data; its files stay
+   too): `scripts/quotes_clean.py`, run by `scripts/housekeeping.sh` (DRY_RUN=1 supported).
+   Every per-visitor limit counts an IPv6 address as its `/64` (`limits.ipv6_prefix`), and all
+   visitors together write at most `limits.quotes_per_minute` proposals a minute.
+7. **The login code fails closed**: with the code on (the default) and no mail server, a login
+   is refused (503) instead of letting the password alone through. The way in is on the server:
+   `cover-users invite <name>` (a link that sets a password and logs in) or
+   `cover-users two-factor off|on|status`. The live server has a mail server set and the code
+   on, so nothing changes there.
+8. **Codes and links**: a password change, a reset or new invitation and switching a user off
+   delete the open login codes; a code's try is counted before it is compared and the right
+   code is used up by one `DELETE ... WHERE` (one code, one session); a password link (studio
+   and B2B) is taken by one `UPDATE ... WHERE used=0` before the password is set.
+9. **Parsers and jobs**: a reference zip is refused over `limits.zip_max_files` entries and
+   stops at `limits.zip_max_mb` written (counted, not the zip's claim); a sheet (Excel read-only,
+   CSV) over `limits.sheet_max_rows`/`sheet_max_cells`. Each job step runs through
+   `coverapi.limited` (address space `limits.job_memory_mb`, CPU time the wall limit times the
+   cores) in its own process group, ended after `limits.job_timeout_s` (4 h; the longest
+   finished drape took 4400 s). The 207 MB Blocchi STEP ran import → export under the limits
+   (peak 1.4 GB resident), and Warp/Newton (the local drape) starts fine under them.
+10. **Smaller ones**: Desk approvers and question owners are matched on the user name only (a
+    display name is free text). Wrong passwords lock per (account, address) with a doubling
+    lock up to `limits.login_lock_max_minutes`; an unknown name is counted and answered exactly
+    as a known one, with the same single scrypt (a dummy hash); at most
+    `limits.login_codes_per_hour` codes are mailed to one person. A B2B 3D scene is shown only
+    to the company whose proposal it is. A Mollie "paid" is acted on only when the payment's
+    amount (cents), currency, order in its metadata and live/test mode match the order.
+
+Better, later: a per-route limit table that FastAPI derives from the routes themselves; Caddy
+2.8's log `mode`; Mollie's own webhook signature once Mollie offers it for payments.

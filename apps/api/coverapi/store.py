@@ -262,6 +262,7 @@ def registry_specs() -> list[dict[str, Any]]:
             "choices": list(s.choices) if s.choices else None,
             "comment": s.comment,
             "to_confirm": s.to_confirm,
+            "server_only": s.server_only,
         }
         for s in registry.specs.values()
     ]

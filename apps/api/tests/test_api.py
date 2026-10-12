@@ -272,7 +272,6 @@ def test_a_full_calculation_is_followed_by_its_drape_in_a_queue_of_its_own(
 ) -> None:
     """ADR-059: after a job that ends with export comes the drape (kept with the model), in
     its own queue; a trial run gets none."""
-    import subprocess
     import time
 
     from coverapi import jobs as jobs_mod
@@ -281,11 +280,17 @@ def test_a_full_calculation_is_followed_by_its_drape_in_a_queue_of_its_own(
 
     ran: list[list[str]] = []
 
-    def fake(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
-        ran.append(args[3:])  # after: python -m coverengine.cli
-        return subprocess.CompletedProcess(args, 0, "", "")
+    class Fake:  # the step's process (python -m coverapi.limited AS CPU coverengine.cli ...)
+        returncode = 0
+        pid = 0
 
-    monkeypatch.setattr(jobs_mod.subprocess, "run", fake)
+        def __init__(self, args: list[str], **_: object) -> None:
+            ran.append(args[args.index("coverengine.cli") + 1 :])
+
+        def communicate(self, timeout: float | None = None) -> tuple[str, str]:
+            return "", ""
+
+    monkeypatch.setattr(jobs_mod.subprocess, "Popen", Fake)
     store = Store(tmp_path / "data")
     store.ensure()
     (store.models / "m").mkdir()

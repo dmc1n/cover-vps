@@ -48,6 +48,7 @@ export function Settings({
     const out: Record<string, ParamSpec[]> = {};
     const f = filter.toLowerCase();
     for (const s of specs) {
+      if (s.server_only) continue; // not per cover (ADR-123)
       if (f && !(s.key.toLowerCase().includes(f) || s.comment.toLowerCase().includes(f))) continue;
       (out[s.group] ??= []).push(s);
     }

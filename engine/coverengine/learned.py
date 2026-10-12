@@ -32,6 +32,8 @@ import numpy as np
 PART_EDITS = "part_edits.json"
 NEAR_MM = 40.0  # param-ok: a seam or piece is found within this of the point given
 SERIES = re.compile(r"([A-Za-z])\d")
+# a group's name as a rules file name (ADR-123): a family or drawing-<letter>, never a path
+GROUP_SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,62}")
 TINY = 1e-6  # param-ok: two numbers this close are the same
 
 
@@ -86,13 +88,27 @@ def _yaml() -> Any:
     return y
 
 
+def valid_group(group: str | None) -> bool:
+    return bool(group) and GROUP_SLUG.fullmatch(str(group)) is not None
+
+
+def rule_path(group: str, base: Path | None = None) -> Path | None:
+    """`<rules dir>/<group>.yaml`, only for a valid group name and only inside the rules dir."""
+    d = rules_dir(base)
+    if d is None or not valid_group(group):
+        return None
+    p = (d / f"{group}.yaml").resolve()
+    if p.parent != d.resolve():
+        return None
+    return p
+
+
 def rules(group: str | None, base: Path | None = None) -> dict[str, Any]:
     """The group's learned rules as a parameter tree ({} when none)."""
-    d = rules_dir(base)
-    if not group or d is None:
+    if not group:
         return {}
-    p = d / f"{group}.yaml"
-    if not p.is_file():
+    p = rule_path(group, base)
+    if p is None or not p.is_file():
         return {}
     data = _yaml().load(p.read_text(encoding="utf-8")) or {}
     return _plain(data) if isinstance(data, dict) else {}
@@ -137,11 +153,17 @@ def get_dotted(tree: dict[str, Any], key: str) -> Any:
 
 
 def write_rule(group: str, key: str, value: Any, by: str, why: str, base: Path) -> dict[str, Any]:
-    """A rule for the whole group, accepted by a person; logged in learning/rules.jsonl."""
+    """A rule for the whole group, accepted by a person; logged in learning/rules.jsonl.
+    Only a valid group name (GROUP_SLUG) and a setting a rule may change (not server-only)."""
+    from coverengine.params import Registry
+
     d = rules_dir(base)
     assert d is not None
     d.mkdir(parents=True, exist_ok=True)
-    p = d / f"{group}.yaml"
+    p = rule_path(group, base)
+    if p is None:
+        raise ValueError(f"not a group name: {group!r}")
+    value = Registry.load().coerce(key, value, "rule")
     tree = rules(group, base)
     set_dotted(tree, key, value)
     tmp = p.with_suffix(".tmp")

@@ -286,6 +286,10 @@ make api-dev    web app and API on :8080     make web-dev   Vite dev server on :
 make web-build  build the pages (apps/web/dist)
 make deploy     build the app image and `docker compose up -d app` (127.0.0.1:8080)
 cover-users list | add <name> --role admin --approve | invite <name>   users (ADR-047)
+cover-users two-factor status|off|on       the login code by mail; on without a mail server refuses logins (ADR-123)
+COVER_DATA_DIR=~/cover-data uv run python scripts/quotes_clean.py [--dry-run]   price proposals older than
+                                             limits.quotes_keep_days that no order names (housekeeping.sh daily, ADR-123)
+caddy validate --config deploy/Caddyfile --adapter caddyfile   check the Caddyfile (request size walls, log redaction; ADR-123)
 cover-site "<what should change>" | --publish | --discard | --history | --translate   the shop's website with the AI CMS, all languages (ADR-062, 064)
 scripts/release.sh v1.2.3 "what is new"     test, tag, build ~/releases/v1.2.3 and switch the app to it (ADR-053)
 scripts/rollback.sh [v1.2.3 | --list]       back to the release before (or a chosen one) in seconds
@@ -294,6 +298,9 @@ make backup     the data directory to ~/backups (5 kept, room checked first; R2 
 cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build
 cd apps/site && npm test | npm run check     the Worker's tests (security headers, no studio routes) and typecheck (ADR-103)
 ```
+
+Settings marked `[server-only]` in config/defaults.yaml (the AI's hosts, spending caps, `limits.*`)
+are set only there: no model, preset, learned rule, `--set` or UI override (ADR-123).
 
 Staging scripts validate output roots and model destinations with
 `coverengine.staging.guard_staging_output` before writes. Live `models/` and

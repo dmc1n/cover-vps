@@ -343,7 +343,8 @@ def ai_read(pdf: Path, params: EffectiveParams, code: str) -> dict[str, Any]:
     vision = Registry.load(None).resolve(trial={
         "ai.provider": str(params["ai.vision_provider"]),
         "ai.model": str(params["ai.vision_model"]),
-        "ai.base_url": str(params["ai.vision_base_url"]), "ai.timeout_s": 600})  # fmt: skip
+        "ai.timeout_s": 600},
+        server={"ai.base_url": str(params["ai.vision_base_url"])})  # fmt: skip
     res = drawing_ai.read(code, pdf, vision, int(params["drawing.ai_rounds"]))  # type: ignore[arg-type]
     shape = res.get("shape") or {}
     info = {"ai": {"matched": res.get("matched"), "written": res.get("written"),

@@ -26,6 +26,8 @@ REFERENCE_PDF = "reference.pdf"
 REFERENCE_PNG = "reference.png"
 REFERENCE_JSON = "reference.json"
 PAGE_DPI = 110  # the drawing as a picture in the web app
+MIB = 1024 * 1024
+CHUNK = MIB  # unpacking reads this much at a time
 # A size in a drawing: a number with a unit (cm, mm, m, in, "), optionally in brackets.
 SIZE = re.compile(r"\[?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m|in|inch|\")(?![a-z])", re.IGNORECASE)
 TO_MM = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "in": 25.4, "inch": 25.4, '"': 25.4}
@@ -45,14 +47,32 @@ class Batch:
     unpaired: list[str] = field(default_factory=list)
 
 
+class ZipTooLarge(ValueError):
+    """A zip with too many files or that unpacks to too much (limits.zip_*, ADR-123)."""
+
+
+def zip_limits() -> tuple[int, int]:
+    from coverengine.params import Registry
+
+    p = Registry.load(None).resolve()
+    return int(p["limits.zip_max_files"]), int(float(p["limits.zip_max_mb"]) * MIB)  # type: ignore[arg-type]
+
+
 def unpack(store: Store, zip_path: Path, batch_id: str) -> Batch:
-    """Unpack a zip into uploads/<batch>/ and pair the 3D files with the drawings by name."""
+    """Unpack a zip into uploads/<batch>/ and pair the 3D files with the drawings by name.
+    Refused whole (ZipTooLarge) with more than `limits.zip_max_files` entries; unpacking stops
+    once `limits.zip_max_mb` is written (counted, not taken from the zip's own claims)."""
+    max_files, max_bytes = zip_limits()
     folder = store.uploads / batch_id
     folder.mkdir(parents=True, exist_ok=True)
     found: dict[str, Pair] = {}
     batch = Batch(batch_id)
+    written = 0
     with zipfile.ZipFile(zip_path) as zf:
-        for info in zf.infolist():
+        infos = zf.infolist()
+        if len(infos) > max_files:
+            raise ZipTooLarge(f"the zip has {len(infos)} files; at most {max_files}")
+        for info in infos:
             if info.is_dir() or "__MACOSX" in info.filename:
                 continue
             name = Path(info.filename).name
@@ -64,7 +84,13 @@ def unpack(store: Store, zip_path: Path, batch_id: str) -> Batch:
                 continue
             dest = folder / name
             with zf.open(info) as src, dest.open("wb") as out:
-                shutil.copyfileobj(src, out)
+                while chunk := src.read(CHUNK):
+                    written += len(chunk)
+                    if written > max_bytes:
+                        out.close()
+                        shutil.rmtree(folder, ignore_errors=True)
+                        raise ZipTooLarge(f"the zip unpacks to more than {max_bytes // MIB} MB")
+                    out.write(chunk)
             pair = found.setdefault(stem, Pair(stem))
             if suffix == ".pdf":
                 pair.drawing = dest
@@ -87,8 +113,15 @@ def _natural(s: str) -> list[Any]:
 def read_drawing(pdf: Path, out_dir: Path) -> dict[str, Any]:
     """The drawing's first page as reference.png, and its texts and sizes as reference.json."""
     import pymupdf
+    from coverengine.params import Registry
+    from coverengine.safeimage import TooLargeImage, max_pixels, safe_dpi
 
+    p = Registry.load(None).resolve()
+    limit_px = max_pixels(p)
     doc = pymupdf.open(pdf)
+    if doc.page_count > int(p["limits.pdf_max_pages"]):  # type: ignore[arg-type]
+        raise TooLargeImage(f"the drawing has {doc.page_count} pages; at most "
+                            f"{p['limits.pdf_max_pages']}")  # fmt: skip
     texts: list[dict[str, Any]] = []
     sizes: list[dict[str, Any]] = []
     for page_no in range(doc.page_count):
@@ -116,7 +149,7 @@ def read_drawing(pdf: Path, out_dir: Path) -> dict[str, Any]:
                     }
                 )
         if page_no == 0:
-            page.get_pixmap(dpi=PAGE_DPI).save(out_dir / REFERENCE_PNG)
+            page.get_pixmap(dpi=safe_dpi(page, PAGE_DPI, limit_px)).save(out_dir / REFERENCE_PNG)
     drawn = sum(len(doc[i].get_drawings()) for i in range(doc.page_count))
     info = {
         "format_version": 1,

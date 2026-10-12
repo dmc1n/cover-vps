@@ -18,6 +18,10 @@ prints every setting, its value, where the value comes from and a note:
 | model   | saved for this one model (its `cover.json`) |
 | trial   | given on the command line with `--set`, this run only |
 
+Settings marked `[server-only]` in `config/defaults.yaml` (the AI's addresses, the spending caps,
+the visitor and request limits, `limits.*`) are changed only there: a model, a family preset,
+a learned rule, `--set` or the web app cannot set them (ADR-123).
+
 `* to confirm` marks an assumption. `choices: a | b` lists the allowed values of a setting.
 In the web app (M6) these become dropdowns.
 

@@ -204,7 +204,7 @@ def _deviation_glb(m: trimesh.Trimesh, signed: np.ndarray, path: Path) -> None:
     t = np.clip(np.abs(signed) / (4 * FIT_MM), 0, 1)[:, None]  # param-ok: full colour at 2 cm
     sage = np.array([110, 119, 107, 255.0])
     room = np.array([180, 154, 114, 255.0])
-    tight = np.array([178, 64, 44, 255.0])
+    tight = np.array([178, 64, 44, 255.0])  # param-ok: a colour (RGBA)
     far = np.where((signed > 0)[:, None], room, tight)
     col = np.where((np.abs(signed) <= FIT_MM)[:, None], sage, sage * (1 - t) + far * t)
     out = trimesh.Trimesh(m.vertices, m.faces, vertex_colors=linear_colours(col.astype(np.uint8)),
@@ -294,7 +294,8 @@ def _ai_compare(model_dir: Path, pdf: Path, params: EffectiveParams,
     vision = Registry.load(None).resolve(trial={
         "ai.provider": str(params["ai.vision_provider"]),
         "ai.model": str(params["ai.vision_model"]),
-        "ai.base_url": str(params["ai.vision_base_url"]), "ai.timeout_s": 600})  # fmt: skip
+        "ai.timeout_s": 600},
+        server={"ai.base_url": str(params["ai.vision_base_url"])})  # fmt: skip
 
     def pages(path: Path, limit: int = 4) -> list[str]:
         doc = pymupdf.open(path)

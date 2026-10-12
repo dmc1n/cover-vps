@@ -46,7 +46,10 @@ from coverapi.auth import (
     LOCK_AFTER,
     LOCK_MINUTES,
     SESSION_DAYS,
+    check_lock,
     check_password,
+    count_failure,
+    dummy_hash,
     hash_password,
     password_problem,
 )
@@ -127,6 +130,13 @@ CREATE TABLE IF NOT EXISTS b2b_failures (
   address TEXT PRIMARY KEY,
   failed INTEGER NOT NULL,
   locked_until REAL
+);
+CREATE TABLE IF NOT EXISTS b2b_login_failures (
+  account TEXT NOT NULL,
+  address TEXT NOT NULL,
+  failed INTEGER NOT NULL,
+  locked_until REAL,
+  PRIMARY KEY (account, address)
 );
 CREATE TABLE IF NOT EXISTS b2b_orders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -440,12 +450,20 @@ class Store:
         problem = password_problem(password, user["email"].split("@")[0])
         if problem:
             raise HTTPException(400, problem)
+        pw = hash_password(password)
         with self._lock, self._db() as db:
+            # the link is used once: whoever marks it used first sets the password (ADR-123)
+            taken = db.execute(
+                "UPDATE b2b_tokens SET used=1 WHERE token_hash=? AND used=0 AND expires>?",
+                (_h(token), time.time()),
+            ).rowcount
+            if taken != 1:
+                raise HTTPException(400, "this link is no longer valid: ask for a new one")
             db.execute(
                 "UPDATE b2b_users SET pw_hash=?, failed=0, locked_until=NULL WHERE id=?",
-                (hash_password(password), user["id"]),
+                (pw, user["id"]),
             )
-            db.execute("UPDATE b2b_tokens SET used=1 WHERE token_hash=?", (_h(token),))
+            db.execute("DELETE FROM b2b_login_failures WHERE account=?", (user["email"],))
             db.execute("DELETE FROM b2b_sessions WHERE user_id=?", (user["id"],))
             db.execute(
                 "UPDATE b2b_companies SET status='active', updated=? WHERE id=? "
@@ -456,36 +474,32 @@ class Store:
 
     # logins, with the studio's lock-outs
     def check(self, email: str, password: str, address: str) -> dict[str, Any]:
+        """As the studio (auth.py, ADR-123): locked per account and address with a growing
+        lock, an unknown address answered and counted exactly as a known one."""
         now = time.time()
+        account = email.strip().lower()[:254]
         with self._db() as db:
             arow = db.execute("SELECT * FROM b2b_failures WHERE address=?", (address,)).fetchone()
-            row = db.execute(
-                "SELECT * FROM b2b_users WHERE email=?", (email.strip().lower(),)
-            ).fetchone()
-        if arow and arow["locked_until"] and arow["locked_until"] > now:
+            locked = check_lock(db, "b2b_login_failures", account, address, now)
+            row = db.execute("SELECT * FROM b2b_users WHERE email=?", (account,)).fetchone()
+        if (arow and arow["locked_until"] and arow["locked_until"] > now) or locked:
             raise HTTPException(429, "too many wrong passwords: try again in a few minutes")
-        if row is not None and row["locked_until"] and row["locked_until"] > now:
-            raise HTTPException(429, "too many wrong passwords: try again in a few minutes")
-        ok = row is not None and bool(row["active"]) and check_password(password, row["pw_hash"])
-        if row is None:
-            check_password(password, hash_password("timing"))  # the same work either way
+        stored = row["pw_hash"] if row is not None and row["pw_hash"] else dummy_hash()
+        right = check_password(password, stored)  # one scrypt, whoever asks
+        ok = right and row is not None and bool(row["active"]) and bool(row["pw_hash"])
         if not ok:
-            self._failed(row, address, now)
+            self._failed(account, address, now)
             raise HTTPException(401, "wrong e-mail address or password")
         with self._lock, self._db() as db:
-            db.execute("UPDATE b2b_users SET failed=0, locked_until=NULL WHERE id=?", (row["id"],))
+            db.execute("DELETE FROM b2b_login_failures WHERE account=? AND address=?",
+                       (account, address))  # fmt: skip
             db.execute("DELETE FROM b2b_failures WHERE address=?", (address,))
         return dict(row)
 
-    def _failed(self, row: sqlite3.Row | None, address: str, now: float) -> None:
+    def _failed(self, account: str, address: str, now: float) -> None:
         lock = now + LOCK_MINUTES * MINUTE_S
         with self._lock, self._db() as db:
-            if row is not None:
-                failed = int(row["failed"]) + 1
-                db.execute(
-                    "UPDATE b2b_users SET failed=?, locked_until=? WHERE id=?",
-                    (failed, lock if failed >= LOCK_AFTER else None, row["id"]),
-                )
+            count_failure(db, "b2b_login_failures", account, address, now)
             a = db.execute("SELECT failed FROM b2b_failures WHERE address=?", (address,)).fetchone()
             n = (int(a["failed"]) if a else 0) + 1
             db.execute(
@@ -754,9 +768,12 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         return merged(DEFAULTS, auth.setting(SETTING, {}) or {})
 
     def address(request: Request) -> str:
+        from coverapi.ratelimit import visitor_key
+
+        a = _address(request)
         if link_ok(auth, request):  # through the website: its visitor's own address
-            return request.headers.get("x-client-ip") or _address(request)
-        return _address(request)
+            a = request.headers.get("x-client-ip") or a
+        return visitor_key(a)  # an IPv6 visitor as its /64 network (ADR-123)
 
     def limit(request: Request, key: str = "", per: int = PER_MINUTE, window: float = 60) -> None:
         a, now = f"{key}:{address(request)}", time.time()
@@ -991,6 +1008,10 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
                         headers={"Cache-Control": "private, max-age=3600"})  # fmt: skip
 
     def make_quote(req: QuoteIn, company: dict[str, Any]) -> dict[str, Any]:
+        from coverapi.ratelimit import quote_cap
+
+        if not quote_cap(app).hit():  # all visitors together (limits.quotes_per_minute, ADR-123)
+            raise HTTPException(429, "many prices are asked just now; please try again soon")
         p = shop_params(auth)
         ps = prices.current(auth)
         stock = None
@@ -1049,11 +1070,19 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
 
     @app.get("/api/b2b/scene/{qid}.glb")
     def scene(qid: str, request: Request) -> Response:
-        customer(request)
+        _, company = customer(request)
         if (
             not re.fullmatch(r"[0-9a-f]{16}(-(none|balloons|frame))?", qid)
             or not (quotes / f"{qid}.glb").is_file()
         ):
+            raise HTTPException(404, "no such scene")
+        # only the company's own proposals (ADR-123): another company's is "not there"
+        rec = quotes / f"{qid.split('-', 1)[0]}.json"
+        try:
+            owner = (json.loads(rec.read_text(encoding="utf-8")).get("b2b") or {}).get("company_id")
+        except (OSError, json.JSONDecodeError):
+            owner = None
+        if owner != company["id"]:
             raise HTTPException(404, "no such scene")
         return Response((quotes / f"{qid}.glb").read_bytes(), media_type="model/gltf-binary")
 

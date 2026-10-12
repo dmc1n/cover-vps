@@ -159,6 +159,13 @@ def install(app: FastAPI, store: Any) -> None:
         data = await file.read()
         if len(data) > MAX_BYTES:
             raise HTTPException(400, "the file is larger than 200 MB")
+        if kind == "drawing":
+            from coverengine.safeimage import TooLargeImage, check_upload_pdf
+
+            try:  # pages and page sizes within limits.pdf_* (ADR-123)
+                check_upload_pdf(data)
+            except TooLargeImage as exc:
+                raise HTTPException(400, str(exc)) from None
         ref = folder(model_id)
         ref.mkdir(parents=True, exist_ok=True)
         for old in ref.glob(f"{kind}.*"):

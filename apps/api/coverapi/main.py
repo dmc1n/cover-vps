@@ -23,7 +23,7 @@ from pydantic import BaseModel
 
 from coverapi.jobs import Jobs, JobSpec, store_upload
 from coverapi.plan import plan, save_seams
-from coverapi.references import register, unpack
+from coverapi.references import ZipTooLarge, register, unpack
 from coverapi.store import ALLOWED, MEDIA, STEPS, UPLOAD_SUFFIXES, Store, registry_specs
 
 
@@ -342,6 +342,8 @@ def create_app(
             batch = unpack(store, target, batch_id)
         except zipfile.BadZipFile:
             raise HTTPException(400, "this is not a readable zip file") from None
+        except ZipTooLarge as exc:  # limits.zip_* (ADR-123)
+            raise HTTPException(413, str(exc)) from None
         drawings = [u for u in batch.unpaired if u.lower().endswith(".pdf")]
         if not batch.pairs and not drawings and products_sheet.zip_has_sheet(target):
             from coverapi.security import current_user
@@ -535,6 +537,12 @@ def create_app(
         install_pages(app, auth, web_dir)  # /shop/..., robots.txt, sitemap.xml, llms.txt
     if web_dir is not None and (web_dir / "index.html").is_file():
         app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
+    from coverengine.params import Registry
+
+    from coverapi import bodylimit
+
+    # last, so outermost: a body over its route's limit is refused before anything parses it
+    bodylimit.install(app, Registry.load(None).resolve(), shop_suggest.MAX_PHOTOS)  # ADR-123
     return app
 
 

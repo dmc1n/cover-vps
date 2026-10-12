@@ -25,7 +25,12 @@ from coverengine.errors import CoverError
 
 Scalar = bool | int | float | str
 
-SOURCES = ("default", "preset", "model", "trial")
+SOURCES = ("default", "preset", "model", "trial", "server")
+
+# A key (or a whole section) whose comment carries this mark is server-only: no family preset,
+# learned rule, model (CoverDefinition), trial `--set` or UI override may set it (the AI's
+# hosts, the spending caps). Only the program itself may, through `resolve(server=...)`.
+SERVER_ONLY_MARK = "[server-only]"
 
 # Integer defaults on keys with these suffixes are measurements, so a float override is fine.
 _MEASURE_SUFFIXES = ("_mm", "_pct", "_deg")
@@ -47,6 +52,7 @@ class ParamSpec:
     comment: str
     to_confirm: bool
     choices: tuple[str, ...] | None
+    server_only: bool = False
 
     @property
     def kind(self) -> str:
@@ -152,6 +158,11 @@ class Registry:
             if not isinstance(value, bool | int | float | str):
                 raise ParamError(f"{path}: {key} must be a single value, got {value!r}")
             comment = comments.get(key, "")
+            parts = key.split(".")
+            server_only = any(
+                SERVER_ONLY_MARK in comments.get(".".join(parts[:i]), "")
+                for i in range(1, len(parts) + 1)
+            )
             specs.append(
                 ParamSpec(
                     key=key,
@@ -159,6 +170,7 @@ class Registry:
                     comment=comment,
                     to_confirm=bool(_UNCONFIRMED.search(comment)),
                     choices=_choices(comment, value),
+                    server_only=server_only,
                 )
             )
         return cls(specs, path)
@@ -171,12 +183,18 @@ class Registry:
                 out.setdefault(float(s.default), []).append(s.key)
         return out
 
+    def server_only(self, key: str) -> bool:
+        spec = self.specs.get(key)
+        return bool(spec and spec.server_only)
+
     def coerce(self, key: str, value: Any, origin: str) -> Scalar:
         spec = self.specs.get(key)
         if spec is None:
             hint = difflib.get_close_matches(key, self.specs, n=1)
             more = f"; did you mean {hint[0]}?" if hint else ""
             raise ParamError(f"{origin}: unknown parameter {key}{more}")
+        if spec.server_only and origin != "server":
+            raise ParamError(f"{origin}: {key} is set on the server only (config/defaults.yaml)")
         kind = spec.kind
         bad = ParamError(f"{origin}: {key} expects {kind}, got {value!r}")
         if kind == "bool":
@@ -206,11 +224,15 @@ class Registry:
         preset: Mapping[str, Any] | None = None,
         model: Mapping[str, Any] | None = None,
         trial: Mapping[str, Any] | None = None,
+        server: Mapping[str, Any] | None = None,
     ) -> EffectiveParams:
-        """Apply override layers. Each layer is a nested tree or a flat dotted-key mapping."""
+        """Apply override layers. Each layer is a nested tree or a flat dotted-key mapping.
+        Server-only keys may be set only in `server`: the program's own choice (the vision
+        model's host, a test's budget), never a person's or a file's."""
         values: dict[str, Scalar] = {k: s.default for k, s in self.specs.items()}
         sources: dict[str, str] = dict.fromkeys(self.specs, "default")
-        for name, layer in (("preset", preset), ("model", model), ("trial", trial)):
+        layers = (("preset", preset), ("model", model), ("trial", trial), ("server", server))
+        for name, layer in layers:
             if not layer:
                 continue
             for key, value in _flatten(layer).items():

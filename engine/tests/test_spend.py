@@ -9,7 +9,7 @@ from coverengine.params import Registry
 
 
 def _params(**over: object):  # type: ignore[no-untyped-def]
-    return Registry.load(None).resolve(trial={"spend.budget_eur_month": 10,
+    return Registry.load(None).resolve(server={"spend.budget_eur_month": 10,
                                               "spend.hourly_spike_eur": 100, **over})  # fmt: skip
 
 

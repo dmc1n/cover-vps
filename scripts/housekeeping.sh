@@ -3,7 +3,9 @@
 # - the local safety copies made before a change (cover-data/backup-*-YYYY-MM-DD) older than
 #   SAFETY_DAYS (14); the nightly archives hold the state of those days too;
 # - the release folders (~/releases/vX.Y.Z) beyond the newest RELEASES_KEEP (8), never the one
-#   ~/releases/current points at; every release can be built again from its tag.
+#   ~/releases/current points at; every release can be built again from its tag;
+# - price proposals (shop_quotes, b2b_quotes, quotes) older than limits.quotes_keep_days (60)
+#   that no order or request names (scripts/quotes_clean.py, ADR-123).
 # Prints what it removed; DRY_RUN=1 only prints.
 set -euo pipefail
 DATA=${COVER_DATA_DIR:-$HOME/cover-data}
@@ -26,4 +28,8 @@ ls -1 "$RELEASES" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | head -n -"$R
     run git -C "$REPO" worktree remove --force "$RELEASES/$v" && echo "release folder removed: $v"
   done
 run git -C "$REPO" worktree prune || true
+PY="$REPO/.venv/bin/python"; [ -x "$PY" ] || PY=python3
+dry=(); [ "${DRY_RUN:-0}" = 1 ] && dry=(--dry-run)
+COVER_DATA_DIR="$DATA" "$PY" "$REPO/scripts/quotes_clean.py" --data "$DATA" "${dry[@]}" ||
+  echo "proposals: clean-up failed"
 echo "$(date '+%Y-%m-%d %H:%M') housekeeping done; $(df -h --output=avail "$DATA" | tail -1 | tr -d ' ') free"

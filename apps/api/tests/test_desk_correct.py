@@ -112,3 +112,29 @@ def test_the_correct_view_lists_the_seams_and_pieces(desk: Any) -> None:
     view = c.get("/api/desk/drawing-r5/correct").json()
     assert view["seams"] == [] and view["pieces"] == [] and view["drawn"] is False
     assert "round front" in view["shapes"]
+
+
+def test_a_rule_only_for_a_known_group_and_a_setting_a_rule_may_change(desk: Any) -> None:
+    """ADR-123: the group is a known family or series, never a path; a server-only setting
+    (the AI's address, the budget) and a wrong type are refused."""
+    from coverengine import learned
+
+    rens = login(desk, "rens")
+    root = desk.state.store.root
+    ok = {"group": "drawing-r", "key": "features.vent_above_hem_mm", "value": 300.0}
+    for group in ("../../etc/x", "drawing-r/../../x", "/tmp/x", "Drawing-R", "nosuchgroup", ""):
+        r = rens.post("/api/desk-rules", json={**ok, "group": group})
+        assert r.status_code == 400, (group, r.text)
+    for key, value in (("ai.base_url", "https://evil.example"), ("spend.hard_stop", False),
+                       ("features.vent_above_hem_mm", "high")):  # fmt: skip
+        r = rens.post("/api/desk-rules", json={**ok, "key": key, "value": value})
+        assert r.status_code == 400, (key, r.text)
+    assert not list(root.rglob("*.yaml")) or all(
+        p.parent == root / "learning" / "rules" for p in root.rglob("*.yaml"))  # fmt: skip
+    assert rens.post("/api/desk-rules", json=ok).status_code == 200
+    assert (root / "learning" / "rules" / "drawing-r.yaml").is_file()
+    # reading: a group name that is a path reads nothing
+    (root / "secret.yaml").write_text("hull:\n  clearance_mm: 99\n")
+    assert learned.rules("../secret", root) == {} and learned.rule_path("../secret", root) is None
+    with pytest.raises(ValueError):
+        learned.write_rule("../secret", "hull.clearance_mm", 5, "x", "y", root)

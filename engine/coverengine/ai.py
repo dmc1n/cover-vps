@@ -60,6 +60,29 @@ ACTIONS: dict[str, str] = {
 
 
 LEDGER_NOTE = 40  # param-ok: characters of the prompt kept in the cost ledger
+# The only hosts a provider's key is ever sent to (ADR-123): https, this host, the standard port.
+KEY_HOSTS: dict[str, tuple[str, ...]] = {
+    "deepseek": ("api.deepseek.com",),
+    "gemini": ("generativelanguage.googleapis.com",),
+}
+
+
+def chat_url(provider: str, base_url: str) -> str:
+    """The chat endpoint for `provider`, refused unless `base_url` is that provider's own host:
+    a changed setting can never send the key elsewhere."""
+    from urllib.parse import urlsplit
+
+    u = urlsplit(base_url.strip())
+    hosts = KEY_HOSTS.get(provider, ())
+    try:
+        port = u.port
+    except ValueError:
+        port = -1
+    if (u.scheme != "https" or u.username is not None or u.password is not None
+            or port not in (None, 443) or (u.hostname or "") not in hosts
+            or u.query or u.fragment):  # fmt: skip
+        raise CoverError(f"ai.base_url is not {provider}'s own address; the key is not sent")
+    return base_url.strip().rstrip("/") + "/chat/completions"
 
 
 def _key(provider: str) -> str:
@@ -167,7 +190,7 @@ def ask_parts(
     if effort:  # how long a reasoning model thinks (it is billed as output; ADR-078)
         body["reasoning_effort"] = effort
     req = urllib.request.Request(
-        str(params["ai.base_url"]).rstrip("/") + "/chat/completions",
+        chat_url(provider, str(params["ai.base_url"])),
         data=json.dumps(body).encode("utf-8"),
         headers={"Authorization": f"Bearer {_key(provider)}", "Content-Type": "application/json"},
     )

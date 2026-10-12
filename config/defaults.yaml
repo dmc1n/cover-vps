@@ -373,7 +373,7 @@ drawn:
 
 desk:                            # the drawing desk: people approve covers, AI only sorts (ADR-079)
   approvers: "rens,rick,wouter,wout"  # who may approve, reject, mark produced (owner, 6 Oct 2026);
-                                 # matched on user name or first name; admins always may; "wout": Wout
+                                 # matched on the user name only (ADR-123); admins always may; "wout": Wout
                                  # logs in as wout, so he gets the approvers' digest too (ADR-115)
   require_approval_for_dxf: true # the cutting table's DXF only once a cover is approved (owner)
   gate_scope: drawings           # drawings: only drawing-* covers need approval for the DXF; all: every
@@ -389,7 +389,7 @@ desk:                            # the drawing desk: people approve covers, AI o
 
 questions:                       # questions for the owner and the workshop, answered at the Desk (ADR-109)
   owners: "rick"                 # who marks an answer final and a question processed (owner, 9 Oct 2026);
-                                 # matched on user name or first name. Who answers: desk.approvers by default
+                                 # matched on the user name only (ADR-123). Who answers: desk.approvers by default
   digest_hours: 24               # new questions mailed to whoever may answer: at most one digest per this
                                  # many hours (0: no mails)
   answer_digest_hours: 8         # new answers mailed to the owners: at most one digest per this many hours
@@ -399,7 +399,39 @@ products:                        # the workshop's product list linked to the dra
   max_bytes: 52428800            # an uploaded list, or a zip unpacked, at most this large (50 MB)
   max_files: 2000                # a zip with more entries than this is refused whole
 
+limits:                          # what a request or an uploaded file may hold (ADR-123) [server-only]
+  body_mb: 2                     # any request body at most this large (MiB) unless its route allows more;
+                                 # also the margin for the form round the files of an upload route
+  upload_mb: 2048                # a logged-in upload of a 3D model, a drawing or a reference zip (MiB);
+                                 # lists, pictures and the shop's photos follow their own caps
+                                 # (products.max_bytes, desk.picture_max_mb x pictures_max,
+                                 # suggest.photo_max_bytes x 3 photos)
+  image_max_mp: 40               # an uploaded picture or photo may be at most this many megapixels (read
+                                 # from its header before it is decoded: no decompression bombs); a PDF
+                                 # page is rendered at a resolution that stays under it
+  pdf_max_pages: 50              # an uploaded drawing (PDF) has at most this many pages
+  pdf_render_dpi: 150            # ... and every page fits the pixel cap at this resolution (A0 does)
+  zip_max_files: 2000            # a reference zip: at most this many files (a batch had 115) ...
+  zip_max_mb: 4096               # ... unpacking to at most this much (MiB, counted while unpacking)
+  sheet_max_rows: 200000         # a product or price list (Excel, CSV): at most this many rows ...
+  sheet_max_cells: 5000000       # ... and cells in one sheet (a small .xlsx can claim a huge sheet)
+  quotes_keep_days: 60           # a price proposal (shop_quotes, b2b_quotes, quotes) older than this is
+                                 # removed by scripts/housekeeping.sh, unless an order or request names it
+  quotes_per_minute: 120         # all visitors together: at most this many new proposals a minute (each
+                                 # writes files); one visitor has its own, lower limit
+  ipv6_prefix: 64                # an IPv6 visitor counts as its network of this size in every per-visitor
+                                 # limit (one customer usually holds a whole /64)
+  login_lock_max_minutes: 240    # wrong passwords for one account from one address lock that pair for 15
+                                 # minutes after 5, doubling with each further one up to this (studio, B2B)
+  login_codes_per_hour: 8        # at most this many login codes mailed to one person in an hour
+  job_timeout_s: 14400           # one step of a background job (cover import, hull, ..., drape) ends after
+                                 # this long; the longest finished drape took 4400 s (Oct 2026). Its CPU time
+                                 # is capped at this times the number of cores. 0: no limit
+  job_memory_mb: 12288           # ... and may reserve at most this much memory (address space, MiB; the
+                                 # server has 16 GB); a step over it fails, the server goes on. 0: no limit
+
 spend:                           # what the AI costs, kept and guarded (owner, 6 Oct 2026; ADR-078)
+                                 # [server-only] (ADR-123): no model, trial, rule or UI sets these
   budget_eur_month: 50           # to confirm: the month's AI budget; at 100 % paid calls stop
   warn_pct: "50,80"              # the watchdog mails at these shares of the budget
   hourly_spike_eur: 2.5          # ... and when one hour costs more than this
@@ -435,12 +467,12 @@ ai:                              # AI advice on cover layouts (the key: DEEPSEEK
   provider: deepseek             # deepseek | gemini | none
   model: deepseek-flash          # deepseek-flash = V4.1 Flash (fast, since 10 Sep 2026) |
                                  # deepseek-v4-pro = V4 Pro (stronger, slower; no 4.1 Pro yet)
-  base_url: https://api.deepseek.com
+  base_url: https://api.deepseek.com  # [server-only] the key is sent only to its provider's own host (ADR-123)
   timeout_s: 120                 # how long to wait for an answer
   vision_provider: gemini        # who reads the drawings (pictures): gemini | deepseek (ADR-068)
   vision_model: gemini-3.8-flash # reading drawings, comparing references: the cheap Flash model
                                  # (owner, 6 Oct 2026; was gemini-3.1-pro-preview; ADR-077)
-  vision_base_url: https://generativelanguage.googleapis.com/v1beta/openai
+  vision_base_url: https://generativelanguage.googleapis.com/v1beta/openai  # [server-only] (ADR-123)
   reasoning_effort: ""           # low | medium | high, or "" for the model's own choice
   check_reasoning: low           # the cross check's reading AI (DeepSeek): it thought 40-70k tokens
                                  # per cover (85 % of the cost); low keeps it right at a fraction (ADR-078)
@@ -470,9 +502,9 @@ arrange:                         # furniture placed together, one cover over the
   cell_mm: 20                    # follow and box: grid for the room and the water check (mm)
 
 suggest:                         # "start from a photo or a link" in the configurator (ADR-086)
-  per_hour: 10                   # suggestions per visitor per hour (the AI costs a little each)
-  per_day: 20                    # to confirm: ... and per visitor per day (a public shop, ADR-103)
-  visitor_eur_day: 0.5           # to confirm: what one visitor's suggestions may cost the AI in a day
+  per_hour: 10                   # [server-only] suggestions per visitor per hour (the AI costs a little each)
+  per_day: 20                    # [server-only] to confirm: ... and per visitor per day (a public shop, ADR-103)
+  visitor_eur_day: 0.5           # [server-only] to confirm: what one visitor's suggestions may cost the AI in a day
                                  # (the ledger, spend.py; about 14 photo suggestions); then by hand only
   photo_max_bytes: 10485760      # a customer's photo, at most this large (10 MB)
   fetch_timeout_s: 8             # a webshop page or its image must arrive within this
@@ -483,7 +515,7 @@ suggest:                         # "start from a photo or a link" in the configu
                                  # (owner, 7 Oct 2026: "via Google image search a comparison as the basis")
   search_pages: 5                # at most this many product pages fetched and compared with the photo
   search_timeout_s: 90           # the search may take this long (it looks up several pages)
-  search_query_eur: 0.013        # to confirm on the bill: Google's grounding fee per search query the
+  search_query_eur: 0.013        # [server-only] to confirm on the bill: Google's grounding fee per search query the
                                  # model runs (Gemini 3: $14 per 1000 queries), for the budget
   thinking: low                  # how long Gemini thinks in the photo steps (low: about 3x faster)
   final_model: gemini-3.8-flash   # final configurator sizing, independently of drawing reading
@@ -499,7 +531,7 @@ suggest:                         # "start from a photo or a link" in the configu
                                  # carries the brand and model the photo was recognised as, this sure
   reverse_search: true           # a real search by image (Google Cloud Vision web detection, as Google Lens):
                                  # on since 7 Oct 2026 (owner gave the key, GOOGLE_VISION_API_KEY; QUESTIONS 68)
-  reverse_eur: 0.0033            # to confirm: its fee per photo ($3.50 per 1000 after the first 1000 a month)
+  reverse_eur: 0.0033            # [server-only] to confirm: its fee per photo ($3.50 per 1000 after the first 1000 a month)
   reverse_max: 50                # results of each kind asked from the search by image (same fee): Google lists
                                  # the pages about its label first, the pages showing the photo after them;
                                  # with 5 only the label's pages came back (ADR-112)

@@ -27,8 +27,23 @@ The column **Access** shows who has a password, who is invited (and until when t
 and who is not invited yet. The invitation links to the short guide **How Cover Studio works**
 (#/guide, readable without logging in).
 
-After five wrong passwords your account waits 15 minutes; ten wrong tries from one address
-block that address for a while.
+After five wrong passwords your account waits 15 minutes **on that computer's address** (each
+further wrong one doubles the wait, at most 4 hours); from anywhere else you can still log in, so
+someone guessing cannot lock you out. Ten wrong tries from one address block that address for a
+while. A user name that does not exist gets exactly the same answers (ADR-123).
+
+**The login code by mail is on by default and fails closed** (ADR-123): if no mail server is set
+(or its settings are removed), nobody can log in with a password alone; the login page says to
+ask an admin. The way in, on the server:
+
+```
+COVER_DATA_DIR=~/cover-data uv run cover-users invite rick          # a link: new password, logged in
+COVER_DATA_DIR=~/cover-data uv run cover-users two-factor status|off|on
+```
+
+A test copy of the data without mail needs `cover-users two-factor off` first. At most 8 login
+codes an hour are mailed to one person; a password change, a reset link and switching a user off
+end the codes still open.
 
 ## Roles and rights
 
@@ -62,7 +77,8 @@ Matches, B2B customers, Website (AI), Photo test), the prices under **Prices**, 
 set once under **Settings** (admins), on tabs:
 
 - **Users & rights**: add, change role, may approve, active (an inactive user is logged out at
-  once), e-mail; *New link* / *Reset* makes a password link (shown to copy, and mailed when
+  once), e-mail (who approves at the Desk is matched on the **user name** in `desk.approvers`,
+  never on the display name); *New link* / *Reset* makes a password link (shown to copy, and mailed when
   possible).
 - **Mail & notifications**: who gets which mail (one list: configurator requests, server alerts
   and B2B, new orders, the fit question, approval requests, the digests), the outgoing mail

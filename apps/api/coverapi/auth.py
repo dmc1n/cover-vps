@@ -102,6 +102,17 @@ CREATE TABLE IF NOT EXISTS address_failures (
   failed INTEGER NOT NULL,
   locked_until REAL
 );
+CREATE TABLE IF NOT EXISTS login_failures (
+  account TEXT NOT NULL,
+  address TEXT NOT NULL,
+  failed INTEGER NOT NULL,
+  locked_until REAL,
+  PRIMARY KEY (account, address)
+);
+CREATE TABLE IF NOT EXISTS code_sends (
+  user_id INTEGER NOT NULL,
+  time REAL NOT NULL
+);
 """
 
 
@@ -166,6 +177,58 @@ def check_password(password: str, stored: str | None) -> bool:
     _, salt, key = stored.split("$")
     got = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), **SCRYPT)  # type: ignore[arg-type]
     return hmac.compare_digest(got.hex(), key)
+
+
+_dummy: list[str] = []
+
+
+def dummy_hash() -> str:
+    """A real scrypt hash of nothing: an unknown name or an account without a password costs
+    the same one scrypt as a known one (no timing difference, ADR-123)."""
+    if not _dummy:
+        _dummy.append(hash_password(secrets.token_urlsafe(16)))
+    return _dummy[0]
+
+
+def login_limits() -> tuple[int, int]:
+    """(limits.login_lock_max_minutes, limits.login_codes_per_hour)."""
+    from coverengine.params import Registry
+
+    p = Registry.load(None).resolve()
+    return int(p["limits.login_lock_max_minutes"]), int(p["limits.login_codes_per_hour"])  # type: ignore[arg-type]
+
+
+def lock_seconds(failed: int) -> float:
+    """After LOCK_AFTER wrong passwords LOCK_MINUTES, doubling with every further one, at most
+    limits.login_lock_max_minutes."""
+    if failed < LOCK_AFTER:
+        return 0.0
+    most = login_limits()[0]
+    return float(min(LOCK_MINUTES * 2 ** (failed - LOCK_AFTER), most) * MINUTE_S)
+
+
+def check_lock(db: sqlite3.Connection, table: str, account: str, address: str, now: float) -> bool:
+    """Is this account locked for this address (an unknown name the same as a known one)?"""
+    row = db.execute(
+        f"SELECT locked_until FROM {table} WHERE account=? AND address=?",  # noqa: S608
+        (account, address),
+    ).fetchone()
+    return bool(row and row[0] and row[0] > now)
+
+
+def count_failure(db: sqlite3.Connection, table: str, account: str, address: str,
+                  now: float) -> None:  # fmt: skip
+    row = db.execute(
+        f"SELECT failed FROM {table} WHERE account=? AND address=?",  # noqa: S608
+        (account, address),
+    ).fetchone()
+    n = (int(row[0]) if row else 0) + 1
+    wait = lock_seconds(n)
+    db.execute(
+        f"INSERT OR REPLACE INTO {table} (account, address, failed, locked_until) "  # noqa: S608
+        "VALUES (?, ?, ?, ?)",
+        (account, address, n, now + wait if wait else None),
+    )
 
 
 def password_problem(password: str, username: str) -> str | None:
@@ -264,6 +327,7 @@ class Auth:
             if changes.get("active") is False:
                 db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
                 db.execute("DELETE FROM trusted WHERE user_id=?", (user_id,))
+                db.execute("DELETE FROM challenges WHERE user_id=?", (user_id,))  # ADR-123
         return self.user(user_id)
 
     # ---- invites (first password, or a reset)
@@ -279,6 +343,7 @@ class Auth:
             db.execute("UPDATE users SET pw_hash=NULL WHERE id=?", (user_id,))
             db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
             db.execute("DELETE FROM trusted WHERE user_id=?", (user_id,))
+            db.execute("DELETE FROM challenges WHERE user_id=?", (user_id,))  # ADR-123
         return token
 
     def invite_user(self, token: str) -> User:
@@ -296,12 +361,21 @@ class Auth:
         problem = password_problem(password, user.username)
         if problem:
             raise AuthError(problem, 400)
+        pw = hash_password(password)
         with self._lock, self._db() as db:
+            # the link is used once: whoever marks it used first sets the password (ADR-123)
+            taken = db.execute(
+                "UPDATE invites SET used=1 WHERE token_hash=? AND used=0 AND expires>?",
+                (_hash_token(token), time.time()),
+            ).rowcount
+            if taken != 1:
+                raise AuthError("this link is no longer valid: ask an admin for a new one", 400)
             db.execute(
                 "UPDATE users SET pw_hash=?, failed=0, locked_until=NULL WHERE id=?",
-                (hash_password(password), user.id),
+                (pw, user.id),
             )
-            db.execute("UPDATE invites SET used=1 WHERE token_hash=?", (_hash_token(token),))
+            db.execute("DELETE FROM challenges WHERE user_id=?", (user.id,))
+            db.execute("DELETE FROM login_failures WHERE account=?", (user.username,))
         return user
 
     def change_password(self, user_id: int, old: str, new: str, keep: str | None = None) -> None:
@@ -320,13 +394,23 @@ class Auth:
                 (user_id, _hash_token(keep) if keep else ""),
             )
             db.execute("DELETE FROM trusted WHERE user_id=?", (user_id,))
+            db.execute("DELETE FROM challenges WHERE user_id=?", (user_id,))  # ADR-123
 
     # ---- second step: a code by mail, and devices that passed it (owner, 2 Oct 2026)
     def challenge(self, user: User, address: str) -> tuple[str, str]:
-        """A new code for this user (an older one stops working): (challenge id, code)."""
+        """A new code for this user (an older one stops working): (challenge id, code). At most
+        limits.login_codes_per_hour codes an hour per user (no mail flood, ADR-123)."""
         cid = secrets.token_urlsafe(24)
         code = "".join(secrets.choice("0123456789") for _ in range(CODE_DIGITS))
+        now = time.time()
         with self._lock, self._db() as db:
+            db.execute("DELETE FROM code_sends WHERE time<?", (now - HOUR_S,))
+            sent = db.execute(
+                "SELECT count(*) FROM code_sends WHERE user_id=?", (user.id,)
+            ).fetchone()[0]
+            if sent >= login_limits()[1]:
+                raise AuthError("too many login codes asked: try again later", 429)
+            db.execute("INSERT INTO code_sends (user_id, time) VALUES (?, ?)", (user.id, now))
             db.execute(
                 "DELETE FROM challenges WHERE user_id=? OR expires<?", (user.id, time.time())
             )
@@ -339,22 +423,34 @@ class Auth:
         return cid, code
 
     def verify(self, cid: str, code: str, address: str) -> tuple[User, str]:
-        """The mailed code: a session for the user (the same as a login)."""
-        with self._db() as db:
+        """The mailed code: a session for the user (the same as a login). Each try is counted
+        before the code is compared, and the right code is used up by one single delete, so
+        parallel guesses get no extra tries and one code gives one session (ADR-123)."""
+        cid_hash, now = _hash_token(cid), time.time()
+        with self._lock, self._db() as db:
             row = db.execute(
-                "SELECT * FROM challenges WHERE id=? AND expires>?", (_hash_token(cid), time.time())
+                "SELECT * FROM challenges WHERE id=? AND expires>?", (cid_hash, now)
             ).fetchone()
-        if row is None:
-            raise AuthError("the code has expired: log in again", 400)
-        if row["tries"] >= CODE_TRIES:
+            if row is None:
+                raise AuthError("the code has expired: log in again", 400)
+            tried = db.execute(
+                "UPDATE challenges SET tries=tries+1 WHERE id=? AND tries<?", (cid_hash, CODE_TRIES)
+            ).rowcount
+        if tried != 1:
             raise AuthError("too many wrong codes: log in again", 429)
         if not hmac.compare_digest(_hash_token(code.strip()), row["code_hash"]):
-            with self._lock, self._db() as db:
-                db.execute("UPDATE challenges SET tries=tries+1 WHERE id=?", (row["id"],))
             raise AuthError("wrong code", 400)
         with self._lock, self._db() as db:
-            db.execute("DELETE FROM challenges WHERE id=?", (row["id"],))
-        return self._session(int(row["user_id"]), address)
+            used = db.execute(
+                "DELETE FROM challenges WHERE id=? AND code_hash=? AND expires>?",
+                (cid_hash, row["code_hash"], time.time()),
+            ).rowcount
+        if used != 1:
+            raise AuthError("the code has expired: log in again", 400)
+        user = self.user(int(row["user_id"]))
+        if not user.active:
+            raise AuthError("the code has expired: log in again", 400)
+        return self._session(user.id, address)
 
     def trust(self, user_id: int, label: str) -> str:
         token = secrets.token_urlsafe(32)
@@ -403,40 +499,40 @@ class Auth:
         return self._session(user.id, address)
 
     def _password(self, username: str, password: str, address: str) -> User:
+        """The lock is per account and address (ADR-123): wrong passwords from elsewhere never
+        lock the real person out, an unknown name is counted and answered exactly as a known
+        one (also when locked), and the lock doubles with every further wrong password."""
+        from coverapi.ratelimit import visitor_key
+
         now = time.time()
+        account = username.strip().lower()[:64]
+        address = visitor_key(address)  # an IPv6 address as its /64 network
         with self._db() as db:
             arow = db.execute(
                 "SELECT * FROM address_failures WHERE address=?", (address,)
             ).fetchone()
-            row = db.execute(
-                "SELECT * FROM users WHERE username=?", (username.strip().lower(),)
-            ).fetchone()
-        if arow and arow["locked_until"] and arow["locked_until"] > now:
+            locked = check_lock(db, "login_failures", account, address, now)
+            row = db.execute("SELECT * FROM users WHERE username=?", (account,)).fetchone()
+        if (arow and arow["locked_until"] and arow["locked_until"] > now) or locked:
             raise AuthError("too many wrong passwords: try again in a few minutes", 429)
-        if row is not None and row["locked_until"] and row["locked_until"] > now:
-            raise AuthError("too many wrong passwords: try again in a few minutes", 429)
-        ok = row is not None and bool(row["active"]) and check_password(password, row["pw_hash"])
-        if row is None:
-            check_password(password, hash_password("timing"))  # the same work either way
+        stored = row["pw_hash"] if row is not None and row["pw_hash"] else dummy_hash()
+        right = check_password(password, stored)  # one scrypt, whoever asks
+        ok = right and row is not None and bool(row["active"]) and bool(row["pw_hash"])
         if not ok:
-            self._failed(row, address, now)
+            self._failed(account, address, now)
             raise AuthError("wrong user name or password")
         with self._lock, self._db() as db:
-            db.execute("UPDATE users SET failed=0, locked_until=NULL WHERE id=?", (row["id"],))
+            db.execute("DELETE FROM login_failures WHERE account=? AND address=?",
+                       (account, address))  # fmt: skip
             db.execute("DELETE FROM address_failures WHERE address=?", (address,))
         user = self._user(row)
         assert user is not None
         return user
 
-    def _failed(self, row: sqlite3.Row | None, address: str, now: float) -> None:
+    def _failed(self, account: str, address: str, now: float) -> None:
         lock = now + LOCK_MINUTES * MINUTE_S
         with self._lock, self._db() as db:
-            if row is not None:
-                failed = int(row["failed"]) + 1
-                db.execute(
-                    "UPDATE users SET failed=?, locked_until=? WHERE id=?",
-                    (failed, lock if failed >= LOCK_AFTER else None, row["id"]),
-                )
+            count_failure(db, "login_failures", account, address, now)
             a = db.execute(
                 "SELECT failed FROM address_failures WHERE address=?", (address,)
             ).fetchone()

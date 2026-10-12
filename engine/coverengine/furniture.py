@@ -91,7 +91,11 @@ def build(product: str, v: dict[str, Any], room_cm: float | None = None,
         h = float(v["table_height_cm"])
         if product == "round_set":
             r = float(v["table_diameter_cm"]) / 2
-            top = trimesh.creation.cylinder(radius=r * cm, height=TOP_CM * cm, sections=64)
+            top = trimesh.creation.cylinder(
+                radius=r * cm,
+                height=TOP_CM * cm,
+                sections=64,  # param-ok: round enough
+            )
             top.apply_translation((0, 0, (h - TOP_CM / 2) * cm))
             parts += [top, _box(-LEG_CM, -LEG_CM, 0, LEG_CM, LEG_CM, h - TOP_CM).apply_scale(cm)]
             lx, wy = r, r

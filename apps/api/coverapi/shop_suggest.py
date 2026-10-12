@@ -286,10 +286,13 @@ def photo_png(data: bytes) -> bytes:
     if data[4:12] in (b"ftypheic", b"ftypheix", b"ftypmif1", b"ftyphevc"):
         raise SuggestError("HEIC photos are not supported: please send a JPG or PNG (on an "
                            "iPhone: Settings, Camera, Formats, Most Compatible)")  # fmt: skip
-    try:
-        im = Image.open(io.BytesIO(data))
-        im.load()
-    except (UnidentifiedImageError, OSError):
+    from coverengine.safeimage import TooLargeImage, max_pixels, open_image
+
+    try:  # the size in pixels checked before decoding: no decompression bombs (ADR-123)
+        im = open_image(data, max_pixels(), draft_edge=PHOTO_EDGE_PX)
+    except TooLargeImage as exc:
+        raise SuggestError(str(exc)) from None
+    except (UnidentifiedImageError, OSError, ValueError):
         raise SuggestError("that file is not a photo (JPG, PNG, WebP or AVIF please)") from None
     # a webshop's cut-out picture: its see-through background white, not black (which made the
     # furniture hard to recognise and found nothing in the image search)
@@ -355,8 +358,8 @@ def ask(
         "ai.provider": str(params["ai.vision_provider"]),
         "ai.model": str(params["suggest.final_model"]),
         "ai.reasoning_effort": str(params["suggest.final_thinking"]),
-        "ai.base_url": str(params["ai.vision_base_url"]),
-        "ai.timeout_s": int(params["suggest.ai_timeout_s"])})  # fmt: skip
+        "ai.timeout_s": int(params["suggest.ai_timeout_s"])},
+        server={"ai.base_url": str(params["ai.vision_base_url"])})  # fmt: skip
     system = SYSTEM.replace("__PRODUCTS__", _products_text(PRODUCTS)).replace(
         "LANGUAGE", {"nl": "Dutch", "de": "German", "fr": "French"}.get(lang, "English")
     )
@@ -1064,10 +1067,12 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
     sources = data / "order_sources"
 
     def visitor(request: Request) -> str:
+        from coverapi.ratelimit import visitor_key
+
         a = _address(request)
         if link_ok(auth, request):  # through the website: its visitor's own address
             a = request.headers.get("x-client-ip") or a
-        return a
+        return visitor_key(a)  # an IPv6 visitor as its /64 network (ADR-123)
 
     @app.post("/api/shop/suggest")
     async def suggest(

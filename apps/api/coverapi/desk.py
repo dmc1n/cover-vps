@@ -253,8 +253,8 @@ def approver(user: Any, params: Any) -> bool:
     if user.may("admin"):
         return True
     names = {n.strip().lower() for n in str(params["desk.approvers"]).split(",") if n.strip()}
-    first = (user.name or "").strip().split(" ")[0].lower()
-    return user.active and (user.username.lower() in names or first in names)
+    # the user name only (ADR-123): a display name is chosen freely, so "Rens Fake" is not Rens
+    return bool(user.active and user.username.lower() in names)
 
 
 def refuse_no_cover(d: Path, action: str) -> None:
@@ -503,7 +503,10 @@ def drawing_page(d: Path, data_dir: Path, page: int) -> Path:
     if not 0 <= page < min(doc.page_count, MAX_PAGES):
         raise HTTPException(404, "no such page")
     cache.mkdir(exist_ok=True)
-    doc[page].get_pixmap(dpi=PAGE_DPI).save(out)
+    from coverengine.safeimage import max_pixels, safe_dpi
+
+    p = doc[page]  # never more pixels than limits.image_max_mp (ADR-123)
+    p.get_pixmap(dpi=safe_dpi(p, PAGE_DPI, max_pixels())).save(out)
     return out
 
 
@@ -533,6 +536,8 @@ def save_picture(d: Path, data: bytes, params: Any, sub: str = PICTURES_DIR) -> 
     most = float(params["desk.picture_max_mb"])
     if len(data) > most * MB:
         raise HTTPException(413, f"a picture may be at most {most:g} MB")
+    from coverengine.safeimage import TooLargeImage, max_pixels, open_image
+
     try:
         with warnings.catch_warnings():
             # a picture that unpacks to an enormous size is refused, not only warned about
@@ -540,8 +545,10 @@ def save_picture(d: Path, data: bytes, params: Any, sub: str = PICTURES_DIR) -> 
             with Image.open(io.BytesIO(data)) as probe:
                 fmt = probe.format
                 probe.verify()
-            img = Image.open(io.BytesIO(data))
-            img.load()
+            # its size in pixels checked before decoding (limits.image_max_mp, ADR-123)
+            img = open_image(data, max_pixels(params), int(params["desk.picture_max_side_px"]))
+    except TooLargeImage as exc:
+        raise HTTPException(413, str(exc)) from None
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError,
             Image.DecompressionBombError, Image.DecompressionBombWarning):  # fmt: skip
         raise HTTPException(400, "not a picture: use JPG, PNG or WebP") from None
@@ -1109,6 +1116,7 @@ def install(app: FastAPI, store: Any) -> None:
         """A person makes a repeated correction the rule for a group; its covers recalculate."""
         from coverengine import learned
         from coverengine.params import resolve_model
+        from coverengine.params.registry import list_families
 
         user = current_user(request)
         params = Registry.load(None).resolve()
@@ -1116,12 +1124,19 @@ def install(app: FastAPI, store: Any) -> None:
             raise HTTPException(403, "only Rens, Rick, Wouter (desk.approvers) or an admin")
         if req.key not in params.keys():
             raise HTTPException(400, f"no setting {req.key!r}")
-        who = user.name or user.username
-        row = learned.write_rule(req.group, req.key, req.value, who,
-                                 "made the rule at the Desk", store.root)  # fmt: skip
         models = Path(store.models)
         covers = [d for d in sorted(models.iterdir())
                   if (d / "cover.json").is_file() and not no_cover(d)]  # fmt: skip
+        # only a group that exists: a family preset or the group of a cover (ADR-123)
+        known = set(list_families()) | {g for d in covers if (g := learned.group_of(d))}
+        if not learned.valid_group(req.group) or req.group not in known:
+            raise HTTPException(400, f"no group {req.group!r}")
+        who = user.name or user.username
+        try:
+            row = learned.write_rule(req.group, req.key, req.value, who,
+                                     "made the rule at the Desk", store.root)  # fmt: skip
+        except ValueError as exc:  # a server-only setting, a wrong type
+            raise HTTPException(400, str(exc)) from None
         members = [d for d in covers if learned.group_of(d) == req.group]
         jobs: list[Any] = []
         for d in members:

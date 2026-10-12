@@ -352,3 +352,37 @@ def test_b2b_has_the_barbecues_only_once_they_are_on(app: Any) -> None:
     admin.put("/api/admin/shop/settings", json={"bbq_enabled": True})
     assert "bbq-bge-large-nest" in ids()
     assert dealer.post("/api/b2b/quote", json=q).status_code == 200
+
+
+def test_a_scene_only_for_its_own_company_and_a_link_used_once(app: Any) -> None:
+    """ADR-123: another company's 3D scene is "not there"; a password link works once; a
+    lock-out is per account and address, and an unknown address is answered the same."""
+    from fastapi import HTTPException
+
+    admin = _admin(app)
+    dealer, _ = _dealer(app, admin)
+    q = dealer.post("/api/b2b/quote", json={"product": "item", "rain": False}).json()
+    assert dealer.get(q["scene"]).status_code == 200
+    other, _ = _dealer(app, admin, "buyer@other.example", name="Other BV")
+    assert other.get(q["scene"]).status_code == 404
+    store = app.state.b2b
+    uid = int(store.user_by_email("inkoop@dealer.example")["id"])
+    token = store.token(uid, "reset")
+    store.set_password(token, "another-long-dealer-password")
+    with pytest.raises(HTTPException) as again:
+        store.set_password(token, "a-third-long-dealer-password")
+    assert again.value.status_code == 400
+    for _ in range(5):
+        with pytest.raises(HTTPException):
+            store.check("inkoop@dealer.example", "wrong", "203.0.113.9")
+    with pytest.raises(HTTPException) as locked:
+        store.check("inkoop@dealer.example", "another-long-dealer-password", "203.0.113.9")
+    assert locked.value.status_code == 429
+    # the real person elsewhere is not locked out
+    assert store.check("inkoop@dealer.example", "another-long-dealer-password", "198.51.100.7")
+    for _ in range(5):
+        with pytest.raises(HTTPException):
+            store.check("nobody@nowhere.example", "wrong", "203.0.113.10")
+    with pytest.raises(HTTPException) as same:
+        store.check("nobody@nowhere.example", "wrong", "203.0.113.10")
+    assert same.value.status_code == 429

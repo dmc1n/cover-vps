@@ -719,6 +719,29 @@ def payment_mode(s: dict[str, Any]) -> str:
     return "live" if key.startswith("live_") else "test" if key else "none"
 
 
+CENTS = 100  # euro to cents
+
+
+def payment_mismatch(pay: dict[str, Any], order: int, total_eur: float, mode: str) -> str | None:
+    """Why Mollie's payment is not this order's (None: it is): the amount to the cent, the
+    currency, the order in its metadata, and live or test as our key (ADR-123)."""
+    amount = pay.get("amount") or {}
+    try:
+        cents = round(float(str(amount.get("value"))) * CENTS)
+    except ValueError:
+        return f"no amount: {amount!r}"
+    if cents != round(total_eur * CENTS):
+        return f"amount {amount.get('value')} is not the order's {total_eur:.2f}"
+    if amount.get("currency") != "EUR":
+        return f"currency {amount.get('currency')!r} is not EUR"
+    meta = pay.get("metadata") or {}
+    if str(meta.get("order")) != str(order):
+        return f"the payment is for order {meta.get('order')!r}, not {order}"
+    if pay.get("mode") != mode:
+        return f"a {pay.get('mode')!r} payment, our key is {mode}"
+    return None
+
+
 def shop_params(auth: Any) -> Any:
     """The engine's parameters with the owner's shop prices on top (when set)."""
     from coverengine.params import Registry
@@ -766,9 +789,12 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     recent: dict[str, list[float]] = {}
 
     def limit(request: Request, per_minute: int = 40) -> None:
+        from coverapi.ratelimit import visitor_key
+
         a, now = _address(request), time.time()
         if link_ok(auth, request):  # through the website: its visitor's own address
             a = request.headers.get("x-client-ip") or a
+        a = visitor_key(a)  # an IPv6 visitor as its /64 network (ADR-123)
         key = f"{request.url.path.split('/')[3]}:{a}"  # each endpoint its own count
         times = [t for t in recent.get(key, []) if now - t < 60]  # noqa: PLR2004 - a minute
         if len(times) >= per_minute:
@@ -810,6 +836,9 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         path = request.url.path
         shop_path = path.startswith(("/api/shop/", "/media/", "/shop")) or path in (
             "/sitemap.xml", "/llms.txt")  # fmt: skip
+        # the old webshop API (ADR-061) too, except for a webshop's own key (checked there)
+        if path.startswith("/api/public/") and not request.headers.get("x-api-key"):
+            shop_path = True
         if shop_path and settings()["website_link"].get("closed"):
             if not link_ok(auth, request) and not staff(request):
                 root = shop_root(auth, request)
@@ -967,6 +996,10 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     def _quote(req: ShopQuote) -> dict[str, Any]:
         from coverengine import match as mt
 
+        from coverapi.ratelimit import quote_cap
+
+        if not quote_cap(app).hit():  # all visitors together (limits.quotes_per_minute, ADR-123)
+            raise HTTPException(429, "many prices are asked just now; please try again soon")
         p = shop_params(auth)
         ps = prices.current(auth)  # the published price set (ADR-098)
         stock = _stock(req.stock_model, req.product, p) if req.stock_model else None
@@ -1132,10 +1165,20 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                   "expired": "cancelled"}.get(pay.get("status", ""), None)  # fmt: skip
         if status:
             with sqlite3.connect(auth.path) as db:
+                row = db.execute("SELECT id, total_eur FROM orders WHERE mollie_id=?",
+                                 (pid,)).fetchone()  # fmt: skip
+            if row is None:
+                return {"ok": True}
+            if status == "paid":
+                problem = payment_mismatch(pay, int(row[0]), float(row[1]),
+                                           payment_mode(settings()))  # fmt: skip
+                if problem:  # never produce on a payment that is not this order's (ADR-123)
+                    notify(f"Order {row[0]}: Mollie payment {pid} does not match", problem)
+                    return {"ok": True}
+            with sqlite3.connect(auth.path) as db:
                 db.execute("UPDATE orders SET status=?, updated=? WHERE mollie_id=? "
                            "AND status='awaiting_payment'", (status, time.time(), pid))  # fmt: skip
-                row = db.execute("SELECT id FROM orders WHERE mollie_id=?", (pid,)).fetchone()
-            if status == "paid" and row:
+            if status == "paid":
                 produce(int(row[0]))
         return {"ok": True}
 

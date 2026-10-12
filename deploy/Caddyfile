@@ -1,14 +1,32 @@
 # Cover Studio on the internet (ADR-048): https with an automatic Let's Encrypt certificate,
 # everything passed to the app on 127.0.0.1:8080, which needs a login for every request.
 # Install: sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+# Check first (no sudo needed): caddy validate --config deploy/Caddyfile --adapter caddyfile
 {
 	email rick@s2dio.industries
 }
 
 covers.suns.nu {
 	encode zstd gzip
-	request_body {
-		max_size 2GB
+	# Request sizes (ADR-123). The app checks each route's own limit again before it reads a
+	# body (coverapi/bodylimit.py, limits.* in config/defaults.yaml); these are the outer walls.
+	# Uploads by logged-in people (3D models, drawings, references, lists, pictures): large.
+	@upload path /api/models /api/references /api/models/drawing /api/models/*/drawing /api/models/*/reference /api/desk-products /api/prices/import /api/desk/*/pictures /api/questions/*/pictures /api/admin/shop/photo-test
+	# The public shop's photos: 3 photos of at most 10 MiB (suggest.photo_max_bytes) and a margin.
+	@photos path /api/shop/suggest /api/shop/order/*/source /api/shop/fit/*/photo
+	# Everything else: small.
+	@small {
+		not path /api/models /api/references /api/models/drawing /api/models/*/drawing /api/models/*/reference /api/desk-products /api/prices/import /api/desk/*/pictures /api/questions/*/pictures /api/admin/shop/photo-test
+		not path /api/shop/suggest /api/shop/order/*/source /api/shop/fit/*/photo
+	}
+	request_body @upload {
+		max_size 2GiB
+	}
+	request_body @photos {
+		max_size 40MiB
+	}
+	request_body @small {
+		max_size 2MiB
 	}
 	header {
 		Strict-Transport-Security "max-age=31536000"
@@ -22,10 +40,25 @@ covers.suns.nu {
 			write_timeout 30m
 		}
 	}
+	# The log file: Caddy 2.6 has no `mode` for it (2.8 has; 2.6 ignores it silently), so once:
+	# sudo chmod 0640 /var/log/caddy/covers.log (a rolled file keeps the mode of the one before).
 	log {
 		output file /var/log/caddy/covers.log {
 			roll_size 20MiB
 			roll_keep 10
+		}
+		# No keys or tokens in the access log (ADR-123): the website's and the B2B API's keys,
+		# the Referer (it carries order and fit links), and the tokens in order, fit, match,
+		# invite and reset links and in ?preview= / ?link= / ?key= / ?token=.
+		# (Cookie and Authorization are redacted by Caddy itself.)
+		format filter {
+			wrap json
+			fields {
+				request>headers>X-Link-Key delete
+				request>headers>X-Api-Key delete
+				request>headers>Referer delete
+				request>uri regexp "(/(?:order|match|fit|token|invite|reset|welcome)/|[?&](?:preview|link|key|token)=)[^/?&#]+" "${1}REDACTED"
+			}
 		}
 	}
 }

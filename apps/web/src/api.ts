@@ -243,6 +243,7 @@ export interface ParamSpec {
   choices: string[] | null;
   comment: string;
   to_confirm: boolean;
+  server_only?: boolean; // set on the server only, never per cover (ADR-123)
 }
 
 export interface ModelParams {

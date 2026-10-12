@@ -52,6 +52,12 @@ def install(app: FastAPI, store: Any, jobs: Any) -> None:
             raise HTTPException(400, "the drawing is larger than 50 MB")
         if not data.startswith(b"%PDF"):
             raise HTTPException(400, "not a PDF")
+        from coverengine.safeimage import TooLargeImage, check_upload_pdf
+
+        try:  # pages and page sizes within limits.pdf_* (ADR-123)
+            check_upload_pdf(data)
+        except TooLargeImage as exc:
+            raise HTTPException(400, str(exc)) from None
         d.mkdir(parents=True, exist_ok=True)
         tmp = d / "reference.pdf.tmp"
         tmp.write_bytes(data)

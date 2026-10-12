@@ -63,7 +63,8 @@ def main() -> int:
     base = Registry.load(None).resolve()
     params = Registry.load(None).resolve(trial={
         "ai.provider": str(base["ai.vision_provider"]), "ai.model": str(base["ai.vision_model"]),
-        "ai.base_url": str(base["ai.vision_base_url"]), "ai.timeout_s": 600})  # fmt: skip
+        "ai.timeout_s": 600},
+        server={"ai.base_url": str(base["ai.vision_base_url"])})  # fmt: skip
     pdfs = {re.sub(r"^cover \d+ - ", "", p.stem): p for p in sorted(a.pdfs.glob("*.pdf"))}
     codes = list(pdfs)
     if a.codes_from:

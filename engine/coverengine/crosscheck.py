@@ -77,7 +77,8 @@ def vision_params() -> EffectiveParams:
     base = Registry.load(None).resolve()
     return Registry.load(None).resolve(trial={
         "ai.provider": str(base["ai.vision_provider"]), "ai.model": str(base["ai.check_model"]),
-        "ai.base_url": str(base["ai.vision_base_url"]), "ai.timeout_s": 600})  # fmt: skip
+        "ai.timeout_s": 600},
+        server={"ai.base_url": str(base["ai.vision_base_url"])})  # fmt: skip
 
 
 def run(pdf: Path, model: Path, facts: dict[str, Any] | None = None) -> dict[str, Any]:

@@ -519,8 +519,8 @@ def _names(s: str) -> set[str]:
 
 
 def _matches(user: Any, names: set[str]) -> bool:
-    first = (user.name or "").strip().split(" ")[0].lower()
-    return bool(user.active and (user.username.lower() in names or first in names))
+    # the user name only (ADR-123): a display name is chosen freely
+    return bool(user.active and user.username.lower() in names)
 
 
 def may_answer(user: Any, q: dict[str, Any] | sqlite3.Row, params: Any) -> bool:

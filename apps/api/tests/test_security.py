@@ -137,6 +137,7 @@ def test_login_code_by_mail_and_a_trusted_device(app: Any, monkeypatch: Any) -> 
     from coverapi import mailer
 
     sent: list[tuple[str, str]] = []
+    app.state.auth.set_setting("two_factor", True)  # the default on a real server
     monkeypatch.setattr(mailer, "configured", lambda auth: True)
     monkeypatch.setattr(mailer, "send", lambda auth, to, subject, text: sent.append((to, subject)))
     c = TestClient(app)
@@ -172,6 +173,7 @@ def test_login_code_by_mail_and_a_trusted_device(app: Any, monkeypatch: Any) -> 
 def test_without_an_email_the_code_cannot_be_sent(app: Any, monkeypatch: Any) -> None:
     from coverapi import mailer
 
+    app.state.auth.set_setting("two_factor", True)
     monkeypatch.setattr(mailer, "configured", lambda auth: True)
     monkeypatch.setattr(mailer, "send", lambda *a: None)
     r = TestClient(app).post(
@@ -210,20 +212,25 @@ def test_invite_all_mails_only_those_without_a_password(
 def test_the_webshop_api_keys_limits_and_requests(
     app: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ADR-061: the public API needs a key from outside; our own page needs none; the
-    customer never sees the cost price; a request is stored; framing only from set shops."""
+    """ADR-061: the public API needs a key from outside; our own page needs a colleague's
+    login (ADR-123: no Origin or Referer counts); the customer never sees the cost price; a
+    request is stored; framing only from set shops."""
     from coverapi import mailer
 
     monkeypatch.setattr(mailer, "configured", lambda auth: False)
     out = TestClient(app)
     body = {"product": "sofa", "sizes": {"length_cm": 210}}
     assert out.post("/api/public/v1/quote", json=body).status_code == 401  # no key, not our page
-    same = out.post("/api/public/v1/quote", json=body, headers={"Origin": "http://testserver"})
+    faked = {"Origin": "http://testserver", "Referer": "http://testserver/#/configure"}
+    assert out.post("/api/public/v1/quote", json=body, headers=faked).status_code == 401
+    assert out.get("/api/public/v1/options").status_code == 401  # a plain GET neither
+    admin = login(app, "rick", "a-long-admin-password")
+    same = admin.post("/api/public/v1/quote", json=body)  # our configurator, logged in
     assert same.status_code == 200, same.text
     q = same.json()
     assert "cost_eur" not in q["price"] and q["price"]["sale_eur"] > 0
-    assert out.get(q["preview"]).content[:4] == b"glTF"
-    admin = login(app, "rick", "a-long-admin-password")
+    assert admin.get(q["preview"]).content[:4] == b"glTF"
+    assert out.get(q["preview"]).status_code == 401
     key = admin.post("/api/admin/webshop/keys", json={"name": "shop"}).json()["key"]
     with_key = out.post("/api/public/v1/quote", json=body, headers={"X-Api-Key": key})
     assert with_key.status_code == 200
@@ -234,7 +241,7 @@ def test_the_webshop_api_keys_limits_and_requests(
     r = out.post(
         "/api/public/v1/request",
         json={"quote_id": q["id"], "name": "Anna", "email": "anna@example.com"},
-        headers={"Origin": "http://testserver"},
+        headers={"X-Api-Key": key},
     )
     assert r.status_code == 200, r.text
     listed = admin.get("/api/admin/requests").json()["requests"]

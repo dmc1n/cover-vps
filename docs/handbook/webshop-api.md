@@ -3,7 +3,12 @@
 Customers design their own cover from rough sizes and get a proposal at once: the cover in 3D,
 the pieces, the fabric and a price. A webshop offers this in one of two ways.
 
-## 1. The configurator in an iframe (the simplest)
+## 1. The configurator in an iframe (retired, ADR-123)
+
+Since 12 Oct 2026 the studio's configurator page (#/configure) works only for a logged-in
+colleague: the public API no longer trusts the browser's Origin header, which any script can
+fake. A webshop uses the consumer shop on the website, or the API below with its own key.
+The old instructions, for reference:
 
 ```html
 <iframe src="https://covers.suns.nu/#/configure"
@@ -17,8 +22,12 @@ Customers' requests appear on the same page and are mailed to the address set th
 ## 2. The API (for the webshop's own design)
 
 Base `https://covers.suns.nu/api/public/v1`. Every call sends the header
-`X-Api-Key: <key>`; an admin makes keys on the admin page (shown once). The limit is 30 calls
-a minute per address.
+`X-Api-Key: <key>`; an admin makes keys on the admin page (shown once). Without a valid key
+(or a colleague's login) every call is refused, `GET /preview/<id>.glb` too: the webshop's
+server fetches the preview with its key and serves it on. The limit is 30 calls a minute per
+address (an IPv6 address counts as its /64 network), and 120 new proposals a minute from all
+callers together (`limits.quotes_per_minute`). With the website link closed the API answers
+only calls with a key and colleagues.
 
 | Call | What |
 |---|---|

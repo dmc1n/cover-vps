@@ -169,6 +169,30 @@ def _table(rows: list[list[Any]], name: str) -> dict[str, Any] | None:
     return None
 
 
+def sheet_limits() -> tuple[int, int]:
+    """(rows, cells) a sheet may hold (limits.sheet_*, ADR-123)."""
+    from coverengine.params import Registry
+
+    p = Registry.load(None).resolve()
+    return int(p["limits.sheet_max_rows"]), int(p["limits.sheet_max_cells"])  # type: ignore[arg-type]
+
+
+def _bounded(rows: Any, filename: str) -> list[list[Any]]:
+    """The rows, refused (SheetError) past limits.sheet_max_rows rows or sheet_max_cells cells:
+    a small file can claim a huge sheet."""
+    max_rows, max_cells = sheet_limits()
+    out: list[list[Any]] = []
+    cells = 0
+    for r in rows:
+        row = list(r)
+        cells += len(row)
+        if len(out) >= max_rows or cells > max_cells:
+            raise SheetError(f"{filename}: the sheet is too large (at most {max_rows} rows "
+                             f"and {max_cells} cells)")  # fmt: skip
+        out.append(row)
+    return out
+
+
 def read_sheets(filename: str, data: bytes) -> list[dict[str, Any]]:
     """The tables in one .xlsx or .csv file."""
     low = filename.lower()
@@ -181,7 +205,7 @@ def read_sheets(filename: str, data: bytes) -> list[dict[str, Any]]:
             dialect: Any = csv.Sniffer().sniff(text[:4096], delimiters=",;\t")
         except csv.Error:
             dialect = csv.excel
-        t = _table([list(r) for r in csv.reader(io.StringIO(text), dialect)], filename)
+        t = _table(_bounded(csv.reader(io.StringIO(text), dialect), filename), filename)
         return [t] if t else []
     if low.endswith((".xlsx", ".xlsm")):
         from openpyxl import load_workbook
@@ -192,7 +216,7 @@ def read_sheets(filename: str, data: bytes) -> list[dict[str, Any]]:
             raise SheetError(f"{filename}: not a readable Excel file ({exc})") from None
         out = []
         for ws in wb.worksheets:
-            rows = [list(r) for r in ws.iter_rows(values_only=True)]
+            rows = _bounded(ws.iter_rows(values_only=True), filename)
             t = _table(rows, f"{filename} · {ws.title}")
             if t:
                 out.append(t)
