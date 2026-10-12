@@ -5,18 +5,86 @@ cutting patterns for its cover. You give it a 3D model of the furniture (or one 
 cover drawings); it gives back the pieces to cut, ready for the CNC cutting table, with a
 cutting list and a size drawing. It runs at **covers.suns.nu**.
 
+## The studio in five sections
+
+The dark bar at the top has five sections; the light bar under it shows the pages of the
+section you are in. Every page has its own address, so a link in a mail opens exactly that
+page.
+
+1. **Work:** what waits for a person.
+  - **Desk:** approve or reject covers and arrangements. The queue on the left, the card on the
+    right with four tabs (Check, Pieces & revisions, Correct this cover, History). The bar at
+    the bottom: Approve, Reject, Comment, After sewing (Produced, Measured, Fits, Does not
+    fit), Undo.
+  - **Questions:** the owner's and the workshop's questions, answered in the studio.
+  - **Workshop:** every cover the Desk approved or marked produced, with its files (cutting
+    list, size drawing, check list, cut pieces, and the DXF once the approval allows it), the
+    revision to cut, and how it fitted. Read only: deciding stays on the Desk card.
+2. **Covers:** every cover and how it is made.
+  - **All covers:** every model and its cover, as a **Table** or as **Cards**, with one filter
+    row (search, category, cover grade, status, tag, sort). Tick covers to run steps for many
+    at once.
+  - **Arrangements:** furniture placed together under one cover.
+  - **New cover:** a 3D file, a drawing (PDF), or a zip with your own drawings and their 3D
+    models.
+  - **Learning:** your drawings beside the covers the program made from them.
+  - **Product list:** the workshop's product list (Excel), linked to the drawings.
+3. **Shop:** orders, requests from the configurator, matches with existing covers, business
+   customers, the website's texts (Website, with AI) and the photo test. Mostly for admins;
+   editors may draft the website.
+4. **Prices:** materials, labour, the exchange rate, channels and price lists, a price list
+   from Excel, the costing of any cover, and every published version.
+5. **Settings** (admins): one page with tabs on the left for everything that is set once: the
+   company and the shop, B2B terms, matching, users and rights, the Desk and the cover
+   defaults, mail, the website and API keys, AI and spending, the system, logins and the audit
+   log.
+
+## The right side of the bar
+
+- **Search** finds everything: covers (name, tag, note, family), Desk codes and product names,
+  questions (title or number), and for admins orders (number, customer, product). **Ctrl+K**
+  (**Cmd+K** on a Mac) jumps to it; the arrow keys and **Enter** open a hit; **Escape** closes
+  the list.
+- **Guide** opens this page.
+- **The round theme button** left of your name switches between As the computer (◐), Light (☀)
+  and Dark (☾). It is remembered in that browser only. Drawings, flat patterns and pictures
+  stay on white, and the 3D view keeps its light stage.
+- **Your name** opens *My account* (your password); then **Log out**.
+
+## Where you start
+
+- **Approvers** start on Work → Desk.
+- **An admin** starts where he was last.
+- **Everyone else** starts on Covers → All covers.
+
+These start pages are still to be confirmed with the owner.
+
+## A cover's page
+
+At the top: the picture, the sizes and a strip with the grade, the status, the Desk status and
+the approval. Then seven tabs:
+- **3D:** the furniture and the cover. The toolbar has Show (layers, vents, dimensions), quick
+  Vents and Dimensions, the switch Design, Rain, Drape, Unfold, then Measure, Simulate and the
+  Check list.
+- **Pieces:** the cut pieces with the DXF and the lists, the flat patterns, the size drawing.
+- **Seams:** the seam editor.
+- **Adjust:** this cover's own settings; try them without saving, or save them for this cover.
+- **Compare:** your drawing, your reference, the AI's advice.
+- **History:** approval and changes, revisions, warnings and the log.
+- **Files:** every file to download.
+
 ## From furniture to cover, in six steps
 
-1. **Upload.** A 3D model in almost any format (STEP, OBJ, GLB, STL, …). The system checks
-   whether it is the furniture itself or an already drawn cover surface, and asks you to
-   confirm.
+1. **Upload** (Covers → New cover). A 3D model in almost any format (STEP, OBJ, GLB, STL, …).
+   The system checks whether it is the furniture itself or an already drawn cover surface, and
+   asks you to confirm.
 2. **Cover surface.** It builds the shape the fabric will take. A box cover with a sloping top
    for most furniture: water must always run off, so there are no flat areas and no hollows.
    Tables get balloons under the cover and room for the chairs beside them.
-3. **Seams and pieces.** The surface is divided into as few pieces as possible, with smooth seam
-   lines. No piece is wider than the 150 cm roll or longer than 3 m.
-4. **Flat patterns.** Every piece is laid flat with its true lengths. The two sides of every seam
-   are checked to be equally long, and any stretch is measured.
+3. **Seams and pieces.** The surface is divided into as few pieces as possible, with smooth
+   seam lines. No piece is wider than the 150 cm roll or longer than 3 m.
+4. **Flat patterns.** Every piece is laid flat with its true lengths. The two sides of every
+   seam are checked to be equally long, and any stretch is measured.
 5. **Finishing.** The seam allowances are added, along with the hem with its bottom drawcord
    (tables also get one in the middle), and the air vents: one per full metre of every side,
    each with a logo. Marks and labels for sewing go on the pen layer, not cut.
@@ -34,62 +102,66 @@ cutting list and a size drawing. It runs at **covers.suns.nu**.
   - the cover has few pieces.
 - **A second opinion by AI (DeepSeek)** on every cover, with the picture. Where the AI and the
   checks disagree, a person looks.
-- **Rain simulation** in the 3D view (the *Rain* button): where water would stand or run,
+- **Rain simulation** in the 3D view (Rain in the switch): where water would stand or run,
   shown on the cover.
-- **Show air vents** in the 3D view (a tick box, remembered in your browser): every air vent
+- **Air vents** in the 3D view (the Vents toggle, remembered in your browser): every air vent
   where it is cut in the cover, the opening dark with a red frame, its hood above it. They are
   the same vents as on the cutting list (after each export).
-- **Approval.** Only users with approval rights can approve the definitive drawing. The approved
-  PDFs are stamped. Any change after approval cancels it, so production always cuts what was
-  approved.
+- **The Desk.** Rens, Wout and the other approvers approve or reject every drawing cover and
+  arrangement. The cutting table's DXF of such a cover is only available once its current cut
+  is approved; a change after the approval puts it back at the Desk.
+- **Approval of the definitive drawing.** Only users with approval rights can approve it. The
+  approved PDFs are stamped. Any change after approval cancels it, so production always cuts
+  what was approved. (Whether this and the Desk's approval become one step is still open with
+  the owner.)
+- **After sewing.** The workshop measures the sewn cover against the check list and enters the
+  sizes and Fits or Does not fit on the Desk card; the Workshop page shows the result.
 
-## Covers from your drawings (ADR-072, ADR-075)
+## Covers from your drawings
 
-The program reads the drawing's own lines and pictures, not the AI:
+On **Covers → New cover**, choose the drawing (PDF). The program reads the drawing's own lines
+and pictures, not the AI:
 - the views, with their exact outlines;
 - every size, through its two arrows;
 - the number of air vents ("4 Air Pocket", or the arrows from "Air Vents").
 
-From the top view and the side or front view it builds the cover as a CAD drawer would. It
+From the top view and the side or front view it builds the cover as a CAD drawer would, in
+about 10 seconds. It places the vents by your rule and splits the pieces to fit the roll. It
 checks the result against the drawing's 3D view. Then Gemini (it looks at the drawing) and
 DeepSeek (it reads all words and numbers) each judge the cover and check each other. When they
 disagree, a person looks.
 
+When the program is not sure, it builds nothing and says why: no top view, no size arrows, or
+the shape does not match the 3D view on the drawing. Such a drawing waits at the Desk for a
+person.
+
 Where the program made the seams itself (free shapes), neighbouring pieces without a real
-crease are joined into one, as long as the piece still lies flat and fits the roll (S43: from 37
-pieces to 9). Covers whose seams follow the drawing keep them.
+crease are joined into one, as long as the piece still lies flat and fits the roll (S43: from
+37 pieces to 9). Covers whose seams follow the drawing keep them.
 
-A drawing cover is only replaced when the new one fits the 3D view better **and** both AIs
-find it better. It then becomes a new revision of the same cover, so nothing is lost.
+A drawing cover is only replaced when the new one fits the 3D view better **and** both AIs find
+it better. It then becomes a new revision of the same cover, so nothing is lost.
 
-## Only what changed is calculated (ADR-080)
+## Only what changed is calculated
 
-When you save a setting or press "Run again", every step checks whether anything it depends on
-changed. A step with no changes skips itself, so a vent setting recalculates only the export, in
-seconds. The size drawing and the air vents in 3D are made when you open them.
+When you save a setting or press **Run again**, every step checks whether anything it depends
+on changed. A step with no changes skips itself, so a vent setting recalculates only the
+export, in seconds. The size drawing and the air vents in 3D are made when you open them.
 
-Since 6 October, two things are not run automatically and have their own button: the drape
-check (the cover falling over the furniture, with rain) and the AI's choice of pieces or
-balloons. The rule decides those by default.
+Two things are not run automatically and have their own button: the drape check (the cover
+falling over the furniture, with rain) and the AI's choice of pieces or balloons. The rule
+decides those by default.
 
-## Unfold: the pieces flat, and where the fabric goes (ADR-085)
+## Unfold: the pieces flat, and where the fabric goes
 
-In the 3D view, "Unfold" plays the cover coming apart and lying flat on a table. On the table,
-each piece shows:
+In the 3D view, Unfold in the switch plays the cover coming apart and lying flat on a table. On
+the table, each piece shows:
 - its net outline (the sewn size) and its cut outline (dashed);
 - the seam allowance (orange), the hem (blue) and the vent openings;
 - its net and cut size in cm.
 
 Below the view, a table shows where the fabric goes: the surface, the seam allowances, the hem,
 the vent hoods, and what is left on the roll.
-
-## What you find where
-
-- **Models:** every model with its state. Open one for the 3D view, the pieces, the files and
-  the approval.
-- **Catalogue:** the SUNS collection, sorted in the categories of hello-suns.com.
-- **Learning:** our 115 earlier cover drawings, rebuilt by the system, to compare and learn from.
-- **Search** in the header finds any model by name.
 
 ## Your account
 
@@ -98,10 +170,11 @@ the vent hoods, and what is left on the roll.
 - Tick *Remember this device* and it is trusted for 14 days.
 - **Roles:**
   - *viewer:* looks and downloads;
-  - *editor:* also uploads, calculates and changes settings;
-  - *admin:* also manages users;
+  - *editor:* also uploads, calculates and changes a cover's settings;
+  - *admin:* also manages users, Settings, the shop and the prices;
   - *may approve:* approves definitive drawings.
-- Change your password under your name (top right) → *My account*.
+- There is no separate workshop login yet; the workshop uses one of these roles.
+- Change your password under your name (top right), *My account*.
 
 ## Safe and recoverable
 
@@ -114,21 +187,7 @@ earlier version is back within seconds if needed.
 
 The first cover cut from these patterns is still to be made and measured on the furniture.
 Several values (seam allowance, hem, vent size) are best guesses until then. Curved and
-U-shaped drawings are being added.
+U-shaped drawings are being added. The studio's language stays English for now (an open
+question for the owner).
 
 *Questions: Rick, rick@s2dio.industries.*
-
-## A new cover from your drawing (route A, ADR-081)
-
-On the Models page, choose **Upload drawing (PDF)**. The program reads the drawing itself, without AI:
-- the views;
-- the sizes, by their arrows;
-- the number of air vents.
-
-Then it builds the cover, places the vents by your rule and splits the pieces to fit the roll. This takes
-about 10 seconds.
-
-When it is not sure, it builds nothing and says why: no top view, no size arrows, or the shape does not
-match the 3D view on the drawing. Such a drawing waits at the top of the **Desk** for a person. A drawing
-cover can be built again from its drawing with `cover drawing-build models/<id>` (or the API); that makes
-a new revision and keeps the history.

@@ -7,6 +7,10 @@ step (the cover shape, seams, patterns) starts from this model.
 Files it reads: STEP (`.step`, `.stp`), IGES (`.iges`, `.igs`), STL, OBJ, PLY and glTF
 (`.glb`, `.gltf`).
 
+In the studio the same import is **Covers → New cover → a 3D file**, with the units and the up
+axis as choices ([web-app.md](web-app.md)). Below is the command line, with the options the
+studio does not show.
+
 ## Import a file
 
 ```

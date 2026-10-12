@@ -23,7 +23,7 @@ the visitor and request limits, `limits.*`) are changed only there: a model, a f
 a learned rule, `--set` or the web app cannot set them (ADR-123).
 
 `* to confirm` marks an assumption. `choices: a | b` lists the allowed values of a setting.
-In the web app (M6) these become dropdowns.
+On a cover's **Adjust** tab these are dropdowns.
 
 ## Change a company default
 
@@ -45,7 +45,7 @@ of the wrong kind: text where a number belongs, or a choice that is not on the l
 
 `construction.method` is `double_stitch` (today's practice) or `welded`. The company default is
 `double_stitch`; a model that should be welded stores `"construction": {"method": "welded"}` in
-its `cover.json` (in the web app: the dropdown on the model page, M6).
+its `cover.json` (in the studio: on the cover's **Adjust** tab).
 
 ## If `make test` fails after you changed a number
 

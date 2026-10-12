@@ -17,17 +17,18 @@ payment. Decision: ADR-104.
 3. Once the password is set, the company is **active**.
 
 A company can also **ask** for an account (*Request an account* on the login page). The request
-appears at the top of *B2B customers* and the alert address gets a mail: *Approve and invite*
-(the asker gets the invitation) or *Reject*.
+appears at the top of *B2B customers* and the alert address (Settings → Mail &
+notifications) gets a mail: *Approve and invite* (the asker gets the invitation) or *Reject*.
 
 ## Per company
 
-Click a company in the list:
+Shop → **B2B customers**, click a company in the list:
 
-- **Price list:** the channel of *Prices & costing* it buys at (Business by default).
+- **Price list:** the channel of **Prices → Channels & price lists** it buys at (Business by
+  default).
 - **Fixed prices:** one per line, ex VAT: `suns-2-seater-kota = 289`, `balloon = 12`,
   `frame = 55`. They win over the price list. (A fixed price in the price list itself, on the
-  Prices page, holds for every company on that list.)
+  Prices → Channels & price lists, holds for every company on that list.)
 - **VAT reverse-charged:** no VAT on its orders (an EU company outside NL with a valid VAT
   number; check with the accountant).
 - **Block (logs everyone out):** nobody of that company can log in or reset a password;
@@ -45,7 +46,11 @@ same way as a paid consumer order (a made-to-measure cover becomes `order-<n>`, 
 cover is cut from its own pattern). The buyer, the company's e-mail and the alert address get a
 confirmation. The customer sees each line's status under *Previous orders*.
 
-## B2B settings (bottom of the tab)
+## B2B terms (Settings → B2B terms)
+
+The terms for every business customer are set once, by an admin, under **Settings → B2B
+terms** (they used to be at the bottom of the B2B customers page):
+
 
 - **Minimum order** ex VAT (0: none).
 - **Shipping per order on top** ex VAT (0: shipping is in the price list's extra costs).
@@ -64,7 +69,7 @@ login, failure, order and change is in Settings → **Logins & audit log** as `b
 ## Languages
 
 The B2B words are part of the site's content (`ui.b2b`), in Dutch, English, German and French;
-the Website (AI) tab edits and translates them like the rest.
+Shop → **Website (AI)** edits and translates them like the rest.
 
 ## Checking it in a browser
 

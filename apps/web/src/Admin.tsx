@@ -868,7 +868,8 @@ export function EmbedAndKeys() {
 
 // ---- the cover webshop (ADR-062) ----------------------------------------------------------------
 
-export function Orders() {
+/** Shop → Orders; `focus`: an order opened from the search (#/shop/orders/<n>), shown and marked. */
+export function Orders({ focus = null }: { focus?: number | null }) {
   const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
@@ -883,107 +884,120 @@ export function Orders() {
   useEffect(() => {
     load();
   }, []);
+  useEffect(() => {
+    if (focus && orders.some((o) => o.id === focus))
+      document
+        .getElementById(`order-${focus}`)
+        ?.scrollIntoView({ block: "center" });
+  }, [focus, orders]);
   return (
     <section className="card">
-      <h3>Orders from the shop</h3>
       <p className="muted">
-        The shop: <a href="/shop/">/shop/</a>. A paid order goes into production
-        by itself (its pattern, then the drape); a status change mails the
-        customer.
+        The shop: <a href="/shop/">/shop/</a>.
+        {focus && !orders.some((o) => o.id === focus) && orders.length > 0 && (
+          <> Order {focus} is not among the latest 300.</>
+        )}
       </p>
       {msg && <p className="error">{msg}</p>}
-      <table className="list">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>When</th>
-            <th>Customer</th>
-            <th>Cover</th>
-            <th>Total</th>
-            <th>Status</th>
-            <th>Model</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.length === 0 && (
-            <tr className="static">
-              <td colSpan={7} className="muted">
-                No orders yet.
-              </td>
+      <div className="table-wrap">
+        <table className="list">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>When</th>
+              <th>Customer</th>
+              <th>Cover</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Model</th>
             </tr>
-          )}
-          {orders.map((o) => {
-            const c = o.data.customer;
-            const q = o.data.quote.quote;
-            return (
-              <tr key={o.id} className="static">
-                <td>{o.id}</td>
-                <td>{when(o.created)}</td>
-                <td>
-                  {o.data.b2b && (
-                    <span className="b2b-status active">
-                      B2B {o.data.b2b.order}
-                      {o.data.b2b.po ? ` · PO ${o.data.b2b.po}` : ""}
-                    </span>
-                  )}{" "}
-                  {String(c.name)}
-                  <br />
-                  <span className="muted">
-                    {o.email} · {String(c.postcode)} {String(c.city)}{" "}
-                    {String(c.country)}
-                  </span>
-                </td>
-                <td>
-                  {q.product}, {q.colour}, support {o.data.quote.input.support}
-                  <br />
-                  <span className="muted">
-                    {Object.entries(q.sizes_cm)
-                      .filter(([, v]) => typeof v === "number")
-                      .map(([k, v]) => `${k.replace(/_cm$/, "")} ${v}`)
-                      .join(", ")}
-                  </span>
-                </td>
-                <td>
-                  {o.data.b2b ? `${o.data.b2b.qty} × ` : ""}€{" "}
-                  {o.total_eur.toFixed(2)}
-                  {o.data.b2b ? " ex VAT, on account" : ""}
-                </td>
-                <td>
-                  <select
-                    value={o.status}
-                    onChange={async (e) => {
-                      await shopAdmin.setStatus(o.id, e.target.value);
-                      load();
-                    }}
-                  >
-                    {statuses.map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  {o.model_id ? (
-                    <a href={modelHref(o.model_id)}>{o.model_id}</a>
-                  ) : (
-                    <button
-                      onClick={async () => {
-                        try {
-                          await shopAdmin.produce(o.id);
-                          load();
-                        } catch (e) {
-                          setMsg(String(e));
-                        }
-                      }}
-                    >
-                      Into production
-                    </button>
-                  )}
+          </thead>
+          <tbody>
+            {orders.length === 0 && (
+              <tr className="static">
+                <td colSpan={7} className="muted">
+                  No orders yet.
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            )}
+            {orders.map((o) => {
+              const c = o.data.customer;
+              const q = o.data.quote.quote;
+              return (
+                <tr
+                  key={o.id}
+                  id={`order-${o.id}`}
+                  className={`static ${o.id === focus ? "focus" : ""}`}
+                >
+                  <td>{o.id}</td>
+                  <td>{when(o.created)}</td>
+                  <td>
+                    {o.data.b2b && (
+                      <span className="b2b-status active">
+                        B2B {o.data.b2b.order}
+                        {o.data.b2b.po ? ` · PO ${o.data.b2b.po}` : ""}
+                      </span>
+                    )}{" "}
+                    {String(c.name)}
+                    <br />
+                    <span className="muted">
+                      {o.email} · {String(c.postcode)} {String(c.city)}{" "}
+                      {String(c.country)}
+                    </span>
+                  </td>
+                  <td>
+                    {q.product}, {q.colour}, support{" "}
+                    {o.data.quote.input.support}
+                    <br />
+                    <span className="muted">
+                      {Object.entries(q.sizes_cm)
+                        .filter(([, v]) => typeof v === "number")
+                        .map(([k, v]) => `${k.replace(/_cm$/, "")} ${v}`)
+                        .join(", ")}
+                    </span>
+                  </td>
+                  <td>
+                    {o.data.b2b ? `${o.data.b2b.qty} × ` : ""}€{" "}
+                    {o.total_eur.toFixed(2)}
+                    {o.data.b2b ? " ex VAT, on account" : ""}
+                  </td>
+                  <td>
+                    <select
+                      value={o.status}
+                      onChange={async (e) => {
+                        await shopAdmin.setStatus(o.id, e.target.value);
+                        load();
+                      }}
+                    >
+                      {statuses.map((s) => (
+                        <option key={s}>{s}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    {o.model_id ? (
+                      <a href={modelHref(o.model_id)}>{o.model_id}</a>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await shopAdmin.produce(o.id);
+                            load();
+                          } catch (e) {
+                            setMsg(String(e));
+                          }
+                        }}
+                      >
+                        Into production
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

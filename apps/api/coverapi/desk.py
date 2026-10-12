@@ -705,6 +705,66 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
     return state(d)
 
 
+# files the workshop works from, in this order (cut.dxf only when dxf_allowed says so)
+WORKSHOP_FILES = ("cutting-list.pdf", "sizes.pdf", "checklist.pdf", "cut.svg", "cut.dxf")
+
+
+def workshop_item(d: Path, params: Any) -> dict[str, Any] | None:
+    """One approved or produced cover for Work → Workshop (ADR-124): what to cut and sew, and how
+    it fitted. None for a cover the Desk has not approved. Read-only: the DXF's link is offered
+    only when the approval gate (ADR-079/115/120) lets it through; the download itself is gated
+    again by the server (`gate`)."""
+    from coverengine.catalogue import REVISIONS, revisions
+
+    st = state(d)
+    if st["status"] not in DONE:
+        return None
+    files = {f for f in WORKSHOP_FILES if (d / f).is_file()}
+    if (d / "pattern.json").is_file():
+        files.add("sizes.pdf")  # made when it is opened (ADR-080)
+        if (d / "finished.json").is_file():
+            files.add("checklist.pdf")  # made when it is opened (ADR-111)
+    dxf_ok = "cut.dxf" in files and dxf_allowed(d, params)
+    preferred = st.get("preferred_revision")
+    revision = None
+    if preferred is not None and any(r["number"] == preferred for r in revisions(d)):
+        folder = d / REVISIONS / f"{int(preferred):03d}"
+        revision = {
+            "n": int(preferred),
+            "dxf": (folder / "cut.dxf").is_file(),
+            "dxf_ok": (folder / "cut.dxf").is_file() and dxf_allowed(d, params, folder),
+        }
+    fit = st.get("fit")
+    if fit:
+        rows = fit.get("measured") or []
+        worst = max(rows, key=lambda r: abs(float(r.get("diff_mm") or 0)), default=None)
+        fit = {k: fit.get(k) for k in ("fits", "note", "by", "time")} | {
+            "measured": len(rows),
+            "worst": worst and {k: worst.get(k) for k in ("label", "diff_mm")},
+        }
+    approved = st.get("approved") or {}
+    produced = st.get("produced") or {}
+    _, count, vents = _pieces(d)
+    return {
+        "id": d.name,
+        "code": _code(d),
+        "drawing": d.name.startswith("drawing-"),
+        "arrangement": is_arrangement(d),
+        "status": st["status"],
+        "approved": {k: approved.get(k) for k in ("by", "time")} if approved else None,
+        "produced": {k: produced.get(k) for k in ("by", "time")} if produced else None,
+        "since": produced.get("time") or approved.get("time"),
+        "files": sorted(files - {"cut.dxf"}) + (["cut.dxf"] if "cut.dxf" in files else []),
+        "dxf_ok": dxf_ok,
+        "revision": revision,
+        "fit": fit,
+        "pieces": count,
+        "vents": vents,
+        "products": product_labels(d),
+        "has_picture": (d / "cover.png").is_file(),
+    }
+
+
 def measured_rows(d: Path, measured: dict[str, float]) -> list[dict[str, Any]]:
     """Measured values (mm) against the check list's points (ADR-111): expected, measured and
     the difference per key, for the learning step to find systematic deviations."""
@@ -964,6 +1024,18 @@ def install(app: FastAPI, store: Any) -> None:
             "reasons": list(REASONS),
             "pictures_max": int(params["desk.pictures_max"]),  # type: ignore[arg-type]
         }
+
+    @app.get("/api/workshop")
+    def workshop_list(request: Request) -> dict[str, Any]:
+        """Work → Workshop (ADR-124): read-only, for every logged-in person (no new right: open
+        owner question 92). Changes nothing; the DXF stays behind the approval gate."""
+        current_user(request)
+        params = Registry.load(None).resolve()
+        dirs = sorted(p for p in Path(store.models).iterdir()
+                      if (p / "cover.json").is_file() and not no_cover(p))  # fmt: skip
+        items = [w for w in (workshop_item(p, params) for p in dirs) if w is not None]
+        items.sort(key=lambda w: -float(w["since"] or 0))
+        return {"items": items, "gate": bool(params["desk.require_approval_for_dxf"])}
 
     @app.get("/api/desk/{model_id}")
     def card(model_id: str, request: Request) -> dict[str, Any]:

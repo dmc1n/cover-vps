@@ -213,3 +213,32 @@ def test_drawing_approval_requires_cut_and_missing_cut_reopens(app: Any, tmp_pat
     assert (
         len([e for e in desk.state(d)["history"] if e["action"] == "changed after approval"]) == 1
     )
+
+
+def test_the_workshop_lists_approved_covers_read_only(app: Any, tmp_path: Path) -> None:
+    """Work → Workshop (ADR-124): approved and produced covers, their files and fits, for every
+    logged-in person; the DXF link only where the approval gate lets it through."""
+    vera, rens = login(app, "vera"), login(app, "rens")
+    assert TestClient(app).get("/api/workshop").status_code == 401
+    assert vera.get("/api/workshop").json()["items"] == []
+    rens.post("/api/desk/drawing-b", json={"action": "approve"})
+    rens.post("/api/desk/drawing-c", json={"action": "approve"})
+    rens.post("/api/desk/drawing-c", json={"action": "produced", "done": True})
+    rens.post("/api/desk/drawing-c", json={"action": "fit", "fits": False, "note": "2 cm short"})
+    w = vera.get("/api/workshop").json()
+    by = {i["id"]: i for i in w["items"]}
+    assert set(by) == {"drawing-b", "drawing-c"}  # not the waiting ones
+    assert [i["id"] for i in w["items"]][0] == "drawing-c"  # the latest first
+    c = by["drawing-c"]
+    assert c["status"] == "produced" and c["produced"]["by"] == "Rens de Vries"
+    assert c["fit"] == {"fits": False, "note": "2 cm short", "by": "Rens de Vries",
+                        "time": c["fit"]["time"], "measured": 0, "worst": None}  # fmt: skip
+    assert c["dxf_ok"] is True and c["files"][-1] == "cut.dxf"
+    assert "checklist.pdf" not in c["files"]  # no pattern.json: nothing to make it from
+    # the cut file changes after the approval: the link goes, the Desk asks again
+    (tmp_path / "data" / "models" / "drawing-b" / "cut.dxf").write_text("0\nSECTION\n0\nEOF\n")
+    by = {i["id"]: i for i in vera.get("/api/workshop").json()["items"]}
+    assert "drawing-b" not in by or by["drawing-b"]["dxf_ok"] is False
+    assert vera.get("/api/models/drawing-b/files/cut.dxf").status_code == 403
+    # the page changes nothing: the Desk's decisions are as they were
+    assert vera.get("/api/desk/drawing-c").json()["desk"]["status"] == "produced"

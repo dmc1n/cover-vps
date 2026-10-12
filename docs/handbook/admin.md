@@ -1,7 +1,9 @@
-# Users, approvals and the admin page
+# Users, approvals, Settings and the Shop pages
 
 Cover Studio is on the internet at **https://covers.suns.nu**. Everyone logs in with their own
-account; nothing can be seen or changed without one.
+account; nothing can be seen or changed without one. This page is for admins: the people,
+the approval of the definitive drawing, the **Settings** page and the **Shop** pages. The map
+of the studio: [navigation.md](navigation.md).
 
 ## Logging in for the first time
 
@@ -10,6 +12,8 @@ server is set, or the link copied by hand). It says what Cover Studio is, gives 
 and a personal link, valid for 7 days, that works once. Open it, choose a password of at least
 12 characters (not your user name), and you are logged in. Forgot your password? Ask an admin
 (Settings → Users & rights → Reset password, then confirm); the old password stops working.
+
+Where you land after logging in: [navigation.md](navigation.md), *Where you start*.
 
 ## Inviting people (for example for a kickoff)
 
@@ -25,7 +29,7 @@ Settings → Users & rights:
 
 The column **Access** shows who has a password, who is invited (and until when the link works)
 and who is not invited yet. The invitation links to the short guide **How Cover Studio works**
-(#/guide, readable without logging in).
+(`#/guide`, readable without logging in).
 
 After five wrong passwords your account waits 15 minutes **on that computer's address** (each
 further wrong one doubles the wait, at most 4 hours); from anywhere else you can still log in, so
@@ -50,15 +54,20 @@ end the codes still open.
 | role | may |
 |---|---|
 | viewer | look at everything and download files |
-| editor | also upload models, calculate, change settings and seams |
-| admin | also the admin page: users, rights, mail, address, logins, audit log |
+| editor | also upload models, calculate, change a cover's settings and seams; draft the website; look at Prices |
+| admin | also Settings (users, rights, mail, keys, system, logins, audit log), the Shop pages, and change and publish Prices |
 
 Besides the role, an admin sets per user **may approve**: only those users can approve the
-definitive drawing of a cover.
+definitive drawing of a cover. Who approves at the **Desk** is a separate list, the setting
+`desk.approvers` (plus every admin; see [desk.md](desk.md)). Whether these become one list and
+one approval is still open with the owner (#83, #84). There is no separate workshop role yet
+(open owner question #92); the Workshop page is open to every role
+([workshop.md](workshop.md)). Exactly which page each role sees: [navigation.md](navigation.md).
 
 ## Approving the definitive drawing
 
-On every model with cut pieces there is a block at the top:
+On every cover with cut pieces there is a block at the top of its page (above the tabs; its
+state is also in the cover's status strip):
 
 - **not approved yet**: an approver presses *Approve the definitive drawing* (with a note if
   wanted). The approval belongs to the current revision. *Approved size drawing* and *Approved
@@ -70,130 +79,126 @@ On every model with cut pieces there is a block at the top:
 An editor who may not approve presses *Ask for approval*: the approvers get a mail with the
 link. Status *production* can only be set with a valid approval.
 
-## Settings (was the admin page; the map: navigation.md)
+This approval is separate from the Desk's **Approve** (open owner question #83/#84: one
+approval or two steps).
 
-Since ADR-122 the old Admin page is split: the shop's work is under **Shop** (Orders, Requests,
-Matches, B2B customers, Website (AI), Photo test), the prices under **Prices**, and everything
-set once under **Settings** (admins), on tabs:
+## Settings
+
+**Settings** in the top bar (admins only, `#/settings/<tab>`): one page with vertical tabs in
+four groups. Every row has a plain name, one line of help and where the value comes from
+(default, changed, empty). **Only changed values** filters the rows; **Save** and **Undo
+changes** sit at the bottom; leaving with unsaved changes asks first. The shop's settings are
+the same stored values as before; nothing moved in the data.
+
+**Business**
+
+- **Company & shop**: the company (name, legal name, address, Chamber of Commerce and VAT
+  number, e-mail, phone, IBAN), the website's domain, languages, colours offered, barbecue
+  covers on or off (`bbq_enabled`), logo, share picture (`og_image`), the delivery promise per
+  language, the balloon and frame products, shipping per country (a table) and, under
+  *advanced*, the film and the scroll story (below, *The film*).
+- **B2B terms**: minimum order, shipping per order, payment term, into production at once
+  ([b2b.md](b2b.md)).
+- **Matching**: mode (learning or automatic), the thresholds with the value that applies, the
+  discount on an existing cover; how a match is scored (read-only). See *Matches* below.
+
+**People & work**
 
 - **Users & rights**: add, change role, may approve, active (an inactive user is logged out at
   once), e-mail (who approves at the Desk is matched on the **user name** in `desk.approvers`,
-  never on the display name); *New link* / *Reset* makes a password link (shown to copy, and mailed when
-  possible).
-- **Mail & notifications**: who gets which mail (one list: configurator requests, server alerts
-  and B2B, new orders, the fit question, approval requests, the digests), the outgoing mail
-  server (SMTP: server, port, security, user name, password, sender), a test mail, the login
-  code by mail, the public address used in links.
+  never on the display name); *New link* / *Reset* makes a password link (shown to copy, and
+  mailed when possible); the invitations (above).
+- **Desk & approval** (`desk.*`, `questions.*`, `products.*`) and **Cover defaults**
+  (construction, stitching, welding, hem, vents and features, seams): the company defaults
+  from `config/defaults.yaml`, read-only here. Whether the owner will change some of them here
+  himself is open owner question #93.
+
+**Connections**
+
+- **Mail & notifications**: who gets which mail, in one list (configurator requests, server
+  alerts and B2B, new orders and shop messages, the fit question to customers and after how
+  many days, approval requests, the question digests, AI spending warnings), the outgoing
+  mail server (SMTP: server, port, security, user name, password, sender), a test mail, the
+  login code by mail, the public address used in links.
+- **Website & API keys**: the website's key (*New website key*, shown once), the shop on this
+  server only for the website (`website_link.closed`), the scroll story as the home page
+  (`home_story`), payment (the Mollie key, masked, with *Replace* to give a new one; bank
+  transfer), the configurator in a webshop and the API keys ([webshop-api.md](webshop-api.md)).
+- **AI & spending**: this month's spend, the budget and limits, which AI does what, the photo
+  suggestion limits (read-only).
+
+**Server**
+
+- **System**: version, engine, disk, last backup, the releases, mail and AI state, open
+  problems and the last alerts (the alert address itself is under Mail & notifications).
 - **Logins & audit log**: who is logged in, since when and from where; every login, failed
-  login, change, approval, with who and when.
-- **System**: version, disk, last backup, mail and AI state, open problems and the last alerts
-  (the alert address itself is under Mail & notifications).
-- **Company & shop**, **B2B terms**, **Matching**, **Website & API keys**: the shop's settings
-  in plain words (below); **Desk & approval**, **Cover defaults**, **AI & spending**: the company
-  defaults from `config/defaults.yaml`, read-only.
+  login, change and approval, with who and when.
 
-## From the command line (the server)
+## The Shop pages
 
-```
-COVER_DATA_DIR=~/cover-data uv run cover-users list
-COVER_DATA_DIR=~/cover-data uv run cover-users add <name> --name "Full Name" --email … \
-    --role editor [--approve]
-COVER_DATA_DIR=~/cover-data uv run cover-users invite <name>      # a new password link
-```
+**Shop** in the top bar. Orders, Requests, Matches, B2B customers and the Photo test are for
+admins; **Website (AI)** is also for editors (they draft, an admin publishes). The shop itself is
+at **/shop/** (the landing page, the configurator, checkout and the order status) and on the
+website's own domain; the public consumer shop: [webshop.md](webshop.md).
 
-## The drape simulation (3D view)
-
-**Drape simulation** sews the cut pieces virtually and drops them over the furniture (and the
-balloons and chairs of a table), with Newton's Style3D garment solver. It takes about 40
-minutes for a sofa, in a queue of its own, so other work goes on meanwhile. Every new model gets
-it by itself after its calculation; the result is kept with the model and in the nightly
-backup. **Drape** then plays the fall
-and shows the cover as it lies.
-
-The fall is followed by a short settling phase: the cover comes to rest, so what you see is the
-shape it keeps, not a moment in the fall. Sewn seams bend less easily than the plain fabric, as
-on a real cover.
-
-- **Red** shows folds: there the piece has more fabric than the shape needs.
-- The card below gives:
-  - the fold area;
-  - the tightest spot;
-  - how far the top sags below the designed surface;
-  - how much of the cover lies on the furniture.
-
-**Back to the design** shows the designed surface again. The fabric values are estimates until
-the fabric has been measured.
-
-## Water on the cover as it lies (heatmap)
-
-After the drape simulation the rain falls on the cover as it really lies.
-
-- In the 3D view, choose **Drape**, then switch **Water** on. The cover is coloured:
-  - **sage**: water runs off;
-  - **amber**: water streams past;
-  - **orange**: flat, water stands;
-  - **red**: a pond (darker is deeper).
-- The card gives the number of ponds, the litres and the deepest point, and whether a pond
-  keeps growing under its own weight.
-
-The rain on the designed surface (the **Rain** button) stays, to compare.
-
-## The cover webshop
-
-The shop is at **/shop/**: the landing page, the configurator, checkout and the order status.
-Its settings are under Settings (Company & shop, Matching, Mail & notifications, Website & API
-keys); its work under Shop.
-
-- **Shop settings** (Settings → Company & shop and the tabs beside it): everything the shop needs (the public consumer shop: docs/handbook/webshop.md):
-  - company data and domain;
-  - prices: under **Prices** now (versioned, B2C and B2B; docs/handbook/prices.md);
-  - delivery costs per country;
-  - the Mollie key (`test_…` to try, `live_…` for real);
-  - the balloon and frame products, colours, and the film's address: **film_url** (H.264),
-    **film_av1** (the same film in AV1, smaller and sharper where the browser plays it) and
-    **film_poster** (its first frame). For the scroll story the same three are
-    `story_media.hero`, `hero_av1` and `hero_poster`. The film files go in the data folder's
-    `media/`; a new film gets a new name (`hero-kota2-…`), because the website keeps
-    `/media` files for a day. How the film is made: ADR-108 (`scripts/film/`).
-
-  The empty fields are listed at the top.
-- **Photo test** (ADR-112): try the shop's "start from a photo or a link" yourself and see
-  every step: what Google's search by image found (its best guess, the pages that show your
-  photo, the names of the matching pictures), what Gemini recognised (brand, model, sizes),
-  the web searches, each found picture held against your photo with its score, which one was
-  picked and the final answer, plus the time and the cost (about €0.03). Nothing is kept: the
-  photo is only used for the test and the result only shows on your screen. Use it when a
-  customer says a photo was read wrongly: try the same kind of photo and read where it went
-  wrong. A photo found on the web (a shop's picture) is recognised almost always; a photo
-  taken at home is found by Google's search by image only when a similar picture is online.
-- **Website (AI):** type what should change on the site, in plain words, for example "add a
-  question about delivery time: about three weeks". The AI changes the draft in Dutch and
-  English. Open the preview, then **Publish** (or **Discard**). Earlier versions can be
-  brought back. The same works on the server: `cover-site "…"`, `cover-site --publish`.
-  Colleagues with the editor role find the same command line under **Website** at the top
-  right: they draft and check the preview; an admin publishes.
-- **Orders:** every order with its customer, cover, total and status.
+- **Orders** (`#/shop/orders`): every order with its customer, cover, total and status. The
+  search in the top bar finds an order by number, customer or product and opens this page with
+  that order highlighted (`#/shop/orders/<n>`).
   - A paid order goes into production by itself: its pattern, then the drape. **Into
     production** does it by hand (for a payment by bank transfer).
   - Changing the status mails the customer.
+  - B2B orders have a green **B2B n · PO …** mark ([b2b.md](b2b.md)).
+- **Requests** (`#/shop/requests`): the quotes customers asked in the configurator. Who gets
+  them by mail is under Settings → Mail & notifications; the embed addresses and API keys
+  under Settings → Website & API keys.
+- **Matches** (`#/shop/matches`): which existing cover fits a request (below).
+- **B2B customers** (`#/shop/b2b`): companies, their logins and orders ([b2b.md](b2b.md)).
+- **Website (AI)** (`#/shop/website`): type what should change on the site, in plain words, for
+  example "add a question about delivery time: about three weeks". The AI changes the draft in
+  Dutch and English. Open the preview, then **Publish** (or **Discard**). Earlier versions can
+  be brought back. The same works on the server: `cover-site "…"`, `cover-site --publish`.
+  Editors draft and check the preview; an admin publishes.
+- **Tools → Photo test** (`#/shop/phototest`, ADR-112): try the shop's "start from a photo or a
+  link" yourself and see every step: what Google's search by image found (its best guess, the
+  pages that show your photo, the names of the matching pictures), what Gemini recognised
+  (brand, model, sizes), the web searches, each found picture held against your photo with its
+  score, which one was picked and the final answer, plus the time and the cost (about €0.03).
+  Nothing is kept: the photo is only used for the test and the result only shows on your
+  screen. Use it when a customer says a photo was read wrongly: try the same kind of photo and
+  read where it went wrong. A photo found on the web (a shop's picture) is recognised almost
+  always; a photo taken at home is found by Google's search by image only when a similar
+  picture is online.
+
+The prices the shop uses are under **Prices** (versioned, B2C and B2B;
+[prices.md](prices.md)).
+
+### The film
+
+Settings → Company & shop, *advanced*: **film_url** (H.264), **film_av1** (the same film in
+AV1, smaller and sharper where the browser plays it) and **film_poster** (its first frame). For
+the scroll story the same three are `story_media.hero`, `hero_av1` and `hero_poster`. The film
+files go in the data folder's `media/`; a new film gets a new name (`hero-kota2-…`), because the
+website keeps `/media` files for a day. How the film is made: ADR-108 (`scripts/film/`).
 
 ## Matches: which existing cover fits (learning mode)
 
 - **The customer enters their sizes in the configurator.**
-  - **Learning mode** (Shop settings, matching, mode `shadow`; the default): the customer leaves
-    an e-mail address. You get a mail, and the request appears in the admin tab **Matches**
-    with the best covers, their percentage and the difference per size in cm (+ is roomier).
-  - Press **Take N %** for the proposal, **Custom**, or type another cover (`suns-…` or `drawing-…`) and press
-    **Choose**. A note for the customer is optional.
+  - **Learning mode** (Settings → Matching, mode *learning*, stored as `shadow`; the default):
+    the customer leaves an e-mail address. You get a mail, and the request appears under
+    Shop → **Matches** with the best covers, their percentage and the difference per size in
+    cm (+ is roomier).
+  - Press **Take N %** for the proposal, **Custom**, or type another cover (`suns-…` or
+    `drawing-…`) and press **Choose**. A note for the customer is optional.
   - The customer gets a link to the proposal, in their own language, and can order the existing
     cover or a custom one.
 - **Every change you make is a lesson.** The table **What we learn** shows, per match band,
   how often the proposal was changed, the fit answers of customers (1–5) and the returns.
-  When a band fits well, set the threshold (Shop settings, matching, `threshold_pct`) and,
-  when you trust it, mode `auto`: customers then see the match at once.
+  When a band fits well, set the threshold (Settings → Matching, *Offer the existing cover
+  from*, `threshold_pct`) and, when you trust it, mode *automatic* (`auto`): customers then see
+  the match at once.
 - **Drawing covers are offered too** (ADR-114): every drawing cover approved or produced at the
-  Desk, as the kind of furniture the price list says (Import prices keeps your list; its
-  column "Type nr." is the drawing code), else the product list's name, else its shape. The
+  Desk, as the kind of furniture the price list says (Prices → Import (Excel) keeps your list;
+  its column "Type nr." is the drawing code), else the product list's name, else its shape. The
   customer sees the price list's name, never "drawing-t1"; it sells at its fixed B2C price, or
   at the configurator's price minus the stock discount. Reject a cover at the Desk and it is no
   longer offered.
@@ -205,15 +210,17 @@ keys); its work under Shop.
     cover.json `"match": {"kind": "corner_sofa", "side": "left"}` (kinds: dining_set,
     round_set, sofa, corner_sofa, lounger, item; `"none"` keeps it out; `"chairs": true` for
     tables).
-- **The fit question:** Shop settings, `fit_mail`. Switch it on and set the days. It needs the
-  domain and the mail server. A shipped order then gets one question by mail; the answers
-  appear under Matches.
+- **The fit question:** Settings → Mail & notifications, *Ask customers whether the cover
+  fits* (`fit_mail`). Switch it on and set the days. It needs the domain and the mail server. A
+  shipped order then gets one question by mail; the answers appear under Matches, and for
+  covers sold from the shop also on Work → Workshop ([workshop.md](workshop.md)).
 
 ## Languages
 
-- Shop settings, `languages`: for example `nl,en,de,fr`. The first is the main language.
-- Website (AI), **Translate missing languages**: DeepSeek fills them into the draft. Check the
-  preview (switch the language at the top right), then **Publish**.
+- Settings → Company & shop, *Languages* (`languages`): for example `nl,en,de,fr`. The first is
+  the main language.
+- Shop → Website (AI), **Translate missing languages**: DeepSeek fills them into the draft.
+  Check the preview (switch the language at the top right), then **Publish**.
 - Every text, buttons included, can be changed by an instruction in the command line, in all
   languages at once.
 
@@ -222,8 +229,8 @@ keys); its work under Shop.
 The website is a different brand on its own domain. It shows the shop, and everything about
 covers comes from this studio (ADR-066).
 
-1. **Shop settings:** set `domain` to the website's domain (for example `example.com`) and,
-   optionally, `logo_url`.
+1. **Settings → Company & shop:** set the website's domain (`domain`, for example
+   `example.com`) and, optionally, the logo (`logo_url`).
 2. **Settings → Website & API keys:** make the website key (*New website key*, or
    `POST /api/admin/shop/link-key`). It is shown once.
 3. **On the server, in `apps/site/`:**
@@ -231,15 +238,16 @@ covers comes from this studio (ADR-066).
    - `npx wrangler secret put LINK_KEY` and paste the key;
    - in `wrangler.toml`, the `routes` line with the domain;
    - then `npm run deploy` (after `make web-build`).
-4. **Check the website.** Then set `website_link.closed` on: the studio's `/shop/` is then
-   only a preview for colleagues, and visitors go to the website.
+4. **Check the website.** Then switch on *The shop here only for the website*
+   (`website_link.closed`, Settings → Website & API keys): the studio's `/shop/` is then only a
+   preview for colleagues, and visitors go to the website.
 
 ## The website's look
 
 The website has one design system (ADR-105): warm paper, sand and a warm ink, Work Sans.
 Colours, sizes and spacing are set once, at the top of `apps/web/src/shop/shop.css`
 (`--paper`, `--sand`, `--ink`, `--fs-h1`, `--gutter`, ...); change a value there and every page
-follows. Texts are not in that file: they stay in the AI CMS (Website (AI)). The font is
+follows. Texts are not in that file: they stay in the AI CMS (Shop → Website (AI)). The font is
 served by our own site, so no visitor's browser asks Google for it.
 
 ### Is the website fast, and does the rain fall? (ADR-106)
@@ -257,37 +265,14 @@ against the preview, or against a fresh build on this machine (`make web-build`,
 
 How to start each is at the top of the file. The pictures go to `out/sitepolish/`.
 
-## Your reference: compare the program with your own drawing or model
+## From the command line (the server)
 
-On a model's page, tab **Your reference**, upload what you know is right:
-- **a 3D model of the cover** (STEP, IGES, STL, OBJ, GLB). You get how far the program's cover
-  lies from yours in mm, the share within ±5 mm, and a 3D view in colour: green within ±5 mm,
-  sand where ours is roomier, red where it is tighter;
-- **a PDF** (your drawing or pattern). You get which of its sizes are found in the program's
-  pieces, the AI's list of differences, and lessons. Press **Accept** on a lesson and the AI
-  follows it for every cover from then on.
+```
+COVER_DATA_DIR=~/cover-data uv run cover-users list
+COVER_DATA_DIR=~/cover-data uv run cover-users add <name> --name "Full Name" --email … \
+    --role editor [--approve]
+COVER_DATA_DIR=~/cover-data uv run cover-users invite <name>      # a new password link
+```
 
-Every comparison is kept, as material for improving the program.
-
-**What the program did with your upload.** At the top of the tab, per upload, a report in plain
-words with one verdict:
-- **Your reference agrees with the program's cover**, **differs: see below**, or **a person must
-  look** (the checks do not agree, or one could not be done).
-- The steps, each marked ✓ (fine), ! (look at it), ✗ (failed) or · (for your information):
-  1. **Received:** the file, its size, who uploaded it and when.
-  2. **Read:** a 3D model with its triangles, the unit and up axis the program chose, and how far
-     it was turned and moved to lie over the program's cover (never scaled or mirrored); a PDF
-     with its pages and the sizes found on it.
-  3. **Compared:** for a 3D model, the share within ±5 mm (it agrees from 90 %), the mean, 95 %
-     and largest deviation, roomier and tighter, the sizes side by side; for a PDF, which sizes
-     are found in the program's pattern and which are not.
-  4. **Double check by two AIs:** for a PDF, Gemini looks at your drawing beside the program's
-     cover, DeepSeek reads every word and number, and they check each other (when they disagree
-     Gemini looks once more with DeepSeek's points). For a 3D model, DeepSeek says in plain
-     words what the deviation means. Their answers are advice: when they disagree with the
-     numbers, the verdict is "a person must look".
-  5. **What changed in the program:** nothing by itself. The lessons the AI proposes wait for a
-     person; the ones accepted for this model are listed with who and when.
-- **Earlier uploads** are listed below the report (when, file, who, verdict); open one to read
-  its steps.
-
+The drape simulation, the water on the draped cover and *Your reference* (compare with your
+own drawing or model) are on a cover's page: [web-app.md](web-app.md).

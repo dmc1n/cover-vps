@@ -28,7 +28,7 @@ export const SECTIONS: Section[] = [
     id: "work",
     label: "Work",
     who: "all",
-    hint: "What waits for a person: the Desk and the questions",
+    hint: "What waits for a person: the Desk, the questions, the workshop",
     pages: [
       {
         id: "desk",
@@ -41,6 +41,12 @@ export const SECTIONS: Section[] = [
         label: "Questions",
         who: "all",
         hint: "The owner's and the workshop's questions",
+      },
+      {
+        id: "workshop",
+        label: "Workshop",
+        who: "all", // a workshop right of its own is open owner question 92
+        hint: "Approved covers: their files, measured fits and the customers' answers",
       },
     ],
   },
@@ -344,7 +350,6 @@ export function redirect(hash: string, user: Viewer): string | null {
   if ((m = p.match(/^#\/questions(?:\/(\d+))?$/)))
     return m[1] ? `#/work/questions/${m[1]}` : "#/work/questions";
   if (p === "#/catalogue") return "#/covers/all?view=cards";
-  if (p === "#/models") return "#/covers/all";
   if ((m = p.match(/^#\/arrangements(?:\/([a-z0-9-]+))?$/)))
     return m[1] ? `#/covers/arrangements/${m[1]}` : "#/covers/arrangements";
   if (p === "#/learning") return "#/covers/learning";
@@ -368,6 +373,13 @@ export function redirect(hash: string, user: Viewer): string | null {
   }
   if ((m = p.match(/^#\/settings\/([a-z0-9]+)$/)))
     return SETTINGS_IDS.includes(m[1]) ? null : "#/settings/company";
+  // an address the studio never had: the person's start page, not "not for your account"
+  if (
+    !/^#\/(work|covers|shop|prices|settings|model|guide|account|configure|welcome)(\/|$|\?)/.test(
+      p,
+    )
+  )
+    return startPage(user);
   return null;
 }
 

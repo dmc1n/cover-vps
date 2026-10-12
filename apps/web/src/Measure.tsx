@@ -76,7 +76,7 @@ export function tag(
   opts: { bg?: string; fg?: string; edge?: string; h?: number } = {},
 ): THREE.Sprite {
   const scale = 2;
-  const font = `600 ${18 * scale}px 'DM Sans', system-ui, sans-serif`;
+  const font = `600 ${18 * scale}px 'Work Sans Variable', system-ui, sans-serif`;
   const c = document.createElement("canvas");
   const g0 = c.getContext("2d")!;
   g0.font = font;

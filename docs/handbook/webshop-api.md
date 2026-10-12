@@ -15,15 +15,16 @@ The old instructions, for reference:
         style="width:100%;height:950px;border:0" title="Design your cover"></iframe>
 ```
 
-First add the webshop's address on the admin page (Settings → Website & API keys → *Configurator in the
-webshop*), for example `https://hello-suns.com`. Without that the browser refuses to show it.
-Customers' requests appear on the same page and are mailed to the address set there.
+First add the webshop's address under Settings → Website & API keys → *Configurator in the
+webshop*, for example `https://hello-suns.com`. Without that the browser refuses to show it.
+Customers' requests appear under Shop → Requests and are mailed to the address set under
+Settings → Mail & notifications.
 
 ## 2. The API (for the webshop's own design)
 
 Base `https://covers.suns.nu/api/public/v1`. Every call sends the header
-`X-Api-Key: <key>`; an admin makes keys on the admin page (shown once). Without a valid key
-(or a colleague's login) every call is refused, `GET /preview/<id>.glb` too: the webshop's
+`X-Api-Key: <key>`; an admin makes keys under Settings → Website & API keys (shown once).
+Without a valid key (or a colleague's login) every call is refused, `GET /preview/<id>.glb` too: the webshop's
 server fetches the preview with its key and serves it on. The limit is 30 calls a minute per
 address (an IPv6 address counts as its /64 network), and 120 new proposals a minute from all
 callers together (`limits.quotes_per_minute`). With the website link closed the API answers

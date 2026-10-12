@@ -79,7 +79,9 @@ Python engine, server side, one VPS.
   user edits, background jobs in a process pool, SQLite for metadata, files on local disk.
 - `apps/web/` — React, TypeScript, Vite, Three.js: 3D viewer with drape-hull overlay, seam
   editing with geodesic preview, patch colours and stretch heatmap; SVG 2D pattern view;
-  parameter panel generated from JSON schema; export downloads.
+  parameter panel generated from JSON schema; export downloads. The studio's map is
+  `src/nav.ts`, its one stylesheet `src/studio.css` (tokens, light and dark), its page
+  templates `src/layout.tsx` (ADR-122, ADR-124); the handbook's index is docs/handbook/README.md.
 - Deployment: Docker Compose on the Hetzner VPS (api, web, cloudflared). Reachable only through
   a Cloudflare Tunnel protected by Cloudflare Access; the firewall allows SSH alone. Nightly
   backups of the data directory to Cloudflare R2. Cloudflare Workers and Containers are not
@@ -257,7 +259,7 @@ Shop → Tools → Photo test                   a photo suggestion step by step:
 node apps/web/e2e/site_serve.mjs [--port N]  this build of the website locally, data from the preview (ADR-106)
 apps/web/e2e/site_rain.py | site_3d.py | site_perf.py   the website: rain keeps falling, 3D loads lean, timings (ADR-106)
 Prices (#/prices/<tab>)                     price set per channel, versioned in app.db; costing per cover (ADR-098)
-Prices & costing → Channels → Import prices (Excel)   a price list as fixed prices, into the draft only (ADR-113)
+Prices → Import (Excel) (#/prices/import)  a price list as fixed prices, into the draft only (ADR-113)
 COVER_DATA_DIR=~/cover-data uv run python scripts/prices_import.py FILE [--channel b2c] [--incl-vat|--ex-vat] [--json OUT] [--apply]
                                              the same matching report; --apply writes the draft, never publishes (ADR-113)
 apps/web/e2e/priceimport.py                 the import in a real browser (sample: e2e/priceimport_sheet.py; usage in its docstring)
@@ -273,8 +275,14 @@ uv run python scripts/bbq_models.py OUT [--only a,b] [--steps build,cover,check]
                                              audited and re-measured (ADR-119; list and sources in docs/plans/bbq-covers.md)
 apps/web/e2e/bbq.py                         the configurator's barbecue option in a real browser (ADR-119; usage in its docstring)
 3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
-apps/web/e2e/uinav.py                       the studio's map (ADR-122): every menu item per role, every old address, a
-                                             cover's and a Desk card's tabs, 1440/820 px, screenshots; docs/handbook/navigation.md
+apps/web/e2e/uinav.py                       the studio's map (ADR-122, 124): every menu item per role, every old address, a
+                                             cover's and a Desk card's tabs, All covers' filters, the search, the theme,
+                                             1440/820 px, light and dark with a contrast check, screenshots; docs/handbook/navigation.md
+Work → Workshop (#/work/workshop)           approved covers: files (DXF behind the gate), fits, customers' answers; read-only (ADR-124)
+Covers → All covers (#/covers/all[?view=cards])   Models + Catalogue: one filter row, Table / Cards, batch selection (ADR-124)
+Covers → New cover (#/covers/new)           a 3D file, a drawing (PDF), reference pairs (zip) on one page (ADR-124)
+header: Search (Ctrl+K) · ◐/☀/☾ theme       covers, Desk codes, questions, orders (admins); light/dark per browser (ADR-124)
+apps/web/src/studio.css                     the one stylesheet: tokens light and dark, the four page templates (ADR-124)
 apps/web/e2e/uiaudit.py | uiaudit_proto.py   every studio page at 1440/820 px with control counts; the proposed layout's
                                              prototype (out/uiaudit/prototype/index.html, static) — docs/plans/studio-ui.md
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes

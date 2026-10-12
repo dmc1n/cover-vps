@@ -3,8 +3,6 @@
 // card the products of a drawing cover, or the drawings a SUNS model is linked to.
 import { useEffect, useRef, useState } from "react";
 import { deskHref } from "./nav";
-import "./desk.css";
-import "./desk-products.css";
 
 type Row = Record<string, string>;
 export interface ProductsResult {

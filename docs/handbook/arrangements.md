@@ -6,7 +6,7 @@ products where they stand, and the program builds one cover over the whole (ADR-
 
 ## Make one
 
-1. Top bar → **Arrangements**.
+1. **Covers → Arrangements** (`#/covers/arrangements`).
 2. Give it a name (for example "Portofino corner").
 3. Type in **Add a model** and pick a product. Add the second one the same way. Only products
    with an imported 3D model can be added; an arrangement cannot be part of another one.
@@ -33,7 +33,8 @@ products where they stand, and the program builds one cover over the whole (ADR-
    model ↗** shows the cover in 3D, its sizes, the air vents and Unfold, like any product.
 
 The arrangement is a normal model called `arr-<name>`, with the tag **arrangement**: it is in
-the catalogue and at the Desk, and it has cut files, a size drawing and revisions.
+Covers → All covers (filter on the tag) and at the Desk, and it has cut files, a size drawing
+and revisions. Once approved it is on Work → Workshop too ([workshop.md](workshop.md)).
 
 ## Change one
 

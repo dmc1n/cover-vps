@@ -1,7 +1,11 @@
 # Prices and costing
 
-**Prices** in the top bar, its tabs in the sub-menu (colleagues with the editor role: the same, to
-look only). Every price the shop, the configurator and each costing use is set here (ADR-098).
+**Prices** in the top bar (`#/prices/<tab>`); its tabs are the sub-menu: **Materials · Labour ·
+Exchange rate · Channels & price lists · Import (Excel)**, then **Costing · Versions**. Admins
+change and publish; colleagues with the editor role see the same, to look only; Import (Excel)
+is for admins. Every price the shop, the configurator and each costing use is set here
+(ADR-098). Moving between the tabs keeps what you typed; leaving Prices with unsaved numbers
+asks first.
 
 ## How a price is made
 
@@ -47,6 +51,8 @@ The strip at the top of the page shows it in four steps:
   costs (shipping, duties as % of cost + shipping or a fixed amount, packaging) and the price
   list: markup or margin and on what, rounding, VAT and whether prices are shown incl. VAT,
   fixed prices per product.
+- **Import (Excel):** a price list from Excel as fixed prices, into the draft (below,
+  *Prijslijst uit Excel importeren*).
 - **Costing:** any cover (catalogue, drawing, arrangement, order) or a configurator product
   with its sizes, line by line, then per channel the extra costs, the price and the margin.
   Prices: **live**, the **saved draft**, or **this page** (your numbers before saving).
@@ -69,7 +75,8 @@ price you keep: price = base ÷ (1 − margin). The same price both ways: markup
    a new version, so nothing is lost.
 
 A wrong number (a negative price, a margin of 100 %)? The page says what is wrong and does not
-publish. Only admins can change prices; every publish is in the audit log.
+publish. Only admins can change prices; every publish is in the audit log (Settings → Logins
+& audit log).
 
 ## Prijslijst uit Excel importeren (vaste prijzen)
 

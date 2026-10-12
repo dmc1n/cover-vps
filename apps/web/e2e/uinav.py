@@ -1,10 +1,16 @@
-"""Browser check of the studio's map (ADR-122, docs/plans/studio-ui.md): every section and every
-page of its sub-menu opens for the roles that may see it, every old address (#/desk, #/admin,
-#/catalogue, …) lands on its new page, a cover's tab and a Desk card's tab are in the address
-(and another cover opens on its own tab, not the one before), each person starts on their own
-page, the header stays on one line, and pages a role may not see say so.
+"""Browser check of the studio's map (ADR-122, ADR-124, docs/plans/studio-ui.md): every section
+and every page of its sub-menu opens for the roles that may see it, every old address (#/desk,
+#/admin, #/catalogue, …) lands on its new page, a cover's tab and a Desk card's tab are in the
+address (and another cover opens on its own tab, not the one before), each person starts on their
+own page, the header stays on one line, and pages a role may not see say so. Since ADR-124 also:
+All covers keeps its filters and selection between Table and Cards, New cover has the three
+uploads, Learning none, the Workshop opens for every role, the header's search finds covers,
+Desk codes and questions, and the theme button cycles auto → light → dark and is remembered.
 
-Screenshots of every page at 1440 and 820 px go to $COVER_E2E_SHOTS/<width>/ (look at them).
+Every pass runs light and dark (COVER_E2E_THEMES, the browser's prefers-color-scheme), with a
+contrast check of the text on every page (WCAG: 4.5:1, 3:1 for large text).
+
+Screenshots of every page go to $COVER_E2E_SHOTS/<width>-<theme>/ (look at them).
 Nothing is saved, approved, sent or run: the script only opens pages and tabs.
 
 Run against a running studio with a scratch data copy (never the live data) and the users rick
@@ -34,13 +40,14 @@ MODEL = os.environ.get("COVER_E2E_MODEL", "drawing-s45")
 MODEL2 = os.environ.get("COVER_E2E_MODEL2", "suns-2-seater-kota")
 ARR = os.environ.get("COVER_E2E_ARR", "arr-portofino-2-c")
 SIZES = os.environ.get("COVER_E2E_SIZES", "1440x900,820x1180")
+THEMES = os.environ.get("COVER_E2E_THEMES", "light,dark").split(",")
 WIDTHS = [(int(w), int(h)) for w, h in (x.split("x") for x in SIZES.split(","))]
 SLOW = 30_000
 
 # section → its sub-menu, as each role sees it (nav.ts)
 MENU = {
     "rick": {
-        "Work": ["Desk", "Questions"],
+        "Work": ["Desk", "Questions", "Workshop"],
         "Covers": ["All covers", "Arrangements", "New cover", "Learning", "Product list"],
         "Shop": ["Orders", "Requests", "Matches", "B2B customers", "Website (AI)", "Photo test"],
         "Prices": ["Materials", "Labour", "Exchange rate", "Channels & price lists",
@@ -48,14 +55,14 @@ MENU = {
         "Settings": [],
     },
     "eddy": {
-        "Work": ["Desk", "Questions"],
+        "Work": ["Desk", "Questions", "Workshop"],
         "Covers": ["All covers", "Arrangements", "New cover", "Learning", "Product list"],
         "Shop": ["Website (AI)"],
         "Prices": ["Materials", "Labour", "Exchange rate", "Channels & price lists", "Costing",
                    "Versions"],
     },
     "vic": {
-        "Work": ["Desk", "Questions"],
+        "Work": ["Desk", "Questions", "Workshop"],
         "Covers": ["All covers", "Arrangements", "Learning"],
     },
 }  # fmt: skip
@@ -71,6 +78,7 @@ SETTINGS = ["Company & shop", "B2B terms", "Matching", "Users & rights", "Desk &
 # every old address and where it must land (an admin)
 OLD = [
     ("#/", "#/work/desk"),
+    ("#/nothing-at-all", "#/work/desk"),
     ("#/desk", "#/work/desk"),
     (f"#/desk/{MODEL}", f"#/work/desk/{MODEL}"),
     ("#/questions", "#/work/questions"),
@@ -98,6 +106,43 @@ OLD = [
     ("#/settings", "#/settings/company"),
     ("#/shop/nothing", "#/shop/orders"),
 ]
+# text against its own background, every visible element with text of its own (WCAG 2.x)
+CONTRAST_JS = """() => {
+  const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const rgb = s => (s.match(/[\\d.]+/g) || []).map(Number);
+  const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  const bgOf = el => {
+    for (let e = el; e; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (cs.backgroundImage !== 'none' && e !== document.body) return null;  // a picture: skip
+      const c = rgb(cs.backgroundColor);
+      if (c.length === 3 || (c.length === 4 && c[3] > 0.9)) return c.slice(0, 3);
+      if (c.length === 4 && c[3] > 0) return null;  // see-through: skip, not guessable
+    }
+    return [255, 255, 255];
+  };
+  const out = [];
+  for (const el of document.querySelectorAll('body *')) {
+    if (['SCRIPT', 'STYLE', 'svg', 'CANVAS', 'OPTION', 'IMG'].includes(el.tagName)) continue;
+    if (el.closest('svg, canvas, .svgbox, .d-drawing, [aria-hidden=true]')) continue;
+    const own = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+    if (!own || !el.checkVisibility({opacityProperty: true, visibilityProperty: true})) continue;
+    if (el.closest('button:disabled, [disabled]')) continue;
+    const cs = getComputedStyle(el);
+    if (parseFloat(cs.opacity) < 0.95) continue;
+    const bg = bgOf(el);
+    if (!bg) continue;
+    const fg = rgb(cs.color);
+    if (fg.length === 4 && fg[3] < 0.95) continue;
+    const a = lum(fg.slice(0, 3)), b = lum(bg);
+    const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    const size = parseFloat(cs.fontSize), bold = parseInt(cs.fontWeight) >= 600;
+    const need = size >= 24 || (bold && size >= 18.6) ? 3 : 4.5;
+    if (ratio < need) out.push({text: el.textContent.trim().slice(0, 40), ratio: +ratio.toFixed(2),
+      need, cls: (el.className && el.className.baseVal === undefined ? el.className : '') + ''});
+  }
+  return out;
+}"""
 COUNTS_JS = """() => ({ buttons: document.querySelectorAll('main button').length,
   height: document.documentElement.scrollHeight })"""
 problems: list[str] = []
@@ -129,13 +174,33 @@ async def landed(page: Page, want: str) -> bool:
         return False
 
 
-async def shot(page: Page, width: int, name: str) -> None:
-    os.makedirs(f"{SHOTS}/{width}", exist_ok=True)
-    await page.wait_for_timeout(600)
+THEME = {"now": "light"}  # the pass that runs (a screenshot folder per width and theme)
+low_contrast: dict[str, list[Any]] = {}
+
+
+async def contrast(page: Page, where: str) -> None:
+    """Text too faint for its background: listed (and a problem when well below the line)."""
     try:
-        await page.screenshot(path=f"{SHOTS}/{width}/{name}.png", full_page=True, timeout=120_000)
+        bad = await page.evaluate(CONTRAST_JS)
+    except Exception:  # noqa: BLE001 - a page in the middle of loading: the next shot checks
+        return
+    if bad:
+        low_contrast[f"{THEME['now']} {where}"] = bad[:6]
+    worst = [b for b in bad if b["ratio"] < b["need"] - 1]
+    check(not worst, f"{THEME['now']} {where}: text contrast ({len(bad)} under the line, "
+                     f"worst {min((b['ratio'] for b in bad), default='-')}: "
+                     f"{[b['text'] for b in worst[:3]]})")  # fmt: skip
+
+
+async def shot(page: Page, width: int, name: str) -> None:
+    folder = f"{SHOTS}/{width}-{THEME['now']}"
+    os.makedirs(folder, exist_ok=True)
+    await page.wait_for_timeout(600)
+    await contrast(page, f"{width} {name}")
+    try:
+        await page.screenshot(path=f"{folder}/{name}.png", full_page=True, timeout=120_000)
     except Exception:  # noqa: BLE001 - a long page with software WebGL: the screen only
-        await page.screenshot(path=f"{SHOTS}/{width}/{name}.png", timeout=120_000)
+        await page.screenshot(path=f"{folder}/{name}.png", timeout=120_000)
 
 
 async def header_one_line(page: Page, where: str) -> None:
@@ -270,6 +335,95 @@ async def as_rick(page: Page, width: int) -> None:
     await expect(page.locator(".d-card")).to_be_visible(timeout=SLOW)
     n[0] += 1
     await shot(page, width, f"{n[0]:02d}-desk-card-arrangement")
+    await covers_and_workshop(page, width, n)
+    await search_and_theme(page, width, n)
+
+
+async def covers_and_workshop(page: Page, width: int, n: list[int]) -> None:
+    """All covers: one filter row for Table and Cards, kept on the switch, selection in both."""
+    await page.goto(f"{URL}/#/covers/all")
+    filters = page.get_by_role("group", name="Filters")
+    await expect(filters).to_be_visible(timeout=SLOW)
+    for label in ["Search covers", "Category", "Cover", "Status", "Tag", "Sort",
+                  "Select all shown"]:  # fmt: skip
+        check(await filters.get_by_label(label, exact=True).count() == 1,
+              f"rick {width}: All covers has the filter {label}")  # fmt: skip
+    await expect(page.locator("table.list tbody tr").first).to_be_visible(timeout=SLOW)
+    await filters.get_by_label("Search covers").fill(MODEL2.split("-")[-1])
+    rows = await page.locator("table.list tbody tr").count()
+    check(rows >= 1, f"rick {width}: the search narrows the table ({rows})")
+    await page.get_by_role("link", name="Cards", exact=True).click()
+    check(await landed(page, "#/covers/all?view=cards"), f"rick {width}: Cards in the address")
+    check(
+        await filters.get_by_label("Search covers").input_value() == MODEL2.split("-")[-1],
+        f"rick {width}: the search stays when switching to Cards",
+    )
+    cards = page.locator(".gallery .product-wrap")
+    check(await cards.count() == rows, f"rick {width}: Cards show what the Table showed")
+    await cards.first.get_by_role("checkbox").check()
+    await expect(page.locator(".selbar")).to_contain_text("1 selected", timeout=SLOW)
+    n[0] += 1
+    await shot(page, width, f"{n[0]:02d}-covers-cards-selected")
+    await page.get_by_role("link", name="Table", exact=True).click()
+    await expect(page.locator(".selbar")).to_contain_text("1 selected", timeout=SLOW)
+    check(True, f"rick {width}: the selection stays when switching back to the Table")
+    await page.get_by_role("button", name="Clear selection").click()
+    # New cover: the three uploads; Learning: no upload
+    await page.goto(f"{URL}/#/covers/new")
+    for name in ["From a 3D file", "From a drawing", "Reference pairs"]:
+        await expect(page.get_by_role("heading", name=re.compile(name))).to_be_visible(timeout=SLOW)
+    check(await page.locator("input[type=file]").count() == 3,
+          f"rick {width}: New cover has three uploads")  # fmt: skip
+    await page.goto(f"{URL}/#/covers/learning")
+    await expect(page.locator("h1.page-title")).to_have_text("Learning", timeout=SLOW)
+    check(await page.locator("input[type=file]").count() == 0,
+          f"rick {width}: Learning has no upload card")  # fmt: skip
+    # the Workshop: read-only, and the cutting table's DXF only where the gate allows it
+    await page.goto(f"{URL}/#/work/workshop")
+    await expect(page.locator("h1.page-title")).to_have_text("Workshop", timeout=SLOW)
+    await page.wait_for_load_state("networkidle")
+    gate = await page.evaluate("""async () => {
+      const w = await (await fetch('/api/workshop')).json();
+      const links = [...document.querySelectorAll('tr[data-model] a[href$="cut.dxf"]')]
+        .map(a => a.closest('tr').dataset.model);
+      const ok = new Set(w.items.filter(i => i.dxf_ok).map(i => i.id));
+      return {links: links.length, bad: links.filter(m => !ok.has(m)), items: w.items.length};
+    }""")
+    check(not gate["bad"], f"rick {width}: Workshop offers the DXF only past the gate {gate}")
+    check(await page.locator("main button").count() == 0,
+          f"rick {width}: the Workshop has no buttons (read-only)")  # fmt: skip
+
+
+async def search_and_theme(page: Page, width: int, n: list[int]) -> None:
+    box = page.get_by_role("searchbox", name=re.compile("Search covers, Desk codes"))
+    await page.keyboard.press("Control+k")
+    await expect(box).to_be_focused()
+    await box.fill(MODEL.split("-")[-1])
+    hits = page.get_by_role("listbox", name="Search results")
+    await expect(hits.get_by_role("option").first).to_be_visible(timeout=SLOW)
+    groups = [g.title() for g in await hits.locator(".hit-group").all_text_contents()]
+    check("Covers" in groups and "Desk" in groups,
+          f"rick {width}: the search finds covers and Desk codes {groups}")  # fmt: skip
+    n[0] += 1
+    await shot(page, width, f"{n[0]:02d}-search")
+    await box.press("Enter")
+    check(await landed(page, f"#/model/{MODEL}/3d"), f"rick {width}: Enter opens the first hit")
+    await box.fill("71")
+    await expect(hits.locator(".hit-group", has_text="Questions")).to_be_visible(timeout=SLOW)
+    await box.press("Escape")
+    # the theme button: auto → light → dark → auto, on <html>, remembered after a reload
+    btn = page.locator("button.theme-toggle")
+    seen = []
+    for _ in range(3):
+        await btn.click()
+        seen.append(await page.evaluate("document.documentElement.dataset.theme || 'auto'"))
+    check(seen == ["light", "dark", "auto"], f"rick {width}: the theme button cycles {seen}")
+    await btn.click()
+    await btn.click()  # dark
+    await page.reload()
+    th = await page.evaluate("document.documentElement.dataset.theme || 'auto'")
+    check(th == "dark", f"rick {width}: the chosen theme is remembered ({th})")
+    await btn.click()  # back to auto: the pass's own scheme
 
 
 async def as_other(page: Page, user: str, width: int) -> None:
@@ -291,9 +445,12 @@ async def main() -> int:
         browser = await p.chromium.launch(
             args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
         )
-        for w, h in WIDTHS:
+        for theme, (w, h) in [(t, s) for t in THEMES for s in WIDTHS]:
+            THEME["now"] = theme
             for user in ["rick", "rens", "eddy", "vic"]:
-                ctx: Any = await browser.new_context(viewport={"width": w, "height": h})
+                ctx: Any = await browser.new_context(
+                    viewport={"width": w, "height": h}, color_scheme=theme
+                )
                 page = await ctx.new_page()
                 page.on(
                     "pageerror", lambda e, u=user, w=w: problems.append(f"{u} {w}: page error {e}")
@@ -304,13 +461,19 @@ async def main() -> int:
                     else:
                         await as_other(page, user, w)
                 except Exception as exc:  # noqa: BLE001 - one role's failure, the rest still run
-                    problems.append(f"{user} {w}: {type(exc).__name__}: {exc}"[:400])
+                    problems.append(f"{theme} {user} {w}: {type(exc).__name__}: {exc}"[:400])
                     try:
-                        await page.screenshot(path=f"{SHOTS}/fail-{user}-{w}.png", timeout=60_000)
+                        await page.screenshot(
+                            path=f"{SHOTS}/fail-{user}-{w}-{theme}.png", timeout=60_000
+                        )
                     except Exception:  # noqa: BLE001 - the failure is already recorded
                         pass
                 await ctx.close()
         await browser.close()
+    if low_contrast:
+        print("\nUnder the contrast line (look at these):")
+        for where, bad in low_contrast.items():
+            print(f"  {where}: {bad}")
     print("\n".join(["", "PROBLEMS:", *problems]) if problems else "\nall good")
     return 1 if problems else 0
 

@@ -33,7 +33,7 @@ It takes from a few seconds (a chair) to under a minute (a large sofa).
 laptop and drag it onto gltf-viewer.donmccurdy.com (run this on the laptop, not on the server):
 
 ```
-scp dev@168.119.50.82:~/cover-pattern-engine/models/blocchi-2seater-moon-right/preview.glb ~/Downloads/
+scp dev@cover-server:~/cover-pattern-engine/models/blocchi-2seater-moon-right/preview.glb ~/Downloads/
 ```
 
 ## Does water run off?

@@ -70,9 +70,9 @@ interface State {
 
 const MARK = { ok: "✓", warn: "!", bad: "✗", info: "·" } as const;
 const TONE = {
-  agrees: "#4f7a4a",
-  differs: "#a0522d",
-  look: "#9a7a1c",
+  agrees: "var(--ok)",
+  differs: "var(--bad)",
+  look: "var(--warn)",
 } as const;
 const KIND = { surface: "3D model", drawing: "PDF" } as Record<string, string>;
 

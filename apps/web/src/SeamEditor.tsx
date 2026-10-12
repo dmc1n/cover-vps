@@ -26,7 +26,15 @@ const MODE_HELP: Record<Mode, string> = {
   delete: "Click a point to take it out, or a line to delete the whole seam.",
 };
 
-export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; onJob: (j: Job) => void }) {
+export function SeamEditor({
+  id,
+  stamp,
+  onJob,
+}: {
+  id: string;
+  stamp: number;
+  onJob: (j: Job) => void;
+}) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [error, setError] = useState("");
   const [skirt, setSkirt] = useState<Pt[]>([]);
@@ -35,7 +43,9 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
   const [drawing, setDrawing] = useState<Pt[] | null>(null);
   const [mode, setMode] = useState<Mode>("move");
   const [dirty, setDirty] = useState(false);
-  const [drag, setDrag] = useState<{ line: number; point: number } | { skirt: number } | null>(null);
+  const [drag, setDrag] = useState<
+    { line: number; point: number } | { skirt: number } | null
+  >(null);
   const svg = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -76,7 +86,13 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
       const [bx, by] = o[i + 1];
       const dx = bx - ax;
       const dy = by - ay;
-      const t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy || 1)));
+      const t = Math.max(
+        0,
+        Math.min(
+          1,
+          ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy || 1),
+        ),
+      );
       const q: Pt = [ax + t * dx, ay + t * dy];
       const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
       if (d < bd) {
@@ -95,10 +111,15 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
   const onBackgroundClick = (e: React.MouseEvent) => {
     const p = toPlan(e);
     if (mode === "draw") change(() => setDrawing([...(drawing ?? []), p]));
-    if (mode === "skirt") change(() => { setSkirt([...skirt, nearestOnOutline(p)]); setSkirtAuto(false); });
+    if (mode === "skirt")
+      change(() => {
+        setSkirt([...skirt, nearestOnOutline(p)]);
+        setSkirtAuto(false);
+      });
   };
   const finish = () => {
-    if (drawing && drawing.length >= 2) change(() => setTops([...tops, drawing]));
+    if (drawing && drawing.length >= 2)
+      change(() => setTops([...tops, drawing]));
     setDrawing(null);
   };
   const onMove = (e: React.PointerEvent) => {
@@ -121,7 +142,10 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
     setError("");
     const body = automatic
       ? { automatic: true }
-      : { skirt_seams: skirtAuto || !skirt.length ? null : skirt, top_seams: tops };
+      : {
+          skirt_seams: skirtAuto || !skirt.length ? null : skirt,
+          top_seams: tops,
+        };
     const res = await fetch(`/api/models/${id}/seams`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -155,12 +179,30 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
     <div className="seam-editor">
       <div className="settings-bar">
         {(["move", "draw", "skirt", "delete"] as Mode[]).map((m) => (
-          <button key={m} className={mode === m ? "active-mode" : ""} onClick={() => { setMode(m); setDrawing(null); }}>
-            {{ move: "Move points", draw: "Draw a top seam", skirt: "Add a skirt seam", delete: "Delete" }[m]}
+          <button
+            key={m}
+            className={mode === m ? "active-mode" : ""}
+            onClick={() => {
+              setMode(m);
+              setDrawing(null);
+            }}
+          >
+            {
+              {
+                move: "Move points",
+                draw: "Draw a top seam",
+                skirt: "Add a skirt seam",
+                delete: "Delete",
+              }[m]
+            }
           </button>
         ))}
         {drawing && <button onClick={finish}>Finish seam</button>}
-        <button className="primary" disabled={!dirty} onClick={() => save(false)}>
+        <button
+          className="primary"
+          disabled={!dirty}
+          onClick={() => save(false)}
+        >
           Save and recut
         </button>
         <button onClick={() => save(true)} title="Forget the hand-placed seams">
@@ -185,9 +227,12 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
       </div>
       {error && <p className="error">{error}</p>}
       <p className="muted">
-        Grey: the seams of the last run. Blue: your seams ({plan.manual ? "from seams.json" : "starting from the automatic ones"});
-        orange dashed: a seam the program proposes where a piece stretches too much (click it to add it);
-        squares: vertical skirt seams{skirtAuto ? " (automatic until you move one)" : ""}. The contour lines (equal height) show where the top folds.
+        Grey: the seams of the last run. Blue: your seams (
+        {plan.manual ? "from seams.json" : "starting from the automatic ones"});
+        orange dashed: a seam the program proposes where a piece stretches too
+        much (click it to add it); squares: vertical skirt seams
+        {skirtAuto ? " (automatic until you move one)" : ""}. The contour lines
+        (equal height) show where the top folds.
       </p>
       <svg
         ref={svg}
@@ -199,11 +244,27 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
         onPointerUp={() => setDrag(null)}
         onPointerLeave={() => setDrag(null)}
       >
-        <image href={`${fileUrl(id, plan.image)}?v=${stamp}`} x={xmin} y={-ymax} width={w} height={h} preserveAspectRatio="none" />
-        <polygon className="outline" points={plan.outline.map(([x, y]) => `${x},${-y}`).join(" ")} />
+        <image
+          href={`${fileUrl(id, plan.image)}?v=${stamp}`}
+          x={xmin}
+          y={-ymax}
+          width={w}
+          height={h}
+          preserveAspectRatio="none"
+        />
+        <polygon
+          className="outline"
+          points={plan.outline.map(([x, y]) => `${x},${-y}`).join(" ")}
+        />
         {background}
         {plan.panels.map((p) => (
-          <text key={p.name} x={p.at[0]} y={-p.at[1]} fontSize={r * 3.2} className="panel-name">
+          <text
+            key={p.name}
+            x={p.at[0]}
+            y={-p.at[1]}
+            fontSize={r * 3.2}
+            className="panel-name"
+          >
             {p.name}
           </text>
         ))}
@@ -236,7 +297,9 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
                   change(() =>
                     setTops(
                       tops
-                        .map((l, i) => (i === li ? l.filter((_, j) => j !== pi) : l))
+                        .map((l, i) =>
+                          i === li ? l.filter((_, j) => j !== pi) : l,
+                        )
                         .filter((l) => l.length >= 2),
                     ),
                   );
@@ -246,18 +309,46 @@ export function SeamEditor({ id, stamp, onJob }: { id: string; stamp: number; on
           </g>
         ))}
         {plan.proposals
-          .filter((pr) => !tops.some((t) => t.length === pr.points.length && t.every((q, i) => q[0] === pr.points[i][0] && q[1] === pr.points[i][1])))
+          .filter(
+            (pr) =>
+              !tops.some(
+                (t) =>
+                  t.length === pr.points.length &&
+                  t.every(
+                    (q, i) =>
+                      q[0] === pr.points[i][0] && q[1] === pr.points[i][1],
+                  ),
+              ),
+          )
           .map((pr, i) => (
-            <g key={`p${i}`} className="proposal" onClick={(e) => { e.stopPropagation(); change(() => setTops([...tops, pr.points])); }}>
+            <g
+              key={`p${i}`}
+              className="proposal"
+              onClick={(e) => {
+                e.stopPropagation();
+                change(() => setTops([...tops, pr.points]));
+              }}
+            >
               <title>Proposed seam for {pr.panel}: click to add it</title>
-              <polyline strokeWidth={r * 0.6} points={pr.points.map(([x, y]) => `${x},${-y}`).join(" ")} />
-              <text x={(pr.points[0][0] + pr.points[1][0]) / 2} y={-(pr.points[0][1] + pr.points[1][1]) / 2} fontSize={r * 3}>
+              <polyline
+                strokeWidth={r * 0.6}
+                points={pr.points.map(([x, y]) => `${x},${-y}`).join(" ")}
+              />
+              <text
+                x={(pr.points[0][0] + pr.points[1][0]) / 2}
+                y={-(pr.points[0][1] + pr.points[1][1]) / 2}
+                fontSize={r * 3}
+              >
                 + proposed for {pr.panel}
               </text>
             </g>
           ))}
         {drawing && (
-          <polyline className="seam-drawing" strokeWidth={r * 0.6} points={drawing.map(([x, y]) => `${x},${-y}`).join(" ")} />
+          <polyline
+            className="seam-drawing"
+            strokeWidth={r * 0.6}
+            points={drawing.map(([x, y]) => `${x},${-y}`).join(" ")}
+          />
         )}
         {skirt.map(([x, y], i) => (
           <rect

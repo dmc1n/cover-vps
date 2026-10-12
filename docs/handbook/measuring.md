@@ -5,7 +5,8 @@ gemeten, naad tot naad (zonder naadtoeslag).
 
 ## Meten in de 3D-weergave
 
-1. Open de hoes (studio, tab 3D, of de kaart op de Desk) en klik **Measure**.
+1. Open de hoes (de pagina van de hoes, tab 3D, of de kaart op Work → Desk) en klik
+   **Measure** in de 3D-balk.
 2. Klik twee punten op de hoes. Het punt springt naar een hoek van een ventilatiegat, het
    einde van een naad, een naad of de zoom als je er dichtbij klikt (de grijze tekst laat zien
    waarheen).
@@ -19,7 +20,7 @@ gemeten, naad tot naad (zonder naadtoeslag).
 
 ## Maten van de ventilatiegaten
 
-Vink **Vent sizes** aan. Bij elk gat staat op de hoes en in de tabel eronder:
+Kies **Show ▾ → Vent sizes** in de 3D-balk. Bij elk gat staat op de hoes en in de tabel eronder:
 
 - de opening, breedte × hoogte;
 - ↕ de onderkant van de opening boven de zoom (onderrand van de hoes);
@@ -31,13 +32,16 @@ Dit zijn dezelfde getallen als in het snijbestand, niet opnieuw geschat.
 
 ## De checklist (PDF)
 
-**Check list (PDF)** in de 3D-balk, op de Desk-kaart of bij Downloads. Pagina 1: de vier
+**Check list (PDF)** in de 3D-balk, onder **More** op de Desk-kaart, bij **Pieces → Cut
+pieces** en **Files** van de hoes, of op **Work → Workshop** ([workshop.md](workshop.md)). Pagina 1: de vier
 zijden met genummerde gaten (V1, V2, …), de hoofdmaten, de rokhoogtes en per gat alle maten,
 met een vakje voor wat je meet en een vakje OK (binnen ±0,5 cm). Daarna de panelen en naden.
 
 ## Gemeten waarden invullen (Desk)
 
-Op de Desk-kaart: **Measured…**, vul in wat je gemeten hebt (lege velden mag), druk daarna op
-**Fits** of **Does not fit**. Het verschil per maat wordt bewaard; als dezelfde afwijking op
+Op de Desk-kaart, in de balk onderaan: **After sewing ▾ → Measured…**, vul in wat je gemeten
+hebt (lege velden mag), druk daarna op **Fits** of **Does not fit**. Op **Work → Workshop**
+zie je daarna per hoes: past / past niet, de notitie, hoeveel maten gemeten zijn en het
+grootste verschil. Het verschil per maat wordt bewaard; als dezelfde afwijking op
 meerdere hoezen terugkomt, ziet het leerprogramma dat (bijvoorbeeld "gaten zitten steeds 8 mm
 te hoog").

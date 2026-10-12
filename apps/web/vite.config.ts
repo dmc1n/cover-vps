@@ -1,13 +1,13 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
-// The shop's own font (Work Sans, self-hosted, ADR-105) is asked for before the stylesheet
-// needs it, so the first paint already has it: a preload of the Latin file in shop.html.
+// The shop's and the studio's font (Work Sans, self-hosted, ADR-105, ADR-124) is asked for before
+// the stylesheet needs it, so the first paint already has it: a preload of the Latin file.
 function preloadShopFont(): Plugin {
   return {
     name: "preload-shop-font",
     transformIndexHtml(html, ctx) {
-      if (!ctx.bundle || !ctx.filename.endsWith("shop.html")) return html;
+      if (!ctx.bundle || !/(shop|index)\.html$/.test(ctx.filename)) return html;
       const font = Object.keys(ctx.bundle).find((f) =>
         /work-sans-latin-wght-normal-.*\.woff2$/.test(f),
       );

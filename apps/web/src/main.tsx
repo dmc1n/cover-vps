@@ -1,8 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import "./styles.css";
-import "./studio.css"; // the shell and the tighter look (ADR-122), after the house style
+import { applyTheme, storedTheme } from "./theme";
+import "./studio.css"; // the one stylesheet: tokens, light and dark (ADR-124)
+
+applyTheme(storedTheme()); // before the first paint: no flash of the other theme
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

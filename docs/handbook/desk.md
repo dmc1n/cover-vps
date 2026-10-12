@@ -1,6 +1,9 @@
 # The Desk: approve the drawing covers
 
-**Work → Desk** (the start page of an approver; see [navigation.md](navigation.md)). The AI sorts, people decide (ADR-079).
+**Work → Desk** (`#/work/desk`; the start page of an approver, see
+[navigation.md](navigation.md)). The AI sorts, people decide (ADR-079). What the Desk approved
+or marked produced is listed for the workshop, with its files and how it fitted, on
+**Work → Workshop** ([workshop.md](workshop.md)); nothing can be approved there.
 
 - **The queue** puts first what needs a person:
   1. covers where Gemini and DeepSeek disagree;
@@ -12,14 +15,24 @@
   7. approved and produced covers come last.
 
   Filter by status, by series (C, S, D, …) or search.
-- **The card** puts the drawing (click to enlarge) beside our cover in 3D (tick "Show air
-  vents"). It also shows:
-  - what the program read from the drawing, with a green or red dot per line (vents, open
-    bottom, pieces, DXF);
-  - what both AIs say;
-  - the pieces, the revisions and the history.
-- **Who decides:** Rens, Rick and Wouter (setting `desk.approvers`) and admins.
-- **The actions:**
+- **The card** (`#/work/desk/<cover>`) has four tabs, each with its own address:
+  - **Check**: the latest rejection and what happened since; the drawing (click to enlarge)
+    beside our cover in 3D (the **Vents** toggle shows the air vents); the products; what the
+    program read from the drawing, with a green or red dot per line (vents, open bottom,
+    pieces, DXF); what both AIs say;
+  - **Pieces & revisions**: the pieces and the revisions ("cut this": the revision the
+    workshop cuts);
+  - **Correct this cover** (below);
+  - **History**: everything that happened, with the pictures.
+
+  **More** (top right of the card): Let the AI read it (costs about 1–5 cents), the check
+  list, Edit arrangement, the cut pieces and DXF, the product list. **Open cover ↗** opens the
+  cover's own page.
+- **Who decides:** Rens, Rick and Wouter (setting `desk.approvers`, shown on Settings → Desk &
+  approval) and admins. (Whether the Desk's approval and the approval of the definitive
+  drawing become one is open with the owner, #83/#84.)
+- **The actions** (the decision bar at the bottom of the card; the after-sewing ones under
+  **After sewing ▾**):
   - **Approve** (key `a`): the catalogue status becomes "checked".
   - **Reject** (`r`): choose a reason (shape, size, seams, vents, pieces) and write what is
     wrong. It is kept in the history. To change the cover itself, use "Correct this cover".
@@ -28,10 +41,11 @@
     a drop or a paste (Ctrl+V), marked with red arrows, circles and lines (ADR-096). The
     history shows them as thumbnails; click one to enlarge it.
   - **Produced** (`p`): the cover was really made; the catalogue status becomes "production".
-  - **Measured…** next to Fits / Does not fit: enter what was measured on the sewn cover
-    against the check list (PDF link above the 3D view); the differences are kept for the
-    learning step. See [measuring.md](measuring.md) (ADR-111).
-  - **Fits / does not fit:** after sewing, with a note.
+  - **Measured…** (After sewing ▾): enter what was measured on the sewn cover against the
+    check list (in the 3D toolbar and under More); the differences are kept for the learning
+    step. See [measuring.md](measuring.md) (ADR-111).
+  - **Fits / does not fit** (After sewing ▾): after sewing, with a note. The result shows on
+    Work → Workshop.
   - **Undo** (`u`) takes back the last step. Use `j` and `k` to go to the next or previous
     cover.
 - **The cutting table's DXF** of a drawing cover downloads only once the current cut is approved.
@@ -39,9 +53,11 @@
   in the history. Review it and approve again. A saved revision downloads only if its cutting
   file was approved at some point. Earlier approvals keep working: their current file is
   recorded once with “fingerprint recorded for an earlier approval” in the history.
-  Before that the model page shows a lock. An admin can force it with `?override=1`, which the
-  history keeps.
-- **The AI spend** of this month is shown in the top right (ADR-078).
+  Before that the cover's page shows a lock in its status strip, and Work → Workshop says the
+  DXF waits for (re)approval. An admin can force it with `?override=1`, which the history
+  keeps.
+- **The AI spend** of this month is shown at the top of the Desk to admins only (ADR-078); the
+  details are on Settings → AI & spending.
 
 ## Correct this cover (ADR-082)
 
@@ -74,9 +90,10 @@ the covers as they are now; with `--recalc` it calculates them again first.
 Link the workshop's product list to the drawing covers, so the Desk can show, search and sort
 by product.
 
-- **Upload:** "Upload product list (Excel)" at the top of the Desk. It takes an .xlsx, a .csv,
-  or a .zip with one or more of them. A zip with the list and no drawings may also go through
-  the studio's drawings-zip button; it ends up in the same place.
+- **Upload:** **Covers → Product list** (`#/covers/products`, editors and admins), "Upload
+  product list (Excel)"; the card's **More** links there. It takes an .xlsx, a .csv, or a .zip
+  with one or more of them. A zip with the list and no drawings may also go through the
+  reference-pairs upload on Covers → New cover; it ends up in the same place.
   - An old **.xls** file is refused: open it in Excel, Save As "Excel Workbook" (.xlsx).
   - Column names do not matter. The program finds the header row and the column that names
     the drawings (D1, C 23, s40, Cover 105, …) by what is in it.
@@ -138,11 +155,12 @@ Eén zin met **waar, wat en een getal** is genoeg.
 
 ## Vragen beantwoorden (voor Rens, ADR-109)
 
-De vragen over hoezen, de werkplaats, de shop en de prijzen staan nu in de Desk. Je hoeft er niet
-meer voor te mailen.
+De vragen over hoezen, de werkplaats, de shop en de prijzen staan in de studio, onder
+**Work → Questions** (`#/work/questions`). Je hoeft er niet meer voor te mailen.
 
-1. **Desk → Questions.** Het getal op het tabblad is het aantal open vragen. Is het rood, dan
-   wachten er vragen op jouw antwoord. Die hebben in de lijst een rood stipje.
+1. **Work → Questions.** Het getal naast Work en Questions in het menu is het aantal open
+   vragen. Is het rood, dan wachten er vragen op jouw antwoord. Die hebben in de lijst een rood
+   stipje. Het zoekvak bovenaan de studio vindt een vraag ook op titel of nummer.
 2. **Kies een vraag.** Filter bovenaan op Open, Answered of Processed, of op onderwerp (vents,
    shape, seams, webshop, prices, …). Zoeken kan ook, met `/`.
 3. **Lees de vraag.** Daaronder staan:
@@ -181,12 +199,13 @@ An arrangement (furniture placed together under one cover, see
   the front at the bottom. Below: each piece with its picture, size, place (cm), turn and
   mirror, a link to its own model and to its own Desk card. The bar above the card says where
   it stands: waiting (sent by whom, when), approved by whom, rejected and why, or "waiting
-  again" after a change. Then the 3D cover (Measure, Vent sizes, Check list), the pieces,
-  the revisions and the history. **Edit arrangement ↗** opens it on the Arrangements page.
+  again" after a change. Then the 3D cover (Measure, Show ▾ → Vent sizes, Check list), and
+  on the other tabs the pieces, the revisions and the history. **More → Edit arrangement**
+  opens it on Covers → Arrangements.
 - **The DXF** of an arrangement downloads only once it is approved, whatever
   `desk.gate_scope` says (`desk.gate_arrangements: true`).
 - **An approved arrangement never changes silently.** If its plan or pieces change on the
-  Arrangements page, or its cut file changes at all (built again from the model page, a
+  Covers → Arrangements, or its cut file changes at all (built again from the cover's page, a
   correction), it goes back to "Ready for approval" with "changed after approval" in the
   history, and the DXF is locked again.
 - **Mail:** the approvers get the arrangements sent that day in the daily digest of the
@@ -194,14 +213,16 @@ An arrangement (furniture placed together under one cover, see
 
 ### Opstellingen goedkeuren (voor Rens en Wout)
 
-1. **Desk → ARR.** Je ziet alle opstellingen. "Ready for approval" wacht op jou; erbij staat
+1. **Work → Desk → ARR.** Je ziet alle opstellingen. "Ready for approval" wacht op jou; erbij staat
    wie hem stuurde. Je krijgt ze ook één keer per dag in de mail met de vragen.
 2. **Open de kaart.** Links de opstelling van bovenaf: elk meubel met een nummer, de rode lijn
    is de hoes. Onder de tekening de meubels zelf, met een link naar hun eigen model. Rechts de
-   hoes in 3D; met **Measure** meet je, met **Vent sizes** zie je de maten van de vents.
-3. **Klopt het?** **Approve** (`a`). Dan pas kan de werkplaats de DXF downloaden.
+   hoes in 3D; met **Measure** meet je, met **Show ▾ → Vent sizes** zie je de maten van de
+   vents.
+3. **Klopt het?** **Approve** (`a`). Dan pas kan de werkplaats de DXF downloaden (ook op
+   Work → Workshop).
 4. **Klopt het niet?** **Reject** (`r`) met een reden en eventueel een plaatje. Wie hem maakte
-   past hem aan op de pagina Arrangements; na opnieuw bouwen staat hij vanzelf weer bij jou.
+   past hem aan onder Covers → Arrangements; na opnieuw bouwen staat hij vanzelf weer bij jou.
 5. **Later veranderd?** Verandert iemand een goedgekeurde opstelling (andere plattegrond,
    meubel verschoven, ander meubel), dan staat hij weer op "Ready for approval" met
    "changed after approval" in de geschiedenis, en is de DXF weer op slot.

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from "react";
 import { auth, User } from "./api";
 import ProcessBackdrop from "./ProcessBackdrop";
+import { LABEL, NEXT, setTheme, useTheme } from "./theme";
 
 // Who is logged in, for the whole app. `null` while unknown; the login page when nobody is.
 export const SessionContext = createContext<{
@@ -233,8 +234,18 @@ export function UserMenu({
   user: User;
   onLogout: () => void;
 }) {
+  const theme = useTheme();
   return (
     <span className="user">
+      <button
+        className="theme-toggle"
+        title={`${LABEL[theme]} (click: ${LABEL[NEXT[theme]].replace("Theme: ", "")})`}
+        aria-label={LABEL[theme]}
+        data-theme-choice={theme}
+        onClick={() => setTheme(NEXT[theme])}
+      >
+        {theme === "auto" ? "◐" : theme === "light" ? "☀" : "☾"}
+      </button>
       <a
         href="#/account"
         className="nav"

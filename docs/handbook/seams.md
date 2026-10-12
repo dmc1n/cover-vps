@@ -24,7 +24,7 @@ seams  9, hem 6.30 m
 drag it onto gltf-viewer.donmccurdy.com:
 
 ```
-scp dev@168.119.50.82:~/cover-pattern-engine/models/blocchi-2seater-moon-right/panels.glb ~/Downloads/
+scp dev@cover-server:~/cover-pattern-engine/models/blocchi-2seater-moon-right/panels.glb ~/Downloads/
 ```
 
 ## Where the seams go by themselves
@@ -92,7 +92,7 @@ Tip: open `panels.glb` in the viewer, look from above, and read positions off th
 ## Proposed seams
 
 When a top piece has to stretch more than the fabric allows (2 %), the program proposes a seam:
-a straight line through where it stretches most, across the piece. In the web app's **Seams**
+a straight line through where it stretches most, across the piece. On a cover's **Seams**
 tab it is drawn dashed orange; click it to take it over, then **Save and recut**. Proposals
 are only suggestions: nothing is cut until you take one. The test dome goes from 41 % to 16 %
 with one proposal, and to 8 % after taking the next two.

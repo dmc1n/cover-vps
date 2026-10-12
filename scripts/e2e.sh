@@ -14,6 +14,8 @@ from coverapi.auth import Auth
 a = Auth(Path(os.environ['COVER_DATA_DIR']) / 'app.db')
 u = a.add_user('tester', 'Tester', 'admin', None, True)
 a.set_password(a.invite(u.id), 'browser-test-password')"
+# no login code by mail on a scratch directory without a mail server (ADR-123)
+COVER_DATA_DIR=$DATA uv run cover-users two-factor off >/dev/null
 COVER_DATA_DIR=$DATA COVER_PORT=18181 uv run cover-web >"$DATA/web.log" 2>&1 &
 APP=$!
 for _ in $(seq 1 60); do curl -sf http://127.0.0.1:18181/api/health >/dev/null && break; sleep 1; done

@@ -26,7 +26,7 @@ sudo fail2ban-client status sshd         # banned addresses
 
 Every night at 02:30 `scripts/backup.sh` writes `~/backups/cover-data-<date>.tar.gz`: all
 models, uploads, jobs, the users and the settings (14 kept, readable only by user dev). The
-time of the last good backup is in `~/cover-data/last_backup.txt` and on the admin page. Still
+time of the last good backup is in `~/cover-data/last_backup.txt` and on Settings → System. Still
 missing: a copy outside this server (see QUESTIONS.md).
 
 Restore one model: `tar -xzf ~/backups/cover-data-<date>.tar.gz ./models/<id>` in a temporary
@@ -43,9 +43,10 @@ has waited more than a week. Reboot: `sudo reboot` (cover-web and Caddy start by
 
 `scripts/watchdog.py` checks every 10 minutes: the app and https answer, the services run,
 disk space, the certificate, the age of the backup, failed services, update errors, a waiting
-reboot. A problem is mailed to the alert address (admin page, System; rick@s2dio.industries)
-once, again every 6 hours while it lasts, and once more when it is solved. It needs the mail
-server on the admin page; until then the alerts are only in `~/cover-data/alerts.log`.
+reboot. A problem is mailed to the alert address (Settings → Mail & notifications;
+rick@s2dio.industries) once, again every 6 hours while it lasts, and once more when it is
+solved; the last alerts are on Settings → System. It needs the mail server (Settings → Mail &
+notifications); until then the alerts are only in `~/cover-data/alerts.log`.
 
 ## Versions (to set up with the owner)
 
@@ -83,7 +84,7 @@ bij elke wissel dezelfde.
 - Terug naar de vorige versie: `scripts/rollback.sh` (ongeveer 10 seconden).
 - Terug naar een bepaalde versie: `scripts/rollback.sh v1.0.0`; welke er zijn:
   `scripts/rollback.sh --list`.
-- Welke versie live is: de adminpagina, tab System ("Release (live)"), met de laatste wissels.
+- Welke versie live is: Settings → System ("Release (live)"), met de laatste wissels.
 
 ## Limits that protect the server (ADR-123)
 

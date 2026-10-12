@@ -189,10 +189,11 @@ export default function Configure() {
     return () => clearTimeout(t);
   }, [sizes, colour, vents, product, opts]);
 
-  if (!opts) return <div className="cfg">{error || "Loading…"}</div>;
+  if (!opts)
+    return <div className="cfg theme-light">{error || "Loading…"}</div>;
   const fields = opts.products[product].fields;
   return (
-    <div className="cfg">
+    <div className="cfg theme-light">
       <header className="cfg-head">
         <strong>Design your cover</strong>
         <span className="muted">

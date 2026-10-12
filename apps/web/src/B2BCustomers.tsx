@@ -2,7 +2,6 @@
 // studio's users. Invite a company by mail, approve a request, block, give a company another
 // price list or its own fixed prices, its delivery addresses, its people, and see its orders.
 import { useCallback, useEffect, useState } from "react";
-import "./b2b-admin.css";
 
 interface Addr {
   id: string | null;

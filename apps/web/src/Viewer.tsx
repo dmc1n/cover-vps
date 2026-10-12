@@ -136,7 +136,7 @@ function label(text: string, size: number): THREE.Sprite {
   g.fill();
   g.stroke();
   g.fillStyle = "#1f241f";
-  g.font = "600 40px 'DM Sans', system-ui, sans-serif";
+  g.font = "600 40px 'Work Sans Variable', system-ui, sans-serif";
   g.textAlign = "center";
   g.textBaseline = "middle";
   g.fillText(text, 160, 42);

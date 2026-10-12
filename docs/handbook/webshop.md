@@ -43,9 +43,9 @@ catalogue. The products, their fields and ranges are in `config/quote_products.j
 Each legal page shows a draft that starts with a red **CONCEPT — TER GOEDKEURING** line, in
 Dutch and English (German and French visitors see the English one until it is translated).
 
-1. Fill in the company details: Settings → **Company & shop** → The company (name, legal name, street,
-   postcode, city, KvK, VAT number, e-mail, phone). They appear in the texts at once; anything
-   still empty shows as "[nog in te vullen: …]".
+1. Fill in the company details: Settings → **Company & shop** → The company (name, legal
+   name, street, postcode, city, KvK, VAT number, e-mail, phone). They appear in the texts at
+   once; anything still empty shows as "[nog in te vullen: …]".
 2. Have the texts read. The drafts are in `config/shop_legal.json`.
 3. Publish your own text: Shop → **Website (AI)**, for example "zet als algemene voorwaarden
    (legal.terms.nl) deze tekst: …", check the preview, **Publish**. From then on that page
@@ -62,12 +62,14 @@ The prices are the **B2C** list of the published price set (**Prices**,
 docs/handbook/prices.md), incl. VAT. While that set is marked **indicative**, the configurator
 and the checkout say so plainly ("Indicatieve prijs — … je betaalt pas na bevestiging").
 Publish a set with *indicative* off when the prices are final; the note disappears.
-Delivery per country (Shop settings → shipping) is added at the checkout and shown before the
-order.
+Delivery per country (Settings → Company & shop → Shipping per country) is added at the
+checkout and shown before the order. The exchange rate's *indicative* switch is on
+Prices → Exchange rate.
 
 ## Payments (Mollie)
 
-Shop settings → payment → Mollie key:
+Settings → **Website & API keys** → Payment → Mollie key (shown masked; *Replace* to give a
+new one):
 
 - empty: orders are placed and wait for payment (bank transfer; **Into production** by hand);
 - `test_…`: Mollie's test mode; the checkout says "Testbetalingen: er wordt geen geld
@@ -91,11 +93,11 @@ To go live: finish the Mollie account, place one test order with the test key en
 
 ## Search engines and sharing
 
-Every page has its own title and description (in every language; the Website (AI) tab edits
+Every page has its own title and description (in every language; Shop → Website (AI) edits
 them as `meta.pages.<page>`), its own address for Google, and links to its other languages.
 `/sitemap.xml` lists every public page; `/robots.txt` keeps the API, the B2B shop and the
 customers' own pages out. When the shop is shared (WhatsApp, LinkedIn, …) it shows
-`/brand/og-shop.png`, or the picture set as `og_image` in Shop settings (1200×630).
+`/brand/og-shop.png`, or the share picture (`og_image`, Settings → Company & shop; 1200×630).
 The preview (preview.s2dio.living) is never indexed.
 
 ## Checking it

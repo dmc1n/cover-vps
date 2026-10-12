@@ -1,6 +1,6 @@
 # The studio's layout: tighter and clearer (proposal, 11 Oct 2026)
 
-Status: **steps 1, 2, 5 and 6 built (11 Oct 2026, night, ADR-122; §11), not released.** The rest is still a proposal. Audited
+Status: **steps 1, 2, 5 and 6 built (11 Oct 2026, night, ADR-122) and live in v1.36.0; steps 7, 8 and 9 built (12 Oct 2026, ADR-124; §11), not released.** Steps 3 and 4 wait for the owner (questions 83/84 and 93). Audited
 release: v1.30.0 (main has moved on since, e.g. ADR-116; the layout findings still hold). This
 document, the clickable prototype and the audit scripts are on the branch `studio-ui-audit`.
 
@@ -580,6 +580,40 @@ approvals, no workshop role, the defaults read-only, the start pages as below.
   published B2B list), which this change does not touch. `make e2e` (flow.py) follows the new
   tabs up to the approval of the definitive drawing, which fails on the test chair in the API
   ("cannot save with zero pages", the stamped PDF), unrelated to the layout: to look at.
+
+### Steps 7, 8 and 9 (12 Oct 2026; ADR-124)
+
+- **Step 7 — the look:** one stylesheet, `apps/web/src/studio.css`, starting with the tokens
+  (light and dark values); desk.css, desk-products.css, b2b-admin.css and the old house style
+  folded in, the Desk's own palette gone. Work Sans everywhere, self-hosted (no Google fonts:
+  Poppins, Fraunces, DM Sans and Caveat are gone from the studio; the shop and the B2B shop keep
+  theirs). Dark mode for every page: the computer's setting, or ◐/☀/☾ left of the name,
+  remembered per browser; drawings, patterns and pictures stay on white, the 3D on its light
+  stage, the configurator always light. The four templates in `layout.tsx` (list, queue,
+  object, form); every page of the router is one of them.
+- **Step 8 — Covers and Workshop:** All covers is one component (`Covers.tsx`) for Table and
+  Cards with one filter row (search, category, cover, status, tag, sort, select all shown), a
+  box on every card, the batch bar; filters and selection stay across the switch. New cover has
+  the three uploads (3D file, drawing, reference pairs); Learning lists the results only. Work →
+  Workshop (`Workshop.tsx`, `GET /api/workshop`): approved and produced covers, their files (the
+  DXF only past the approval gate), the revision to cut, the measured fit, the customers' fit
+  answers (editors and admins); read-only, every role, no new right (question 92).
+- **Step 9 — tidy up:** Gallery.tsx, QuickSearch.tsx, the old Models list and the CSS of gone
+  pages and tabs removed; the `#/models` shim removed (every unknown address → the start page);
+  every redirect uinav.py checks stays. The header's search finds covers, Desk codes, questions
+  and (admins) orders, Ctrl+K. The handbook rewritten around the map, in English
+  (docs/handbook/README.md is its index, workshop.md new). CLAUDE.md's command list updated.
+- **Checks:** uinav.py light and dark at 1440 and 820 with a contrast check of every text; the
+  other browser checks on a scratch copy (mail, public URL, shop domain, Mollie cleared; login
+  code off). Screenshots in out/uinew2/<width>-<theme>/.
+
+| before (ADR-122) | now (ADR-124) |
+|---|---|
+| All covers: two components, Table filters (search, category, grade, status, batch) and Cards filters (search, grade, category, tag, sort) apart | one filter row for both; the selection and batch bar in both |
+| New cover: 3D file and drawing; Learning: the zip upload and the results | New cover: 3D file, drawing, reference pairs; Learning: the results |
+| Work: Desk, Questions | Work: Desk, Questions, Workshop |
+| Search: models only | Search everything: covers, Desk codes, questions, orders (admins) |
+| Light only (the Desk had its own dark) | Light and dark for the whole studio |
 
 ### Inventory: every screen, action and field, and where it is now
 

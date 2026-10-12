@@ -8,7 +8,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PictureTray, uploadPictures, type Pending } from "./DeskPictures";
 import { deskHref, questionHref } from "./nav";
-import "./desk.css";
 
 interface ModelRef {
   id: string;
@@ -172,19 +171,19 @@ export function Questions({ selected }: { selected: number | null }) {
 
   if (err)
     return (
-      <div className="desk">
+      <div className="desk tpl tpl-queue">
         <p className="d-err">{err}</p>
       </div>
     );
   if (!list)
     return (
-      <div className="desk">
+      <div className="desk tpl tpl-queue">
         <p className="d-muted">Loading the questions…</p>
       </div>
     );
   const c = list.counts;
   return (
-    <div className="desk">
+    <div className="desk tpl tpl-queue">
       <section className="d-top">
         <div className="d-title">
           <h1>Questions</h1>

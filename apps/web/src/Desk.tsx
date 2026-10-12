@@ -31,7 +31,6 @@ import {
   FOOTPRINT_NAMES,
   MEMBER_COLOURS,
 } from "./ArrangementPlan";
-import "./desk.css";
 
 type Scores = {
   gemini: number | null;
@@ -327,13 +326,13 @@ export function Desk({
 
   if (err)
     return (
-      <div className="desk">
+      <div className="desk tpl tpl-queue">
         <p className="d-err">{err}</p>
       </div>
     );
   if (!q)
     return (
-      <div className="desk">
+      <div className="desk tpl tpl-queue">
         <p className="d-muted">Loading the desk…</p>
       </div>
     );
@@ -348,7 +347,7 @@ export function Desk({
     ["rejected", c.rejected ?? 0],
   ] as const;
   return (
-    <div className="desk">
+    <div className="desk tpl tpl-queue">
       <section className="d-top">
         <div className="d-title">
           <h1>Desk</h1>

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { fileUrl } from "./api";
 import { modelHref } from "./nav";
+import { Tpl } from "./layout";
 import { ProductsSummary, type ProductsResult } from "./DeskProducts";
 
-// Learning: upload one zip with the owner's drawings and their 3D models, paired by name
-// (1.step + 1.pdf). Every pair is calculated and shown next to its drawing.
+// Learning: the owner's drawings and their 3D models, paired by name (1.step + 1.pdf), each pair
+// calculated and shown next to its drawing. The zip is uploaded on Covers → New cover (ADR-124).
 
 interface Batch {
   id: string;
@@ -14,32 +15,20 @@ interface Batch {
   drawings_only?: string[];
 }
 
-export function Learning() {
-  const [batches, setBatches] = useState<Batch[] | null>(null);
+/** The reference pairs' upload (Covers → New cover, ADR-124): one zip with drawings and their 3D
+ * models, paired by name. Was the top of Learning. */
+export function ReferenceUpload() {
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [done, setDone] = useState("");
   // a zip with the product list and no drawings goes to the Desk's product list (ADR-091)
   const [products, setProducts] = useState<ProductsResult | null>(null);
-  const load = useCallback(() => {
-    fetch("/api/references")
-      .then((r) => r.json())
-      .then(setBatches)
-      .catch((e) => setError(String(e)));
-  }, []);
-  useEffect(load, [load]);
-  useEffect(() => {
-    const busy = batches?.some((b) =>
-      b.pairs.some((p) => p.status === "queued" || p.status === "running"),
-    );
-    if (!busy) return;
-    const t = window.setInterval(load, 5000);
-    return () => window.clearInterval(t);
-  }, [batches, load]);
 
   const send = () => {
     if (!file) return;
     setError("");
+    setDone("");
     const form = new FormData();
     form.append("file", file);
     const xhr = new XMLHttpRequest(); // XHR for upload progress on a large zip
@@ -59,10 +48,11 @@ export function Learning() {
         try {
           const doc = JSON.parse(xhr.responseText);
           setProducts(doc.kind === "products" ? doc : null);
+          if (doc.kind !== "products") setDone(file.name);
         } catch {
           setProducts(null);
+          setDone(file.name);
         }
-        load();
       }
     };
     xhr.onerror = () => {
@@ -73,45 +63,86 @@ export function Learning() {
   };
 
   return (
-    <>
-      <section className="card upload">
-        <h2>Learn from your own covers</h2>
+    <section className="card upload">
+      <h2>Reference pairs (learn from your own covers)</h2>
+      <p className="muted">
+        One zip with your drawings and their 3D models, with the same name for
+        each pair: <code>1.step</code> + <code>1.pdf</code>, <code>2.stp</code>{" "}
+        + <code>2.pdf</code>, or <code>kota.glb</code> + <code>kota.pdf</code>.
+        Folders inside the zip do not matter. Every pair is calculated and shown
+        next to your drawing on <a href="#/covers/learning">Learning</a>.
+      </p>
+      <div className="row">
+        <input
+          type="file"
+          accept=".zip"
+          aria-label="Reference pairs (zip)"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
+        <button
+          className="primary"
+          disabled={!file || progress !== null}
+          onClick={send}
+        >
+          {progress !== null
+            ? `Uploading ${progress} %`
+            : "Upload and calculate"}
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+      {done && (
         <p className="muted">
-          One zip with your drawings and their 3D models, with the same name for
-          each pair: <code>1.step</code> + <code>1.pdf</code>,{" "}
-          <code>2.stp</code> + <code>2.pdf</code>, or <code>kota.glb</code> +{" "}
-          <code>kota.pdf</code>. Folders inside the zip do not matter. Every
-          pair is calculated and shown next to your drawing.
+          {done} is uploaded; the pairs are being calculated. See them on{" "}
+          <a href="#/covers/learning">Learning</a>.
         </p>
-        <div className="row">
-          <input
-            type="file"
-            accept=".zip"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-          <button
-            className="primary"
-            disabled={!file || progress !== null}
-            onClick={send}
-          >
-            {progress !== null
-              ? `Uploading ${progress} %`
-              : "Upload and calculate"}
-          </button>
+      )}
+      {products && (
+        <div className="desk dp-host">
+          <p className="muted">
+            This zip held the product list and no drawings: it was linked to the
+            drawing covers. See them at <a href="#/work/desk">the Desk</a>.
+          </p>
+          <ProductsSummary res={products} onClose={() => setProducts(null)} />
         </div>
-        {error && <p className="error">{error}</p>}
-        {products && (
-          <div className="desk dp-host">
-            <p className="muted">
-              This zip held the product list and no drawings: it was linked to
-              the drawing covers. See them at <a href="#/work/desk">the Desk</a>
-              .
-            </p>
-            <ProductsSummary res={products} onClose={() => setProducts(null)} />
-          </div>
-        )}
-      </section>
-      <h2>Uploaded</h2>
+      )}
+    </section>
+  );
+}
+
+/** Covers → Learning: what the reference pairs gave (the upload is on New cover). */
+export function Learning() {
+  const [batches, setBatches] = useState<Batch[] | null>(null);
+  const [error, setError] = useState("");
+  const load = useCallback(() => {
+    fetch("/api/references")
+      .then((r) => r.json())
+      .then(setBatches)
+      .catch((e) => setError(String(e)));
+  }, []);
+  useEffect(load, [load]);
+  useEffect(() => {
+    const busy = batches?.some((b) =>
+      b.pairs.some((p) => p.status === "queued" || p.status === "running"),
+    );
+    if (!busy) return;
+    const t = window.setInterval(load, 5000);
+    return () => window.clearInterval(t);
+  }, [batches, load]);
+
+  return (
+    <Tpl
+      kind="list"
+      title="Learning"
+      intro={
+        <>
+          Your covers against ours: every pair of your drawing and its 3D model,
+          calculated and shown side by side. Upload pairs on{" "}
+          <a href="#/covers/new">New cover</a>.
+        </>
+      }
+    >
+      {error && <p className="error">{error}</p>}
+      <h2 className="count-line">Uploaded</h2>
       {!batches ? (
         <p className="muted">Loading…</p>
       ) : !batches.length ? (
@@ -169,7 +200,7 @@ export function Learning() {
           </section>
         ))
       )}
-    </>
+    </Tpl>
   );
 }
 

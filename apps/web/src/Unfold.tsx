@@ -88,8 +88,8 @@ function textSprite(lines: string[], height: number): THREE.Sprite {
   lines.forEach((l, i) => {
     g.font =
       i === 0
-        ? "700 40px 'DM Sans', system-ui"
-        : "500 34px 'DM Sans', system-ui";
+        ? "700 40px 'Work Sans Variable', system-ui"
+        : "500 34px 'Work Sans Variable', system-ui";
     g.fillText(l, w / 2, 46 + i * 52);
   });
   const s = new THREE.Sprite(

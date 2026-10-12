@@ -1,7 +1,6 @@
 import { Arrangements } from "./Arrangements";
 import { Desk } from "./Desk";
 import { Questions } from "./Questions";
-import { DrawingUpload } from "./DrawingUpload";
 import { useCallback, useEffect, useState } from "react";
 import Configure from "./Configure";
 import Guide from "./Guide";
@@ -14,18 +13,18 @@ import {
   fileUrl,
   Job,
   Kind,
-  ModelBrief,
   ModelDetail,
   Scalar,
   Step,
   STEP_LABEL,
-  STEPS,
   User,
 } from "./api";
 import { AiAdvice } from "./AiAdvice";
-import { BatchBar, ModelInfo, Revisions } from "./Catalogue";
-import { Gallery } from "./Gallery";
-import { QuickSearch } from "./QuickSearch";
+import { ModelInfo, Revisions } from "./Catalogue";
+import { AllCovers, NewCover } from "./Covers";
+import { Tpl } from "./layout";
+import { Search } from "./Search";
+import { Workshop } from "./Workshop";
 import { Matches, Orders, Requests, Website } from "./Admin";
 import { B2BCustomers } from "./B2BCustomers";
 import { PhotoTest } from "./PhotoTest";
@@ -238,7 +237,7 @@ function TopBar({
             <a href="#/covers/all">Covers</a> / {route.page}
           </span>
         )}
-        <QuickSearch />
+        <Search />
         <a
           href="#/guide"
           className={`hdr-icon ${route.section === "guide" ? "on" : ""}`}
@@ -286,26 +285,6 @@ function NotAllowed() {
   );
 }
 
-function PageHead({
-  title,
-  children,
-  actions,
-}: {
-  title: string;
-  children?: React.ReactNode;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <div className="page-head">
-      <div>
-        <h1 className="page-title">{title}</h1>
-        {children && <p className="muted">{children}</p>}
-      </div>
-      {actions && <div className="page-actions">{actions}</div>}
-    </div>
-  );
-}
-
 /** Which page an address shows; a page this person may not see says so. */
 function Page({ route, user }: { route: Route; user: User }) {
   const { section, page, rest, query } = route;
@@ -324,6 +303,7 @@ function Page({ route, user }: { route: Route; user: User }) {
     case "work":
       if (page === "questions")
         return <Questions selected={Number(rest[0] ?? "") || null} />;
+      if (page === "workshop") return <Workshop />;
       return <Desk selected={rest[0] ?? null} tab={rest[1] ?? "check"} />;
     case "covers":
       if (page === "arrangements")
@@ -337,364 +317,109 @@ function Page({ route, user }: { route: Route; user: User }) {
       if (page === "products") return <ProductList />;
       return <AllCovers cards={query.get("view") === "cards"} />;
     case "shop":
-      if (page === "orders") return <Orders />;
+      if (page === "orders")
+        return (
+          <Tpl
+            kind="list"
+            title="Orders"
+            intro="Orders from the shop. A paid order goes into production by itself (its pattern, then the drape); a status change mails the customer."
+          >
+            <Orders focus={Number(rest[0] ?? "") || null} />
+          </Tpl>
+        );
       if (page === "requests")
         return (
-          <>
-            <PageHead title="Requests">
-              Quotes customers asked for in the configurator.
-            </PageHead>
+          <Tpl
+            kind="list"
+            title="Requests"
+            intro="Quotes customers asked for in the configurator."
+          >
             <Requests />
-          </>
+          </Tpl>
         );
-      if (page === "matches") return <Matches />;
-      if (page === "b2b") return <B2BCustomers />;
-      if (page === "phototest") return <PhotoTest />;
+      if (page === "matches")
+        return (
+          <Tpl
+            kind="list"
+            title="Matches"
+            intro="Which existing cover fits a customer's sizes; in learning mode a colleague answers every request."
+          >
+            <Matches />
+          </Tpl>
+        );
+      if (page === "b2b")
+        return (
+          <Tpl
+            kind="list"
+            title="B2B customers"
+            intro="Companies, their logins, prices and orders on account. The terms are under Settings → B2B terms."
+          >
+            <B2BCustomers />
+          </Tpl>
+        );
+      if (page === "phototest")
+        return (
+          <Tpl
+            kind="form"
+            title="Photo test"
+            intro="A photo suggestion step by step: image search, identification, searches and scores."
+          >
+            <PhotoTest />
+          </Tpl>
+        );
       return (
-        <>
-          <PageHead title="Website (AI)">
-            Say what should change on the website; the AI changes the draft, you
-            check the preview{isAdmin ? " and publish" : "; an admin publishes"}
-            .
-          </PageHead>
+        <Tpl
+          kind="form"
+          title="Website (AI)"
+          intro={`Say what should change on the website; the AI changes the draft, you check the preview${isAdmin ? " and publish" : "; an admin publishes"}.`}
+        >
           <Website canPublish={isAdmin} />
-        </>
+        </Tpl>
       );
     case "prices":
-      return <Prices canEdit={isAdmin} sub={page} />;
+      return (
+        <Tpl kind="form">
+          <Prices canEdit={isAdmin} sub={page} />
+        </Tpl>
+      );
     case "settings":
-      return <SettingsArea tab={page} />;
+      return (
+        <Tpl kind="form">
+          <SettingsArea tab={page} />
+        </Tpl>
+      );
     case "guide":
       return <Guide loggedIn />;
     case "account":
-      return <Account user={user} />;
+      return (
+        <Tpl kind="form" title="My account">
+          <Account user={user} />
+        </Tpl>
+      );
     default:
       return <NotAllowed />;
   }
-}
-
-/** Covers → All covers: one list, as a table or as cards (was Models and Catalogue). */
-function AllCovers({ cards }: { cards: boolean }) {
-  const { user } = useSession();
-  return (
-    <>
-      <PageHead
-        title="All covers"
-        actions={
-          <>
-            <span className="seg" role="group" aria-label="View">
-              <a href="#/covers/all" className={cards ? "" : "on"}>
-                Table
-              </a>
-              <a href="#/covers/all?view=cards" className={cards ? "on" : ""}>
-                Cards
-              </a>
-            </span>
-            {user?.role !== "viewer" && (
-              <a className="btn primary" href="#/covers/new">
-                + New cover
-              </a>
-            )}
-          </>
-        }
-      >
-        Every model and its cover. A row or a card opens the cover.
-      </PageHead>
-      {cards ? <Gallery /> : <ModelList />}
-    </>
-  );
-}
-
-/** Covers → New cover: from a 3D file or from a drawing (was the top of the Models page). */
-function NewCover() {
-  return (
-    <>
-      <PageHead title="New cover">
-        From a 3D file of the furniture, or from a drawing (PDF). Pairs of
-        drawings and 3D to learn from go to{" "}
-        <a href="#/covers/learning">Learning</a>.
-      </PageHead>
-      <Upload />
-      <DrawingUpload />
-    </>
-  );
 }
 
 /** Covers → Product list: the product list (Excel) linked to the drawings (was on the Desk). */
 function ProductList() {
   const [done, setDone] = useState(0);
   return (
-    <>
-      <PageHead title="Product list">
-        The workshop's product list (Excel): every row is linked to its drawing
-        cover; the Desk shows the products on each card.
-        {done > 0 && " The list is read; the Desk shows it."}
-      </PageHead>
+    <Tpl
+      kind="form"
+      title="Product list"
+      intro={
+        <>
+          The workshop's product list (Excel): every row is linked to its
+          drawing cover; the Desk shows the products on each card.
+          {done > 0 && " The list is read; the Desk shows it."}
+        </>
+      }
+    >
       <div className="desk desk-inline">
         <ProductsUpload onDone={() => setDone((n) => n + 1)} />
       </div>
-    </>
-  );
-}
-
-function ModelList() {
-  const [models, setModels] = useState<ModelBrief[] | null>(null);
-  const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("");
-  const [status, setStatus] = useState("");
-  const [grade, setGrade] = useState("");
-  const [picked, setPicked] = useState<Record<string, boolean>>({});
-  const load = useCallback(() => {
-    api
-      .models()
-      .then(setModels)
-      .catch((e) => setError(String(e)));
-  }, []);
-  useEffect(load, [load]);
-  const q = query.toLowerCase();
-  const shown = (models ?? []).filter(
-    (m) =>
-      (!q ||
-        m.id.includes(q) ||
-        m.tags.some((t) => t.toLowerCase().includes(q)) ||
-        m.notes.toLowerCase().includes(q)) &&
-      (!category ||
-        (category === "-"
-          ? !m.category
-          : (m.category ?? "") === category ||
-            (m.category ?? "").startsWith(`${category} ›`))) &&
-      (!status || m.status === status) &&
-      (!grade || m.grade === grade),
-  );
-  const cats = [
-    ...new Set((models ?? []).map((m) => m.category).filter(Boolean)),
-  ].sort() as string[];
-  const groups = [...new Set(cats.map((c) => c.split(" › ")[0]))];
-  const selected = shown.filter((m) => picked[m.id]);
-  return (
-    <>
-      <h2 className="count-line">
-        Models{" "}
-        {models && (
-          <span className="muted">
-            ({models.length}: {models.filter((m) => m.grade === "ready").length}{" "}
-            ready, {models.filter((m) => m.grade === "check").length} to check,{" "}
-            {models.filter((m) => m.grade === "failed").length} failed)
-          </span>
-        )}
-      </h2>
-      {error && <p className="error">{error}</p>}
-      <div className="row">
-        <input
-          className="search"
-          placeholder="Search name, tag or note…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <select value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="">all categories</option>
-          {groups.map((g) => (
-            <optgroup key={g} label={g}>
-              <option value={g}>all {g}</option>
-              {cats
-                .filter((c) => c.startsWith(`${g} ›`))
-                .map((c) => (
-                  <option key={c} value={c}>
-                    {c.split(" › ")[1]} (
-                    {(models ?? []).filter((m) => m.category === c).length})
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-          <option value="-">no category</option>
-        </select>
-        <select value={grade} onChange={(e) => setGrade(e.target.value)}>
-          <option value="">any cover</option>
-          <option value="ready">ready</option>
-          <option value="check">to check</option>
-          <option value="failed">failed</option>
-        </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">any status</option>
-          <option>draft</option>
-          <option>checked</option>
-          <option>production</option>
-        </select>
-      </div>
-      {selected.length > 0 && <BatchBar selected={selected} onDone={load} />}
-      {!models ? (
-        <p className="muted">Loading…</p>
-      ) : !models.length ? (
-        <p className="muted">No models yet: Covers → New cover.</p>
-      ) : (
-        <table className="list">
-          <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  checked={shown.length > 0 && shown.every((m) => picked[m.id])}
-                  onChange={(e) =>
-                    setPicked(
-                      Object.fromEntries(
-                        shown.map((m) => [m.id, e.target.checked]),
-                      ),
-                    )
-                  }
-                />
-              </th>
-              <th>Model</th>
-              <th>Cover</th>
-              <th>Category</th>
-              <th>Status</th>
-              <th>Size (cm)</th>
-              <th>Steps done</th>
-              <th>Panels</th>
-              <th>Worst stretch</th>
-              <th>Warnings</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((m) => (
-              <tr
-                key={m.id}
-                onClick={() => (window.location.hash = modelHref(m.id))}
-              >
-                <td onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={!!picked[m.id]}
-                    onChange={(e) =>
-                      setPicked({ ...picked, [m.id]: e.target.checked })
-                    }
-                  />
-                </td>
-                <td>
-                  <a href={modelHref(m.id)}>{m.id}</a>
-                  {m.tags.map((t) => (
-                    <span key={t} className="badge">
-                      {t}
-                    </span>
-                  ))}
-                </td>
-                <td title={m.reasons.join("\n")}>
-                  <span className={`badge grade-${m.grade}`}>{m.grade}</span>
-                  {m.no_cover && (
-                    <span
-                      className="badge no-cover"
-                      title={
-                        m.no_cover_reason || "not in the shop, not on the Desk"
-                      }
-                    >
-                      no cover
-                    </span>
-                  )}
-                </td>
-                <td className="nowrap">
-                  {m.category ? m.category.split(" › ")[1] : ""}
-                </td>
-                <td>
-                  <span className={`badge status-${m.status}`}>{m.status}</span>
-                </td>
-                <td>
-                  {m.size_mm
-                    ? m.size_mm.map((v) => (v / 10).toFixed(0)).join(" × ")
-                    : "–"}
-                </td>
-                <td>
-                  <Steps done={m.steps_done} />
-                </td>
-                <td>{m.panels ?? "–"}</td>
-                <td>
-                  {m.max_stretch_pct != null
-                    ? `${m.max_stretch_pct.toFixed(1)} %`
-                    : "–"}
-                </td>
-                <td>{m.warnings.length || ""}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </>
-  );
-}
-
-function Steps({ done }: { done: Step[] }) {
-  return (
-    <span className="steps">
-      {STEPS.map((s) => (
-        <span
-          key={s}
-          className={done.includes(s) ? "step done" : "step"}
-          title={STEP_LABEL[s]}
-        />
-      ))}
-    </span>
-  );
-}
-
-function Upload() {
-  const [file, setFile] = useState<File | null>(null);
-  const [units, setUnits] = useState("");
-  const [up, setUp] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const send = async () => {
-    if (!file) return;
-    setBusy(true);
-    setError("");
-    try {
-      const r = await api.upload(file, units, up);
-      window.location.hash = modelHref(r.model_id);
-    } catch (e) {
-      setError(String(e));
-      setBusy(false);
-    }
-  };
-  return (
-    <section className="card upload">
-      <h2>New model</h2>
-      <p className="muted">
-        STEP, IGES, STL, OBJ, PLY or GLB: the complete product, or only the
-        cover surface. After the import the program shows which one it thinks it
-        is; you confirm, and the rest runs by itself: cover, seams, patterns and
-        the cut pieces.
-      </p>
-      <div className="row">
-        <input
-          type="file"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        />
-        <label>
-          Units{" "}
-          <select value={units} onChange={(e) => setUnits(e.target.value)}>
-            <option value="">from the file</option>
-            <option>mm</option>
-            <option>cm</option>
-            <option>m</option>
-            <option>in</option>
-          </select>
-        </label>
-        <label>
-          Up{" "}
-          <select value={up} onChange={(e) => setUp(e.target.value)}>
-            <option value="">automatic</option>
-            <option>z</option>
-            <option>y</option>
-            <option>x</option>
-            <option>-z</option>
-            <option>-y</option>
-            <option>-x</option>
-          </select>
-        </label>
-        <button className="primary" disabled={!file || busy} onClick={send}>
-          {busy ? "Uploading…" : "Upload and run"}
-        </button>
-      </div>
-      {error && <p className="error">{error}</p>}
-    </section>
+    </Tpl>
   );
 }
 
@@ -949,7 +674,7 @@ function ModelPage({
   const a = model.approval;
 
   return (
-    <>
+    <div className="tpl tpl-object">
       <section className="cv-head">
         {has("cover.png") && (
           <img
@@ -1135,7 +860,7 @@ function ModelPage({
         {tab === "history" && sub === "log" && <Log model={model} job={job} />}
         {tab === "files" && <Files model={model} />}
       </section>
-    </>
+    </div>
   );
 }
 

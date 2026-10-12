@@ -691,6 +691,42 @@ export interface LearningBand {
   fit_avg: number | null;
   returns: number;
 }
+/** Work → Workshop (ADR-124): an approved or produced cover, read-only. */
+export interface WorkshopItem {
+  id: string;
+  code: string;
+  drawing: boolean;
+  arrangement: boolean;
+  status: "approved" | "produced";
+  approved: { by: string; time: number } | null;
+  produced: { by: string; time: number } | null;
+  since: number | null;
+  /** cutting-list.pdf, sizes.pdf, checklist.pdf, cut.svg, cut.dxf: what exists */
+  files: string[];
+  /** the approval gate lets the cutting table's DXF through (ADR-079/115/120) */
+  dxf_ok: boolean;
+  /** the revision the Desk marked to cut */
+  revision: { n: number; dxf: boolean; dxf_ok: boolean } | null;
+  fit: {
+    fits: boolean;
+    note: string;
+    by: string;
+    time: number;
+    measured: number;
+    worst: { label: string; diff_mm: number } | null;
+  } | null;
+  pieces: number;
+  vents: number;
+  products: string[];
+  has_picture: boolean;
+}
+export const workshop = {
+  list: () =>
+    fetch("/api/workshop").then((r) =>
+      json<{ items: WorkshopItem[]; gate: boolean }>(r),
+    ),
+};
+
 export interface FitFeedback {
   id: number;
   created: number;

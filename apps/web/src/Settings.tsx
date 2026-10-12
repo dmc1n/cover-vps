@@ -24,7 +24,6 @@ const GROUP_LABEL: Record<string, string> = {
   units: "Units",
 };
 
-
 export function Settings({
   id,
   onRun,
@@ -49,7 +48,13 @@ export function Settings({
     const f = filter.toLowerCase();
     for (const s of specs) {
       if (s.server_only) continue; // not per cover (ADR-123)
-      if (f && !(s.key.toLowerCase().includes(f) || s.comment.toLowerCase().includes(f))) continue;
+      if (
+        f &&
+        !(
+          s.key.toLowerCase().includes(f) || s.comment.toLowerCase().includes(f)
+        )
+      )
+        continue;
       (out[s.group] ??= []).push(s);
     }
     return out;
@@ -61,10 +66,10 @@ export function Settings({
   // every step after import; the server skips the ones whose inputs did not change (ADR-080)
   const firstStep = (): Step[] => ["hull", "cut", "flatten", "export"];
 
-
   const save = async () => {
     const own: Record<string, Scalar> = {};
-    for (const [k, v] of Object.entries(current.values)) if (current.sources[k] === "model") own[k] = v;
+    for (const [k, v] of Object.entries(current.values))
+      if (current.sources[k] === "model") own[k] = v;
     try {
       const saved = await api.saveParams(id, { ...own, ...edits });
       setCurrent(saved);
@@ -82,13 +87,19 @@ export function Settings({
     for (const [k, v] of Object.entries(current.values))
       if (current.sources[k] === "model" && k !== key) own[k] = v;
     setCurrent(await api.saveParams(id, own));
-    setMessage(`${key} is back to the company default (run again to see the effect).`);
+    setMessage(
+      `${key} is back to the company default (run again to see the effect).`,
+    );
   };
 
   return (
     <div className="settings">
       <div className="settings-bar">
-        <input placeholder="Search settings…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <input
+          placeholder="Search settings…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
         <button disabled={!changed} onClick={() => onRun(firstStep(), edits)}>
           Try without saving
         </button>
@@ -108,8 +119,10 @@ export function Settings({
           </h3>
           {(open[group] || filter) &&
             list.map((s) => {
-              const value = s.key in edits ? edits[s.key] : current.values[s.key];
-              const source = s.key in edits ? "changed" : current.sources[s.key];
+              const value =
+                s.key in edits ? edits[s.key] : current.values[s.key];
+              const source =
+                s.key in edits ? "changed" : current.sources[s.key];
               const set = (v: Scalar) => {
                 const next = { ...edits };
                 if (v === current.values[s.key]) delete next[s.key];
@@ -120,7 +133,11 @@ export function Settings({
                 <div key={s.key} className="param">
                   <div className="param-name">
                     <code>{s.key.slice(s.group.length + 1)}</code>
-                    {s.to_confirm && <span className="badge warn" title="Still to confirm">to confirm</span>}
+                    {s.to_confirm && (
+                      <span className="badge warn" title="Still to confirm">
+                        to confirm
+                      </span>
+                    )}
                     <span className={`badge ${source}`}>{source}</span>
                     {source === "model" && (
                       <button className="link" onClick={() => reset(s.key)}>
@@ -141,9 +158,23 @@ export function Settings({
   );
 }
 
-function Input({ spec, value, onChange }: { spec: ParamSpec; value: Scalar; onChange: (v: Scalar) => void }) {
+function Input({
+  spec,
+  value,
+  onChange,
+}: {
+  spec: ParamSpec;
+  value: Scalar;
+  onChange: (v: Scalar) => void;
+}) {
   if (spec.kind === "bool")
-    return <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
+    return (
+      <input
+        type="checkbox"
+        checked={Boolean(value)}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+    );
   if (spec.kind === "choice" && spec.choices)
     return (
       <select value={String(value)} onChange={(e) => onChange(e.target.value)}>
@@ -160,9 +191,12 @@ function Input({ spec, value, onChange }: { spec: ParamSpec; value: Scalar; onCh
         value={String(value)}
         onChange={(e) => {
           const n = Number(e.target.value);
-          if (e.target.value !== "" && !Number.isNaN(n)) onChange(spec.kind === "int" ? Math.round(n) : n);
+          if (e.target.value !== "" && !Number.isNaN(n))
+            onChange(spec.kind === "int" ? Math.round(n) : n);
         }}
       />
     );
-  return <input value={String(value)} onChange={(e) => onChange(e.target.value)} />;
+  return (
+    <input value={String(value)} onChange={(e) => onChange(e.target.value)} />
+  );
 }

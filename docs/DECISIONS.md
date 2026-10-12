@@ -4238,3 +4238,78 @@ takes whole numbers only, so a page rendered smaller goes through a scaling matr
 
 Better, later: a per-route limit table that FastAPI derives from the routes themselves; Caddy
 2.8's log `mode`; Mollie's own webhook signature once Mollie offers it for payments.
+
+## ADR-124 — The studio's look, Covers and Workshop, and the tidy-up (steps 7, 8 and 9)
+
+The owner asked (12 Oct 2026) to continue the studio's layout (docs/plans/studio-ui.md §9) after
+steps 1, 2, 5 and 6 (ADR-122). Built: steps 7, 8 and 9. Business choices stay as they are: no
+workshop right (open question 92), English (91), approvals unchanged (83, 84), defaults read-only
+and applied as before (step 4 waits for 93).
+
+- **One stylesheet (step 7):** `apps/web/src/studio.css` replaces styles.css, studio.css's
+  first version, desk.css, desk-products.css and b2b-admin.css. It starts with the tokens
+  (page, surface, sunken, stone, lines, ink, muted, sand, accent, primary and its ink, the
+  header, status ok/warn/bad/info, code, stage, shadows, type, radius, 32 px controls) and builds
+  everything from them; the Desk's own green palette (`--d-*`) and its own dark block are gone,
+  the Desk and the Questions use the studio's tokens. Every hard-coded colour left is a picture's
+  (the 3D markers, the arrangement plan, the login page's backdrop, which stays on its dark
+  ground). Rectangular buttons and fields (chips and badges stay round), 8 px corners.
+- **Work Sans everywhere, self-hosted:** the studio's page no longer asks Google for Poppins,
+  Fraunces, DM Sans, Caveat or Work Sans; it uses `@fontsource-variable/work-sans` like the
+  shop (ADR-105), preloaded by the same Vite plugin. The canvas labels (3D, Measure, Unfold)
+  use Work Sans too. The public shop and the B2B shop keep their own design (b2b.html untouched).
+- **Dark mode for the whole studio:** a second set of token values, used when the computer asks
+  for dark (`prefers-color-scheme`) unless the person chose Light, or when he chose Dark. The
+  choice is a button left of the name (◐ as the computer → ☀ light → ☾ dark), stored per browser
+  (`studio.theme`, `apps/web/src/theme.ts`) and set on `<html data-theme>` before the first
+  paint. Drawn things stay on a white "stage" (drawings, flat patterns, the seam plan, Desk
+  pictures, the marker) and the 3D viewer keeps its light scene in both themes: a Desk picture
+  and its red marks look the same whoever took it (ADR-096, ADR-100). The customers' configurator
+  (#/configure) is always light (`.theme-light`), as it sits inside other websites.
+- **Four page templates (`layout.tsx`):** list (a head, one filter row, a table with a sticky
+  head or cards, a selection bar: All covers, Workshop, Orders, Requests, Matches, B2B customers,
+  Learning), queue (Desk, Questions), object (a cover), form (Settings, Prices, New cover,
+  Product list, Website, Photo test, My account). Every page in App.tsx's router is wrapped in
+  one; each has one page head.
+- **All covers (step 8):** Models and Catalogue are one component (`Covers.tsx`) with one filter
+  row for both views: search (name, tag, note, family; the old table's and cards' rules
+  together), category with its groups and counts, cover grade, status, tag, sort (name, ready
+  first, stretch, size), "select all shown", a box on every card, and the batch bar; the filters
+  and the selection stay when switching Table / Cards (the view is in the address). Nothing the
+  two pages had is lost: the table's columns and the cards' facts are unchanged (the cards also
+  show the status and tags now).
+- **New cover:** the three uploads on one page: a 3D file, a drawing (PDF), reference pairs (the
+  zip that was on Learning, `ReferenceUpload`). Learning shows the batches only.
+- **Work → Workshop:** `GET /api/workshop` (any logged-in person, as GET /api/desk; no new right)
+  lists covers the Desk approved or marked produced: who and when, the files (cutting list, size
+  drawing, check list, cut pieces SVG), the cutting table's DXF only when `dxf_allowed` says so
+  (the same gate as the download, ADR-079/115/120; the server checks again on download, and the
+  admin override is not offered), the revision the Desk marked to cut (behind its own
+  fingerprint gate), and the fit (Fits / Does not fit, the note, how many sizes were measured and
+  the largest difference). The customers' fit answers (1–5, comment, photo) are joined to the
+  cover through the order's model, from the existing editor APIs; viewers see a note instead.
+  The page has no buttons: approving, Produced and the measured sizes stay on the Desk card.
+- **Search everything (step 9):** the header's box (`Search.tsx`, Ctrl+K / Cmd+K) searches
+  covers (name, tag, note, family, category, Desk code), the Desk's codes and product names, the
+  questions (number, title, covers) and, for admins, the orders (number, customer, mail,
+  product); a hit opens the cover, the Desk card, the question or `#/shop/orders/<n>` (the order
+  marked and scrolled to). The lists are fetched on first use with the person's own rights.
+  Not "/" as the plan said: the Questions page uses "/" for its own search.
+- **Tidy-up:** Gallery.tsx and QuickSearch.tsx, the old Models list in App.tsx and the CSS of
+  pages and tabs that no longer exist (the Desk's Covers/Questions tabs and their badge, the old
+  button tabs, the rain buttons, the old header) are removed. The redirect shim `#/models`
+  (made in ADR-122, never an address before) is gone; instead every address the studio never
+  had goes to the person's start page rather than "Not for your account". Every old address
+  uinav.py checks still redirects.
+- **Handbook:** rewritten around the map (docs/handbook/README.md as the index, workshop.md new,
+  navigation.md, how-it-works.md, catalogue.md, admin.md, web-app.md, learning.md rewritten,
+  the rest's page names fixed), in English.
+- **Checks:** apps/web/e2e/uinav.py runs every pass light and dark (the browser's colour scheme)
+  with a WCAG contrast check of every visible text on every screenshot, and checks All covers'
+  filters and selection across the switch, the three uploads, Learning without one, the
+  Workshop's DXF links against the gate, the search and the theme button. test_desk.py checks
+  the Workshop API (approved and produced only, the DXF link gone once the cut changes, nothing
+  changed by reading). Screenshots: out/uinew2/.
+
+Better, later: a workshop login with its own right (question 92); the Workshop's fit history per
+revision; server-side search when the lists grow past a few thousand.

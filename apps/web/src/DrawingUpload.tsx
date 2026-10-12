@@ -47,7 +47,7 @@ export function DrawingUpload() {
   const conflicts = read?.outline?.conflicts ?? [];
   return (
     <section className="card upload">
-      <h2>New cover from a drawing</h2>
+      <h2>From a drawing (PDF)</h2>
       <p className="muted">
         Your drawing as a PDF. The program reads the views, the sizes (by their
         arrows) and the number of air vents itself, builds the cover, puts the
