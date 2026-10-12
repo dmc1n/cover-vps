@@ -81,6 +81,7 @@ export function AllCovers({
       ? wanted
       : "";
   const [rows, setRows] = useState<Record<string, PriceRow> | null>(null);
+  const [units, setUnits] = useState<Record<string, { show_vat: boolean }>>({});
   const [priceMsg, setPriceMsg] = useState("");
   useEffect(() => {
     if (!priceCols) return;
@@ -91,6 +92,7 @@ export function AllCovers({
       .then((r) => {
         if (!current) return;
         setRows(r.rows);
+        setUnits(r.units);
         setPriceMsg(
           priceCols === "draft" && r.set !== "draft"
             ? "There is no draft: the live prices are shown."
@@ -346,6 +348,7 @@ export function AllCovers({
           picked={picked}
           pick={pick}
           prices={priceCols ? (rows ?? {}) : null}
+          units={units}
         />
       )}
     </Tpl>
@@ -363,7 +366,14 @@ function Table({
   picked,
   pick,
   prices: pr,
-}: PickProps & { prices: Record<string, PriceRow> | null }) {
+  units = {},
+}: PickProps & {
+  prices: Record<string, PriceRow> | null;
+  units?: Record<string, { show_vat: boolean }>;
+}) {
+  // the unit of the set shown (a draft may show a channel differently from the live set)
+  const vatOf = (k: string) =>
+    units[k] ? (units[k].show_vat ? "incl. VAT" : "ex VAT") : "";
   const cell = (id: string, child: React.ReactNode) => (
     <td className="nowrap price-cell">
       <a href={modelHref(id, "price")} onClick={(e) => e.stopPropagation()}>
@@ -394,8 +404,8 @@ function Table({
             {pr && (
               <>
                 <th>Cost</th>
-                <th>B2C incl. VAT</th>
-                <th>B2B ex VAT</th>
+                <th>B2C {vatOf("b2c")}</th>
+                <th>B2B {vatOf("b2b")}</th>
                 <th>Margin B2C</th>
                 <th>Source</th>
               </>

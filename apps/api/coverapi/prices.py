@@ -672,7 +672,14 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
                     for k, ch in c["channels"].items()
                 },
             }
-        return {"set": "draft" if name == "draft" and draft() else "current", "rows": rows}
+        # each channel's unit in this set: the page names its columns after them (Codex)
+        units = {k: {"name": ch.get("name", k), "show_vat": bool(ch.get("show_vat"))}
+                 for k, ch in ps["channels"].items()}  # fmt: skip
+        return {
+            "set": "draft" if name == "draft" and draft() else "current",
+            "rows": rows,
+            "units": units,
+        }
 
     @app.get("/api/prices/products")
     def products(request: Request) -> dict[str, Any]:

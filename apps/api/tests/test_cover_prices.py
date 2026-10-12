@@ -155,7 +155,10 @@ def test_the_cover_view_shop_place_and_admin_lists(app: Any) -> None:  # noqa: F
 
 def test_the_price_columns_of_all_covers(app: Any) -> None:  # noqa: F811
     admin, editor = login(app, "rick"), login(app, "eddy")
-    rows = editor.get("/api/prices/list").json()["rows"]
+    listed = editor.get("/api/prices/list").json()
+    rows = listed["rows"]
+    assert listed["units"]["b2c"]["show_vat"] is True  # the columns are named after these
+    assert listed["units"]["b2b"]["show_vat"] is False
     assert MODEL in rows and rows[MODEL]["b2c"]["fixed"] is False
     one = editor.get(f"/api/prices/costing?model={MODEL}").json()
     assert rows[MODEL]["cost"] == one["cost_eur"]

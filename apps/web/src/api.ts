@@ -1241,7 +1241,11 @@ export const prices = {
   /** every calculated cover's cost and prices: All covers' price columns */
   list: (set: "current" | "draft") =>
     fetch(`/api/prices/list?set=${set}`).then((r) =>
-      json<{ set: string; rows: Record<string, PriceRow> }>(r),
+      json<{
+        set: string;
+        rows: Record<string, PriceRow>;
+        units: Record<string, { name: string; show_vat: boolean }>;
+      }>(r),
     ),
   /** the page's unsaved numbers: errors, placeholders and one cover's costing under them */
   check: (
