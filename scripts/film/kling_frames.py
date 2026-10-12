@@ -188,6 +188,13 @@ def canvas(m: bpy.types.Material, close: bool = False) -> bpy.types.Material:
             and n.inputs["Color"].links
             and n.inputs["Color"].links[0].from_node.bl_idname == "ShaderNodeTexImage"
             and "seams" in (n.inputs["Color"].links[0].from_node.image.name or "")]  # fmt: skip
+    if not close:  # the seam's baked relief in a raking sun reads as a saw-tooth edge from afar
+        for n in nt.nodes:
+            if (
+                n.bl_idname == "ShaderNodeBump"
+                and abs(n.inputs["Distance"].default_value - 0.004) < 1e-9
+            ):
+                n.inputs["Strength"].default_value = 0.25
     if seps and close:  # from further away the raised dashes alias into a serrated edge
         thread = seps[0].outputs["Green"]
         # render_reel.fabric scales the thread by `stitched`; follow it when present
@@ -554,6 +561,12 @@ def main() -> None:
     rh.render_settings(a)
     states = SHOTS[a.shot](a, d, reel)
     settings(a)
+    # a low sun along the cover's folds shows its triangles as a saw-tooth shadow line (Cycles'
+    # shadow terminator on a coarse smooth mesh); the offsets let the smooth shading win
+    for ob in bpy.context.scene.objects:
+        if ob.type == "MESH" and any(m and "cover" in m.name for m in ob.data.materials):
+            ob.cycles.shadow_terminator_geometry_offset = 0.6
+            ob.cycles.shadow_terminator_offset = 0.3
     cam = Cam()
     sc = bpy.context.scene
     only = {t for t in a.only.split(",") if t}

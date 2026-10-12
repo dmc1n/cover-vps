@@ -77,6 +77,22 @@ The negative prompt for all shots:
 | **sew** (sew) | `sew-start-4x5.png` | Macro close-up of a double-stitched seam on a sand-coloured canvas outdoor furniture cover: two parallel rows of even stitches run along the corner. The camera glides slowly along the seam; warm sunlight moves gently across the woven texture. Shallow depth of field, calm. | exactly two rows of stitches stay two rows (no third row, no zig-zag), the stitch length stays even, the weave stays fine |
 | **vent** (vent) | `vent-start-4x5.png` | Close-up of an air vent on a sand-coloured canvas furniture cover: a small fabric hood held open by a grey plastic insert, a dark mesh membrane behind it. A light breeze makes the hood tremble very slightly; the camera slowly arcs a little to the side. Warm sunlight, soft shadows, calm. | the hood stays one hood with its insert, the membrane stays dark mesh behind it, nothing opens or tears, the cover around it stays smooth |
 
+### The frames as rendered (12 Oct, 160 samples, ~15 minutes a picture), and how good they are
+
+Rendered with `kling_frames.py`, looked at one by one at full size; earlier tries are kept in
+`~/opt/film2/kling/first/` for comparison.
+
+| Frame | Judgement |
+|---|---|
+| `fit-start-*` (bare sofa) | good: real light on the stone and plaster, the sofa reads as a product photo; its aluminium base still shows a few facets |
+| `fit-end-*` (covered) | good: our drape, sand, soft folds at the hem, the same camera as the start, so Kling only has to bring the cover in |
+| `fit-mid-*` (settling) | usable: the cover already on, its hem not yet down; for fit-b |
+| `rain-start-*` | good after the second try: overcast, wet dark stone, the cover clean (the first try baked drops on the run paths; they read as white rivets and grey marks) |
+| `villa-start-*` | the best of the set: low warm sun from the left lighting the covers' ends and the tiles, long shadows, the sea and the island in haze; the Sato lounger shows its designed surface (its drape sags). Third try: the first had a saw-tooth shadow along the Kota cover's front fold (Cycles' shadow terminator on the coarse mesh), fixed with the terminator offsets; the slope now lies in its own soft shade |
+| `sew-start-*` | good: the double stitching stands up as thread, the weave is visible, a T where the skirt seam meets the corner; one dent shadow beside the corner could read as a mark |
+| `cut-start-*` | fair: the head now hangs from a carriage on a beam, the pen lines and labels sit on the sand; the carriage is a plain block and the fabric reads pale in the workshop light |
+| `vent-start-*` | weakest: the hood and its insert read, the membrane hardly shows (from the eye's height it is hidden under the hood, as on a real cover); the owner's phone clip would be better |
+
 `range` (other covers from the catalogue) keeps its current clip: the Sato lounger's drape still
 sags into its seat and the Savona set is a box (ADR-121), so a Kling take of it would show those
 faults more convincingly, not fewer.
