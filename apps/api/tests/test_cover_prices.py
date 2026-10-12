@@ -80,17 +80,37 @@ def test_bad_fixed_prices_are_refused(app: Any) -> None:  # noqa: F811
 
 def test_a_stale_page_does_not_overwrite_or_publish_a_newer_draft(app: Any) -> None:  # noqa: F811
     admin = login(app, "rick")
-    live = admin.get("/api/prices").json()["current"]
+    first = admin.get("/api/prices").json()
+    live, seen = first["current"], first["revision"]
+    assert seen == "v0:"  # nothing published, no draft
     # the Settings page loaded with no draft; then a price is set on a cover
     admin.put("/api/prices/draft/fixed", json={"model": MODEL, "channel": "b2c", "price": 99})
-    t = admin.get("/api/prices").json()["draft"]["time"]
-    r = admin.put("/api/prices/draft", json={"data": live, "since": None})
+    now = admin.get("/api/prices").json()["revision"]
+    r = admin.put("/api/prices/draft", json={"data": live, "since": seen})
     assert r.status_code == 409
     assert admin.get("/api/prices").json()["draft"]["data"]["channels"]["b2c"]["fixed"][MODEL] == 99
-    assert admin.post("/api/prices/publish", json={"since": t - 1}).status_code == 409
+    assert admin.post("/api/prices/publish", json={"since": seen}).status_code == 409
     assert admin.get("/api/prices").json()["published"] is None
     # with the right one it goes through (and without `since`, as before)
-    assert admin.post("/api/prices/publish", json={"since": t}).status_code == 200
+    assert admin.post("/api/prices/publish", json={"since": now}).status_code == 200
+
+
+def test_publish_and_clear_elsewhere_does_not_let_a_stale_page_revert(app: Any) -> None:  # noqa: F811
+    """Codex's second review: a page loaded without a draft; elsewhere a cover price is set and
+    published (the draft is cleared again). The stale page's whole set must not go back."""
+    a, b = login(app, "rick"), login(app, "rick")
+    first = a.get("/api/prices").json()
+    stale_doc, seen = first["current"], first["revision"]
+    rb = b.get(f"/api/prices/cover/{MODEL}").json()["revision"]
+    b.put("/api/prices/draft/fixed",
+          json={"model": MODEL, "channel": "b2c", "price": 555, "since": rb})  # fmt: skip
+    assert b.post("/api/prices/publish", json={"since": b.get("/api/prices").json()["revision"]}
+                  ).status_code == 200  # fmt: skip
+    assert a.get("/api/prices").json()["draft"] is None  # cleared, as when the page loaded
+    assert a.put("/api/prices/draft", json={"data": stale_doc, "since": seen}).status_code == 409
+    assert a.post("/api/prices/publish", json={"since": seen}).status_code in (400, 409)
+    live = a.get("/api/prices").json()
+    assert live["current"]["channels"]["b2c"]["fixed"][MODEL] == 555 and live["draft"] is None
 
 
 def test_the_cover_view_shop_place_and_admin_lists(app: Any) -> None:  # noqa: F811
@@ -151,19 +171,20 @@ def test_interleaved_edits_are_refused_not_lost(app: Any) -> None:  # noqa: F811
     """Codex's review: a page publishes the draft it saved, never a newer one; a cover page's
     stale Save or Remove does not overwrite a newer fixed price."""
     a, b = login(app, "rick"), login(app, "rick")
-    live = a.get("/api/prices").json()["current"]
-    saved = a.put("/api/prices/draft", json={"data": live, "since": None}).json()["draft"]
+    first = a.get("/api/prices").json()
+    saved = a.put("/api/prices/draft", json={"data": first["current"], "since": first["revision"]})
+    rev = saved.json()["revision"]
     # B sets a cover price between A's save and A's publish
-    fix = {"model": MODEL, "channel": "b2c", "price": 700, "since": saved["time"]}
+    fix = {"model": MODEL, "channel": "b2c", "price": 700, "since": rev}
     assert b.put("/api/prices/draft/fixed", json=fix).status_code == 200
-    r = a.post("/api/prices/publish", json={"note": "A", "since": saved["time"]})
+    r = a.post("/api/prices/publish", json={"note": "A", "since": rev})
     assert r.status_code == 409
     assert a.get("/api/prices").json()["published"] is None  # B's price not published unseen
-    # a cover page that loaded the draft before B's change cannot remove B's price
-    stale = {"model": MODEL, "channel": "b2c", "price": None, "since": saved["time"]}
+    # a cover page that loaded the prices before B's change cannot remove B's price
+    stale = {"model": MODEL, "channel": "b2c", "price": None, "since": rev}
     assert a.put("/api/prices/draft/fixed", json=stale).status_code == 409
-    d = a.get("/api/prices").json()["draft"]
-    assert d["data"]["channels"]["b2c"]["fixed"][MODEL] == 700
-    # with the draft it has seen, it may
-    seen = {**stale, "since": d["time"]}
+    d = a.get("/api/prices").json()
+    assert d["draft"]["data"]["channels"]["b2c"]["fixed"][MODEL] == 700
+    # with the prices it has seen, it may
+    seen = {**stale, "since": d["revision"]}
     assert a.put("/api/prices/draft/fixed", json=seen).status_code == 200

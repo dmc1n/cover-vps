@@ -223,6 +223,7 @@ def install(app: FastAPI, auth: Any, store: Any, facts: Any, draft: Any) -> None
         out: dict[str, Any] = {
             "model": model_id,
             "can_edit": user.may("admin"),
+            "revision": prices.revision(auth),  # what this page saw (`since`)
             "calculated": f is not None,
             "published": (lambda p: p and {k: p[k] for k in ("version", "created", "username",
                                                               "note")})(prices.published(auth)),

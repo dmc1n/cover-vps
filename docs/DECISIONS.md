@@ -4396,10 +4396,16 @@ docs/plans/studio-ui.md §12; handbook: prices.md, navigation.md.
   never publishes. A test proves the draft equals the one the old Channels table produced, row
   for row; editors and viewers get 403. Publishing from the cover is the same `POST
   /api/prices/publish`, after the preview's count and a confirmation naming the whole draft.
-- **No lost update, no surprise publish:** `PUT /api/prices/draft` and `POST /api/prices/publish`
-  take an optional `since` (the draft's time the page loaded, or null); a newer draft (a price
-  set on a cover, an import) is refused with 409 and the page offers to load it. Old clients
-  without `since` behave as before. The Settings page and the cover's page send it.
+- **No lost update, no surprise publish:** `PUT /api/prices/draft`, `PUT /api/prices/draft/fixed`
+  and `POST /api/prices/publish` take an optional `since`: the `revision` the page was given
+  (`v<live version>:<draft time>`, from `GET /api/prices`, the cover endpoint and every save).
+  It changes with every save, fixed price, import, publish, discard and rollback, so prices
+  changed elsewhere (a cover price, an import, a publish that cleared the draft) are refused
+  with 409 and the page offers to load them; a page publishes exactly the draft it saved. Old
+  clients without `since` behave as before. Codex found the holes of the first two versions (a
+  publish that fetched the newest draft after saving; cover edits without the token; a
+  time-only token that a publish-and-clear elsewhere made look current again); each has a
+  regression test.
 - **All covers' optional price columns** (`?prices=live|draft`, `GET /api/prices/list`, editors
   and admins): cost, B2C, B2B, margin, source; sort by B2C price or margin; a price opens the
   cover's Price & shop. No separate price page.

@@ -139,7 +139,7 @@ async def main() -> int:
         await expect(page.get_by_text("€ 1,001.00").first).to_be_visible()
         await other.get_by_label("vent_set price").fill("7")
         await other.get_by_role("button", name="Save draft").click()
-        await expect(other.get_by_text("Someone changed the draft")).to_be_visible()
+        await expect(other.get_by_text("Someone changed the prices")).to_be_visible()
         await shot(other, "06-stale-page")
         state = await (await page.request.get(URL + "/api/prices")).json()
         assert state["draft"]["data"]["channels"]["b2b"]["fixed"][MODEL] == 1001

@@ -198,12 +198,17 @@ export function Prices({
   const saveDraft = async () => {
     // `since`: the draft this page loaded; a newer one (a price set on a cover's page, an
     // import) is not overwritten (409) — load it again first (ADR-126)
-    const r = await prices.saveDraft(doc, state.draft?.time ?? null);
+    const r = await prices.saveDraft(doc, state.revision);
     setErrors(r.errors);
     setDirty(false);
-    setState({ ...state, draft: r.draft, draft_errors: r.errors });
+    setState({
+      ...state,
+      draft: r.draft,
+      draft_errors: r.errors,
+      revision: r.revision,
+    });
     // the draft this page wrote: Publish publishes exactly this one (never a newer one)
-    return { errors: r.errors, time: r.draft?.time ?? null };
+    return { errors: r.errors, revision: r.revision };
   };
   const pub = state.published;
   const shownErrors = dirty && check ? check.errors : errors;
@@ -297,11 +302,11 @@ export function Prices({
                 disabled={busy || (!dirty && !state.draft)}
                 onClick={() =>
                   run(async () => {
-                    let since = state.draft?.time ?? null;
+                    let since = state.revision;
                     if (dirty) {
                       const saved = await saveDraft();
                       if (saved.errors.length) return;
-                      since = saved.time;
+                      since = saved.revision;
                     }
                     const r = await prices.publish(note, since);
                     setNote("");
@@ -341,13 +346,14 @@ export function Prices({
             )}
           </>
         )}
-        {msg && !msg.includes("draft changed") && (
+        {msg && !msg.includes("prices changed since") && (
           <p className="muted">{msg}</p>
         )}
-        {msg.includes("draft changed") && (
+        {msg.includes("prices changed since") && (
           <p className="error">
-            Someone changed the draft after this page loaded it (a price on a
-            cover's page, an import). Your numbers here are not saved.{" "}
+            Someone changed the prices after this page loaded them (a price on a
+            cover's page, an import, a publish). Your numbers here are not
+            saved.{" "}
             <button
               onClick={() => {
                 setMsg("");

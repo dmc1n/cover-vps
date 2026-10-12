@@ -241,7 +241,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                         return;
                       const r = await prices.publish(
                         c.draft?.note ? "" : `Published from the cover ${id}`,
-                        c.draft?.time ?? null,
+                        c.revision,
                       );
                       load();
                       return `Published version ${r.version}: ${r.prices_changed} prices changed.`;
@@ -256,12 +256,14 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
           <a href="#/settings/publish">all changes, versions</a>
         </section>
       )}
-      {msg && !msg.includes("draft changed") && <p className="muted">{msg}</p>}
-      {msg.includes("draft changed") && (
+      {msg && !msg.includes("prices changed since") && (
+        <p className="muted">{msg}</p>
+      )}
+      {msg.includes("prices changed since") && (
         <p className="error">
-          The draft changed after this page loaded it (someone else set a price
-          or imported a list); nothing was saved or published.{" "}
-          <button onClick={load}>Load the newer draft</button>
+          The prices changed after this page loaded them (someone else set a
+          price, imported a list or published); nothing was saved or published.{" "}
+          <button onClick={load}>Load them again</button>
         </p>
       )}
       <section className="card" data-testid="cover-prices">
@@ -382,7 +384,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                                 id,
                                 k,
                                 Number(typed[k]),
-                                c.draft?.time ?? null,
+                                c.revision,
                               );
                               load();
                               return r.errors.length
@@ -400,12 +402,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                             title="The calculated price applies again (in the draft)"
                             onClick={() =>
                               run(async () => {
-                                await prices.setFixed(
-                                  id,
-                                  k,
-                                  null,
-                                  c.draft?.time ?? null,
-                                );
+                                await prices.setFixed(id, k, null, c.revision);
                                 load();
                                 return `${k.toUpperCase()} fixed price removed in the draft: the calculated price applies once published.`;
                               })

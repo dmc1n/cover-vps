@@ -59,6 +59,16 @@ def published(auth: Any) -> dict[str, Any] | None:
     return {**dict(row), "data": json.loads(row["data"])}
 
 
+def revision(auth: Any) -> str:
+    """Which prices a page saw: the live version and the draft's time ("v3:" when there is no
+    draft). It changes with every save, fixed price, import, publish, discard and rollback, so a
+    page that sends the one it loaded (`since`) cannot overwrite or publish what came after
+    (ADR-126; Codex: a page loaded without a draft, then publish-and-clear elsewhere)."""
+    pub = published(auth)
+    d: dict[str, Any] | None = auth.setting(DRAFT_SETTING, None)
+    return f"v{pub['version'] if pub else 0}:{d['time'] if d else ''}"
+
+
 def defaults(auth: Any) -> dict[str, Any]:
     """The price set before anything is published: config/defaults.yaml with the old Shop
     settings prices on top."""
@@ -444,6 +454,7 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             "using_defaults": pub is None,
             "draft": d,
             "draft_errors": costing.validate(d["data"]) if d else [],
+            "revision": revision(auth),
             "defaults": defaults(auth),
             "can_edit": user.may("admin"),
             **marks(d["data"] if d else (pub["data"] if pub else defaults(auth))),
@@ -458,14 +469,15 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             },
         }
 
-    def stale(body: Any, now: dict[str, Any] | None) -> None:
-        """A save from a page that loaded an older draft would overwrite what was written since
-        (a fixed price set on a cover's page, an import): refused when the page says which draft
-        it loaded (`since`: that draft's time, or null for none) and it is no longer the one."""
+    def stale(body: Any, now: dict[str, Any] | None = None) -> None:
+        """A save from a page that loaded older prices would overwrite what was written since
+        (a fixed price set on a cover's page, an import, a publish): refused when the page says
+        which prices it loaded (`since`: the `revision` it was given) and they are not the
+        current ones. Without `since` (older clients) as before."""
         if isinstance(body, dict) and "since" in body:
-            if body["since"] != (now or {}).get("time"):
+            if body["since"] != revision(auth):
                 raise HTTPException(
-                    409, "the draft changed since this page loaded it; load it again first"
+                    409, "the prices changed since this page loaded them; load them again first"
                 )
 
     @app.put("/api/prices/draft")
@@ -482,7 +494,7 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
         if before and before.get("note"):  # an import's note stays with the draft (ADR-113)
             d["note"] = before["note"]
         auth.set_setting(DRAFT_SETTING, d)
-        return {"draft": d, "errors": costing.validate(data)}
+        return {"draft": d, "errors": costing.validate(data), "revision": revision(auth)}
 
     @app.put("/api/prices/draft/fixed")
     async def put_fixed(request: Request) -> dict[str, Any]:
@@ -523,7 +535,7 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
         if before and before.get("note"):  # an import's note stays with the draft (ADR-113)
             d["note"] = before["note"]
         auth.set_setting(DRAFT_SETTING, d)
-        return {"draft": d, "errors": costing.validate(data)}
+        return {"draft": d, "errors": costing.validate(data), "revision": revision(auth)}
 
     @app.delete("/api/prices/draft")
     def discard_draft(request: Request) -> dict[str, Any]:

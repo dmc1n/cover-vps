@@ -945,6 +945,8 @@ export interface PricesState {
   using_defaults: boolean;
   draft: { data: PriceSet; by: string; time: number; note?: string } | null;
   draft_errors: string[];
+  /** which prices the page saw (the live version and the draft): sent back as `since` */
+  revision: string;
   defaults: PriceSet;
   can_edit: boolean;
   /** ids of the fields still at their "to confirm" default (costing.FIELD_KEYS) */
@@ -1038,6 +1040,8 @@ export interface CostingProducts {
 export interface CoverPrices {
   model: string;
   can_edit: boolean;
+  /** which prices this page saw: sent back as `since` */
+  revision: string;
   calculated: boolean;
   published: {
     version: number;
@@ -1169,12 +1173,18 @@ export interface PriceCheck {
 export const prices = {
   state: () => fetch("/api/prices").then((r) => json<PricesState>(r)),
   /** `since`: the draft's time this page loaded (null: none); a newer draft is refused (409) */
-  saveDraft: (data: PriceSet, since?: number | null) =>
+  saveDraft: (data: PriceSet, since?: string) =>
     send(
       "PUT",
       "/api/prices/draft",
       since === undefined ? { data } : { data, since },
-    ).then((r) => json<{ draft: PricesState["draft"]; errors: string[] }>(r)),
+    ).then((r) =>
+      json<{
+        draft: PricesState["draft"];
+        errors: string[];
+        revision: string;
+      }>(r),
+    ),
   discard: () =>
     send("DELETE", "/api/prices/draft").then((r) => json<unknown>(r)),
   preview: (data?: PriceSet) =>
@@ -1186,7 +1196,7 @@ export const prices = {
         total: number;
       }>(r),
     ),
-  publish: (note: string, since?: number | null) =>
+  publish: (note: string, since?: string) =>
     send(
       "POST",
       "/api/prices/publish",
@@ -1212,7 +1222,7 @@ export const prices = {
     model: string,
     channel: string,
     price: number | null,
-    since: number | null,
+    since: string,
   ) =>
     send("PUT", "/api/prices/draft/fixed", {
       model,
