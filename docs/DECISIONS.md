@@ -4406,7 +4406,11 @@ docs/plans/studio-ui.md §12; handbook: prices.md, navigation.md.
   clients without `since` behave as before. Codex found the holes of the first two versions (a
   publish that fetched the newest draft after saving; cover edits without the token; a
   time-only token that a publish-and-clear elsewhere made look current again); each has a
-  regression test.
+  regression test. Later passes, also fixed: the revision is derived from the very records an
+  answer shows and every check-then-write holds one lock; Discard draft carries the revision;
+  saving one channel keeps a price typed in the other (and leaving asks); the cover names the
+  draft's VAT unit and drops a typed price whose unit changed on reload; All covers ignores a
+  slower answer for the other set and names its columns after the shown set's units.
 - **All covers' optional price columns** (`?prices=live|draft`, `GET /api/prices/list`, editors
   and admins): cost, B2C, B2B, margin, source; sort by B2C price or margin; a price opens the
   cover's Price & shop. No separate price page.
