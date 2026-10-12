@@ -96,7 +96,8 @@ bij elke wissel dezelfde.
   (`limits.image_max_mp`, 40 megapixels; a large phone JPEG is decoded at half or quarter size).
   A drawing has at most `limits.pdf_max_pages` pages; a reference zip at most
   `limits.zip_max_files` files and `limits.zip_max_mb` unpacked; a product or price list at
-  most `limits.sheet_max_rows` rows and `limits.sheet_max_cells` cells.
+  most `limits.sheet_max_rows` rows and `limits.sheet_max_cells` cells, and an .xlsx may unpack
+  to at most `limits.sheet_max_unpacked_mb`.
 - **Background jobs**: each step (import, hull, ..., drape) stops after `limits.job_timeout_s`
   (4 hours) and may reserve at most `limits.job_memory_mb` (12 GiB); the job then shows why. A
   207 MB STEP (the Blocchi sofa) runs every step well inside both.

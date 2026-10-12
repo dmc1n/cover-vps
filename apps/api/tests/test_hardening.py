@@ -443,3 +443,40 @@ def test_a_job_step_has_a_time_and_memory_limit(
     job = app.state.jobs.submit(jobs_module.JobSpec("m", ["hull"], {}))
     done = app.state.jobs.wait(job["id"], 20)
     assert done["status"] == "failed" and "longer than 1 s" in done["error"]
+
+
+def test_a_page_over_the_pixel_cap_renders_smaller_not_fails() -> None:
+    """Codex, 12 Oct: a fractional resolution must not break the render (PyMuPDF's dpi= takes
+    whole numbers)."""
+    import pymupdf
+    from coverengine.safeimage import render_page
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=7200, height=7200)  # 100 x 100 inches: 121 MP at 110 dpi
+    pix = render_page(page, 110, 4_000_000)
+    assert 0 < pix.width * pix.height <= 4_000_000 * 1.01
+    small = doc.new_page(width=595, height=842)
+    assert render_page(small, 110, 4_000_000).width == small.get_pixmap(dpi=110).width
+
+
+def test_an_xlsx_that_unpacks_to_too_much_is_refused_before_it_is_opened(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Codex, 12 Oct: openpyxl reads the shared strings whole; the zip's sizes are checked first."""
+    from coverapi import products_sheet
+    from coverengine.params import Registry
+
+    base = Registry.load(None).resolve()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("xl/sharedStrings.xml", b"<sst>" + b"A" * (3 * 1024 * 1024) + b"</sst>")
+    data = buf.getvalue()
+    assert len(data) < 100_000  # small on the wire
+
+    class Small:
+        def __getitem__(self, key: str) -> object:
+            return 1 if key == "limits.sheet_max_unpacked_mb" else base[key]
+
+    monkeypatch.setattr(Registry, "resolve", lambda self, **k: Small())
+    with pytest.raises(products_sheet.SheetError, match="unpacks to too much"):
+        products_sheet.read_sheets("prices.xlsx", data)

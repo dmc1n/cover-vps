@@ -177,6 +177,23 @@ def sheet_limits() -> tuple[int, int]:
     return int(p["limits.sheet_max_rows"]), int(p["limits.sheet_max_cells"])  # type: ignore[arg-type]
 
 
+def check_xlsx(data: bytes, filename: str) -> None:
+    """An .xlsx is a zip of XML: refused before openpyxl opens it when its parts would unpack
+    to more than limits.sheet_max_unpacked_mb (openpyxl reads the shared strings whole, even
+    read-only). The sizes in the zip's directory bound what zipfile will ever unpack."""
+    from coverengine.params import Registry
+
+    p = Registry.load(None).resolve()
+    most = int(float(p["limits.sheet_max_unpacked_mb"]) * 1024 * 1024)  # type: ignore[arg-type]
+    try:
+        infos = zipfile.ZipFile(io.BytesIO(data)).infolist()
+    except zipfile.BadZipFile:
+        raise SheetError(f"{filename}: not a readable Excel file") from None
+    if len(infos) > int(p["products.max_files"]) or sum(i.file_size for i in infos) > most:  # type: ignore[arg-type]
+        raise SheetError(f"{filename}: the workbook unpacks to too much "
+                         f"(at most {most // (1024 * 1024)} MB)")  # fmt: skip
+
+
 def _bounded(rows: Any, filename: str) -> list[list[Any]]:
     """The rows, refused (SheetError) past limits.sheet_max_rows rows or sheet_max_cells cells:
     a small file can claim a huge sheet."""
@@ -210,6 +227,7 @@ def read_sheets(filename: str, data: bytes) -> list[dict[str, Any]]:
     if low.endswith((".xlsx", ".xlsm")):
         from openpyxl import load_workbook
 
+        check_xlsx(data, filename)  # before openpyxl unpacks anything (ADR-123)
         try:
             wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
         except Exception as exc:  # noqa: BLE001 - say it plainly

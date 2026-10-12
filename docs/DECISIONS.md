@@ -4230,5 +4230,11 @@ B2B, Desk and security tests).
     to the company whose proposal it is. A Mollie "paid" is acted on only when the payment's
     amount (cents), currency, order in its metadata and live/test mode match the order.
 
+Codex's adversarial review found two holes in the first version, both closed: an .xlsx is a zip
+whose shared strings openpyxl unpacks whole even read-only, so the workbook's unpacked size is
+checked from its zip directory first (`limits.sheet_max_unpacked_mb`); and PyMuPDF's `dpi=`
+takes whole numbers only, so a page rendered smaller goes through a scaling matrix
+(`safeimage.render_page`).
+
 Better, later: a per-route limit table that FastAPI derives from the routes themselves; Caddy
 2.8's log `mode`; Mollie's own webhook signature once Mollie offers it for payments.

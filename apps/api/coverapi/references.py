@@ -114,7 +114,7 @@ def read_drawing(pdf: Path, out_dir: Path) -> dict[str, Any]:
     """The drawing's first page as reference.png, and its texts and sizes as reference.json."""
     import pymupdf
     from coverengine.params import Registry
-    from coverengine.safeimage import TooLargeImage, max_pixels, safe_dpi
+    from coverengine.safeimage import TooLargeImage, max_pixels, render_page
 
     p = Registry.load(None).resolve()
     limit_px = max_pixels(p)
@@ -149,7 +149,7 @@ def read_drawing(pdf: Path, out_dir: Path) -> dict[str, Any]:
                     }
                 )
         if page_no == 0:
-            page.get_pixmap(dpi=safe_dpi(page, PAGE_DPI, limit_px)).save(out_dir / REFERENCE_PNG)
+            render_page(page, PAGE_DPI, limit_px).save(out_dir / REFERENCE_PNG)
     drawn = sum(len(doc[i].get_drawings()) for i in range(doc.page_count))
     info = {
         "format_version": 1,

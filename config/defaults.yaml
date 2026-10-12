@@ -415,6 +415,8 @@ limits:                          # what a request or an uploaded file may hold (
   zip_max_mb: 4096               # ... unpacking to at most this much (MiB, counted while unpacking)
   sheet_max_rows: 200000         # a product or price list (Excel, CSV): at most this many rows ...
   sheet_max_cells: 5000000       # ... and cells in one sheet (a small .xlsx can claim a huge sheet)
+  sheet_max_unpacked_mb: 512     # ... and an .xlsx may unpack to at most this much XML (MiB), checked
+                                 # before it is opened (a zip bomb of shared strings)
   quotes_keep_days: 60           # a price proposal (shop_quotes, b2b_quotes, quotes) older than this is
                                  # removed by scripts/housekeeping.sh, unless an order or request names it
   quotes_per_minute: 120         # all visitors together: at most this many new proposals a minute (each

@@ -99,9 +99,18 @@ def page_pixels(page: Any, dpi: float) -> float:
 
 
 def safe_dpi(page: Any, dpi: float, limit_px: int) -> float:
-    """`dpi`, or less so the rendered page stays within `limit_px` pixels."""
+    """`dpi`, or less so the rendered page stays within `limit_px` pixels (a fraction: render
+    with `render_page`, PyMuPDF's own `dpi=` takes whole numbers only)."""
     px = page_pixels(page, dpi)
     return dpi if px <= limit_px else dpi * math.sqrt(limit_px / px)
+
+
+def render_page(page: Any, dpi: float, limit_px: int) -> Any:
+    """The page as a pixmap at `dpi`, or smaller so it stays within `limit_px` pixels."""
+    import pymupdf
+
+    zoom = safe_dpi(page, dpi, limit_px) / POINTS_PER_INCH
+    return page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom))
 
 
 def check_upload_pdf(pdf: Path | bytes, params: Any | None = None) -> int:

@@ -503,10 +503,10 @@ def drawing_page(d: Path, data_dir: Path, page: int) -> Path:
     if not 0 <= page < min(doc.page_count, MAX_PAGES):
         raise HTTPException(404, "no such page")
     cache.mkdir(exist_ok=True)
-    from coverengine.safeimage import max_pixels, safe_dpi
+    from coverengine.safeimage import max_pixels, render_page
 
     p = doc[page]  # never more pixels than limits.image_max_mp (ADR-123)
-    p.get_pixmap(dpi=safe_dpi(p, PAGE_DPI, max_pixels())).save(out)
+    render_page(p, PAGE_DPI, max_pixels()).save(out)
     return out
 
 
