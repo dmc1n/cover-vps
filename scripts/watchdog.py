@@ -31,7 +31,7 @@ STATE = DATA / "watchdog.json"
 LOG = DATA / "alerts.log"
 PUBLIC_HOST = "covers.suns.nu"
 ALERT_TO = "rick@s2dio.industries"
-DISK_FREE_MIN = 0.15  # share of the disk
+DISK_FREE_MIN = 0.25  # share of the disk; warn early (2026-10-12: the backups filled it)
 CERT_DAYS_MIN = 14
 BACKUP_HOURS_MAX = 26
 REBOOT_DAYS_MAX = 7
@@ -106,6 +106,8 @@ def checks() -> dict[str, str]:
     age = (time.time() - last.stat().st_mtime) / 3600 if last.is_file() else 1e9
     if age > BACKUP_HOURS_MAX:
         bad["backup"] = f"the last backup is {age:.0f} hours old"
+    elif "FAILED" in last.read_text(encoding="utf-8", errors="replace"):
+        bad["backup"] = "the last backup failed: " + last.read_text(encoding="utf-8").strip()
     failed = subprocess.run(
         ["systemctl", "--failed", "--no-legend", "--plain"], capture_output=True, text=True
     ).stdout.split()
