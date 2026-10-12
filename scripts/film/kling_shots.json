@@ -1,5 +1,5 @@
 {
-  "about": "Kling shots for the website (ADR-124, docs/plans/kling-shots.md). Frames from kling_frames.py; {aspect} is 4x5 or 16x9.",
+  "about": "Kling shots for the website (ADR-125, docs/plans/kling-shots.md). Frames from kling_frames.py; {aspect} is 4x5 or 16x9.",
   "frames_dir": "~/opt/film2/kling/final",
   "defaults": {
     "model": "kling-3.0",
@@ -20,7 +20,7 @@
       "media_key": "fit",
       "first": "fit-mid-{aspect}.png",
       "last": "fit-end-{aspect}.png",
-      "prompt": "A sand-coloured canvas cover, half lowered over an outdoor sofa, slides down the rest of the way and settles, the fabric relaxing into soft folds, the hem coming to rest just above the stone terrace. Slow steady push-in. Low warm late-afternoon sun. Realistic cloth physics, calm.",
+      "prompt": "A sand-coloured canvas cover that has just been pulled over an outdoor sofa slides the last few centimetres down and settles, the fabric relaxing into soft folds, the hem coming to rest just above the stone terrace. Slow steady push-in. Low warm late-afternoon sun. Realistic cloth physics, calm.",
       "check": "the second try for fit if the first invents hands: the cover only falls and settles; same checks as fit"
     },
     "rain": {

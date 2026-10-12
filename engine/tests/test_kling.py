@@ -1,4 +1,4 @@
-"""scripts/film/kling.py with a mocked HTTP layer: no real calls, nothing paid (ADR-124)."""
+"""scripts/film/kling.py with a mocked HTTP layer: no real calls, nothing paid (ADR-125)."""
 
 import base64
 import hashlib

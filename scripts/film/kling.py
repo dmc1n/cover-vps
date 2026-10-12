@@ -1,4 +1,4 @@
-"""The website's clips from our own stills with Kling image-to-video (ADR-124).
+"""The website's clips from our own stills with Kling image-to-video (ADR-125).
 
 Our Blender frames (kling_frames.py) decide the cover, its colour and the light; Kling only
 adds the motion: the cover settling, the rain running off, a slow camera. One shot a call or a

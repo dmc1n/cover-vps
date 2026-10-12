@@ -1,4 +1,4 @@
-"""Start and end frames for Kling image-to-video (ADR-124, docs/plans/kling-shots.md).
+"""Start and end frames for Kling image-to-video (ADR-125, docs/plans/kling-shots.md).
 
 Kling turns one still (and, for a transition, a last still) into a 5 s clip. The still decides
 almost everything: the cover's shape, its colour, the light. So these are single pictures, made
@@ -11,13 +11,15 @@ more samples, and a closer fabric:
   length (solution-dyed acrylic reads slightly heathered), a soft mottle and fine creases on top
   of the scanned weave; a matt roughness with the sheen of acrylic;
 - **the double stitching standing up**: the thread rows of seams.png get their own relief and
-  a slightly glossier thread, so they read as stitches, not as a printed line.
+  a slightly glossier thread in the close-ups, so they read as stitches, not as a printed line
+  (from further away the raised dashes alias into a serrated edge, so the wide shots keep the
+  film's flat thread).
 
 Shots (each at 16:9 1920 × 1080 and 4:5 1080 × 1350; ``--aspects`` picks):
 
-- ``fit``: the bare sofa on the terrace (``fit-start``), the cover half lowered by its ridge
+- ``fit``: the bare sofa on the terrace (``fit-start``), the cover still settling
   (``fit-mid``, the cloth solver's fall.npz) and the cover settled (``fit-end``), one camera;
-- ``rain``: overcast, wet stone, the coating beading, drops on the run paths of our rain check;
+- ``rain``: the moment the rain starts: overcast, wet stone, the coating beading (Kling rains);
 - ``villa``: a whitewashed terrace on Ibiza at golden hour, the Kota sofa and the Sato lounger
   under their covers, the sea to the horizon (``--more sato=DIR``);
 - ``cut``: the cutting head on the sand fabric, its kerf behind it, the pen lines beside it;
@@ -186,7 +188,7 @@ def canvas(m: bpy.types.Material, close: bool = False) -> bpy.types.Material:
             and n.inputs["Color"].links
             and n.inputs["Color"].links[0].from_node.bl_idname == "ShaderNodeTexImage"
             and "seams" in (n.inputs["Color"].links[0].from_node.image.name or "")]  # fmt: skip
-    if seps:
+    if seps and close:  # from further away the raised dashes alias into a serrated edge
         thread = seps[0].outputs["Green"]
         # render_reel.fabric scales the thread by `stitched`; follow it when present
         for lk in thread.links:
@@ -297,34 +299,27 @@ def shot_fit(a, d, reel) -> list[State]:
 
 
 def shot_rain(a, d, reel) -> list[State]:
+    """The moment the rain starts: overcast, the stone wet, the coating beading. No drops on
+    the run paths and no streaks: baked into a still they read as white rivets and grey marks,
+    and Kling makes the rain run better than a still can show it."""
     sky, sun, stone = rr.terrace_scene(a)
     sc = bpy.context.scene
     rr.mood(sky, sun, sc, "rain")
     sc.view_settings.exposure = 0.15
     mat = fabric(a, d)
     cov = rr.lean(rh.cover(d, mat))
-    final = rr.draped(d)
-    rr.set_points(cov, final)
-    normals = np.zeros(len(final) * 3)
-    cov.data.vertices.foreach_get("normal", normals)
-    run = rr.Runs(d, d["frames"][-1].astype(float), normals.reshape(-1, 3)[d["weld"]])
-    _, runners = rr.rain_parts()
-    stream = cov.data.attributes["stream"]
+    rr.set_points(cov, rr.draped(d))
     stone.node_tree.nodes["wet"].outputs[0].default_value = 0.9
     rr.set_value(mat, "wet", 1.0)
 
-    def wet():
-        where, sizes, dirs, w = run.at(5.0)
-        rh.set_runners(runners, where, sizes, dirs)
-        ws = np.zeros(len(final))
-        np.maximum.at(ws, d["weld"], w)
-        stream.data.foreach_set("value", ws.astype(np.float32))
+    def nothing():
+        pass
 
     views = {
         "16x9": (38, (2.35, -3.25, 0.95), (0.05, -0.2, 0.4), 0.0, 0.0, 5.0),
-        "4x5": (25, (2.35, -3.25, 0.95), (0.0, -0.15, 0.42), 0.0, 0.0, 5.0),
+        "4x5": (30, (2.4, -3.35, 0.85), (0.0, -0.15, 0.2), 0.0, 0.0, 5.0),
     }
-    return [("start", wet, views)]
+    return [("start", nothing, views)]
 
 
 VILLA_SUN = (8.0, 282.0)  # elevation, azimuth: low from the left, raking across the covers
@@ -334,7 +329,7 @@ def villa_scene(a):
     """render_reel's Ibiza terrace in a warmer, clearer golden hour and a deeper sea."""
     rr.ibiza_scene(a)
     sc = bpy.context.scene
-    sc.view_settings.exposure = -0.1
+    sc.view_settings.exposure = -0.3  # the sand stays sand in the low sun, not cream
     w = sc.world.node_tree
     sky = next(n for n in w.nodes if n.bl_idname == "ShaderNodeTexSky")
     sky.sun_elevation = math.radians(VILLA_SUN[0])

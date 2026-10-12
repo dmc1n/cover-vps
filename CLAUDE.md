@@ -241,9 +241,9 @@ uv run python scripts/film/reel_data.py DATA MODEL_DIR   the roll nest, vents an
 scripts/film/blender.sh -P scripts/film/render_reel.py -- --shot st1..st6|cut|sew|vent|fit|runoff|range|ibiza --data DATA --assets DIR --out DIR
                                              the scroll story's chapters and the website's clips (ADR-121)
 scripts/film/blender.sh -P scripts/film/kling_frames.py -- --shot fit|rain|villa|cut|sew|vent --data DATA --assets DIR --out DIR
-                                             the start/end stills for Kling, 16:9 and 4:5, woven canvas (ADR-124)
+                                             the start/end stills for Kling, 16:9 and 4:5, woven canvas (ADR-125)
 uv run python scripts/film/kling.py submit SHOT | run --shots a,b | status | fetch | cost [--dry-run] [--budget-eur 50]
-                                             the website's clips by Kling from those stills; ledger, cap (ADR-124,
+                                             the website's clips by Kling from those stills; ledger, cap (ADR-125,
                                              docs/plans/kling-shots.md; key KLING_API_KEY or KLING_ACCESS/SECRET_KEY)
 uv run python scripts/film/story_frames.py OUT --name storyN --chapters DIR | --base SET --replace DIR   the story's WEBP sets (ADR-121)
 make e2e        the web app flow in a real browser (Playwright in Docker)

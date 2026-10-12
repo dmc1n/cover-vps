@@ -4239,7 +4239,9 @@ takes whole numbers only, so a page rendered smaller goes through a scaling matr
 Better, later: a per-route limit table that FastAPI derives from the routes themselves; Caddy
 2.8's log `mode`; Mollie's own webhook signature once Mollie offers it for payments.
 
-## ADR-124 — The website's clips by Kling image-to-video, from our own stills
+## ADR-125 — The website's clips by Kling image-to-video, from our own stills
+
+(Numbered 125: 124 is the studio's look on main, 12 Oct.)
 
 The owner (12 October 2026): our Blender animations on the website are far from realistic;
 redo them with Kling. This reverses ADR-108's "no generated video" for the clips, on one
