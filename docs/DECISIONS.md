@@ -4164,3 +4164,5 @@ safety copies (cover-data/backup-*), and 14 were kept; the backup of 12 Oct fail
 `scripts/backup.sh` leaves out backup-* and logs (4.2 GB), keeps 5, writes to a .partial file,
 first frees room for the new archive plus 20 GB (never removing the newest 2) or stops and writes
 FAILED in last_backup.txt; the watchdog mails a failed backup and warns at 25 % free disk.
+`scripts/housekeeping.sh` (cron 03:30) removes safety copies older than 14 days and release folders
+beyond the newest 8 (never the current one).

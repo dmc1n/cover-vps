@@ -290,7 +290,7 @@ cover-site "<what should change>" | --publish | --discard | --history | --transl
 scripts/release.sh v1.2.3 "what is new"     test, tag, build ~/releases/v1.2.3 and switch the app to it (ADR-053)
 scripts/rollback.sh [v1.2.3 | --list]       back to the release before (or a chosen one) in seconds
 sudo systemctl restart cover-web            the app as a service (runs ~/releases/current); Caddy serves https://covers.suns.nu
-make backup     push the data directory to R2 with rclone
+make backup     the data directory to ~/backups (5 kept, room checked first; R2 when set); scripts/housekeeping.sh daily (safety copies > 14 days, releases beyond 8)
 cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build
 cd apps/site && npm test | npm run check     the Worker's tests (security headers, no studio routes) and typecheck (ADR-103)
 ```
