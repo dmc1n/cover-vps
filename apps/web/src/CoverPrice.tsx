@@ -256,7 +256,14 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
           <a href="#/settings/publish">all changes, versions</a>
         </section>
       )}
-      {msg && <p className="muted">{msg}</p>}
+      {msg && !msg.includes("draft changed") && <p className="muted">{msg}</p>}
+      {msg.includes("draft changed") && (
+        <p className="error">
+          The draft changed after this page loaded it (someone else set a price
+          or imported a list); nothing was saved or published.{" "}
+          <button onClick={load}>Load the newer draft</button>
+        </p>
+      )}
       <section className="card" data-testid="cover-prices">
         <h3>Prices</h3>
         {!c.calculated && (
@@ -375,6 +382,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                                 id,
                                 k,
                                 Number(typed[k]),
+                                c.draft?.time ?? null,
                               );
                               load();
                               return r.errors.length
@@ -392,7 +400,12 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                             title="The calculated price applies again (in the draft)"
                             onClick={() =>
                               run(async () => {
-                                await prices.setFixed(id, k, null);
+                                await prices.setFixed(
+                                  id,
+                                  k,
+                                  null,
+                                  c.draft?.time ?? null,
+                                );
                                 load();
                                 return `${k.toUpperCase()} fixed price removed in the draft: the calculated price applies once published.`;
                               })

@@ -202,7 +202,8 @@ export function Prices({
     setErrors(r.errors);
     setDirty(false);
     setState({ ...state, draft: r.draft, draft_errors: r.errors });
-    return r.errors;
+    // the draft this page wrote: Publish publishes exactly this one (never a newer one)
+    return { errors: r.errors, time: r.draft?.time ?? null };
   };
   const pub = state.published;
   const shownErrors = dirty && check ? check.errors : errors;
@@ -269,7 +270,7 @@ export function Prices({
             <div className="row">
               <button
                 disabled={busy || !dirty}
-                onClick={() => run(async () => void (await saveDraft()))}
+                onClick={() => run(async () => void (await saveDraft()).errors)}
               >
                 Save draft
               </button>
@@ -296,14 +297,13 @@ export function Prices({
                 disabled={busy || (!dirty && !state.draft)}
                 onClick={() =>
                   run(async () => {
+                    let since = state.draft?.time ?? null;
                     if (dirty) {
-                      const errs = await saveDraft();
-                      if (errs.length) return;
+                      const saved = await saveDraft();
+                      if (saved.errors.length) return;
+                      since = saved.time;
                     }
-                    const since = dirty
-                      ? (await prices.state()).draft?.time
-                      : state.draft?.time;
-                    const r = await prices.publish(note, since ?? null);
+                    const r = await prices.publish(note, since);
                     setNote("");
                     setMoves(null);
                     load();
@@ -396,7 +396,9 @@ export function Prices({
         )}
         {sub === "publish" && edit && (
           <PriceImport
-            beforeApply={async () => !dirty || (await saveDraft()).length === 0}
+            beforeApply={async () =>
+              !dirty || (await saveDraft()).errors.length === 0
+            }
             onApplied={(m) => {
               load();
               setMoves(null);

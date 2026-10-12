@@ -1208,10 +1208,18 @@ export const prices = {
       json<CoverPrices>(r),
     ),
   /** one fixed price in the draft (null removes it); never publishes */
-  setFixed: (model: string, channel: string, price: number | null) =>
-    send("PUT", "/api/prices/draft/fixed", { model, channel, price }).then(
-      (r) => json<{ draft: PricesState["draft"]; errors: string[] }>(r),
-    ),
+  setFixed: (
+    model: string,
+    channel: string,
+    price: number | null,
+    since: number | null,
+  ) =>
+    send("PUT", "/api/prices/draft/fixed", {
+      model,
+      channel,
+      price,
+      since,
+    }).then((r) => json<{ draft: PricesState["draft"]; errors: string[] }>(r)),
   /** every calculated cover's cost and prices: All covers' price columns */
   list: (set: "current" | "draft") =>
     fetch(`/api/prices/list?set=${set}`).then((r) =>
