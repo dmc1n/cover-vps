@@ -4319,3 +4319,43 @@ and applied as before (step 4 waits for 93).
 
 Better, later: a workshop login with its own right (question 92); the Workshop's fit history per
 revision; server-side search when the lists grow past a few thousand.
+
+## ADR-125 — The website's clips by Kling image-to-video, from our own stills
+
+(Numbered 125: 124 is the studio's look on main, 12 Oct.)
+
+The owner (12 October 2026): our Blender animations on the website are far from realistic;
+redo them with Kling. This reverses ADR-108's "no generated video" for the clips, on one
+condition that keeps ADR-108's reason: every clip starts from **our own still** (and, for a
+transition, ends on one), so the cover's shape, its sand colour and its stitching are ours; Kling
+adds only the motion. Plan, prompts and checks: docs/plans/kling-shots.md.
+
+- **The stills** (`scripts/film/kling_frames.py`, Blender 4.2 Cycles on the CPU through
+  `blender.sh`, nice 19, one at a time): the start film's and the reel's scene parts, 160
+  adaptive samples (5× the films'; 384 took 40 minutes a picture here, too long for one night),
+  16:9 1920 × 1080 and 4:5 1080 × 1350. The fabric is closer to the canvas: a
+  procedural plain weave at the real yarn pitch (0.7 mm) in each piece's flat UV, heathered yarns,
+  a soft mottle and fine creases, a matt roughness; the thread rows of seams.png get their own
+  relief and a glossier thread. The villa's sun is low from the left (it was behind, the covers
+  in shade), the island smaller, the sea deeper; the Sato lounger shows its designed surface
+  (its drape sags into the seat, against domain rule 12). The cutter's head hangs from a
+  carriage on a beam, as on the machine, instead of floating.
+- **The client** (`scripts/film/kling.py`): `submit`, `status`, `fetch`, `run --shots`, `cost`;
+  `--dry-run` prints the request with the key masked. Kling's current API (path-versioned,
+  `/image-to-video/kling-3.0`, `/tasks`) takes only an API key and has no negative prompt or
+  mode field: the negative words go into the prompt as "Avoid: …", the mode is the resolution.
+  The AK/SK JWT (HS256, 30 min) works only with the legacy API (`/v1/videos/image2video`,
+  `model_name`, `image_tail`, `negative_prompt`), which the script also speaks. Default
+  kling-3.0 at 1080p, 5 s, no audio: 4 units, $0.56, ~€0.53 a clip.
+- **Money**: every submit is written to `out/kling/ledger.jsonl` and the studio's AI ledger
+  (spend.py) before it is sent; a submit whose estimate would pass `--budget-eur` (default 50)
+  is refused before anything goes out; a bill in Kling's answer replaces the estimate. The
+  conversion errs high ($1 = €0.95).
+- **Tests** (`engine/tests/test_kling.py`): a fake HTTP layer only; the JWT, the request
+  shapes of both APIs, the budget refusal, a run polling to the download and the bill, no key in
+  any output, and the shot file's prompts equal to the plan's.
+- **To the site**: frames at 24 fps → `hero_encode.py` (AV1 + H.264, poster) under new names
+  (`work-<key>-2`, `villa-ibiza2`) beside the old ones → the preview's `story_media` only; live
+  with a release and the owner's go.
+- **Rejected**: text-to-video (not our cover); Kling's 3.0 Turbo (no last frame); paying for
+  4K (the cards are 720 × 900).

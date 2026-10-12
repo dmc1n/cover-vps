@@ -1,0 +1,58 @@
+{
+  "about": "Kling shots for the website (ADR-125, docs/plans/kling-shots.md). Frames from kling_frames.py; {aspect} is 4x5 or 16x9.",
+  "frames_dir": "~/opt/film2/kling/final",
+  "defaults": {
+    "model": "kling-3.0",
+    "mode": "pro",
+    "duration": 5,
+    "aspect": "4x5",
+    "negative": "hands, fingers, people, text, letters, numbers, logos, labels, watermark, extra seams, new stitching, zips, buttons, warping or bending furniture, morphing shapes, melting fabric, colour change, flicker, camera shake, fast motion, cuts"
+  },
+  "shots": {
+    "fit": {
+      "media_key": "fit",
+      "first": "fit-start-{aspect}.png",
+      "last": "fit-end-{aspect}.png",
+      "prompt": "A sand-coloured canvas cover drops gently from above onto an outdoor sofa on a stone terrace and settles over it, the fabric sliding over the back and arms and coming to rest with its hem just above the stone. Slow steady push-in, camera otherwise still. Low warm late-afternoon sun, soft shadows. Realistic cloth physics, calm.",
+      "check": "the cover arrives from above (no hands, nobody holding it), ends exactly as the last frame, the sofa does not change shape, no extra seams"
+    },
+    "fit-b": {
+      "media_key": "fit",
+      "first": "fit-mid-{aspect}.png",
+      "last": "fit-end-{aspect}.png",
+      "prompt": "A sand-coloured canvas cover that has just been pulled over an outdoor sofa slides the last few centimetres down and settles, the fabric relaxing into soft folds, the hem coming to rest just above the stone terrace. Slow steady push-in. Low warm late-afternoon sun. Realistic cloth physics, calm.",
+      "check": "the second try for fit if the first invents hands: the cover only falls and settles; same checks as fit"
+    },
+    "rain": {
+      "media_key": "runoff",
+      "first": "rain-start-{aspect}.png",
+      "prompt": "Steady rain falls on a sand-coloured canvas cover over an outdoor sofa on a stone terrace. Raindrops bead on the coated fabric and run down its slopes in thin streams, gather at the hem and drip onto the wet stone, where small splashes form. Grey overcast light, very slow push-in, camera otherwise still. Calm and realistic.",
+      "check": "water runs downhill and off the cover (never pooling on top, never soaking dark), the drops fall straight, the fabric stays sand and dry-looking under the beads, no puddles on the cover"
+    },
+    "villa": {
+      "media_key": "villa",
+      "aspect": "16x9",
+      "first": "villa-start-{aspect}.png",
+      "prompt": "Golden hour on a whitewashed villa terrace on Ibiza above a calm sea. An outdoor sofa and a sun lounger stand under fitted sand-coloured canvas covers. The camera dollies slowly sideways to the right. A light sea breeze moves the leaves of the plants and barely stirs the fabric; sunlight glitters on the water; the warm low sun throws long soft shadows across the terracotta tiles.",
+      "check": "both covers keep their shape and colour, the horizon stays level, the island stays put, no people, the motion is slow enough to loop with a dissolve"
+    },
+    "cut": {
+      "media_key": "cut",
+      "first": "cut-start-{aspect}.png",
+      "prompt": "Close-up of an automatic cutting table in a workshop: the steel cutting head glides slowly and steadily along a straight line over sand-coloured canvas, its blade leaving a clean thin cut behind it. The drawn pen lines on the fabric stay still. Soft even workshop light, the camera follows the head very slightly.",
+      "check": "the head moves along the line at an even speed and the cut grows behind it, the fabric does not ripple or change colour, the pen labels do not change or turn into new text"
+    },
+    "sew": {
+      "media_key": "sew",
+      "first": "sew-start-{aspect}.png",
+      "prompt": "Macro close-up of a double-stitched seam on a sand-coloured canvas outdoor furniture cover: two parallel rows of even stitches run along the corner. The camera glides slowly along the seam; warm sunlight moves gently across the woven texture. Shallow depth of field, calm.",
+      "check": "exactly two rows of stitches stay two rows (no third row, no zig-zag), the stitch length stays even, the weave stays fine"
+    },
+    "vent": {
+      "media_key": "vent",
+      "first": "vent-start-{aspect}.png",
+      "prompt": "Close-up of an air vent on a sand-coloured canvas furniture cover: a small fabric hood held open by a grey plastic insert, a dark mesh membrane behind it. A light breeze makes the hood tremble very slightly; the camera slowly arcs a little to the side. Warm sunlight, soft shadows, calm.",
+      "check": "the hood stays one hood with its insert, the membrane stays dark mesh behind it, nothing opens or tears, the cover around it stays smooth"
+    }
+  }
+}
