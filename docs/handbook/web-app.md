@@ -19,7 +19,7 @@ then **http://localhost:8080** in the browser (see [server.md](server.md)).
 
 ## The pages, along the map
 
-The five sections and their pages, with who sees what, the search, the theme button and every
+The four sections and their pages, with who sees what, the search, the theme button and every
 address: [navigation.md](navigation.md). In short:
 
 - **Work → Desk**: approve or reject covers and arrangements ([desk.md](desk.md)).
@@ -33,10 +33,10 @@ address: [navigation.md](navigation.md). In short:
 - **Covers → New cover**: the three uploads (below).
 - **Covers → Learning**: your reference pairs and their results ([learning.md](learning.md)).
 - **Covers → Product list**: the workshop's product list ([desk.md](desk.md)).
-- **Shop**: orders, requests, matches, business customers, the website, the photo test
+- **Shop**: orders, requests (and matches), business customers, the website
   ([admin.md](admin.md), [webshop.md](webshop.md), [b2b.md](b2b.md)).
-- **Prices**: purchase prices, labour, price lists and costing ([prices.md](prices.md)).
-- **Settings** (admins): everything that is set once ([admin.md](admin.md)).
+- **Settings** (admins; editors see Prices & costs): everything that is set once, the prices
+  and costs among them ([admin.md](admin.md), [prices.md](prices.md)).
 
 ## Covers → New cover
 
@@ -71,7 +71,8 @@ Desk status, the approval of the definitive drawing, a lock when the DXF waits f
 and "N changes since the run before". The buttons **Run again**, **Edit details** (category,
 family, status, tags, notes; see [catalogue.md](catalogue.md)) and **Desk card ↗**. Above the
 tabs stay the approval of the definitive drawing ([admin.md](admin.md)), a running job, a
-rejection at the Desk and today's warnings.
+rejection at the Desk and today's warnings. Under the head one summary row: the Desk, the fit,
+the workshop (revision to cut, files) and the open questions about this cover (ADR-126).
 
 **The seven tabs:**
 
@@ -88,6 +89,7 @@ rejection at the Desk and today's warnings.
   - **Flat patterns:** the flat pieces and the stretch picture, with a table per piece
     ([patterns.md](patterns.md)).
   - **Size drawing:** `sizes.pdf`, with your reference cover's sizes where there is one.
+  - **Files:** every file to download (a tab of its own until ADR-126).
 - **Seams:** the seam editor. **Let the program add seams**: the program takes its own
   proposals round by round while the worst stretch goes down, and keeps them in
   `proposals.json`, apart from your seams. Delete that file (or use "Use automatic seams") to
@@ -111,7 +113,10 @@ rejection at the Desk and today's warnings.
     by more than 1 mm ("since the run before");
   - **Revisions:** every saved cut; pick two to see what changed ([catalogue.md](catalogue.md));
   - **Warnings and log:** what the program reported.
-- **Files:** every file to download.
+- **Price & shop:** this cover's cost line by line, its B2C and B2B price, margin and where
+  each comes from, its fixed price (admins change it in the draft and can publish from here),
+  whether the shop offers it as an existing cover, its B2B companies, orders, quotes and match
+  requests ([prices.md](prices.md)). Editors look; viewers see no prices.
 
 ## The drape simulation (3D view)
 

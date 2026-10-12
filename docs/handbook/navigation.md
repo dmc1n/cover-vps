@@ -1,6 +1,6 @@
 # Finding your way in the studio
 
-The studio has **five sections** in the dark bar at the top (ADR-122, ADR-124). Each has its
+The studio has **four sections** in the dark bar at the top (ADR-122, ADR-124, ADR-126). Each has its
 own pages in the light bar under it (the sub-menu). Every page, every tab of a cover and every
 tab of a Desk card has its own address. So a link in a mail, a bookmark or this handbook opens
 exactly that page, and the browser's Back button goes back one tab.
@@ -12,11 +12,15 @@ The index of the whole handbook, in the same order: [README.md](README.md).
 ```
 Work        Desk · Questions · Workshop
 Covers      All covers · Arrangements · New cover | Learning · Product list
-Shop        Orders · Requests · Matches · B2B customers | Website (AI) | Tools: Photo test
-Prices      Materials · Labour · Exchange rate · Channels & price lists · Import (Excel) | Costing · Versions
-Settings    one page with vertical tabs (admins)
+Shop        Orders · Requests · B2B customers | Website (AI)
+Settings    one page with vertical tabs (admins; editors: the three Prices & costs tabs)
 Right side  Search (everything) · Guide · theme button · your name (My account) · Log out
 ```
+
+**One cover, one page** (ADR-126): everything about one cover — its cost, prices, fixed price,
+place in the shop, B2B prices, orders, its Desk status, fit and questions — is on that cover's
+page. The general settings (prices and costs too) are in Settings. Nothing about one cover is
+repeated elsewhere; lists (All covers, Orders, Requests) link to it.
 
 A number beside **Work** and **Questions** counts the open questions; it is red when one waits
 for you.
@@ -62,9 +66,11 @@ for you.
 | Covers: All covers, Arrangements, Learning | yes | yes | yes |
 | Covers: New cover, Product list | – | yes | yes |
 | Shop: Website (AI) | – | draft and preview | also publish |
-| Shop: Orders, Requests, Matches, B2B customers, Photo test | – | – | yes |
-| Prices | – | look | change and publish; Import (Excel) |
-| Settings | – | – | yes |
+| Shop: Orders, Requests, B2B customers | – | – | yes |
+| A cover's Price & shop tab | – (a note) | look (no orders, no B2B) | everything; set a fixed price in the draft, publish |
+| All covers with prices | – | yes | yes |
+| Settings → Prices & costs (Costs, Price rules, Publish & versions) | – | look | change and publish; Import (Excel) |
+| Settings, every other tab (Photo test inside AI & spending) | – | – | yes |
 
 A page that is not for your account says so ("Not for your account"). The server checks the
 same rights on every action, whatever the menu shows. A separate login or right for the
@@ -79,7 +85,7 @@ button per view. There are four kinds of page:
 - **a list with a filter row** (All covers, Workshop, Orders, …);
 - **a queue with the detail beside it** (Desk, Questions);
 - **an object page** (a cover);
-- **a settings form** (Settings, Prices).
+- **a settings form** (Settings).
 
 ## The pages
 
@@ -109,8 +115,10 @@ button per view. There are four kinds of page:
 ### Covers
 
 - **All covers** (`#/covers/all`): every model and its cover, as a **Table** or as **Cards**
-  (`#/covers/all?view=cards`). One filter row for both views, selection and the batch bar. See
-  [catalogue.md](catalogue.md).
+  (`#/covers/all?view=cards`). One filter row for both views, selection and the batch bar. In
+  the Table, **Prices: live / draft** (editors and admins) adds cost, B2C, B2B, margin and
+  source per cover (`?prices=live`); a price opens the cover's Price & shop tab. See
+  [catalogue.md](catalogue.md) and [prices.md](prices.md).
 - **Arrangements** (`#/covers/arrangements[/<arr-id>]`): furniture placed together under one
   cover, with *Send to the Desk* ([arrangements.md](arrangements.md)).
 - **New cover** (`#/covers/new`): three uploads on one page: a 3D file, a drawing (PDF), and
@@ -124,7 +132,10 @@ button per view. There are four kinds of page:
 
 At the top: the picture, the name and sizes, a strip with the cover's grade, its status, its
 Desk status (a link to its card), the approval of the definitive drawing, a lock when the DXF
-waits for the Desk's approval, and "N changes since the run before". The buttons **Run again**,
+waits for the Desk's approval, and "N changes since the run before". Under it **one summary
+row**: the Desk (status, who approved, produced), the **fit** (fits / does not fit, sizes
+measured, the largest difference), the **workshop** (pieces, vents, the revision to cut, files,
+DXF lock) and the **open questions** about this cover (links). The buttons **Run again**,
 **Edit details** (category, family, status, tags, notes) and **Desk card ↗**. Under it the
 approval of the definitive drawing (Approve / Ask for approval / Withdraw, the approved PDFs),
 a running job, a rejection at the Desk and today's warnings: these stay above the tabs.
@@ -134,12 +145,12 @@ Seven tabs; the older tabs are one click away inside them, each with its own add
 | tab | inside | was |
 |---|---|---|
 | **3D** (`/3d`) | the 3D view | 3D |
-| **Pieces** (`/pieces/cut`, `/flat`, `/sizes`) | Cut pieces (DXF, cutting list, check list), Flat patterns, Size drawing | Cut pieces, Patterns, Size drawing |
+| **Pieces** (`/pieces/cut`, `/flat`, `/sizes`, `/files`) | Cut pieces (DXF, cutting list, check list), Flat patterns, Size drawing, Files (every file to download) | Cut pieces, Patterns, Size drawing, Files (a tab of its own until ADR-126) |
 | **Seams** (`/seams`) | the seam editor | Seams |
 | **Adjust** (`/adjust`) | this cover's own settings | Settings |
 | **Compare** (`/compare/drawing`, `/reference`, `/ai`) | Your drawing, Your reference, AI advice | the same three tabs |
 | **History** (`/history/changes`, `/revisions`, `/log`) | Approval & changes (since the run before), Revisions, Warnings and log | Revisions, Warnings and log, the "Since the run before" card |
-| **Files** (`/files`) | every file to download | Downloads |
+| **Price & shop** (`/price`) | its cost, prices per channel (live and draft), fixed price, margin; the shop; B2B prices; orders, quotes, match requests ([prices.md](prices.md)) | Prices → Costing, the fixed-price list, parts of Orders, Matches and B2B customers |
 
 Another cover always opens on the tab in its own address. More: [web-app.md](web-app.md).
 
@@ -153,19 +164,15 @@ browser.
 
 ### Shop (admins; editors: Website (AI) only)
 
-**Orders** (one order: `#/shop/orders/<n>`), **Requests** (quotes asked in the configurator),
-**Matches**, **B2B customers**, **Website (AI)**, and under *Tools* the **Photo test**. See
-[admin.md](admin.md), [webshop.md](webshop.md) and [b2b.md](b2b.md).
+Only what is about the shop as a whole: **Orders** (one order: `#/shop/orders/<n>`),
+**Requests** (which existing cover fits a customer's sizes, the learning mode, and the quotes
+asked in the configurator, on one page), **B2B customers**, **Website (AI)**. A cover's own
+orders, quotes and requests are also on its Price & shop tab. See [admin.md](admin.md),
+[webshop.md](webshop.md) and [b2b.md](b2b.md).
 
-### Prices (`#/prices/<tab>`)
+### Settings (`#/settings/<tab>`, admins; editors see Prices & costs)
 
-The tabs are the sub-menu: Materials, Labour, Exchange rate, Channels & price lists, Import
-(Excel), then Costing and Versions. Moving between the tabs keeps what you typed; leaving
-Prices with unsaved numbers asks first. See [prices.md](prices.md).
-
-### Settings (`#/settings/<tab>`, admins)
-
-One page with vertical tabs in four groups (a row of tabs on a tablet). Every setting is one
+One page with vertical tabs in five groups (a row of tabs on a tablet). Every setting is one
 row: a plain name (its stored key small and grey), the control, one line of explanation and
 where the value comes from — **default X**, **changed · default X**, **empty**, or for
 matching **uses the company default: 90** when the field is empty. **Only changed values**
@@ -175,18 +182,18 @@ unsaved changes asks first.
 | group | tab | what |
 |---|---|---|
 | Business | **Company & shop** | the company, the shop (domain, languages, colours, barbecues, logo, share picture, delivery promise), support products, shipping per country (a table), *advanced:* film and story |
-| | **B2B terms** | minimum order, shipping, payment days, into production at once |
-| | **Matching** | mode (learning / automatic), the thresholds with the value that applies, stock discount; how a match is scored (read-only) |
+| | **Selling** | matching: mode (learning / automatic), the thresholds with the value that applies, the direct-order (stock) discount; how a match is scored (read-only); the **B2B terms**: minimum order, shipping, payment days, into production at once |
+| Prices & costs | **Costs** | materials, labour and the exchange rate on one page ([prices.md](prices.md)) |
+| | **Price rules** | per channel: extra costs, markup or margin, rounding, VAT; the balloon's and frame's fixed prices; a configurator product's costing |
+| | **Publish & versions** | the draft, preview, publish, discard; the versions with roll back; Import a price list (Excel) |
 | People & work | **Users & rights** | the users, roles, *may approve*, invitations |
-| | **Desk & approval** | `desk.*`, `questions.*`, `products.*` (read-only: the developer changes them) |
-| | **Cover defaults** | construction, stitching, welding, hem, vents and features, seams (read-only) |
+| | **Rules & defaults** | *Desk & approval* (`desk.*`, `questions.*`, `products.*`) and *Cover defaults* (construction, stitching, welding, hem, vents and features, seams), read-only: the developer changes them |
 | Connections | **Mail & notifications** | who gets which mail in one list (requests, alerts and B2B, new orders, the fit question, approval requests, the question digests, AI spending warnings), the mail server, the login code, the public address |
 | | **Website & API keys** | the website's key, the shop on this server only for the website, the scroll story, payment (Mollie key, masked; *Replace* to give a new one; bank transfer), the configurator in a webshop, API keys |
-| | **AI & spending** | this month's spend, the budget and limits, which AI does what, the photo suggestion limits (read-only) |
-| Server | **System** | release, engine, disk, backup, releases, the last alerts |
-| | **Logins & audit log** | who is logged in, every login, change and approval |
+| | **AI & spending** | this month's spend, the budget and limits, which AI does what, the photo suggestion limits (read-only); the **Photo test** (was Shop → Tools) |
+| Server | **System & logs** | release, engine, disk, backup, releases, the last alerts; who is logged in; the audit log |
 
-Desk & approval, Cover defaults and AI & spending show the company defaults read-only. Whether
+Rules & defaults and AI & spending show the company defaults read-only. Whether
 the owner will change some of them here himself is open owner question #93. More:
 [admin.md](admin.md).
 
@@ -204,14 +211,21 @@ Every old address still works and goes to its new place:
 | `#/catalogue` | `#/covers/all?view=cards` |
 | `#/arrangements[/<id>]` | `#/covers/arrangements[/<id>]` |
 | `#/learning` | `#/covers/learning` |
-| `#/prices` | `#/prices/materials` |
+| `#/prices`, `#/prices/materials`, `/labour`, `/rate` | `#/settings/costs` |
+| `#/prices/channels`, `#/prices/costing` | `#/settings/pricing` (a cover's costing: its Price & shop tab) |
+| `#/prices/import`, `#/prices/versions` | `#/settings/publish` |
+| `#/shop/matches` | `#/shop/requests` |
+| `#/shop/phototest` | `#/settings/ai` |
+| `#/settings/matching`, `#/settings/b2b` | `#/settings/selling` |
+| `#/settings/desk` | `#/settings/defaults` |
+| `#/settings/activity` | `#/settings/system` |
 | `#/website` | `#/shop/website` |
 | `#/admin` | `#/settings/users` |
-| `#/admin/<tab>` | orders, b2b, matches, phototest, website → Shop; webshop, requests → Shop → Requests; prices → Prices → Materials; shop → Settings → Company & shop; users, mail, system → Settings; sessions, audit → Settings → Logins & audit log |
-| `#/settings` | `#/settings/company` |
-| `#/work`, `#/covers`, `#/shop`, `#/prices` | the first page of that section you may see |
+| `#/admin/<tab>` | orders, b2b, website → Shop; webshop, requests, matches → Shop → Requests; phototest → Settings → AI & spending; prices → Settings → Costs; shop → Settings → Company & shop; users, mail, system → Settings; sessions, audit → Settings → System & logs |
+| `#/settings` | its first tab you may see (`#/settings/company`; an editor `#/settings/costs`) |
+| `#/work`, `#/covers`, `#/shop` | the first page of that section you may see |
 | `#/model/<cover>` | `#/model/<cover>/3d` |
-| `#/model/<cover>/<old tab>` | `/downloads` → `/files`, `/settings` → `/adjust`, `/patterns` → `/pieces/flat`, `/sizes` → `/pieces/sizes`, `/cut` → `/pieces/cut`, `/drawing`, `/reference`, `/ai` → `/compare/…`, `/revisions`, `/log` → `/history/…` |
+| `#/model/<cover>/<old tab>` | `/downloads`, `/files` → `/pieces/files`, `/settings` → `/adjust`, `/patterns` → `/pieces/flat`, `/sizes` → `/pieces/sizes`, `/cut` → `/pieces/cut`, `/drawing`, `/reference`, `/ai` → `/compare/…`, `/revisions`, `/log` → `/history/…` |
 | `#/guide`, `#/account`, `#/configure`, `#/welcome/…` | unchanged |
 
 The mails (approval requests, question digests, the arrangements' digest) link to the new
@@ -224,3 +238,7 @@ addresses.
 | `#/work/workshop` | Work → Workshop ([workshop.md](workshop.md)) |
 | `#/shop/orders/<n>` | Shop → Orders with order `<n>` highlighted (from the search) |
 | `#/covers/all?view=cards` | All covers as cards (the table: `#/covers/all`) |
+| `#/covers/all?prices=live` (or `=draft`, `=1`) | All covers with every cover's cost and prices (ADR-126) |
+| `#/model/<cover>/price` | the cover's Price & shop tab (ADR-126) |
+| `#/settings/costs`, `/pricing`, `/publish` | Settings → Prices & costs (ADR-126) |
+| `#/settings/selling`, `/defaults`, `/system` | the merged Settings tabs (ADR-126) |

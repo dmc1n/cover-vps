@@ -3,8 +3,20 @@
 // One filter row serves both views (search, category, cover grade, status, tag, sort), the
 // selection and the batch bar work in both, and the filters stay when the view changes.
 // New cover: the three uploads (a 3D file, a drawing, reference pairs) on one page.
+// Since ADR-126 the Table can show every cover's price (cost, B2C, B2B, margin, fixed or
+// calculated; live or draft): `?prices=live|draft` in the address; a price opens the cover's
+// Price & shop tab. Editors and admins (as the prices' API); there is no separate price page.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, fileUrl, ModelBrief, Step, STEP_LABEL, STEPS } from "./api";
+import {
+  api,
+  fileUrl,
+  ModelBrief,
+  PriceRow,
+  prices,
+  Step,
+  STEP_LABEL,
+  STEPS,
+} from "./api";
 import { BatchBar } from "./Catalogue";
 import { DrawingUpload } from "./DrawingUpload";
 import { FilterRow, Tpl } from "./layout";
@@ -12,7 +24,10 @@ import { ReferenceUpload } from "./Learning";
 import { modelHref } from "./nav";
 import { useSession } from "./Session";
 
-type Sort = "name" | "grade" | "stretch" | "size";
+type Sort = "name" | "grade" | "stretch" | "size" | "b2c" | "margin";
+type PriceCols = "" | "live" | "draft";
+const eur = (x: number) =>
+  `€ ${x.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const GRADE_ORDER = { ready: 0, check: 1, failed: 2 };
 
 const title = (id: string) =>
@@ -51,8 +66,40 @@ function passes(
   );
 }
 
-export function AllCovers({ cards }: { cards: boolean }) {
+export function AllCovers({
+  cards,
+  priceCols: colsIn = "",
+}: {
+  cards: boolean;
+  priceCols?: string;
+}) {
   const { user } = useSession();
+  const mayPrices = !!user && user.role !== "viewer";
+  const wanted = colsIn === "1" ? "live" : colsIn; // ?prices=1: the live prices
+  const priceCols: PriceCols =
+    mayPrices && !cards && (wanted === "live" || wanted === "draft")
+      ? wanted
+      : "";
+  const [rows, setRows] = useState<Record<string, PriceRow> | null>(null);
+  const [priceMsg, setPriceMsg] = useState("");
+  useEffect(() => {
+    if (!priceCols) return;
+    setRows(null);
+    prices
+      .list(priceCols === "draft" ? "draft" : "current")
+      .then((r) => {
+        setRows(r.rows);
+        setPriceMsg(
+          priceCols === "draft" && r.set !== "draft"
+            ? "There is no draft: the live prices are shown."
+            : "",
+        );
+      })
+      .catch((e) => setPriceMsg(String(e)));
+  }, [priceCols]);
+  const setCols = (v: PriceCols) => {
+    window.location.hash = v ? `#/covers/all?prices=${v}` : "#/covers/all";
+  };
   const [models, setModels] = useState<ModelBrief[] | null>(null);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
@@ -88,17 +135,23 @@ export function AllCovers({ cards }: { cards: boolean }) {
     );
     const vol = (m: ModelBrief) =>
       m.size_mm ? m.size_mm[0] * m.size_mm[1] * m.size_mm[2] : 0;
+    const price = (m: ModelBrief) => rows?.[m.id]?.b2c.shown ?? -1;
+    const margin = (m: ModelBrief) => rows?.[m.id]?.b2c.margin_pct ?? -999;
     return list.sort((a, b) =>
-      sort === "grade"
-        ? GRADE_ORDER[a.grade] - GRADE_ORDER[b.grade] ||
-          a.id.localeCompare(b.id)
-        : sort === "stretch"
-          ? (a.max_stretch_pct ?? 999) - (b.max_stretch_pct ?? 999)
-          : sort === "size"
-            ? vol(b) - vol(a)
-            : a.id.localeCompare(b.id),
+      sort === "b2c" && rows
+        ? price(b) - price(a) || a.id.localeCompare(b.id)
+        : sort === "margin" && rows
+          ? margin(a) - margin(b) || a.id.localeCompare(b.id)
+          : sort === "grade"
+            ? GRADE_ORDER[a.grade] - GRADE_ORDER[b.grade] ||
+              a.id.localeCompare(b.id)
+            : sort === "stretch"
+              ? (a.max_stretch_pct ?? 999) - (b.max_stretch_pct ?? 999)
+              : sort === "size"
+                ? vol(b) - vol(a)
+                : a.id.localeCompare(b.id),
     );
-  }, [all, q, category, grade, status, tag, sort]);
+  }, [all, q, category, grade, status, tag, sort, rows]);
   const selected = shown.filter((m) => picked[m.id]);
   const allPicked = shown.length > 0 && shown.every((m) => picked[m.id]);
   const pickAll = (on: boolean) =>
@@ -249,8 +302,25 @@ export function AllCovers({ cards }: { cards: boolean }) {
           <option value="grade">sort by cover (ready first)</option>
           <option value="stretch">sort by stretch</option>
           <option value="size">sort by size</option>
+          {priceCols && <option value="b2c">sort by B2C price</option>}
+          {priceCols && (
+            <option value="margin">sort by margin (lowest first)</option>
+          )}
         </select>
+        {mayPrices && !cards && (
+          <select
+            value={priceCols}
+            aria-label="Prices"
+            title="Show every cover's cost, prices and margin"
+            onChange={(e) => setCols(e.target.value as PriceCols)}
+          >
+            <option value="">no prices</option>
+            <option value="live">prices: live</option>
+            <option value="draft">prices: draft</option>
+          </select>
+        )}
       </FilterRow>
+      {priceCols && priceMsg && <p className="muted">{priceMsg}</p>}
       {selected.length > 0 && (
         <div className="selbar">
           <BatchBar selected={selected} onDone={load} />
@@ -266,7 +336,12 @@ export function AllCovers({ cards }: { cards: boolean }) {
       ) : cards ? (
         <Cards models={shown} picked={picked} pick={pick} />
       ) : (
-        <Table models={shown} picked={picked} pick={pick} />
+        <Table
+          models={shown}
+          picked={picked}
+          pick={pick}
+          prices={priceCols ? (rows ?? {}) : null}
+        />
       )}
     </Tpl>
   );
@@ -278,7 +353,19 @@ type PickProps = {
   pick: (id: string, on: boolean) => void;
 };
 
-function Table({ models, picked, pick }: PickProps) {
+function Table({
+  models,
+  picked,
+  pick,
+  prices: pr,
+}: PickProps & { prices: Record<string, PriceRow> | null }) {
+  const cell = (id: string, child: React.ReactNode) => (
+    <td className="nowrap price-cell">
+      <a href={modelHref(id, "price")} onClick={(e) => e.stopPropagation()}>
+        {child}
+      </a>
+    </td>
+  );
   return (
     <div className="table-wrap">
       <table className="list">
@@ -290,10 +377,24 @@ function Table({ models, picked, pick }: PickProps) {
             <th>Category</th>
             <th>Status</th>
             <th>Size (cm)</th>
-            <th>Steps done</th>
-            <th>Panels</th>
-            <th>Worst stretch</th>
-            <th>Warnings</th>
+            {/* with the prices on, the technical columns make room for them */}
+            {!pr && (
+              <>
+                <th>Steps done</th>
+                <th>Panels</th>
+                <th>Worst stretch</th>
+                <th>Warnings</th>
+              </>
+            )}
+            {pr && (
+              <>
+                <th>Cost</th>
+                <th>B2C incl. VAT</th>
+                <th>B2B ex VAT</th>
+                <th>Margin B2C</th>
+                <th>Source</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -343,16 +444,44 @@ function Table({ models, picked, pick }: PickProps) {
                   ? m.size_mm.map((v) => (v / 10).toFixed(0)).join(" × ")
                   : "–"}
               </td>
-              <td>
-                <Steps done={m.steps_done} />
-              </td>
-              <td>{m.panels ?? "–"}</td>
-              <td>
-                {m.max_stretch_pct != null
-                  ? `${m.max_stretch_pct.toFixed(1)} %`
-                  : "–"}
-              </td>
-              <td>{m.warnings.length || ""}</td>
+              {!pr && (
+                <>
+                  <td>
+                    <Steps done={m.steps_done} />
+                  </td>
+                  <td>{m.panels ?? "–"}</td>
+                  <td>
+                    {m.max_stretch_pct != null
+                      ? `${m.max_stretch_pct.toFixed(1)} %`
+                      : "–"}
+                  </td>
+                  <td>{m.warnings.length || ""}</td>
+                </>
+              )}
+              {pr &&
+                (pr[m.id] ? (
+                  <>
+                    {cell(m.id, eur(pr[m.id].cost))}
+                    {cell(m.id, eur(pr[m.id].b2c.shown))}
+                    {cell(m.id, eur(pr[m.id].b2b.shown))}
+                    {cell(m.id, <>{pr[m.id].b2c.margin_pct} %</>)}
+                    {cell(
+                      m.id,
+                      pr[m.id].b2c.fixed || pr[m.id].b2b.fixed
+                        ? `fixed ${[
+                            pr[m.id].b2c.fixed && "B2C",
+                            pr[m.id].b2b.fixed && "B2B",
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}`
+                        : "calculated",
+                    )}
+                  </>
+                ) : (
+                  <td colSpan={5} className="muted">
+                    not calculated
+                  </td>
+                ))}
             </tr>
           ))}
         </tbody>

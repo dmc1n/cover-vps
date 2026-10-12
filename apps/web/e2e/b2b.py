@@ -76,6 +76,13 @@ async def main() -> int:  # noqa: PLR0915 - one story, step by step
         await card.get_by_role("button", name="Save").click()
         await expect(admin.get_by_text("+ 1 fixed")).to_be_visible()
         await shot(admin, "02-admin-company")
+        # the cover's own page names the company and its price (ADR-126)
+        await admin.goto(URL + f"/#/model/{FIXED}/price")
+        b2b = admin.get_by_test_id("cover-b2b")
+        await expect(b2b).to_contain_text("Tuincentrum De Linde", timeout=30_000)
+        await expect(b2b).to_contain_text("€ 289.00 ex VAT")
+        await b2b.screenshot(path=f"{SHOTS}/02b-cover-b2b.png")
+        await admin.goto(URL + "/#/shop/b2b")
 
         # 2. the buyer sets a password from the link
         ctx = await browser.new_context(viewport={"width": 1440, "height": 950}, locale="en-GB")
@@ -224,6 +231,12 @@ async def main() -> int:  # noqa: PLR0915 - one story, step by step
         )
         await expect(admin.get_by_text("B2B 1 · PO PO-2026-118").first).to_be_visible()
         await shot(admin, "19-admin-orders-flagged")
+        # and on the cover's own page: its orders, the B2B one among them (ADR-126)
+        await admin.goto(URL + f"/#/model/{FIXED}/price")
+        orders = admin.get_by_test_id("cover-orders")
+        await expect(orders).to_contain_text("Tuincentrum De Linde", timeout=30_000)
+        await expect(orders.get_by_text("B2B", exact=True).first).to_be_visible()
+        await orders.screenshot(path=f"{SHOTS}/20-cover-orders.png")
         await browser.close()
     if errors:
         print("\n".join(errors))

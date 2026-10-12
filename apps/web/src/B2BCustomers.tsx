@@ -355,7 +355,7 @@ export function B2BCustomers() {
       </section>
       <p className="muted">
         The terms (minimum order, shipping, payment days, into production at
-        once): Settings → <a href="#/settings/b2b">B2B terms</a>.
+        once): Settings → <a href="#/settings/selling">Selling</a>.
       </p>
     </>
   );

@@ -1,6 +1,6 @@
 # The studio's layout: tighter and clearer (proposal, 11 Oct 2026)
 
-Status: **steps 1, 2, 5 and 6 built (11 Oct 2026, night, ADR-122) and live in v1.36.0; steps 7, 8 and 9 built (12 Oct 2026, ADR-124; §11), not released.** Steps 3 and 4 wait for the owner (questions 83/84 and 93). Audited
+Status: **steps 1, 2, 5 and 6 built (11 Oct 2026, night, ADR-122) and live in v1.36.0; steps 7, 8 and 9 built (12 Oct 2026, ADR-124; §11), not released.** §12 (one cover, one page; ADR-126) built 12 Oct 2026, evening, not released. Steps 3 and 4 wait for the owner (questions 83/84 and 93). Audited
 release: v1.30.0 (main has moved on since, e.g. ADR-116; the layout findings still hold). This
 document, the clickable prototype and the audit scripts are on the branch `studio-ui-audit`.
 
@@ -690,3 +690,88 @@ approvals, no workshop role, the defaults read-only, the start pages as below.
 | 3D: Rain simulation / Simulate again, Drape simulation / Drape again | Simulate ▾ (with the time each takes; running: shown in the bar) |
 | 3D: Check list (PDF) | Check list (PDF) |
 | Account, Guide, Configure, Welcome, Login | unchanged |
+
+## 12. One cover, one page; settings in Settings (12 Oct 2026; ADR-126)
+
+The owner (12 Oct 2026): *"we have to many different tabs, like the pricelist, why is this not
+vissable in the item settings, all settings related to a covers should be visseble in the cover,
+like cost, sales price etc, now there is to much information all over the place, it needs to be
+less and more together"*; and that evening: *"dat mag alles in de settings page komen, maar
+product gelateerde informatie bij het product houden niet overal plaatsen"* (general settings may
+all go into Settings; what belongs to a product stays with the product and is not repeated
+elsewhere).
+
+### 12.1 Inventory: everything about ONE cover, where it was and where it goes
+
+| what (about one cover) | was | now |
+|---|---|---|
+| Costing: fabric m², components, labour, total cost EUR and IDR, CSV, PDF | Prices → Costing (pick the cover from a list) | the cover → **Price & shop** → Cost |
+| Its B2C price (incl. VAT), B2B price (ex VAT), margin per channel | Prices → Costing (per channel card) | the cover → Price & shop → Prices |
+| Whether its price is fixed or calculated, and the fixed price itself | Prices → Channels & price lists → Fixed prices (a list of model ids, per channel) | the cover → Price & shop → Prices (source per channel; admins set or remove the fixed price **in the draft**) |
+| Its price in the draft vs live; "N changes in the draft — Publish" | Prices → the draft bar (whole set) | the cover → Price & shop (its own draft vs live, the draft's size, Publish for admins, with the preview count and a confirmation) |
+| Its row in an imported price list (match, price) | Prices → Import (Excel) | the import stays one action (Settings → Prices & costs → Publish & versions); the cover shows the result: a fixed price in the draft |
+| Its price moving in a preview | Prices → Preview changes (all covers) | Settings → Publish & versions (all covers, it is about the whole set) |
+| Offered in the shop / configurator as an existing cover ("Bestel direct"), its kind, sizes | nowhere (only by trying the configurator); Shop → Matches showed it per request | the cover → Price & shop → Shop (offered or why not) |
+| Its category from the price list (section, family, item, suits) | nowhere in the studio (ADR-114, `match_list`) | the cover → Price & shop → Shop |
+| "Bestel direct": how its direct-order price is made (fixed B2C price, or the configurator's minus the stock discount) and the delivery note | Settings → Matching (discount), Settings → Company & shop (note) | the cover → Price & shop → Shop (what applies to this cover; the settings themselves stay in Settings) |
+| Match requests that proposed or chose it (learning) | Shop → Matches (all requests) | the cover → Price & shop → Shop (its requests, linking to Shop → Requests) |
+| Orders of this cover (existing-cover orders, the production model of an order) | Shop → Orders (all orders) | the cover → Price & shop → Orders and quotes (links to Shop → Orders/<n>) |
+| Quotes asked for this cover (stock quotes) | nowhere (files in quotes/) | the cover → Price & shop → Orders and quotes (recent ones) |
+| B2B companies with their own price for it | Shop → B2B customers → a company → fixed prices | the cover → Price & shop → B2B (which companies, their price; editing stays on the company) |
+| Desk status and history | the cover's strip (status), the Desk card | the cover's head: a summary row (Desk status, approved by, produced, fit, revision to cut, open questions) |
+| Workshop: files, the revision to cut, measured fit | Work → Workshop (all approved covers) | the cover's head summary (fit, revision) and Pieces → Files |
+| Questions about it | Work → Questions (search) | the cover's head summary: open questions about it, linking to each |
+| Catalogue info (category, family, status, tags, notes, no-cover) | the cover → Edit details | unchanged |
+| Files (downloads) | the cover → Files (a tab) | the cover → Pieces → Files (one tab fewer) |
+
+What stays general (Settings, not per cover): materials and their prices, labour rate and
+times, the exchange rate, the channels' extra costs, markup or margin, rounding, VAT, the
+accessories' fixed prices (balloon, frame), the draft as a whole, preview, publish, versions and
+rollback, the Excel import, the stock discount, the delivery note, the B2B terms.
+
+### 12.2 The design
+
+- **Header: four sections** — Work · Covers · Shop · Settings. Prices is no longer a section.
+- **A cover: seven tabs** — 3D · Pieces · Seams · Adjust · Compare · History · **Price & shop**.
+  Files moved into Pieces (Cut pieces · Flat patterns · Size drawing · Files); the old
+  `#/model/<id>/files` and `/downloads` redirect there.
+- **Price & shop** (`#/model/<id>/price`): Cost (the costing lines, EUR and IDR, CSV, PDF;
+  live or draft), Prices (per channel: shown price, ex/incl. VAT, margin, source fixed or
+  calculated, the draft's value beside the live one; admins type a fixed price or remove it:
+  `PUT /api/prices/draft/fixed`, which writes the same draft row the old Channels table wrote),
+  "the draft has N changes — Publish" (admins; the preview count first and a confirmation),
+  Shop (offered or why not, kind, sizes, category from the price list, the direct-order price
+  and its delivery note), B2B (companies with their own price; admins), Orders and quotes
+  (admins; links). Editors see it read-only; viewers see the cover without prices (as before:
+  prices are for editors and admins).
+- **Covers → All covers** gets optional **price columns** (cost, B2C, B2B, margin, source; live
+  or draft), switched on with *Prices* in the filter row and remembered in the address
+  (`?prices=1`); a price cell opens the cover's Price & shop tab. No separate price page.
+- **Settings** gets a group **Prices & costs** with three tabs: *Costs* (materials, labour,
+  exchange rate on one page), *Price rules* (per channel: extra costs, markup or margin,
+  rounding, VAT; the accessories' fixed prices; the costing of a configurator product), and
+  *Publish & versions* (the draft, preview, publish, discard, the versions with rollback, and the
+  Excel import). Editors see these three (read-only, as Prices before); every other Settings
+  tab stays admin-only.
+- **Settings, fewer tabs:** Matching and B2B terms → *Selling*; Desk & approval and Cover
+  defaults → *Rules & defaults* (both read-only yaml); System and Logins & audit log → *System
+  & logs*; Photo test moved from Shop into *AI & spending* (its tool).
+- **Shop keeps only shop-wide pages:** Orders · Requests · B2B customers · Website (AI).
+  Matches is a part of Requests (both are what customers asked).
+- **Every old address redirects:** `#/prices[/materials|labour|rate]` → Settings → Costs,
+  `#/prices/channels` and `/costing` → Price rules, `#/prices/import` and `/versions` → Publish
+  & versions, `#/shop/matches` → Requests, `#/shop/phototest` → AI & spending,
+  `#/settings/matching|b2b` → Selling, `#/settings/desk` → Rules & defaults, `#/settings/activity`
+  → System & logs, `#/admin/prices|matches|phototest` likewise.
+- **Unchanged:** the pricing maths, VAT, rounding, draft → preview → publish → versions, the
+  rights (admins edit and publish, editors look, viewers none), B2B scoping, the approval gate,
+  server-only settings.
+
+| | before | after |
+|---|---|---|
+| Header sections | 5 | 4 |
+| Prices | 7 tabs | 0 (3 tabs in Settings; the per-cover part on the cover) |
+| Shop | 6 pages | 4 |
+| Settings | 11 tabs | 11 (of which 3 are the former Prices; 8 of the former 11) |
+| Tabs and pages in Prices + Shop + Settings | 24 | 15 |
+| A cover | 7 tabs | 7 tabs (Files inside Pieces, Price & shop new) |

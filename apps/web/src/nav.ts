@@ -1,4 +1,4 @@
-// The studio's map (docs/plans/studio-ui.md, ADR-122): five sections, each with its own pages
+// The studio's map (docs/plans/studio-ui.md, ADR-122, ADR-126): four sections, each with its own pages
 // (the sub-menu), every page and tab in the address, and every old address sent to its new
 // place. Pure functions, so the browser check (e2e/uinav.py) and the code agree on one table.
 import type { User } from "./api";
@@ -16,7 +16,7 @@ export interface Page {
   group?: string; // a small label before this page in the sub-menu (Shop: "Tools")
 }
 export interface Section {
-  id: "work" | "covers" | "shop" | "prices" | "settings";
+  id: "work" | "covers" | "shop" | "settings";
   label: string;
   who: Who;
   hint: string;
@@ -93,31 +93,25 @@ export const SECTIONS: Section[] = [
     id: "shop",
     label: "Shop",
     who: "edit",
-    hint: "Orders, requests, matches, business customers, the website",
+    hint: "Orders, requests, business customers, the website",
     pages: [
       {
         id: "orders",
         label: "Orders",
         who: "admin",
-        hint: "Orders from the shop",
+        hint: "Orders from the shop and the B2B shop",
       },
       {
         id: "requests",
         label: "Requests",
         who: "admin",
-        hint: "Quotes asked in the configurator",
-      },
-      {
-        id: "matches",
-        label: "Matches",
-        who: "admin",
-        hint: "Which existing cover fits a request; learning mode",
+        hint: "What customers asked: quotes from the configurator, and which existing cover fits (matches, learning mode)",
       },
       {
         id: "b2b",
         label: "B2B customers",
         who: "admin",
-        hint: "Companies, their logins and orders",
+        hint: "Companies, their logins, own prices and orders",
       },
       {
         id: "website",
@@ -126,66 +120,41 @@ export const SECTIONS: Section[] = [
         hint: "Change the website's text, preview it; an admin publishes",
         sep: true,
       },
-      {
-        id: "phototest",
-        label: "Photo test",
-        who: "admin",
-        hint: "A photo suggestion step by step",
-        sep: true,
-        group: "Tools",
-      },
-    ],
-  },
-  {
-    id: "prices",
-    label: "Prices",
-    who: "edit",
-    hint: "Purchase prices, labour, price lists and costing",
-    pages: [
-      { id: "materials", label: "Materials", who: "edit", hint: "" },
-      { id: "labour", label: "Labour", who: "edit", hint: "" },
-      { id: "rate", label: "Exchange rate", who: "edit", hint: "" },
-      {
-        id: "channels",
-        label: "Channels & price lists",
-        who: "edit",
-        hint: "",
-      },
-      {
-        id: "import",
-        label: "Import (Excel)",
-        who: "admin",
-        hint: "A price list from Excel as fixed prices, into the draft",
-      },
-      { id: "costing", label: "Costing", who: "edit", hint: "", sep: true },
-      { id: "versions", label: "Versions", who: "edit", hint: "" },
     ],
   },
   {
     id: "settings",
     label: "Settings",
-    who: "admin",
-    hint: "Everything that is set once: company, people, mail, keys, system",
+    who: "edit", // editors see only the Prices & costs tabs (read-only), as Prices before
+    hint: "Everything that is set once: company, prices and costs, people, mail, keys, system",
     pages: [], // vertical tabs inside the page (SETTINGS_TABS)
   },
 ];
 
-/** The Settings area's tabs, in groups (vertical on a wide screen, a row on a tablet). */
+/** The Settings area's tabs, in groups (vertical on a wide screen, a row on a tablet). Since
+ * ADR-126 the general price settings live here too (Prices & costs); what belongs to one cover
+ * (its cost, prices, shop place, orders) is on the cover's own Price & shop tab. */
 export const SETTINGS_TABS: { group: string; tabs: [string, string][] }[] = [
   {
     group: "Business",
     tabs: [
       ["company", "Company & shop"],
-      ["b2b", "B2B terms"],
-      ["matching", "Matching"],
+      ["selling", "Selling"],
+    ],
+  },
+  {
+    group: "Prices & costs",
+    tabs: [
+      ["costs", "Costs"],
+      ["pricing", "Price rules"],
+      ["publish", "Publish & versions"],
     ],
   },
   {
     group: "People & work",
     tabs: [
       ["users", "Users & rights"],
-      ["desk", "Desk & approval"],
-      ["defaults", "Cover defaults"],
+      ["defaults", "Rules & defaults"],
     ],
   },
   {
@@ -198,15 +167,26 @@ export const SETTINGS_TABS: { group: string; tabs: [string, string][] }[] = [
   },
   {
     group: "Server",
-    tabs: [
-      ["system", "System"],
-      ["activity", "Logins & audit log"],
-    ],
+    tabs: [["system", "System & logs"]],
   },
 ];
+/** Who sees a Settings tab: the price tabs are for editors too (they look, admins change, as the
+ * API decides); every other tab is for admins. */
+export const SETTINGS_WHO: Record<string, Who> = {
+  costs: "edit",
+  pricing: "edit",
+  publish: "edit",
+};
+export const settingsWho = (tab: string): Who => SETTINGS_WHO[tab] ?? "admin";
 export const SETTINGS_IDS = SETTINGS_TABS.flatMap((g) =>
   g.tabs.map((t) => t[0]),
 );
+/** The Settings tabs a person may see, in their groups. */
+export const visibleSettings = (user: Viewer) =>
+  SETTINGS_TABS.map((g) => ({
+    ...g,
+    tabs: g.tabs.filter(([id]) => allowed(settingsWho(id), user)),
+  })).filter((g) => g.tabs.length > 0);
 
 /** A cover's tabs (#/model/<id>/<tab>[/<sub>]). */
 export const MODEL_TABS: [string, string][] = [
@@ -216,7 +196,7 @@ export const MODEL_TABS: [string, string][] = [
   ["adjust", "Adjust"],
   ["compare", "Compare"],
   ["history", "History"],
-  ["files", "Files"],
+  ["price", "Price & shop"], // cost, prices, the shop, orders: this cover's own (ADR-126)
 ];
 /** The sub-views inside a cover's tabs: the old twelve tabs, each still one click away. */
 export const MODEL_SUBS: Record<string, [string, string][]> = {
@@ -224,6 +204,7 @@ export const MODEL_SUBS: Record<string, [string, string][]> = {
     ["cut", "Cut pieces"],
     ["flat", "Flat patterns"],
     ["sizes", "Size drawing"],
+    ["files", "Files"], // the downloads (a tab of its own before ADR-126)
   ],
   compare: [
     ["drawing", "Your drawing"],
@@ -278,7 +259,7 @@ const LAST_KEY = "studio.last";
 function rememberedPage(): string | null {
   try {
     const v = localStorage.getItem(LAST_KEY);
-    return v && /^#\/(work|covers|shop|prices|settings)\/[a-z0-9]+$/.test(v)
+    return v && /^#\/(work|covers|shop|settings)\/[a-z0-9]+$/.test(v)
       ? v
       : null;
   } catch {
@@ -288,7 +269,7 @@ function rememberedPage(): string | null {
 /** Remember the section page an admin is on (his start page next time). */
 export function rememberPage(hash: string, user: Viewer): void {
   if (user.role !== "admin") return;
-  const m = hash.match(/^#\/(work|covers|shop|prices|settings)\/[a-z0-9]+/);
+  const m = hash.match(/^#\/(work|covers|shop|settings)\/[a-z0-9]+/);
   if (!m) return;
   try {
     localStorage.setItem(LAST_KEY, m[0]);
@@ -301,7 +282,10 @@ export function rememberPage(hash: string, user: Viewer): void {
 export function sectionHome(id: string, user: Viewer): string | null {
   const s = visibleSections(user).find((x) => x.id === id);
   if (!s) return null;
-  if (s.id === "settings") return "#/settings/company";
+  if (s.id === "settings") {
+    const first = visibleSettings(user)[0]?.tabs[0]?.[0];
+    return first ? `#/settings/${first}` : null;
+  }
   return s.pages.length ? `#/${s.id}/${s.pages[0].id}` : null;
 }
 
@@ -310,17 +294,39 @@ const ADMIN_TO: Record<string, string> = {
   users: "#/settings/users",
   orders: "#/shop/orders",
   b2b: "#/shop/b2b",
-  matches: "#/shop/matches",
+  matches: "#/shop/requests",
   shop: "#/settings/company",
-  phototest: "#/shop/phototest",
-  prices: "#/prices/materials",
+  phototest: "#/settings/ai",
+  prices: "#/settings/costs",
   website: "#/shop/website",
   webshop: "#/shop/requests",
   requests: "#/shop/requests",
   mail: "#/settings/mail",
-  sessions: "#/settings/activity",
-  audit: "#/settings/activity",
+  sessions: "#/settings/system",
+  audit: "#/settings/system",
   system: "#/settings/system",
+};
+// The Prices section's tabs (ADR-098, 122) and where they live since ADR-126: the general part in
+// Settings → Prices & costs; a cover's costing on the cover's own Price & shop tab.
+const PRICES_TO: Record<string, string> = {
+  materials: "#/settings/costs",
+  labour: "#/settings/costs",
+  rate: "#/settings/costs",
+  channels: "#/settings/pricing",
+  costing: "#/settings/pricing",
+  import: "#/settings/publish",
+  versions: "#/settings/publish",
+};
+// Shop pages that moved (ADR-126), and Settings tabs that were merged.
+const SHOP_TO: Record<string, string> = {
+  matches: "#/shop/requests",
+  phototest: "#/settings/ai",
+};
+const SETTINGS_TO: Record<string, string> = {
+  matching: "#/settings/selling",
+  b2b: "#/settings/selling",
+  desk: "#/settings/defaults",
+  activity: "#/settings/system",
 };
 // A cover's old tabs (never in the address before, but named in the handbook) → tab/sub.
 const MODEL_OLD: Record<string, string> = {
@@ -332,7 +338,8 @@ const MODEL_OLD: Record<string, string> = {
   cut: "pieces/cut",
   settings: "adjust",
   revisions: "history/revisions",
-  downloads: "files",
+  downloads: "pieces/files",
+  files: "pieces/files", // Files moved into Pieces (ADR-126)
   log: "history/log",
 };
 
@@ -355,25 +362,34 @@ export function redirect(hash: string, user: Viewer): string | null {
     return m[1] ? `#/covers/arrangements/${m[1]}` : "#/covers/arrangements";
   if (p === "#/learning") return "#/covers/learning";
   if (p === "#/website") return "#/shop/website";
-  if (p === "#/prices") return "#/prices/materials";
+  if (p === "#/prices") return "#/settings/costs";
+  if ((m = p.match(/^#\/prices\/([a-z0-9]+)/)))
+    return PRICES_TO[m[1]] ?? "#/settings/costs";
+  if ((m = p.match(/^#\/shop\/([a-z0-9]+)$/)) && SHOP_TO[m[1]])
+    return SHOP_TO[m[1]];
+  if ((m = p.match(/^#\/settings\/([a-z0-9]+)$/)) && SETTINGS_TO[m[1]])
+    return SETTINGS_TO[m[1]];
   if (p === "#/admin") return "#/settings/users";
   if ((m = p.match(/^#\/admin\/([a-z0-9]+)$/)))
     return ADMIN_TO[m[1]] ?? "#/settings/users";
   if ((m = p.match(/^#\/model\/([a-z0-9-]+)$/))) return `#/model/${m[1]}/3d`;
   if ((m = p.match(/^#\/model\/([a-z0-9-]+)\/([a-z0-9]+)$/)) && MODEL_OLD[m[2]])
     return `#/model/${m[1]}/${MODEL_OLD[m[2]]}`;
-  if (p === "#/settings") return "#/settings/company";
-  if (["#/work", "#/covers", "#/shop", "#/prices"].includes(p))
+  if (p === "#/settings")
+    return sectionHome("settings", user) ?? startPage(user);
+  if (["#/work", "#/covers", "#/shop"].includes(p))
     return sectionHome(p.slice(2), user) ?? startPage(user);
   if (p === "#/covers/all" || p.startsWith("#/model/")) return null;
-  if ((m = p.match(/^#\/(work|covers|shop|prices)\/([a-z0-9]+)/))) {
+  if ((m = p.match(/^#\/(work|covers|shop)\/([a-z0-9]+)/))) {
     const s = SECTIONS.find((x) => x.id === m![1])!;
     if (!s.pages.some((x) => x.id === m![2]))
       return sectionHome(s.id, user) ?? startPage(user);
     return null;
   }
   if ((m = p.match(/^#\/settings\/([a-z0-9]+)$/)))
-    return SETTINGS_IDS.includes(m[1]) ? null : "#/settings/company";
+    return SETTINGS_IDS.includes(m[1])
+      ? null
+      : (sectionHome("settings", user) ?? startPage(user));
   // an address the studio never had: the person's start page, not "not for your account"
   if (
     !/^#\/(work|covers|shop|prices|settings|model|guide|account|configure|welcome)(\/|$|\?)/.test(
@@ -399,7 +415,6 @@ export function parse(hash: string): Route {
     "work",
     "covers",
     "shop",
-    "prices",
     "settings",
     "model",
     "guide",

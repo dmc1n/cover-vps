@@ -5,9 +5,9 @@ cutting patterns for its cover. You give it a 3D model of the furniture (or one 
 cover drawings); it gives back the pieces to cut, ready for the CNC cutting table, with a
 cutting list and a size drawing. It runs at **covers.suns.nu**.
 
-## The studio in five sections
+## The studio in four sections
 
-The dark bar at the top has five sections; the light bar under it shows the pages of the
+The dark bar at the top has four sections; the light bar under it shows the pages of the
 section you are in. Every page has its own address, so a link in a mail opens exactly that
 page.
 
@@ -29,15 +29,18 @@ page.
     models.
   - **Learning:** your drawings beside the covers the program made from them.
   - **Product list:** the workshop's product list (Excel), linked to the drawings.
-3. **Shop:** orders, requests from the configurator, matches with existing covers, business
-   customers, the website's texts (Website, with AI) and the photo test. Mostly for admins;
+3. **Shop:** orders, requests (from the configurator, and which existing cover fits), business
+   customers and the website's texts (Website, with AI). Mostly for admins;
    editors may draft the website.
-4. **Prices:** materials, labour, the exchange rate, channels and price lists, a price list
-   from Excel, the costing of any cover, and every published version.
-5. **Settings** (admins): one page with tabs on the left for everything that is set once: the
-   company and the shop, B2B terms, matching, users and rights, the Desk and the cover
-   defaults, mail, the website and API keys, AI and spending, the system, logins and the audit
-   log.
+4. **Settings** (admins; editors see the price tabs): one page with tabs on the left for
+   everything that is set once: the company and the shop, selling (matching, B2B terms), prices
+   and costs (materials, labour, the exchange rate, the price rules, publish and versions, a
+   price list from Excel), users and rights, the Desk's rules and the cover defaults, mail, the
+   website and API keys, AI and spending (with the photo test), the system and its logs.
+
+Everything about **one cover** — its pieces, its cost and prices, its place in the shop, its
+orders, its Desk status, fit and questions — is on that cover's own page (tab *Price & shop*
+for the money and the shop).
 
 ## The right side of the bar
 

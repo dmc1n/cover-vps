@@ -24,11 +24,12 @@ notifications) gets a mail: *Approve and invite* (the asker gets the invitation)
 
 Shop → **B2B customers**, click a company in the list:
 
-- **Price list:** the channel of **Prices → Channels & price lists** it buys at (Business by
+- **Price list:** the channel of **Settings → Price rules** it buys at (Business by
   default).
 - **Fixed prices:** one per line, ex VAT: `suns-2-seater-kota = 289`, `balloon = 12`,
-  `frame = 55`. They win over the price list. (A fixed price in the price list itself, on the
-  Prices → Channels & price lists, holds for every company on that list.)
+  `frame = 55`. They win over the price list. (A fixed price in the price list itself, set
+  on the cover's own Price & shop tab, holds for every company on that list. The cover's tab
+  also lists the companies with a price of their own for it.)
 - **VAT reverse-charged:** no VAT on its orders (an EU company outside NL with a valid VAT
   number; check with the accountant).
 - **Block (logs everyone out):** nobody of that company can log in or reset a password;
@@ -46,7 +47,7 @@ same way as a paid consumer order (a made-to-measure cover becomes `order-<n>`, 
 cover is cut from its own pattern). The buyer, the company's e-mail and the alert address get a
 confirmation. The customer sees each line's status under *Previous orders*.
 
-## B2B terms (Settings → B2B terms)
+## B2B terms (Settings → Selling)
 
 The terms for every business customer are set once, by an admin, under **Settings → B2B
 terms** (they used to be at the bottom of the B2B customers page):
@@ -64,7 +65,7 @@ B2B logins are not studio users: a business customer can never open Cover Studio
 colleague's studio login does not open the B2B shop. Passwords are stored as hashes; 5 wrong
 passwords lock that person for 15 minutes (10 from one address lock that address). A forgotten
 password: *Forgot your password?* on the login page mails a link valid for 2 hours. Every
-login, failure, order and change is in Settings → **Logins & audit log** as `b2b:<e-mail>`.
+login, failure, order and change is in Settings → **System & logs** as `b2b:<e-mail>`.
 
 ## Languages
 

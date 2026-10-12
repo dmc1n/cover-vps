@@ -1,7 +1,7 @@
 # The Cover Studio handbook
 
 How to use Cover Studio (https://covers.suns.nu), for the owner, the approvers and the
-workshop. It follows the studio's map: the five sections in the top bar, then a cover's own
+workshop. It follows the studio's map: the four sections in the top bar, then a cover's own
 page and the server. The map itself, with every address and who sees what:
 [navigation.md](navigation.md). The short tour that the studio shows under **Guide**:
 [how-it-works.md](how-it-works.md).
@@ -73,40 +73,40 @@ owner question (#91).
 
 ## Shop
 
-- **The Shop pages** (Orders, Requests, Matches, B2B customers, Website (AI), Tools: Photo
-  test): [admin.md — The Shop pages](admin.md#the-shop-pages)
+- **The Shop pages** (Orders, Requests, B2B customers, Website (AI)):
+  [admin.md — The Shop pages](admin.md#the-shop-pages)
 - **Orders:** [admin.md — The Shop pages](admin.md#the-shop-pages); B2B orders:
   [b2b.md — Orders](b2b.md#orders)
 - **Requests** and the configurator in another webshop, the API:
   [webshop-api.md](webshop-api.md)
-- **Matches:** [admin.md — Matches](admin.md#matches-which-existing-cover-fits-learning-mode)
+- **Matches** (a part of Requests): [admin.md — Matches](admin.md#matches-which-existing-cover-fits-learning-mode)
 - **B2B customers:** [b2b.md](b2b.md)
 - **Website (AI)**, languages, the website on its own domain:
   [admin.md — The Shop pages](admin.md#the-shop-pages),
   [admin.md — Languages](admin.md#languages),
   [admin.md — The website on its own domain](admin.md#the-website-on-its-own-domain-cloudflare)
-- **Tools: Photo test:** [admin.md — The Shop pages](admin.md#the-shop-pages)
+- **Photo test** (Settings → AI & spending): [admin.md — Settings](admin.md#settings)
 - **The public consumer shop** (pages, barbecues, legal pages, payments):
   [webshop.md](webshop.md)
 
-## Prices
+## Prices (Settings → Prices & costs; one cover's: its Price & shop tab)
 
-- **Materials, Labour, Exchange rate, Channels & price lists:**
-  [prices.md — The tabs](prices.md#the-tabs)
+- **Costs, Price rules, Publish & versions:** [prices.md — The tabs](prices.md#the-tabs)
+- **A cover's Price & shop tab:**
+  [prices.md — A cover's Price & shop tab](prices.md#a-covers-price--shop-tab)
 - **Import (Excel):**
   [prices.md — Prijslijst uit Excel importeren](prices.md#prijslijst-uit-excel-importeren-vaste-prijzen)
-- **Costing, Versions:** [prices.md — The tabs](prices.md#the-tabs); publishing:
-  [prices.md — Changing a price](prices.md#changing-a-price)
+- **Publishing:** [prices.md — Changing a price](prices.md#changing-a-price)
 
 ## Settings
 
-- **All the tabs** (Company & shop · B2B terms · Matching | Users & rights · Desk & approval ·
-  Cover defaults | Mail & notifications · Website & API keys · AI & spending | System ·
-  Logins & audit log): [admin.md — Settings](admin.md#settings)
+- **All the tabs** (Company & shop · Selling | Costs · Price rules · Publish & versions |
+  Users & rights · Rules & defaults | Mail & notifications · Website & API keys · AI & spending
+  | System & logs): [admin.md — Settings](admin.md#settings)
 - **Users & rights, inviting people:**
   [admin.md — Inviting people](admin.md#inviting-people-for-example-for-a-kickoff),
   [admin.md — Roles and rights](admin.md#roles-and-rights)
-- **B2B terms:** [b2b.md — B2B terms](b2b.md#b2b-terms-settings--b2b-terms)
+- **B2B terms** (Settings → Selling): [b2b.md — B2B terms](b2b.md#b2b-terms-settings--selling)
 - **Company defaults** (read-only in Settings; changed in `config/defaults.yaml`):
   [parameters.md](parameters.md). Whether the owner will edit some of them in Settings is an
   open owner question (#93).

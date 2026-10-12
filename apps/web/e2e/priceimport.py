@@ -1,7 +1,9 @@
-"""Browser check of Import prices (Excel), ADR-113: an admin uploads a price list on Prices &
-costing → Channels & price lists, sees what matched (exact / probable), the conflicts and the
+"""Browser check of Import prices (Excel), ADR-113: an admin uploads a price list on Settings →
+Publish & versions (ADR-126; was Prices → Import), sees what matched (exact / probable), the
+conflicts and the
 rows to choose by hand, looks at B2B (stored ex VAT) and back, puts the prices in the draft,
-previews and publishes with the note "Imported from …"; an editor sees no import; a phone.
+previews and publishes with the note "Imported from …", and finds the fixed price on the
+cover's own Price & shop tab; an editor sees no import; a phone.
 
 Make the sample list (apps/web/e2e/priceimport_sheet.py), run a studio on a scratch data copy
 (never the live data) with an admin `tester` and an editor `eddy2` (password
@@ -35,12 +37,12 @@ async def login(page: Page, user: str) -> None:
 
 
 async def channels(page: Page) -> None:
-    await page.goto(URL + "#/prices/channels")
+    await page.goto(URL + "#/settings/pricing")
 
 
 async def import_page(page: Page) -> None:
-    """Prices → Import (Excel): its own page in the sub-menu since ADR-122."""
-    await page.goto(URL + "#/prices/import")
+    """Settings → Publish & versions: the import beside the versions (ADR-126)."""
+    await page.goto(URL + "#/settings/publish")
 
 
 async def shot(page: Page, name: str, full: bool = True) -> None:
@@ -106,20 +108,15 @@ async def main() -> int:
         await shot(page, "05-preview")
         await page.get_by_role("button", name="Publish", exact=True).click()
         await expect(page.get_by_text("Published version").first).to_be_visible()
-        await (
-            page.get_by_role("navigation", name="Prices")
-            .get_by_role("link", name="Versions", exact=True)
-            .click()
-        )
         await expect(page.get_by_text("Imported from prijslijst-2027.xlsx").first).to_be_visible()
         await shot(page, "06-versions", full=False)
-        # the fixed prices are in the price list now
-        await (
-            page.get_by_role("navigation", name="Prices")
-            .get_by_role("link", name="Channels & price lists", exact=True)
-            .click()
-        )
-        await expect(page.get_by_label("b2c fixed drawing-s40")).to_have_value("1234.95")
+        # the fixed price is the cover's own now: on its Price & shop tab, live
+        await page.goto(URL + "#/model/drawing-s40/price")
+        prices = page.get_by_test_id("cover-prices")
+        await expect(prices.locator("tr[data-channel=b2c]")).to_contain_text("€ 1,234.95")
+        await expect(prices.locator("tr[data-channel=b2c]")).to_contain_text("fixed price")
+        await expect(page.get_by_label("b2c fixed price")).to_have_value("1234.95")
+        await shot(page, "06b-cover-price")
         # a phone
         await import_page(page)
         await page.set_viewport_size({"width": 390, "height": 844})
@@ -141,6 +138,8 @@ async def main() -> int:
         await login(ed, "eddy2")
         await channels(ed)
         await expect(ed.get_by_text("Fixed prices").first).to_be_visible()
+        await import_page(ed)
+        await expect(ed.get_by_text("An admin imports a price list.")).to_be_visible()
         await expect(ed.get_by_test_id("price-import")).to_have_count(0)
         await expect(ed.get_by_role("link", name="Import (Excel)")).to_have_count(0)
         await browser.close()

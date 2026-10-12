@@ -1,5 +1,6 @@
 // Settings (ADR-122, docs/plans/studio-ui.md §6): one place for everything that is set once,
-// on tabs in four groups. Every setting is one row: a plain name (the stored key small and grey),
+// on tabs in five groups (ADR-126: Prices & costs moved in, merged tabs: Selling, Rules & defaults,
+// System & logs). Every setting is one row: a plain name (the stored key small and grey),
 // the right control, one line of explanation, its default and whether it was changed. The shop's
 // settings are the same stored keys as before (GET/PUT /api/admin/shop/settings): no data moved.
 // The company defaults from config/defaults.yaml are shown read-only (the developer changes them;
@@ -7,7 +8,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { admin, api, ParamSpec, Scalar, shopAdmin } from "./api";
 import { Audit, EmbedAndKeys, Mail, Sessions, System, Users } from "./Admin";
-import { SETTINGS_TABS } from "./nav";
+import { SETTINGS_TABS, visibleSettings } from "./nav";
+import { PhotoTest } from "./PhotoTest";
+import { Prices } from "./Prices";
+import { useSession } from "./Session";
 import { useUnsaved } from "./unsaved";
 
 type Doc = Record<string, unknown>;
@@ -263,7 +267,7 @@ const MATCHING: Group[] = [
       {
         key: "matching.mode",
         label: "Mode",
-        help: "Learning: a colleague confirms every proposal first (Shop → Matches). Automatic: above the threshold the customer gets the existing cover directly.",
+        help: "Learning: a colleague confirms every proposal first (Shop → Requests). Automatic: above the threshold the customer gets the existing cover directly.",
         kind: "choice",
         choices: [
           ["shadow", "Learning (a colleague confirms)"],
@@ -308,7 +312,7 @@ const MAIL_SHOP: Field[] = [
   {
     key: "fit_mail.enabled",
     label: "Ask customers whether the cover fits",
-    help: "A mail to the customer some days after delivery; the answers come in at Shop → Matches.",
+    help: "A mail to the customer some days after delivery; the answers come in at Shop → Requests.",
     kind: "bool",
   },
   {
@@ -802,8 +806,9 @@ function B2BTerms() {
       <Intro>
         The terms for business customers in the B2B shop (ADR-104). The
         companies, their logins and orders: Shop →{" "}
-        <a href="#/shop/b2b">B2B customers</a>; their price list: Prices →{" "}
-        <a href="#/prices/channels">Channels &amp; price lists</a>.
+        <a href="#/shop/b2b">B2B customers</a>; their price list: Settings →{" "}
+        <a href="#/settings/pricing">Price rules</a>; a company's own price for
+        one cover also shows on that cover's Price &amp; shop tab.
       </Intro>
       <section className="set-group">
         {num("min_order_eur", "Minimum order", "Ex VAT; 0: no minimum.", "€")}
@@ -1065,28 +1070,28 @@ function WebsiteKey({ linkKeySet }: { linkKeySet?: boolean }) {
 const TAB_INTRO: Record<string, string> = {
   company:
     "The company's details and what the shop offers. Saved for the shop at once.",
-  b2b: "",
-  matching: "",
+  selling:
+    "How we sell existing covers and to business customers: matching, the direct-order discount, the B2B terms.",
   users:
     "Who may log in, with which role, and who may approve the definitive drawing.",
-  desk: "",
   defaults: "",
   mail: "The mail server, the login code and every address that receives mail.",
   website: "How the website and webshops reach the studio.",
   ai: "",
-  system: "The server's state, the releases and the last alerts. Read-only.",
-  activity: "Who is logged in now, and every login, change and approval.",
+  system:
+    "The server's state, the releases, the last alerts; who is logged in and every login, change and approval. Read-only.",
 };
+const PRICE_TABS = ["costs", "pricing", "publish"];
 
 export function SettingsArea({ tab }: { tab: string }) {
-  const specs = useParams();
-  const { state } = useShop();
+  const { user } = useSession();
   const label =
     SETTINGS_TABS.flatMap((g) => g.tabs).find(([t]) => t === tab)?.[1] ?? "";
+  if (!user) return null;
   return (
     <div className="settings-area">
       <nav className="set-tabs" aria-label="Settings">
-        {SETTINGS_TABS.map((g) => (
+        {visibleSettings(user).map((g) => (
           <div key={g.group} className="set-tabgroup">
             <span className="set-tabgroup-name">{g.group}</span>
             {g.tabs.map(([id, l]) => (
@@ -1105,124 +1110,162 @@ export function SettingsArea({ tab }: { tab: string }) {
       <section className="set-body">
         <h1 className="page-title">{label}</h1>
         {TAB_INTRO[tab] && <p className="muted">{TAB_INTRO[tab]}</p>}
-        {tab === "company" && (
-          <ShopForm
-            key="company"
-            specs={specs}
-            groups={COMPANY}
-            owns={[
-              "company",
-              "domain",
-              "languages",
-              "colours",
-              "bbq_enabled",
-              "logo_url",
-              "og_image",
-              "stock_delivery_note",
-              "products",
-              "film_url",
-              "film_av1",
-              "film_poster",
-              "story_model",
-              "story_media",
-            ]}
-          />
-        )}
-        {tab === "company" && <Shipping />}
-        {tab === "b2b" && <B2BTerms />}
-        {tab === "matching" && (
-          <>
-            <ShopForm
-              key="matching"
-              specs={specs}
-              groups={MATCHING}
-              owns={["matching"]}
-            />
-            <details className="set-group">
-              <summary>How a match is scored (developer values)</summary>
-              <Defaults specs={specs} groups={["match"]} filter={false} />
-            </details>
-          </>
-        )}
-        {tab === "users" && <Users />}
-        {tab === "desk" && (
-          <Defaults
-            specs={specs}
-            groups={["desk", "questions", "products"]}
-            intro={
-              <Intro>
-                How the Desk works: which covers need an approval before the
-                cutting-table DXF, who approves, when a repeated correction
-                becomes a rule, how often the question mails go out. Today two
-                lists decide who approves: <b>may approve</b> on a user (Users
-                &amp; rights; the definitive drawing) and{" "}
-                <code>desk.approvers</code> below (the Desk; admins always may).
-                Making that one list is an open question for the owner.
-              </Intro>
-            }
-          />
-        )}
-        {tab === "defaults" && (
-          <Defaults
-            specs={specs}
-            groups={[
-              "construction",
-              "stitching",
-              "welding",
-              "hem",
-              "features",
-              "seams",
-            ]}
-            intro={
-              <Intro>
-                The company defaults every new cover starts from (
-                <code>config/defaults.yaml</code>); a cover's own values are on
-                its <i>Adjust</i> tab. Read-only here: the developer changes
-                them, one commit per change (which ones you want to change
-                yourself is open question 5).
-              </Intro>
-            }
-          />
-        )}
-        {tab === "mail" && (
-          <>
-            <Recipients specs={specs} />
-            <ShopForm
-              key="mail"
-              specs={specs}
-              groups={[{ title: "Shop mails", fields: MAIL_SHOP }]}
-              owns={["notify_email", "fit_mail"]}
-            />
-            <Mail />
-          </>
-        )}
-        {tab === "website" && (
-          <>
-            <WebsiteKey linkKeySet={state?.link_key_set} />
-            <ShopForm
-              key="website"
-              specs={specs}
-              groups={[
-                { title: "The shop on this server", fields: WEBSITE },
-                PAYMENT,
-              ]}
-              owns={["website_link", "home_story", "payment"]}
-            />
-            <EmbedAndKeys />
-          </>
-        )}
-        {tab === "ai" && <AiSpending specs={specs} />}
-        {tab === "system" && <System />}
-        {tab === "activity" && (
-          <>
-            <h3>Logged in now</h3>
-            <Sessions />
-            <h3>Audit log</h3>
-            <Audit />
-          </>
+        {PRICE_TABS.includes(tab) ? (
+          <Prices canEdit={user.role === "admin"} sub={tab} />
+        ) : (
+          <AdminTab tab={tab} />
         )}
       </section>
     </div>
+  );
+}
+
+/** The admins' tabs (their hooks read the shop's settings, which only admins may). */
+function AdminTab({ tab }: { tab: string }) {
+  const specs = useParams();
+  const { state } = useShop();
+  return (
+    <>
+      {tab === "company" && (
+        <ShopForm
+          key="company"
+          specs={specs}
+          groups={COMPANY}
+          owns={[
+            "company",
+            "domain",
+            "languages",
+            "colours",
+            "bbq_enabled",
+            "logo_url",
+            "og_image",
+            "stock_delivery_note",
+            "products",
+            "film_url",
+            "film_av1",
+            "film_poster",
+            "story_model",
+            "story_media",
+          ]}
+        />
+      )}
+      {tab === "company" && <Shipping />}
+      {tab === "selling" && (
+        <>
+          <h2 className="set-h2" id="matching">
+            Matching and direct orders
+          </h2>
+          <ShopForm
+            key="matching"
+            specs={specs}
+            groups={MATCHING}
+            owns={["matching"]}
+          />
+          <details className="set-group">
+            <summary>How a match is scored (developer values)</summary>
+            <Defaults specs={specs} groups={["match"]} filter={false} />
+          </details>
+          <h2 className="set-h2" id="b2b">
+            B2B terms
+          </h2>
+          <B2BTerms />
+        </>
+      )}
+      {tab === "users" && <Users />}
+      {tab === "defaults" && (
+        <h2 className="set-h2" id="desk">
+          Desk &amp; approval
+        </h2>
+      )}
+      {tab === "defaults" && (
+        <Defaults
+          specs={specs}
+          groups={["desk", "questions", "products"]}
+          intro={
+            <Intro>
+              How the Desk works: which covers need an approval before the
+              cutting-table DXF, who approves, when a repeated correction
+              becomes a rule, how often the question mails go out. Today two
+              lists decide who approves: <b>may approve</b> on a user (Users
+              &amp; rights; the definitive drawing) and{" "}
+              <code>desk.approvers</code> below (the Desk; admins always may).
+              Making that one list is an open question for the owner.
+            </Intro>
+          }
+        />
+      )}
+      {tab === "defaults" && (
+        <h2 className="set-h2" id="cover">
+          Cover defaults
+        </h2>
+      )}
+      {tab === "defaults" && (
+        <Defaults
+          specs={specs}
+          groups={[
+            "construction",
+            "stitching",
+            "welding",
+            "hem",
+            "features",
+            "seams",
+          ]}
+          intro={
+            <Intro>
+              The company defaults every new cover starts from (
+              <code>config/defaults.yaml</code>); a cover's own values are on
+              its <i>Adjust</i> tab. Read-only here: the developer changes them,
+              one commit per change (which ones you want to change yourself is
+              open question 5).
+            </Intro>
+          }
+        />
+      )}
+      {tab === "mail" && (
+        <>
+          <Recipients specs={specs} />
+          <ShopForm
+            key="mail"
+            specs={specs}
+            groups={[{ title: "Shop mails", fields: MAIL_SHOP }]}
+            owns={["notify_email", "fit_mail"]}
+          />
+          <Mail />
+        </>
+      )}
+      {tab === "website" && (
+        <>
+          <WebsiteKey linkKeySet={state?.link_key_set} />
+          <ShopForm
+            key="website"
+            specs={specs}
+            groups={[
+              { title: "The shop on this server", fields: WEBSITE },
+              PAYMENT,
+            ]}
+            owns={["website_link", "home_story", "payment"]}
+          />
+          <EmbedAndKeys />
+        </>
+      )}
+      {tab === "ai" && <AiSpending specs={specs} />}
+      {tab === "ai" && (
+        <>
+          <PhotoTest />
+        </>
+      )}
+      {tab === "system" && (
+        <>
+          <System />
+          <h2 className="set-h2" id="activity">
+            Logged in now
+          </h2>
+          <Sessions />
+          <h2 className="set-h2">Audit log</h2>
+          <Audit />
+        </>
+      )}
+    </>
   );
 }
 

@@ -28,6 +28,8 @@ from typing import Any
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
+from coverapi import cover_commerce
+
 DRAFT_SETTING = "prices_draft"
 TABLE = """CREATE TABLE IF NOT EXISTS price_sets (
     version INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -456,6 +458,16 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             },
         }
 
+    def stale(body: Any, now: dict[str, Any] | None) -> None:
+        """A save from a page that loaded an older draft would overwrite what was written since
+        (a fixed price set on a cover's page, an import): refused when the page says which draft
+        it loaded (`since`: that draft's time, or null for none) and it is no longer the one."""
+        if isinstance(body, dict) and "since" in body:
+            if body["since"] != (now or {}).get("time"):
+                raise HTTPException(
+                    409, "the draft changed since this page loaded it; load it again first"
+                )
+
     @app.put("/api/prices/draft")
     async def put_draft(request: Request) -> dict[str, Any]:
         admin = require(request, "admin")
@@ -463,9 +475,51 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
         data = body.get("data") if isinstance(body, dict) else None
         if not isinstance(data, dict):
             raise HTTPException(400, "send {data: the price set}")
+        before = draft()
+        stale(body, before)
         data = costing.normalised(data)
         d = {"data": data, "by": admin.username, "time": time.time()}
+        if before and before.get("note"):  # an import's note stays with the draft (ADR-113)
+            d["note"] = before["note"]
+        auth.set_setting(DRAFT_SETTING, d)
+        return {"draft": d, "errors": costing.validate(data)}
+
+    @app.put("/api/prices/draft/fixed")
+    async def put_fixed(request: Request) -> dict[str, Any]:
+        """One product's fixed price in one channel, in the draft (ADR-126): what a cover's
+        Price & shop tab writes. The same row of the same draft the whole-set editor writes
+        (`channels.<channel>.fixed.<model>`, in the channel's own unit: B2C incl. VAT, B2B ex
+        VAT); `price: null` removes it (the calculated price applies again). The draft starts
+        from the live set when there is none; nothing is published."""
+        admin = require(request, "admin")
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        if not isinstance(body, dict):
+            raise HTTPException(400, "send {model, channel, price}")
+        key = str(body.get("model") or "")
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,159}", key):
+            raise HTTPException(400, "model: a cover's id (or balloon, frame)")
+        channel = str(body.get("channel") or "")
+        price = body.get("price")
+        if price is not None:
+            if isinstance(price, bool) or not isinstance(price, (int, float)):
+                raise HTTPException(400, "price: a number, or null to remove the fixed price")
+            if not (0 < float(price) < 1_000_000):  # noqa: PLR2004 - a sane price in euros
+                raise HTTPException(400, "price: more than 0 (null removes the fixed price)")
         before = draft()
+        stale(body, before)
+        base = json.loads(json.dumps(before["data"] if before else current(auth)))
+        if channel not in base.get("channels", {}):
+            raise HTTPException(400, f"channel: one of {', '.join(base.get('channels', {}))}")
+        fixed = base["channels"][channel].setdefault("fixed", {})
+        if price is None:
+            fixed.pop(key, None)
+        else:
+            fixed[key] = float(price)
+        data = costing.normalised(base)
+        d = {"data": data, "by": admin.username, "time": time.time()}
         if before and before.get("note"):  # an import's note stays with the draft (ADR-113)
             d["note"] = before["note"]
         auth.set_setting(DRAFT_SETTING, d)
@@ -509,6 +563,7 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
         d = draft()
         if not d:
             raise HTTPException(400, "no draft to publish")
+        stale(body, d)  # publish what the page showed, not a draft changed since (ADR-126)
         data = checked(d["data"])
         before = current(auth)
         moved = compare(before, data, facts.all(), shop_params(auth))["changed"]
@@ -558,6 +613,35 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
         return {"version": new, "from_version": version}
 
     install_import(app, auth, store, facts, draft)
+    cover_commerce.install(app, auth, store, facts, draft)  # a cover's Price & shop (ADR-126)
+
+    @app.get("/api/prices/list")
+    def price_list(request: Request) -> dict[str, Any]:
+        """Every calculated cover's cost, B2C and B2B price, margin and where each price comes
+        from (fixed or calculated), under the live set or the draft (`?set=draft`): the optional
+        price columns of Covers → All covers (ADR-126). The same costing as everywhere."""
+        require(request, "edit")
+        name = request.query_params.get("set")
+        ps = which(name)
+        rows = {}
+        for mid, f in facts.all().items():
+            try:
+                c = costing.costing(f, ps, mid)
+            except (KeyError, TypeError, ValueError, ZeroDivisionError):
+                continue
+            rows[mid] = {
+                "cost": c["cost_eur"],
+                **{
+                    k: {
+                        "shown": ch["shown_eur"],
+                        "margin_eur": ch["margin_eur"],
+                        "margin_pct": ch["margin_pct"],
+                        "fixed": bool(ch["fixed"]),
+                    }
+                    for k, ch in c["channels"].items()
+                },
+            }
+        return {"set": "draft" if name == "draft" and draft() else "current", "rows": rows}
 
     @app.get("/api/prices/products")
     def products(request: Request) -> dict[str, Any]:

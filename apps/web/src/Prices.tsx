@@ -25,24 +25,13 @@ import { PriceImport } from "./PriceImport";
 // config/defaults.yaml). Live examples beside the settings cost one real cover with the numbers
 // as they are typed (POST /api/prices/check), so the owner sees what a number does.
 
-// The tabs are the Prices section's sub-menu, in the address (#/prices/<tab>, ADR-122).
-type Sub =
-  | "materials"
-  | "labour"
-  | "rate"
-  | "channels"
-  | "import"
-  | "costing"
-  | "versions";
-const SUBS: [Sub, string][] = [
-  ["materials", "Materials"],
-  ["labour", "Labour"],
-  ["rate", "Exchange rate"],
-  ["channels", "Channels & price lists"],
-  ["import", "Import (Excel)"],
-  ["costing", "Costing"],
-  ["versions", "Versions"],
-];
+// Since ADR-126 these are three tabs of Settings → Prices & costs (#/settings/<tab>): Costs
+// (materials, labour, the exchange rate), Price rules (per channel; the accessories' fixed
+// prices; a configurator product's costing) and Publish & versions (the draft, preview, publish,
+// the versions, the Excel import). What belongs to one cover (its costing, its prices, its fixed
+// price) is on that cover's own Price & shop tab (CoverPrice.tsx).
+type Sub = "costs" | "pricing" | "publish";
+const SUBS: Sub[] = ["costs", "pricing", "publish"];
 const CHANNELS: ChannelKey[] = ["b2c", "b2b"];
 const ROUNDING_LABEL: Record<string, string> = {
   none: "none (cents)",
@@ -72,7 +61,7 @@ const COMPONENT_HELP: Record<string, string> = {
   elastic:
     "Only for covers with an elastic hem instead of a cord, per metre of hem. Example € 0.85/m.",
   balloon:
-    "Goes under a table cover so rain runs off. Not in the cover's cost price: sold next to the cover at its own price (Channels). Example € 14.50.",
+    "Goes under a table cover so rain runs off. Not in the cover's cost price: sold next to the cover at its own price (Price rules). Example € 14.50.",
   frame:
     "A gabled frame under a table cover, like the balloon; sold next to the cover. Example € 64.50.",
 };
@@ -89,7 +78,7 @@ const OPERATION_HELP: Record<string, string> = {
 
 export function Prices({
   canEdit,
-  sub: subIn = "materials",
+  sub: subIn = "costs",
 }: {
   canEdit: boolean;
   sub?: string;
@@ -97,9 +86,7 @@ export function Prices({
   const [state, setState] = useState<PricesState | null>(null);
   const [doc, setDoc] = useState<PriceSet | null>(null);
   const [dirty, setDirty] = useState(false);
-  const sub: Sub = SUBS.some(([k]) => k === subIn)
-    ? (subIn as Sub)
-    : "materials";
+  const sub: Sub = SUBS.includes(subIn as Sub) ? (subIn as Sub) : "costs";
   const [msg, setMsg] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
   const [moves, setMoves] = useState<{
@@ -154,7 +141,12 @@ export function Prices({
     }, 300);
     return () => clearTimeout(t);
   }, [doc, example]);
-  useUnsaved("prices", dirty, "#/prices/"); // leaving with numbers not saved as a draft asks first
+  // leaving with numbers not saved as a draft asks first; the three price tabs keep them
+  useUnsaved(
+    "prices",
+    dirty,
+    "#/settings/costs|#/settings/pricing|#/settings/publish",
+  );
   if (!state || !doc) return <p className="muted">{msg || "Loading…"}</p>;
   const edit = canEdit && state.can_edit;
   const update = (fn: (d: PriceSet) => void) => {
@@ -204,7 +196,9 @@ export function Prices({
     }
   };
   const saveDraft = async () => {
-    const r = await prices.saveDraft(doc);
+    // `since`: the draft this page loaded; a newer one (a price set on a cover's page, an
+    // import) is not overwritten (409) — load it again first (ADR-126)
+    const r = await prices.saveDraft(doc, state.draft?.time ?? null);
     setErrors(r.errors);
     setDirty(false);
     setState({ ...state, draft: r.draft, draft_errors: r.errors });
@@ -214,34 +208,17 @@ export function Prices({
   const shownErrors = dirty && check ? check.errors : errors;
   return (
     <div className="prices">
-      <section className="card">
-        <h3>Prices &amp; costing</h3>
+      <section className="card prices-bar">
         <p className="muted">
-          Purchase prices, labour, the exchange rate and the price lists for
-          consumers (B2C) and business customers (B2B). The configurator, the
-          shop and every costing use the <b>published</b> version.{" "}
+          The configurator, the shop and every costing use the <b>published</b>{" "}
+          version.{" "}
           {edit
-            ? "Change numbers below, look at which prices move, then publish."
-            : "You can look; an admin changes the prices."}
+            ? "Change numbers, save them as a draft, look at which prices move, then publish."
+            : "You can look; an admin changes the prices."}{" "}
+          A cover's own cost, prices and fixed price: open the cover →{" "}
+          <i>Price &amp; shop</i>, or switch on <i>Prices</i> on{" "}
+          <a href="#/covers/all?prices=1">All covers</a>.
         </p>
-        <ol className="prices-flow" aria-label="how a price is made">
-          <li>
-            <b>Cost price</b>
-            <span>fabric + components (Materials) + labour (Labour)</span>
-          </li>
-          <li>
-            <b>Landed cost</b>
-            <span>+ shipping, duties, packaging (Channels)</span>
-          </li>
-          <li>
-            <b>Price ex VAT</b>
-            <span>× the channel's markup, or ÷ its margin</span>
-          </li>
-          <li>
-            <b>Shown price</b>
-            <span>+ VAT (B2C), rounded up</span>
-          </li>
-        </ol>
         <p className="prices-status">
           {pub ? (
             <>
@@ -323,7 +300,10 @@ export function Prices({
                       const errs = await saveDraft();
                       if (errs.length) return;
                     }
-                    const r = await prices.publish(note);
+                    const since = dirty
+                      ? (await prices.state()).draft?.time
+                      : state.draft?.time;
+                    const r = await prices.publish(note, since ?? null);
                     setNote("");
                     setMoves(null);
                     load();
@@ -349,26 +329,72 @@ export function Prices({
                 Discard draft
               </button>
             </div>
-            <p className="help">
-              <b>Save draft</b> keeps your numbers without changing the shop.{" "}
-              <b>Preview changes</b> lists every price that would move, before →
-              after. <b>Publish</b> makes them live for the shop and every
-              costing; each published version is kept (Versions can roll back).{" "}
-              <b>Discard draft</b> throws your changes away.
-            </p>
+            {sub === "publish" && (
+              <p className="help">
+                <b>Save draft</b> keeps your numbers without changing the shop.{" "}
+                <b>Preview changes</b> lists every price that would move, before
+                → after. <b>Publish</b> makes the whole draft live for the shop
+                and every costing (also the fixed prices set on covers' pages);
+                each published version is kept and can be rolled back below.{" "}
+                <b>Discard draft</b> throws the draft away.
+              </p>
+            )}
           </>
         )}
-        {msg && <p className="muted">{msg}</p>}
+        {msg && !msg.includes("draft changed") && (
+          <p className="muted">{msg}</p>
+        )}
+        {msg.includes("draft changed") && (
+          <p className="error">
+            Someone changed the draft after this page loaded it (a price on a
+            cover's page, an import). Your numbers here are not saved.{" "}
+            <button
+              onClick={() => {
+                setMsg("");
+                load();
+              }}
+            >
+              Load the newer draft (drops the numbers typed here)
+            </button>
+          </p>
+        )}
       </section>
       {moves && <Moves moves={moves} />}
       <section className="tab">
-        {sub === "materials" && <Materials {...ctx} />}
-        {sub === "labour" && <Labour {...ctx} />}
-        {sub === "rate" && <Rate {...ctx} />}
-        {sub === "import" && !edit && (
+        {sub === "costs" && (
+          <>
+            <h2 className="set-h2" id="materials">
+              Materials
+            </h2>
+            <Materials {...ctx} />
+            <h2 className="set-h2" id="labour">
+              Labour
+            </h2>
+            <Labour {...ctx} />
+            <h2 className="set-h2" id="rate">
+              Exchange rate
+            </h2>
+            <Rate {...ctx} />
+          </>
+        )}
+        {sub === "publish" && (
+          <Versions
+            edit={edit}
+            onChange={() => {
+              load();
+              setMsg("");
+            }}
+          />
+        )}
+        {sub === "publish" && (
+          <h2 className="set-h2" id="import">
+            Import a price list (Excel)
+          </h2>
+        )}
+        {sub === "publish" && !edit && (
           <p className="muted">An admin imports a price list.</p>
         )}
-        {sub === "import" && edit && (
+        {sub === "publish" && edit && (
           <PriceImport
             beforeApply={async () => !dirty || (await saveDraft()).length === 0}
             onApplied={(m) => {
@@ -379,23 +405,19 @@ export function Prices({
             }}
           />
         )}
-        {sub === "channels" && <Channels {...ctx} />}
-        {sub === "costing" && (
-          <CostingView
-            hasDraft={!!state.draft}
-            dirty={dirty}
-            doc={doc}
-            products={products}
-          />
-        )}
-        {sub === "versions" && (
-          <Versions
-            edit={edit}
-            onChange={() => {
-              load();
-              setMsg("");
-            }}
-          />
+        {sub === "pricing" && <Channels {...ctx} />}
+        {sub === "pricing" && (
+          <>
+            <h2 className="set-h2" id="configurator">
+              A configurator product's costing
+            </h2>
+            <CostingView
+              hasDraft={!!state.draft}
+              dirty={dirty}
+              doc={doc}
+              products={products}
+            />
+          </>
         )}
       </section>
     </div>
@@ -663,14 +685,14 @@ function Materials(ctx: Ctx) {
           <b>What every cover is made of, at purchase price.</b> Fill in the
           fabric first (the biggest cost), then each component. Prices may be in
           euros or rupiah; rupiah are converted with the rate on{" "}
-          <i>Exchange rate</i>.
+          <i>Exchange rate</i> below.
         </p>
         <p>
           For each cover the program takes the metres from its own cut plan and
           counts its vents, cord and pieces, so: fabric metres × price per metre
           + components × how many the cover has. Together with <i>Labour</i>{" "}
-          this is the <b>cost price</b>; the <i>Channels</i> tab turns it into
-          the shop price.
+          (below) this is the <b>cost price</b>; <i>Price rules</i> turns it
+          into the shop price.
         </p>
       </Intro>
       {doc.fabrics.map((f, i) => {
@@ -1406,6 +1428,12 @@ function Channels(ctx: Ctx) {
       Object.fromEntries((products?.models ?? []).map((m) => [m.id, m.name])),
     [products],
   );
+  // a calculated cover's fixed price lives on its page; the rest (balloon, frame, products with
+  // no calculated cover) stays here, so nothing set before becomes unreachable
+  const coverFixed = (f: Record<string, number>) =>
+    Object.entries(f).filter(([k]) => k in names);
+  const otherFixed = (f: Record<string, number>) =>
+    Object.entries(f).filter(([k]) => !(k in names));
   return (
     <>
       <Intro>
@@ -1690,52 +1718,84 @@ function Channels(ctx: Ctx) {
                   </label>
                 </Field>
               </div>
-              <h5>Fixed prices ({vatWord} VAT)</h5>
+              <h5>Fixed prices of other products ({vatWord} VAT)</h5>
               <p className="help">
-                A price you set by hand for one product in this channel; it wins
-                over the rule above, without rounding. Type a model id (or
-                balloon, frame) and the price {vatWord} VAT.
+                A price set by hand wins over the rule above, without rounding.
+                A cover's own fixed price is set on its page (
+                <i>Price &amp; shop</i>)
+                {coverFixed(ch.fixed).length > 0 && (
+                  <>
+                    : {coverFixed(ch.fixed).length} covers have one in this
+                    channel (
+                    <a href="#/covers/all?prices=1">All covers, with prices</a>)
+                  </>
+                )}
+                . Here: the balloon, the frame, and fixed prices of products
+                that have no calculated cover.
               </p>
-              {Object.keys(ch.fixed).length > 0 && (
-                <table className="list">
-                  <tbody>
-                    {Object.entries(ch.fixed).map(([key, v]) => (
-                      <tr key={key} className="static">
-                        <td>
-                          {key}
-                          <div className="muted">{names[key] ?? ""}</div>
-                        </td>
-                        <td>
-                          <Num
-                            value={v}
-                            edit={edit}
-                            label={`${k} fixed ${key}`}
-                            onChange={(n) =>
-                              set((x) => void (x.fixed[key] = n))
-                            }
-                          />
-                        </td>
-                        {edit && (
+              {(() => {
+                const fixedTable = (rows: [string, number][]) => (
+                  <table className="list">
+                    <tbody>
+                      {rows.map(([key, v]) => (
+                        <tr key={key} className="static">
                           <td>
-                            <button
-                              onClick={() =>
-                                set((x) => void delete x.fixed[key])
-                              }
-                            >
-                              Remove
-                            </button>
+                            {key}
+                            <div className="muted">{names[key] ?? ""}</div>
                           </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                          <td>
+                            <Num
+                              value={v}
+                              edit={edit}
+                              label={`${k} fixed ${key}`}
+                              onChange={(n) =>
+                                set((x) => void (x.fixed[key] = n))
+                              }
+                            />
+                          </td>
+                          {edit && (
+                            <td>
+                              <button
+                                onClick={() =>
+                                  set((x) => void delete x.fixed[key])
+                                }
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+                const acc = otherFixed(ch.fixed).filter(([key]) =>
+                  BUILT_IN.includes(key),
+                );
+                const rest = otherFixed(ch.fixed).filter(
+                  ([key]) => !BUILT_IN.includes(key),
+                );
+                return (
+                  <>
+                    {acc.length > 0 && fixedTable(acc)}
+                    {rest.length > 0 && (
+                      <details className="explain">
+                        <summary>
+                          {rest.length} fixed price
+                          {rest.length === 1 ? "" : "s"} of products without a
+                          calculated cover here
+                        </summary>
+                        {fixedTable(rest)}
+                      </details>
+                    )}
+                  </>
+                );
+              })()}
               {edit && (
                 <div className="row">
                   <input
                     list="price-products"
-                    placeholder="model id, balloon or frame"
+                    placeholder="balloon or frame"
                     aria-label={`${k} fixed product`}
                     value={newKey[k] ?? ""}
                     onChange={(e) =>
@@ -1773,11 +1833,6 @@ function Channels(ctx: Ctx) {
       <datalist id="price-products">
         <option value="balloon">Balloon</option>
         <option value="frame">Frame</option>
-        {(products?.models ?? []).map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
       </datalist>
     </>
   );
@@ -1870,35 +1925,26 @@ function CostingView({
   doc: PriceSet;
   products: CostingProducts | null;
 }) {
-  const [mode, setMode] = useState<"model" | "configurator">("model");
-  const [model, setModel] = useState("");
+  // a configurator product at its sizes; a cover's own costing is on its page (ADR-126)
   const [product, setProduct] = useState("sofa");
   const [sizes, setSizes] = useState<Record<string, number | boolean>>({});
   const [set, setSet] = useState<SetChoice>("current");
   const [c, setC] = useState<Costing | null>(null);
   const [msg, setMsg] = useState("");
-  useEffect(() => {
-    if (products?.models.length)
-      setModel((m) => m || products.example || products.models[0].id);
-  }, [products]);
-  const query = useMemo((): Record<string, string> | null => {
+  const query = useMemo((): Record<string, string> => {
     const s = set === "page" ? "current" : set;
-    if (mode === "model") return model ? { model, set: s } : null;
     return { product, sizes: JSON.stringify(sizes), set: s };
-  }, [mode, model, product, sizes, set]);
+  }, [product, sizes, set]);
   useEffect(() => {
-    if (!query) return;
     const t = setTimeout(() => {
       const get: Promise<Costing> =
         set === "page"
-          ? prices
-              .check(doc, mode === "model" ? { model } : { product, sizes })
-              .then((r) => {
-                if (r.costing) return r.costing;
-                throw new Error(
-                  r.errors.join("; ") || r.costing_error || "no costing",
-                );
-              })
+          ? prices.check(doc, { product, sizes }).then((r) => {
+              if (r.costing) return r.costing;
+              throw new Error(
+                r.errors.join("; ") || r.costing_error || "no costing",
+              );
+            })
           : prices.costing(query);
       get
         .then((x) => {
@@ -1911,17 +1957,17 @@ function CostingView({
         });
     }, 250);
     return () => clearTimeout(t);
-  }, [query, set, doc, mode, model, product, sizes]);
+  }, [query, set, doc, product, sizes]);
   const spec = products?.configurator.find((p) => p.product === product);
-  const qs = query ? new URLSearchParams(query).toString() : "";
+  const qs = new URLSearchParams(query).toString();
   return (
     <>
       <Intro>
         <p>
-          <b>What one cover costs and sells for, line by line.</b> Choose a
-          cover (catalogue, drawing, arrangement, order) or a configurator
-          product with its sizes. The quantities come from the cover's real cut
-          pieces; the prices from the tabs before.
+          <b>What a configurator product costs and sells for, line by line,</b>{" "}
+          at the sizes you give. A cover's own costing (catalogue, drawing,
+          arrangement, order) is on the cover's page, tab{" "}
+          <i>Price &amp; shop</i>.
         </p>
         <p>
           <b>Prices:</b> “live” = what the shop uses now; “saved draft” = your
@@ -1967,22 +2013,6 @@ function CostingView({
       </Intro>
       <section className="card">
         <div className="row">
-          <label className="check">
-            <input
-              type="radio"
-              checked={mode === "model"}
-              onChange={() => setMode("model")}
-            />{" "}
-            A cover (catalogue, drawing, arrangement)
-          </label>
-          <label className="check">
-            <input
-              type="radio"
-              checked={mode === "configurator"}
-              onChange={() => setMode("configurator")}
-            />{" "}
-            A configurator product
-          </label>
           <span className="spacer" />
           <label className="inline">
             Prices{" "}
@@ -2001,28 +2031,7 @@ function CostingView({
             </select>
           </label>
         </div>
-        {mode === "model" ? (
-          <div className="row">
-            <input
-              list="costing-models"
-              className="wide"
-              aria-label="cover to cost"
-              value={model}
-              onChange={(e) => setModel(e.target.value.trim())}
-              placeholder="model id"
-            />
-            <datalist id="costing-models">
-              {(products?.models ?? []).map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.kind}: {m.name}
-                </option>
-              ))}
-            </datalist>
-            <span className="muted">
-              {products?.models.length ?? 0} calculated covers; type to search
-            </span>
-          </div>
-        ) : (
+        {
           <div className="row">
             <select
               value={product}
@@ -2068,160 +2077,166 @@ function CostingView({
               ),
             )}
           </div>
-        )}
+        }
         {msg && <p className="error">{msg}</p>}
       </section>
-      {c && (
-        <section className="card costing" data-testid="costing">
-          <div className="row">
-            <h4>
-              {c.name}
-              {c.model ? <span className="muted"> · {c.model}</span> : null}
-            </h4>
-            <span className="spacer" />
-            {c.indicative && <span className="pill warn">indicative</span>}
-            {set !== "page" && (
-              <>
-                <a className="button" href={`/api/prices/costing.csv?${qs}`}>
-                  CSV
-                </a>
-                <a
-                  className="button"
-                  href={`/api/prices/costing.pdf?${qs}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  PDF
-                </a>
-              </>
-            )}
-          </div>
-          <p className="muted">
-            {c.facts.piece} pieces · {c.facts.fabric_m?.toFixed(2)} m of roll in
-            the cut plan · {c.facts.seam_m?.toFixed(1)} m of seam ·{" "}
-            {c.facts.hem_m?.toFixed(1)} m of hem · {c.facts.vent} vents ·{" "}
-            {c.facts.cord_m?.toFixed(1)} m of cord · fabric {c.fabric.name} · 1
-            EUR = {c.exchange.idr_per_eur.toLocaleString("en-GB")} IDR (
-            {c.exchange.date})
-          </p>
-          <table className="list costing-lines">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>How</th>
-                <th>Quantity</th>
-                <th>Unit price</th>
-                <th>EUR</th>
-                <th>IDR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {c.lines.map((x: CostLine) => (
-                <tr key={x.section + x.code} className={`static ${x.section}`}>
-                  <td>
-                    <span className="muted">{x.section}</span> {x.name}
-                  </td>
-                  <td className="muted">{x.note}</td>
-                  <td>
-                    {x.qty.toLocaleString("en-GB", {
-                      maximumFractionDigits: 3,
-                    })}{" "}
-                    {x.unit}
-                  </td>
-                  <td>{money(x.unit_price, x.currency)}</td>
-                  <td>{eur(x.eur)}</td>
-                  <td className="muted">{idr(x.idr)}</td>
-                </tr>
-              ))}
-              <tr className="static total">
-                <td colSpan={2}>
-                  Cost price{" "}
-                  <span className="muted">
-                    (fabric {eur(c.fabric_eur)} · components{" "}
-                    {eur(c.components_eur)} · labour {eur(c.labour_eur)},{" "}
-                    {Math.round(c.labour_minutes)} min)
-                  </span>
-                </td>
-                <td />
-                <td />
-                <td>{eur(c.cost_eur)}</td>
-                <td>{idr(c.cost_idr)}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div className="prices-channels">
-            {Object.entries(c.channels).map(([k, ch]) => (
-              <div key={k} className="card channel-price" data-channel={k}>
-                <h5>
-                  {k.toUpperCase()}: {ch.name}
-                </h5>
-                <table className="list">
-                  <tbody>
-                    <tr className="static">
-                      <td>Cost price</td>
-                      <td>{eur(c.cost_eur)}</td>
-                    </tr>
-                    {ch.extras.map((e) => (
-                      <tr key={e.code} className="static">
-                        <td>+ {e.name}</td>
-                        <td>{eur(e.eur)}</td>
-                      </tr>
-                    ))}
-                    <tr className="static total">
-                      <td>Landed cost</td>
-                      <td>{eur(ch.landed_eur)}</td>
-                    </tr>
-                    <tr className="static">
-                      <td>
-                        Price ex VAT{" "}
-                        <span className="muted">
-                          {ch.fixed
-                            ? "(fixed price)"
-                            : `(${ch.method} ${ch.pct} % on the ${ch.base === "landed" ? "landed" : "cost"} price)`}
-                        </span>
-                      </td>
-                      <td>{eur(ch.net_eur)}</td>
-                    </tr>
-                    <tr className="static">
-                      <td>VAT {ch.vat_pct} %</td>
-                      <td>{eur(ch.vat_eur)}</td>
-                    </tr>
-                    <tr className="static">
-                      <td>Price incl. VAT</td>
-                      <td>{eur(ch.gross_eur)}</td>
-                    </tr>
-                    <tr className="static total">
-                      <td>
-                        Shown price{" "}
-                        <span className="muted">
-                          ({ch.show_vat ? "incl." : "ex"} VAT)
-                        </span>
-                      </td>
-                      <td>{eur(ch.shown_eur)}</td>
-                    </tr>
-                    <tr className="static">
-                      <td>Margin</td>
-                      <td>
-                        {eur(ch.margin_eur)}{" "}
-                        <span className="muted">({ch.margin_pct} %)</span>
-                      </td>
-                    </tr>
-                    {Object.entries(ch.accessories).map(([code, a]) => (
-                      <tr key={code} className="static">
-                        <td>
-                          Sold with it: {a.count} × {code}
-                        </td>
-                        <td>{eur(a.shown_eur)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {c && <CostingSheet c={c} qs={set !== "page" ? qs : ""} />}
     </>
+  );
+}
+
+/** One costing, line by line, and its price per channel (the configurator's here, a cover's on
+ * its Price & shop tab). `qs`: the query for the CSV and PDF links ("" for none). */
+export function CostingSheet({ c, qs }: { c: Costing; qs: string }) {
+  return (
+    <section className="card costing" data-testid="costing">
+      <div className="row">
+        <h4>
+          {c.name}
+          {c.model ? <span className="muted"> · {c.model}</span> : null}
+        </h4>
+        <span className="spacer" />
+        {c.indicative && <span className="pill warn">indicative</span>}
+        {qs && (
+          <>
+            <a className="button" href={`/api/prices/costing.csv?${qs}`}>
+              CSV
+            </a>
+            <a
+              className="button"
+              href={`/api/prices/costing.pdf?${qs}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              PDF
+            </a>
+          </>
+        )}
+      </div>
+      <p className="muted">
+        {c.facts.piece} pieces · {c.facts.fabric_m?.toFixed(2)} m of roll in the
+        cut plan · {c.facts.seam_m?.toFixed(1)} m of seam ·{" "}
+        {c.facts.hem_m?.toFixed(1)} m of hem · {c.facts.vent} vents ·{" "}
+        {c.facts.cord_m?.toFixed(1)} m of cord · fabric {c.fabric.name} · 1 EUR
+        = {c.exchange.idr_per_eur.toLocaleString("en-GB")} IDR (
+        {c.exchange.date})
+      </p>
+      <table className="list costing-lines">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>How</th>
+            <th>Quantity</th>
+            <th>Unit price</th>
+            <th>EUR</th>
+            <th>IDR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {c.lines.map((x: CostLine) => (
+            <tr key={x.section + x.code} className={`static ${x.section}`}>
+              <td>
+                <span className="muted">{x.section}</span> {x.name}
+              </td>
+              <td className="muted">{x.note}</td>
+              <td>
+                {x.qty.toLocaleString("en-GB", {
+                  maximumFractionDigits: 3,
+                })}{" "}
+                {x.unit}
+              </td>
+              <td>{money(x.unit_price, x.currency)}</td>
+              <td>{eur(x.eur)}</td>
+              <td className="muted">{idr(x.idr)}</td>
+            </tr>
+          ))}
+          <tr className="static total">
+            <td colSpan={2}>
+              Cost price{" "}
+              <span className="muted">
+                (fabric {eur(c.fabric_eur)} · components {eur(c.components_eur)}{" "}
+                · labour {eur(c.labour_eur)}, {Math.round(c.labour_minutes)}{" "}
+                min)
+              </span>
+            </td>
+            <td />
+            <td />
+            <td>{eur(c.cost_eur)}</td>
+            <td>{idr(c.cost_idr)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div className="prices-channels">
+        {Object.entries(c.channels).map(([k, ch]) => (
+          <div key={k} className="card channel-price" data-channel={k}>
+            <h5>
+              {k.toUpperCase()}: {ch.name}
+            </h5>
+            <table className="list">
+              <tbody>
+                <tr className="static">
+                  <td>Cost price</td>
+                  <td>{eur(c.cost_eur)}</td>
+                </tr>
+                {ch.extras.map((e) => (
+                  <tr key={e.code} className="static">
+                    <td>+ {e.name}</td>
+                    <td>{eur(e.eur)}</td>
+                  </tr>
+                ))}
+                <tr className="static total">
+                  <td>Landed cost</td>
+                  <td>{eur(ch.landed_eur)}</td>
+                </tr>
+                <tr className="static">
+                  <td>
+                    Price ex VAT{" "}
+                    <span className="muted">
+                      {ch.fixed
+                        ? "(fixed price)"
+                        : `(${ch.method} ${ch.pct} % on the ${ch.base === "landed" ? "landed" : "cost"} price)`}
+                    </span>
+                  </td>
+                  <td>{eur(ch.net_eur)}</td>
+                </tr>
+                <tr className="static">
+                  <td>VAT {ch.vat_pct} %</td>
+                  <td>{eur(ch.vat_eur)}</td>
+                </tr>
+                <tr className="static">
+                  <td>Price incl. VAT</td>
+                  <td>{eur(ch.gross_eur)}</td>
+                </tr>
+                <tr className="static total">
+                  <td>
+                    Shown price{" "}
+                    <span className="muted">
+                      ({ch.show_vat ? "incl." : "ex"} VAT)
+                    </span>
+                  </td>
+                  <td>{eur(ch.shown_eur)}</td>
+                </tr>
+                <tr className="static">
+                  <td>Margin</td>
+                  <td>
+                    {eur(ch.margin_eur)}{" "}
+                    <span className="muted">({ch.margin_pct} %)</span>
+                  </td>
+                </tr>
+                {Object.entries(ch.accessories).map(([code, a]) => (
+                  <tr key={code} className="static">
+                    <td>
+                      Sold with it: {a.count} × {code}
+                    </td>
+                    <td>{eur(a.shown_eur)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -2245,11 +2260,8 @@ function Versions({ edit, onChange }: { edit: boolean; onChange: () => void }) {
         is <b>live</b>: the shop, the configurator and every costing use it.
       </p>
       <p>
-        <b>Draft</b> (your saved, unpublished numbers) → <b>Preview</b> (which
-        prices would move) → <b>Publish</b> (a new live version).{" "}
         <b>Roll back</b> makes an older version live again; that too is stored
-        as a new version, so nothing is ever lost and you can always go forward
-        again.
+        as a new version, so nothing is ever lost.
       </p>
     </Intro>
   );

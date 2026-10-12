@@ -27,8 +27,7 @@ import { Search } from "./Search";
 import { Workshop } from "./Workshop";
 import { Matches, Orders, Requests, Website } from "./Admin";
 import { B2BCustomers } from "./B2BCustomers";
-import { PhotoTest } from "./PhotoTest";
-import { Prices } from "./Prices";
+import { CoverPrice, CoverSummary } from "./CoverPrice";
 import { Reference } from "./Reference";
 import {
   Account,
@@ -57,6 +56,7 @@ import {
   Route,
   SECTIONS,
   sectionHome,
+  settingsWho,
   visibleSections,
 } from "./nav";
 
@@ -293,6 +293,8 @@ function Page({ route, user }: { route: Route; user: User }) {
     const pg = sec.pages.find((p) => p.id === page);
     if (!allowed(sec.who, user) || (pg && !allowed(pg.who, user)))
       return <NotAllowed />;
+    if (sec.id === "settings" && !allowed(settingsWho(page), user))
+      return <NotAllowed />;
   }
   const isAdmin = user.role === "admin";
   switch (section) {
@@ -315,7 +317,12 @@ function Page({ route, user }: { route: Route; user: User }) {
       if (page === "new") return <NewCover />;
       if (page === "learning") return <Learning />;
       if (page === "products") return <ProductList />;
-      return <AllCovers cards={query.get("view") === "cards"} />;
+      return (
+        <AllCovers
+          cards={query.get("view") === "cards"}
+          priceCols={query.get("prices") ?? ""}
+        />
+      );
     case "shop":
       if (page === "orders")
         return (
@@ -332,19 +339,28 @@ function Page({ route, user }: { route: Route; user: User }) {
           <Tpl
             kind="list"
             title="Requests"
-            intro="Quotes customers asked for in the configurator."
+            intro="What customers asked: which existing cover fits their sizes (in learning mode a colleague answers first), and the quotes from the configurator. A cover's own requests are also on its Price & shop tab."
           >
-            <Requests />
-          </Tpl>
-        );
-      if (page === "matches")
-        return (
-          <Tpl
-            kind="list"
-            title="Matches"
-            intro="Which existing cover fits a customer's sizes; in learning mode a colleague answers every request."
-          >
+            <p className="jump" aria-label="On this page">
+              {[
+                ["req-matches", "Which cover fits"],
+                ["req-quotes", "Quotes from the configurator"],
+              ].map(([to, label]) => (
+                <button
+                  key={to}
+                  className="link"
+                  onClick={() =>
+                    document
+                      .getElementById(to)
+                      ?.scrollIntoView({ behavior: "smooth" })
+                  }
+                >
+                  {label} ↓
+                </button>
+              ))}
+            </p>
             <Matches />
+            <Requests />
           </Tpl>
         );
       if (page === "b2b")
@@ -352,19 +368,9 @@ function Page({ route, user }: { route: Route; user: User }) {
           <Tpl
             kind="list"
             title="B2B customers"
-            intro="Companies, their logins, prices and orders on account. The terms are under Settings → B2B terms."
+            intro="Companies, their logins, prices and orders on account. The terms are under Settings → Selling; a cover's own B2B prices also show on its Price & shop tab."
           >
             <B2BCustomers />
-          </Tpl>
-        );
-      if (page === "phototest")
-        return (
-          <Tpl
-            kind="form"
-            title="Photo test"
-            intro="A photo suggestion step by step: image search, identification, searches and scores."
-          >
-            <PhotoTest />
           </Tpl>
         );
       return (
@@ -374,12 +380,6 @@ function Page({ route, user }: { route: Route; user: User }) {
           intro={`Say what should change on the website; the AI changes the draft, you check the preview${isAdmin ? " and publish" : "; an admin publishes"}.`}
         >
           <Website canPublish={isAdmin} />
-        </Tpl>
-      );
-    case "prices":
-      return (
-        <Tpl kind="form">
-          <Prices canEdit={isAdmin} sub={page} />
         </Tpl>
       );
     case "settings":
@@ -757,6 +757,7 @@ function ModelPage({
           </a>
         </div>
       </section>
+      <CoverSummary model={model} />
       {model.kind && !model.kind.confirmed && has("model.json") && !running && (
         <KindCheck
           kind={model.kind}
@@ -858,7 +859,8 @@ function ModelPage({
           <Revisions model={model} />
         )}
         {tab === "history" && sub === "log" && <Log model={model} job={job} />}
-        {tab === "files" && <Files model={model} />}
+        {tab === "pieces" && sub === "files" && <Files model={model} />}
+        {tab === "price" && <CoverPrice id={id} model={model} />}
       </section>
     </div>
   );

@@ -5355,3 +5355,91 @@ header.hdr .user button.theme-toggle {
 .ws-table td {
   vertical-align: top;
 }
+
+/* ---- one cover, one page (ADR-126) -------------------------------------------------------- */
+.cv-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px 18px;
+  margin: 0 0 10px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+.cv-summary > div {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+.cv-summary dt {
+  flex: none;
+  width: 76px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.cv-summary dd {
+  margin: 0;
+  min-width: 0;
+}
+.cv-summary .badge {
+  margin-left: 0;
+}
+.set-h2 {
+  font-size: 17px;
+  margin: 22px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.set-body > .set-h2:first-of-type,
+.tab > .set-h2:first-child {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 4px;
+}
+.cover-price .pill {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--sand-soft);
+  color: var(--ink);
+}
+.cover-price .pill.muted-pill {
+  background: var(--line);
+}
+.cover-price table.cover-prices td {
+  vertical-align: top;
+}
+.cover-price table.cover-prices input.num {
+  width: 110px;
+}
+.cover-price .row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cover-price h4 {
+  margin: 14px 0 6px;
+}
+.cover-price .cover-cost > .row h3 {
+  margin: 14px 0 6px;
+}
+.cover-price .card.attention button {
+  margin-left: 6px;
+}
+td.price-cell a {
+  color: var(--ink);
+  text-decoration: none;
+}
+td.price-cell a:hover {
+  text-decoration: underline;
+}
+.jump {
+  display: flex;
+  gap: 16px;
+  margin: 0 0 8px;
+}

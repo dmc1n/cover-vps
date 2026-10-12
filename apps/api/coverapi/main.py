@@ -212,8 +212,12 @@ def create_app(
         out["approval"] = state(d)
         from coverengine.params import Registry
 
-        out["dxf_ok"] = desk.dxf_allowed(d, Registry.load(None).resolve())  # ADR-079
+        params = Registry.load(None).resolve()
+        out["dxf_ok"] = desk.dxf_allowed(d, params)  # ADR-079
         out["desk_status"] = desk.state(d)["status"]
+        # the Workshop's line for this cover (approved or produced; fit, the revision to cut),
+        # for the summary at the top of its page (ADR-126); None before the Desk approves
+        out["workshop"] = desk.workshop_item(d, params)
         return out
 
     @app.get("/api/models/{model_id}/files/{name:path}")

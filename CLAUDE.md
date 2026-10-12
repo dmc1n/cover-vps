@@ -81,7 +81,8 @@ Python engine, server side, one VPS.
   editing with geodesic preview, patch colours and stretch heatmap; SVG 2D pattern view;
   parameter panel generated from JSON schema; export downloads. The studio's map is
   `src/nav.ts`, its one stylesheet `src/studio.css` (tokens, light and dark), its page
-  templates `src/layout.tsx` (ADR-122, ADR-124); the handbook's index is docs/handbook/README.md.
+  templates `src/layout.tsx` (ADR-122, ADR-124). One cover, one page: what belongs to one cover
+  (its cost, prices, shop place, orders) lives only on its page; general settings in Settings (ADR-126); the handbook's index is docs/handbook/README.md.
 - Deployment: Docker Compose on the Hetzner VPS (api, web, cloudflared). Reachable only through
   a Cloudflare Tunnel protected by Cloudflare Access; the firewall allows SSH alone. Nightly
   backups of the data directory to Cloudflare R2. Cloudflare Workers and Containers are not
@@ -250,7 +251,8 @@ uv run python scripts/film/kling.py submit SHOT | run --shots a,b | status | fet
 uv run python scripts/film/story_frames.py OUT --name storyN --chapters DIR | --base SET --replace DIR   the story's WEBP sets (ADR-121)
 make e2e        the web app flow in a real browser (Playwright in Docker)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
-apps/web/e2e/prices.py                      Prices & costing in a real browser (ADR-098; usage in its docstring)
+apps/web/e2e/prices.py                      prices in a real browser: Settings → Prices & costs, a cover's Price & shop,
+                                             a stale page refused (ADR-098, ADR-126; usage in its docstring)
 Work → Questions (#/work/questions)         the owner's and the workshop's questions, answered in the studio (ADR-109)
 COVER_DATA_DIR=~/cover-data uv run python scripts/questions.py new|ack|done ID "note"|list|show ID|add F|import [--dry-run]|mail
                                              the daily processing of the answers; the import of 9 Oct (ADR-109)
@@ -258,13 +260,16 @@ apps/web/e2e/questions.py                   the Questions tab in a real browser,
 apps/web/e2e/b2c.py                         the public consumer shop, desktop and 390 px, through the Worker (ADR-103)
 apps/web/e2e/suggest_layout.py              the configurator's photo/link box in Chromium, WebKit, Firefox at 4 widths (ADR-112)
 apps/web/e2e/stock_order.py                 an existing cover ordered directly: card, price, delivery promise, checkout (ADR-118)
-Shop → Tools → Photo test                   a photo suggestion step by step: image search, identification, searches, scores (ADR-112)
+Settings → AI & spending → Photo test      a photo suggestion step by step: image search, identification, searches, scores (ADR-112)
                                              final sizing uses suggest.final_model/final_thinking; ledger: "suggest final"
 
 node apps/web/e2e/site_serve.mjs [--port N]  this build of the website locally, data from the preview (ADR-106)
 apps/web/e2e/site_rain.py | site_3d.py | site_perf.py   the website: rain keeps falling, 3D loads lean, timings (ADR-106)
-Prices (#/prices/<tab>)                     price set per channel, versioned in app.db; costing per cover (ADR-098)
-Prices → Import (Excel) (#/prices/import)  a price list as fixed prices, into the draft only (ADR-113)
+Settings → Prices & costs (#/settings/costs|pricing|publish)   the price set per channel, versioned in app.db (ADR-098, 126)
+<cover> → Price & shop (#/model/<id>/price)  one cover's cost, prices, fixed price (into the draft), shop place, B2B prices,
+                                             orders, quotes (GET /api/prices/cover/<id>, PUT /api/prices/draft/fixed; ADR-126)
+Covers → All covers ?prices=live|draft      every cover's cost, B2C, B2B, margin, source (GET /api/prices/list; ADR-126)
+Settings → Publish & versions → Import     a price list as fixed prices, into the draft only (ADR-113)
 COVER_DATA_DIR=~/cover-data uv run python scripts/prices_import.py FILE [--channel b2c] [--incl-vat|--ex-vat] [--json OUT] [--apply]
                                              the same matching report; --apply writes the draft, never publishes (ADR-113)
 apps/web/e2e/priceimport.py                 the import in a real browser (sample: e2e/priceimport_sheet.py; usage in its docstring)
@@ -280,8 +285,8 @@ uv run python scripts/bbq_models.py OUT [--only a,b] [--steps build,cover,check]
                                              audited and re-measured (ADR-119; list and sources in docs/plans/bbq-covers.md)
 apps/web/e2e/bbq.py                         the configurator's barbecue option in a real browser (ADR-119; usage in its docstring)
 3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
-apps/web/e2e/uinav.py                       the studio's map (ADR-122, 124): every menu item per role, every old address, a
-                                             cover's and a Desk card's tabs, All covers' filters, the search, the theme,
+apps/web/e2e/uinav.py                       the studio's map (ADR-122, 124, 126): every menu item per role, every old address, a
+                                             cover's and a Desk card's tabs, a cover's Price & shop, All covers' prices, All covers' filters, the search, the theme,
                                              1440/820 px, light and dark with a contrast check, screenshots; docs/handbook/navigation.md
 Work → Workshop (#/work/workshop)           approved covers: files (DXF behind the gate), fits, customers' answers; read-only (ADR-124)
 Covers → All covers (#/covers/all[?view=cards])   Models + Catalogue: one filter row, Table / Cards, batch selection (ADR-124)

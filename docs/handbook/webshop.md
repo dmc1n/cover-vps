@@ -58,13 +58,13 @@ which applies.
 
 ## Prices
 
-The prices are the **B2C** list of the published price set (**Prices**,
-docs/handbook/prices.md), incl. VAT. While that set is marked **indicative**, the configurator
+The prices are the **B2C** list of the published price set (Settings → Prices & costs, and
+each cover's own Price & shop tab; docs/handbook/prices.md), incl. VAT. While that set is marked **indicative**, the configurator
 and the checkout say so plainly ("Indicatieve prijs — … je betaalt pas na bevestiging").
 Publish a set with *indicative* off when the prices are final; the note disappears.
 Delivery per country (Settings → Company & shop → Shipping per country) is added at the
-checkout and shown before the order. The exchange rate's *indicative* switch is on
-Prices → Exchange rate.
+checkout and shown before the order. The *indicative* switch is on
+Settings → Costs, under Exchange rate.
 
 ## Payments (Mollie)
 

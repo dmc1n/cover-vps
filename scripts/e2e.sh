@@ -19,5 +19,6 @@ COVER_DATA_DIR=$DATA uv run cover-users two-factor off >/dev/null
 COVER_DATA_DIR=$DATA COVER_PORT=18181 uv run cover-web >"$DATA/web.log" 2>&1 &
 APP=$!
 for _ in $(seq 1 60); do curl -sf http://127.0.0.1:18181/api/health >/dev/null && break; sleep 1; done
-docker run --rm --network host -v "$PWD:/repo:ro" mcr.microsoft.com/playwright/python:v1.63.0-noble \
-  bash -c "pip install -q playwright==1.63.0 >/dev/null 2>&1 && python /repo/apps/web/e2e/flow.py"
+docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/repo:ro" \
+  mcr.microsoft.com/playwright/python:v1.63.0-noble \
+  bash -c "pip install -q --user playwright==1.63.0 >/dev/null 2>&1 && python /repo/apps/web/e2e/flow.py"

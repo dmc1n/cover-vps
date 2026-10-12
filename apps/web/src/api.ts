@@ -231,6 +231,8 @@ export interface ModelDetail extends ModelBrief {
   diff?: Diff | null;
   job?: Job | null;
   revisions?: Revision[];
+  /** its Workshop line (approved or produced: fit, revision to cut), ADR-126 */
+  workshop?: WorkshopItem | null;
 }
 
 export type Scalar = string | number | boolean;
@@ -1032,6 +1034,130 @@ export interface CostingProducts {
   }[];
 }
 
+/** A cover's Price & shop tab (GET /api/prices/cover/<id>, ADR-126). */
+export interface CoverPrices {
+  model: string;
+  can_edit: boolean;
+  calculated: boolean;
+  published: {
+    version: number;
+    created: number;
+    username: string;
+    note: string;
+  } | null;
+  draft: {
+    by: string;
+    time: number;
+    note?: string;
+    fixed: {
+      channel: string;
+      key: string;
+      live: number | null;
+      draft: number | null;
+    }[];
+    other: boolean;
+  } | null;
+  channels: Record<
+    string,
+    {
+      name: string;
+      show_vat: boolean;
+      vat_pct: number;
+      fixed_live: number | null;
+      fixed_draft: number | null;
+    }
+  >;
+  costing: Costing | null;
+  costing_draft: Costing | null;
+  costing_draft_error?: string;
+  shop: {
+    offered: boolean;
+    why_not: string | null;
+    card: {
+      name: string;
+      category: string;
+      kind: string | null;
+      size_cm: number[];
+      side: string | null;
+      chairs: boolean | null;
+      height_max?: boolean;
+    } | null;
+    price_list: {
+      code: string;
+      section: string | null;
+      item: string | null;
+      suitable: string | null;
+      size: string | null;
+      row: number | null;
+      used: boolean;
+    }[];
+    codes: string[];
+    doubts: string[];
+    desk_status: string | null;
+    direct: {
+      price_source: "fixed" | "configurator";
+      fixed_eur: number | null;
+      discount_pct: number;
+      delivery_note: Record<string, string>;
+    };
+  };
+  companies?: {
+    id: number;
+    name: string;
+    status: string;
+    price_list: string;
+    price_list_name: string;
+    price_eur: number;
+  }[];
+  orders?: {
+    id: number;
+    created: number;
+    status: string;
+    total_eur: number;
+    stock: boolean;
+    produced_as: boolean;
+    customer: string;
+    b2b: boolean;
+    qty: number | null;
+  }[];
+  quotes?: {
+    id: string;
+    time: number;
+    where: "shop" | "b2b";
+    price_eur: number | null;
+    vat: "incl" | "ex";
+    source: string | null;
+    company_id: number | null;
+  }[];
+  matches?: {
+    id: number;
+    created: number;
+    product: string;
+    best_model: string | null;
+    best_pct: number;
+    decision: string;
+    status: string;
+    chosen: string | null;
+    chosen_by: string | null;
+  }[];
+}
+/** One row of All covers' price columns (GET /api/prices/list). */
+export interface PriceRow {
+  cost: number;
+  b2c: {
+    shown: number;
+    margin_eur: number;
+    margin_pct: number;
+    fixed: boolean;
+  };
+  b2b: {
+    shown: number;
+    margin_eur: number;
+    margin_pct: number;
+    fixed: boolean;
+  };
+}
+
 export interface PriceCheck {
   errors: string[];
   placeholders: string[];
@@ -1042,10 +1168,13 @@ export interface PriceCheck {
 
 export const prices = {
   state: () => fetch("/api/prices").then((r) => json<PricesState>(r)),
-  saveDraft: (data: PriceSet) =>
-    send("PUT", "/api/prices/draft", { data }).then((r) =>
-      json<{ draft: PricesState["draft"]; errors: string[] }>(r),
-    ),
+  /** `since`: the draft's time this page loaded (null: none); a newer draft is refused (409) */
+  saveDraft: (data: PriceSet, since?: number | null) =>
+    send(
+      "PUT",
+      "/api/prices/draft",
+      since === undefined ? { data } : { data, since },
+    ).then((r) => json<{ draft: PricesState["draft"]; errors: string[] }>(r)),
   discard: () =>
     send("DELETE", "/api/prices/draft").then((r) => json<unknown>(r)),
   preview: (data?: PriceSet) =>
@@ -1057,10 +1186,12 @@ export const prices = {
         total: number;
       }>(r),
     ),
-  publish: (note: string) =>
-    send("POST", "/api/prices/publish", { note }).then((r) =>
-      json<{ version: number; prices_changed: number }>(r),
-    ),
+  publish: (note: string, since?: number | null) =>
+    send(
+      "POST",
+      "/api/prices/publish",
+      since === undefined ? { note } : { note, since },
+    ).then((r) => json<{ version: number; prices_changed: number }>(r)),
   versions: () =>
     fetch("/api/prices/versions").then((r) =>
       json<{ versions: PriceVersion[] }>(r),
@@ -1071,6 +1202,21 @@ export const prices = {
     ),
   products: () =>
     fetch("/api/prices/products").then((r) => json<CostingProducts>(r)),
+  /** a cover's Price & shop (ADR-126) */
+  cover: (id: string) =>
+    fetch(`/api/prices/cover/${encodeURIComponent(id)}`).then((r) =>
+      json<CoverPrices>(r),
+    ),
+  /** one fixed price in the draft (null removes it); never publishes */
+  setFixed: (model: string, channel: string, price: number | null) =>
+    send("PUT", "/api/prices/draft/fixed", { model, channel, price }).then(
+      (r) => json<{ draft: PricesState["draft"]; errors: string[] }>(r),
+    ),
+  /** every calculated cover's cost and prices: All covers' price columns */
+  list: (set: "current" | "draft") =>
+    fetch(`/api/prices/list?set=${set}`).then((r) =>
+      json<{ set: string; rows: Record<string, PriceRow> }>(r),
+    ),
   /** the page's unsaved numbers: errors, placeholders and one cover's costing under them */
   check: (
     data: PriceSet,

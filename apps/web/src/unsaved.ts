@@ -23,11 +23,17 @@ export function useUnsaved(key: string, isDirty: boolean, keeps = ""): void {
  * when the person says yes). */
 export function mayLeave(href: string): boolean {
   if (!anyUnsaved()) return true;
-  const keeps = (k: string) =>
-    !!k &&
-    (k.endsWith("/")
-      ? href.startsWith(k)
-      : href === k || href.startsWith(`${k}/`));
+  // `keeps` may name several addresses, "a|b|c" (the three price tabs of Settings, ADR-126)
+  const keeps = (ks: string) =>
+    ks
+      .split("|")
+      .some(
+        (k) =>
+          !!k &&
+          (k.endsWith("/")
+            ? href.startsWith(k)
+            : href === k || href.startsWith(`${k}/`)),
+      );
   if ([...dirty.values()].every(keeps)) return true;
   if (!window.confirm("You have changes that are not saved. Leave this page?"))
     return false;

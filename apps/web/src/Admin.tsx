@@ -686,7 +686,7 @@ export function Requests() {
     <>
       {msg && <p className="muted">{msg}</p>}
       <section className="card">
-        <h3>Requests from customers</h3>
+        <h3 id="req-quotes">Quotes from the configurator</h3>
         <p className="muted">
           From the configurator (<a href="#/configure">#/configure</a>, also in
           a webshop). The cost price is only shown here.
@@ -1229,7 +1229,7 @@ export function Matches() {
   return (
     <>
       <section className="card">
-        <h3>Requests</h3>
+        <h3 id="req-matches">Which existing cover fits (match requests)</h3>
         <p className="muted">
           {data.mode === "shadow"
             ? "Learning mode: customers see nothing until you answer. Take the proposal, choose another cover, or custom."

@@ -97,10 +97,13 @@ the same stored values as before; nothing moved in the data.
   covers on or off (`bbq_enabled`), logo, share picture (`og_image`), the delivery promise per
   language, the balloon and frame products, shipping per country (a table) and, under
   *advanced*, the film and the scroll story (below, *The film*).
-- **B2B terms**: minimum order, shipping per order, payment term, into production at once
-  ([b2b.md](b2b.md)).
-- **Matching**: mode (learning or automatic), the thresholds with the value that applies, the
-  discount on an existing cover; how a match is scored (read-only). See *Matches* below.
+- **Selling**: *Matching and direct orders*: mode (learning or automatic), the thresholds
+  with the value that applies, the discount on an existing cover; how a match is scored
+  (read-only), see *Matches* below. *B2B terms*: minimum order, shipping per order, payment
+  term, into production at once ([b2b.md](b2b.md)).
+
+**Prices & costs** (editors see these three, to look): **Costs**, **Price rules**, **Publish &
+versions** ([prices.md](prices.md)). One cover's cost and prices are on its Price & shop tab.
 
 **People & work**
 
@@ -108,8 +111,8 @@ the same stored values as before; nothing moved in the data.
   once), e-mail (who approves at the Desk is matched on the **user name** in `desk.approvers`,
   never on the display name); *New link* / *Reset* makes a password link (shown to copy, and
   mailed when possible); the invitations (above).
-- **Desk & approval** (`desk.*`, `questions.*`, `products.*`) and **Cover defaults**
-  (construction, stitching, welding, hem, vents and features, seams): the company defaults
+- **Rules & defaults**: *Desk & approval* (`desk.*`, `questions.*`, `products.*`) and *Cover
+  defaults* (construction, stitching, welding, hem, vents and features, seams): the company defaults
   from `config/defaults.yaml`, read-only here. Whether the owner will change some of them here
   himself is open owner question #93.
 
@@ -125,19 +128,20 @@ the same stored values as before; nothing moved in the data.
   (`home_story`), payment (the Mollie key, masked, with *Replace* to give a new one; bank
   transfer), the configurator in a webshop and the API keys ([webshop-api.md](webshop-api.md)).
 - **AI & spending**: this month's spend, the budget and limits, which AI does what, the photo
-  suggestion limits (read-only).
+  suggestion limits (read-only); the **Photo test**: a photo suggestion step by step (image
+  search, identification, searches, scores; each test costs about € 0.03).
 
 **Server**
 
-- **System**: version, engine, disk, last backup, the releases, mail and AI state, open
-  problems and the last alerts (the alert address itself is under Mail & notifications).
-- **Logins & audit log**: who is logged in, since when and from where; every login, failed
-  login, change and approval, with who and when.
+- **System & logs**: version, engine, disk, last backup, the releases, mail and AI state, open
+  problems and the last alerts (the alert address itself is under Mail & notifications); who is
+  logged in, since when and from where; every login, failed login, change and approval, with
+  who and when.
 
 ## The Shop pages
 
-**Shop** in the top bar. Orders, Requests, Matches, B2B customers and the Photo test are for
-admins; **Website (AI)** is also for editors (they draft, an admin publishes). The shop itself is
+**Shop** in the top bar: only what is about the shop as a whole (ADR-126). Orders, Requests
+and B2B customers are for admins; **Website (AI)** is also for editors (they draft, an admin publishes). The shop itself is
 at **/shop/** (the landing page, the configurator, checkout and the order status) and on the
 website's own domain; the public consumer shop: [webshop.md](webshop.md).
 
@@ -148,10 +152,11 @@ website's own domain; the public consumer shop: [webshop.md](webshop.md).
     production** does it by hand (for a payment by bank transfer).
   - Changing the status mails the customer.
   - B2B orders have a green **B2B n · PO …** mark ([b2b.md](b2b.md)).
-- **Requests** (`#/shop/requests`): the quotes customers asked in the configurator. Who gets
-  them by mail is under Settings → Mail & notifications; the embed addresses and API keys
-  under Settings → Website & API keys.
-- **Matches** (`#/shop/matches`): which existing cover fits a request (below).
+- **Requests** (`#/shop/requests`): what customers asked, on one page: *which existing cover
+  fits* (the match requests, learning mode, below; was its own page Matches) and the *quotes
+  from the configurator*. Who gets them by mail is under Settings → Mail & notifications; the
+  embed addresses and API keys under Settings → Website & API keys. One cover's orders, quotes
+  and match requests are also on its Price & shop tab.
 - **B2B customers** (`#/shop/b2b`): companies, their logins and orders ([b2b.md](b2b.md)).
 - **Website (AI)** (`#/shop/website`): type what should change on the site, in plain words, for
   example "add a question about delivery time: about three weeks". The AI changes the draft in
@@ -183,9 +188,9 @@ website keeps `/media` files for a day. How the film is made: ADR-108 (`scripts/
 ## Matches: which existing cover fits (learning mode)
 
 - **The customer enters their sizes in the configurator.**
-  - **Learning mode** (Settings → Matching, mode *learning*, stored as `shadow`; the default):
+  - **Learning mode** (Settings → Selling, mode *learning*, stored as `shadow`; the default):
     the customer leaves an e-mail address. You get a mail, and the request appears under
-    Shop → **Matches** with the best covers, their percentage and the difference per size in
+    Shop → **Requests** with the best covers, their percentage and the difference per size in
     cm (+ is roomier).
   - Press **Take N %** for the proposal, **Custom**, or type another cover (`suns-…` or
     `drawing-…`) and press **Choose**. A note for the customer is optional.
@@ -193,11 +198,11 @@ website keeps `/media` files for a day. How the film is made: ADR-108 (`scripts/
     cover or a custom one.
 - **Every change you make is a lesson.** The table **What we learn** shows, per match band,
   how often the proposal was changed, the fit answers of customers (1–5) and the returns.
-  When a band fits well, set the threshold (Settings → Matching, *Offer the existing cover
+  When a band fits well, set the threshold (Settings → Selling, *Offer the existing cover
   from*, `threshold_pct`) and, when you trust it, mode *automatic* (`auto`): customers then see
   the match at once.
 - **Drawing covers are offered too** (ADR-114): every drawing cover approved or produced at the
-  Desk, as the kind of furniture the price list says (Prices → Import (Excel) keeps your list;
+  Desk, as the kind of furniture the price list says (Settings → Publish & versions → Import keeps your list;
   its column "Type nr." is the drawing code), else the product list's name, else its shape. The
   customer sees the price list's name, never "drawing-t1"; it sells at its fixed B2C price, or
   at the configurator's price minus the stock discount. Reject a cover at the Desk and it is no
@@ -212,7 +217,7 @@ website keeps `/media` files for a day. How the film is made: ADR-108 (`scripts/
     tables).
 - **The fit question:** Settings → Mail & notifications, *Ask customers whether the cover
   fits* (`fit_mail`). Switch it on and set the days. It needs the domain and the mail server. A
-  shipped order then gets one question by mail; the answers appear under Matches, and for
+  shipped order then gets one question by mail; the answers appear under Requests, and for
   covers sold from the shop also on Work → Workshop ([workshop.md](workshop.md)).
 
 ## Languages

@@ -4,6 +4,7 @@ comes from the Playwright Docker image; the app runs on this machine with an emp
 
 import asyncio
 import os
+import re
 import sys
 
 from playwright.async_api import async_playwright, expect
@@ -36,19 +37,22 @@ async def main() -> int:
         tabs = page.get_by_role("navigation", name="Cover")
         show = page.get_by_role("group", name="In this tab")
         views = [("3D", ""), ("Seams", ""), ("Pieces", "Flat patterns"), ("Pieces", "Size drawing"),
-                 ("Pieces", "Cut pieces"), ("Files", "")]  # fmt: skip
+                 ("Pieces", "Cut pieces"), ("Pieces", "Files")]  # fmt: skip
         for tab, sub in views:
             await tabs.get_by_role("link", name=tab, exact=True).click()
             if sub:
                 await show.get_by_role("link", name=sub, exact=True).click()
             await page.wait_for_timeout(1000)
         await expect(page.get_by_text("cut.dxf").first).to_be_visible()
+        # the cover's own price and shop (ADR-126): its costing from its own cut pieces
+        await tabs.get_by_role("link", name="Price & shop", exact=True).click()
+        await expect(page.get_by_test_id("cover-cost")).to_be_visible(timeout=RUN_MS)
         await page.get_by_role("button", name="Edit details").click()
         status = page.locator(".info select", has=page.locator("option", has_text="checked"))
         await status.select_option("checked")  # the status (category and family come first)
         await page.locator(".info").get_by_role("button", name="Save").click()
         await expect(page.locator(".info").get_by_text("Saved.")).to_be_visible()
-        await tabs.get_by_role("link", name="History", exact=True).click()
+        await tabs.get_by_role("link", name=re.compile(r"^History")).click()
         await show.get_by_role("link", name="Revisions", exact=True).click()
         await expect(page.get_by_role("cell").filter(has_text="pattern.json").first).to_be_visible()
         await expect(page.get_by_text("Definitive drawing: not approved yet")).to_be_visible()
@@ -63,7 +67,7 @@ async def main() -> int:
         await page.get_by_role("button", name="Try without saving").click()
         await expect(page.get_by_text("not saved")).to_be_visible(timeout=RUN_MS)  # the trial run
         await expect(page.get_by_text("Last run finished.")).to_be_visible(timeout=RUN_MS)
-        await tabs.get_by_role("link", name="History", exact=True).click()  # since the run before
+        await tabs.get_by_role("link", name=re.compile(r"^History")).click()  # since the run before
         await expect(page.get_by_text("hull.clearance_mm: 10 → 15")).to_be_visible()
         await page.screenshot(path="/tmp/e2e.png")
         await page.goto(URL + "#/admin")  # → Settings → Users & rights

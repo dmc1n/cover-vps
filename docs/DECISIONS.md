@@ -4359,3 +4359,60 @@ adds only the motion. Plan, prompts and checks: docs/plans/kling-shots.md.
   with a release and the owner's go.
 - **Rejected**: text-to-video (not our cover); Kling's 3.0 Turbo (no last frame); paying for
   4K (the cards are 720 × 900).
+
+## ADR-126 — One cover, one page: its price and its shop on the cover; general settings in Settings
+
+The owner (12 Oct 2026): "we have to many different tabs, like the pricelist, why is this not
+vissable in the item settings, all settings related to a covers should be visseble in the cover,
+like cost, sales price etc, now there is to much information all over the place, it needs to be
+less and more together"; that evening: "dat mag alles in de settings page komen, maar product
+gelateerde informatie bij het product houden niet overal plaatsen". Inventory and design:
+docs/plans/studio-ui.md §12; handbook: prices.md, navigation.md.
+
+- **Four sections** (Work · Covers · Shop · Settings). Prices is no longer a section: its seven
+  tabs became three tabs of Settings, group **Prices & costs**: *Costs* (materials, labour, the
+  exchange rate on one page), *Price rules* (per channel extras, markup or margin, rounding,
+  VAT; the balloon's and frame's fixed prices, and folded the fixed prices of products without
+  a calculated cover so nothing set before is unreachable; a configurator product's costing)
+  and *Publish & versions* (the draft bar, the versions with roll back, the Excel import).
+  Editors see these three tabs read-only, as they saw Prices; every other Settings tab stays
+  admin-only (`nav.ts` `SETTINGS_WHO`); the same `Prices` component, so the numbers typed stay
+  while moving between the three (unsaved guard with several kept addresses, `a|b|c`).
+- **A cover's seventh tab, Price & shop** (`#/model/<id>/price`, `CoverPrice.tsx`,
+  `GET /api/prices/cover/<id>` in `coverapi/cover_commerce.py`): the costing (live or draft;
+  CSV, PDF), per channel the live price, fixed or calculated, the margin and the draft's price;
+  the shop (offered as an existing cover or why not — the same `match.card` /
+  `match_drawings.review` the shop uses — kind, sizes, the price list's rows, how its
+  direct-order price is made and the delivery note); for admins its B2B companies with an own
+  price, its orders (consumer and B2B), recent stock quotes and the match requests that proposed
+  or chose it. Read-only gathering; no price is computed differently. Files moved into Pieces
+  (`/pieces/files`) so a cover keeps seven tabs.
+- **One summary row** under a cover's head: Desk status, who approved, produced, the measured fit,
+  the workshop's revision to cut and files, the open questions about the cover
+  (`/api/models/<id>` now carries its Workshop line, `desk.workshop_item`).
+- **A fixed price from the cover** is `PUT /api/prices/draft/fixed {model, channel, price|null}`
+  (admins only): it writes `channels.<ch>.fixed.<model>` of the same draft the whole-set editor
+  writes (the draft starts from the live set when there is none; the import's note kept),
+  never publishes. A test proves the draft equals the one the old Channels table produced, row
+  for row; editors and viewers get 403. Publishing from the cover is the same `POST
+  /api/prices/publish`, after the preview's count and a confirmation naming the whole draft.
+- **No lost update, no surprise publish:** `PUT /api/prices/draft` and `POST /api/prices/publish`
+  take an optional `since` (the draft's time the page loaded, or null); a newer draft (a price
+  set on a cover, an import) is refused with 409 and the page offers to load it. Old clients
+  without `since` behave as before. The Settings page and the cover's page send it.
+- **All covers' optional price columns** (`?prices=live|draft`, `GET /api/prices/list`, editors
+  and admins): cost, B2C, B2B, margin, source; sort by B2C price or margin; a price opens the
+  cover's Price & shop. No separate price page.
+- **Shop keeps only shop-wide pages:** Orders · Requests (the match requests and the configurator
+  quotes on one page) · B2B customers · Website (AI). The Photo test moved to Settings → AI &
+  spending. **Settings merged:** Matching + B2B terms → *Selling*; Desk & approval + Cover
+  defaults → *Rules & defaults*; System + Logins & audit log → *System & logs*. Tabs and pages
+  in Prices + Shop + Settings: 24 → 15.
+- **Every old address redirects** (`#/prices[/<tab>]`, `#/shop/matches`, `#/shop/phototest`,
+  `#/settings/matching|b2b|desk|activity`, `#/admin/prices|matches|phototest|sessions|audit`,
+  `#/model/<id>/files|downloads`); uinav.py checks each.
+- **Unchanged:** the pricing maths, VAT, rounding, draft → preview → publish → versions and
+  rollback, rights (admins edit and publish, editors look, viewers none), B2B scoping, the
+  approval gate (ADR-079/115/120), server-only settings (ADR-123).
+- **Better later:** inline editing in All covers' price columns (now: one click to the cover);
+  a per-cover price history (who set its fixed price when) from the versions.

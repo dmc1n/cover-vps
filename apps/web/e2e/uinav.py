@@ -6,6 +6,9 @@ own page, the header stays on one line, and pages a role may not see say so. Sin
 All covers keeps its filters and selection between Table and Cards, New cover has the three
 uploads, Learning none, the Workshop opens for every role, the header's search finds covers,
 Desk codes and questions, and the theme button cycles auto → light → dark and is remembered.
+Since ADR-126: four sections (no Prices), the price settings in Settings → Prices & costs (editors
+see only those), a cover's seventh tab Price & shop with its parts and the summary on top, All
+covers' optional price columns, and every Prices, Shop and Settings address that moved.
 
 Every pass runs light and dark (COVER_E2E_THEMES, the browser's prefers-color-scheme), with a
 contrast check of the text on every page (WCAG: 4.5:1, 3:1 for large text).
@@ -49,17 +52,14 @@ MENU = {
     "rick": {
         "Work": ["Desk", "Questions", "Workshop"],
         "Covers": ["All covers", "Arrangements", "New cover", "Learning", "Product list"],
-        "Shop": ["Orders", "Requests", "Matches", "B2B customers", "Website (AI)", "Photo test"],
-        "Prices": ["Materials", "Labour", "Exchange rate", "Channels & price lists",
-                   "Import (Excel)", "Costing", "Versions"],
+        "Shop": ["Orders", "Requests", "B2B customers", "Website (AI)"],
         "Settings": [],
     },
     "eddy": {
         "Work": ["Desk", "Questions", "Workshop"],
         "Covers": ["All covers", "Arrangements", "New cover", "Learning", "Product list"],
         "Shop": ["Website (AI)"],
-        "Prices": ["Materials", "Labour", "Exchange rate", "Channels & price lists", "Costing",
-                   "Versions"],
+        "Settings": [],
     },
     "vic": {
         "Work": ["Desk", "Questions", "Workshop"],
@@ -72,9 +72,11 @@ START = {
     "eddy": "#/covers/all",
     "vic": "#/covers/all",
 }
-SETTINGS = ["Company & shop", "B2B terms", "Matching", "Users & rights", "Desk & approval",
-            "Cover defaults", "Mail & notifications", "Website & API keys", "AI & spending",
-            "System", "Logins & audit log"]  # fmt: skip
+SETTINGS = ["Company & shop", "Selling", "Costs", "Price rules", "Publish & versions",
+            "Users & rights", "Rules & defaults", "Mail & notifications", "Website & API keys",
+            "AI & spending", "System & logs"]  # fmt: skip
+SETTINGS_EDITOR = ["Costs", "Price rules", "Publish & versions"]
+COVER_TABS = ["3D", "Pieces", "Seams", "Adjust", "Compare", "History", "Price & shop"]
 # every old address and where it must land (an admin)
 OLD = [
     ("#/", "#/work/desk"),
@@ -88,7 +90,23 @@ OLD = [
     ("#/arrangements", "#/covers/arrangements"),
     (f"#/arrangements/{ARR}", f"#/covers/arrangements/{ARR}"),
     ("#/learning", "#/covers/learning"),
-    ("#/prices", "#/prices/materials"),
+    ("#/prices", "#/settings/costs"),
+    ("#/prices/materials", "#/settings/costs"),
+    ("#/prices/labour", "#/settings/costs"),
+    ("#/prices/rate", "#/settings/costs"),
+    ("#/prices/channels", "#/settings/pricing"),
+    ("#/prices/costing", "#/settings/pricing"),
+    ("#/prices/import", "#/settings/publish"),
+    ("#/prices/versions", "#/settings/publish"),
+    ("#/shop/matches", "#/shop/requests"),
+    ("#/shop/phototest", "#/settings/ai"),
+    ("#/settings/matching", "#/settings/selling"),
+    ("#/settings/b2b", "#/settings/selling"),
+    ("#/settings/desk", "#/settings/defaults"),
+    ("#/settings/activity", "#/settings/system"),
+    ("#/admin/matches", "#/shop/requests"),
+    ("#/admin/phototest", "#/settings/ai"),
+    ("#/admin/sessions", "#/settings/system"),
     ("#/website", "#/shop/website"),
     ("#/admin", "#/settings/users"),
     ("#/admin/orders", "#/shop/orders"),
@@ -97,9 +115,10 @@ OLD = [
     ("#/admin/webshop", "#/shop/requests"),
     ("#/admin/mail", "#/settings/mail"),
     ("#/admin/system", "#/settings/system"),
-    ("#/admin/prices", "#/prices/materials"),
+    ("#/admin/prices", "#/settings/costs"),
     (f"#/model/{MODEL}", f"#/model/{MODEL}/3d"),
-    (f"#/model/{MODEL}/downloads", f"#/model/{MODEL}/files"),
+    (f"#/model/{MODEL}/downloads", f"#/model/{MODEL}/pieces/files"),
+    (f"#/model/{MODEL}/files", f"#/model/{MODEL}/pieces/files"),
     (f"#/model/{MODEL}/settings", f"#/model/{MODEL}/adjust"),
     ("#/work", "#/work/desk"),
     ("#/covers", "#/covers/all"),
@@ -266,8 +285,9 @@ async def as_rick(page: Page, width: int) -> None:
     check(
         await page.locator(".set-row").count() >= 25, f"rick {width}: Company & shop has its rows"
     )
-    await page.goto(f"{URL}/#/settings/matching")
+    await page.goto(f"{URL}/#/settings/selling")
     await expect(page.get_by_text("Offer the existing cover from")).to_be_visible(timeout=SLOW)
+    await expect(page.get_by_role("heading", name="B2B terms")).to_be_visible(timeout=SLOW)
     check(
         await page.get_by_text(re.compile("uses the company default: 90")).count() >= 1,
         f"rick {width}: Matching shows the threshold that applies (90)",
@@ -283,19 +303,20 @@ async def as_rick(page: Page, width: int) -> None:
         ok = await landed(page, new)
         check(ok, f"rick {width}: {old} → {new} (got {await hash_of(page)})")
     # a cover: seven tabs in the address; another cover opens on its own tab
-    await page.goto(f"{URL}/#/model/{MODEL}/files")
+    await page.goto(f"{URL}/#/model/{MODEL}/price")
     tabs = page.get_by_role("navigation", name="Cover")
-    await expect(tabs.locator("a[aria-current=page]")).to_have_text("Files", timeout=SLOW)
+    await expect(tabs.locator("a[aria-current=page]")).to_have_text("Price & shop", timeout=SLOW)
     got = [re.sub(r"\d+$", "", t).strip() for t in await tabs.locator("a").all_inner_texts()]
-    check(got == ["3D", "Pieces", "Seams", "Adjust", "Compare", "History", "Files"],
-          f"rick {width}: a cover's tabs {got}")  # fmt: skip
+    check(got == COVER_TABS, f"rick {width}: a cover's tabs {got}")
+    await price_and_shop(page, width, n)
     await page.goto(f"{URL}/#/model/{MODEL2}")
     check(await landed(page, f"#/model/{MODEL2}/3d"), f"rick {width}: another cover opens on 3D")
     await expect(tabs.locator("a[aria-current=page]")).to_have_text("3D", timeout=SLOW)
     for t, sub in [("3d", ""), ("pieces", "cut"), ("pieces", "flat"), ("pieces", "sizes"),
                    ("seams", ""), ("adjust", ""), ("compare", "drawing"),
                    ("compare", "reference"), ("compare", "ai"), ("history", "changes"),
-                   ("history", "revisions"), ("history", "log"), ("files", "")]:  # fmt: skip
+                   ("history", "revisions"), ("history", "log"), ("pieces", "files"),
+                   ("price", "")]:  # fmt: skip
         await page.goto(f"{URL}/#/model/{MODEL2}/{t}{'/' + sub if sub else ''}")
         await page.wait_for_load_state("networkidle")
         n[0] += 1
@@ -338,6 +359,30 @@ async def as_rick(page: Page, width: int) -> None:
     await shot(page, width, f"{n[0]:02d}-desk-card-arrangement")
     await covers_and_workshop(page, width, n)
     await search_and_theme(page, width, n)
+
+
+async def price_and_shop(page: Page, width: int, n: list[int]) -> None:
+    """A cover's Price & shop (ADR-126): the summary on top, prices per channel with the admin's
+    fixed-price fields, the costing, the shop, B2B and orders; nothing is saved here."""
+    await expect(page.get_by_test_id("cover-summary")).to_be_visible(timeout=SLOW)
+    for part in ["cover-prices", "cover-shop", "cover-b2b", "cover-orders"]:
+        await expect(page.get_by_test_id(part)).to_be_visible(timeout=SLOW)
+    check(await page.get_by_test_id("cover-cost").count() == 1,
+          f"rick {width}: Price & shop shows the costing")  # fmt: skip
+    check(await page.get_by_role("button", name="Save in draft").count() == 2,
+          f"rick {width}: an admin may set the B2C and B2B fixed price")  # fmt: skip
+    n[0] += 1
+    await shot(page, width, f"{n[0]:02d}-cover-price-and-shop")
+    # All covers with the price columns; a price opens the cover's Price & shop
+    await page.goto(f"{URL}/#/covers/all?prices=live")
+    await expect(page.get_by_role("columnheader", name="B2C incl. VAT")).to_be_visible(timeout=SLOW)
+    await expect(page.locator("td.price-cell a").first).to_be_visible(timeout=SLOW)
+    n[0] += 1
+    await shot(page, width, f"{n[0]:02d}-covers-with-prices")
+    href = await page.locator("td.price-cell a").first.get_attribute("href")
+    await page.locator("td.price-cell a").first.click()
+    check(await landed(page, href or "-"), f"rick {width}: a price opens {href}")
+    check((href or "").endswith("/price"), f"rick {width}: … the cover's Price & shop tab")
 
 
 async def covers_and_workshop(page: Page, width: int, n: list[int]) -> None:
@@ -434,11 +479,30 @@ async def as_other(page: Page, user: str, width: int) -> None:
         await walk_menu(page, user, width, [0])
     # pages for other roles say so; nothing breaks
     for h in ["#/settings/users", "#/shop/orders"] + (
-        ["#/prices/materials"] if user == "vic" else []
+        ["#/prices/materials", "#/settings/costs"] if user == "vic" else []
     ):
         await page.goto(f"{URL}/{h}")
         await expect(page.get_by_text("Not for your account")).to_be_visible(timeout=SLOW)
     check(True, f"{user} {width}: pages for other roles say so")
+    if user in ("eddy", "rens"):
+        # editors: the price tabs of Settings only, read-only; a cover's prices without fields
+        await page.goto(f"{URL}/#/prices/channels")
+        check(await landed(page, "#/settings/pricing"), f"{user} {width}: old Prices address")
+        tabs = page.get_by_role("navigation", name="Settings")
+        await expect(tabs).to_be_visible(timeout=SLOW)
+        got = [t.strip() for t in await tabs.locator("a").all_inner_texts()]
+        check(got == SETTINGS_EDITOR, f"{user} {width}: Settings tabs {got}")
+        await page.goto(f"{URL}/#/model/{MODEL}/price")
+        await expect(page.get_by_test_id("cover-prices")).to_be_visible(timeout=SLOW)
+        check(await page.get_by_role("button", name="Save in draft").count() == 0,
+              f"{user} {width}: an editor sees the prices, no fields")  # fmt: skip
+        check(await page.get_by_test_id("cover-orders").count() == 0,
+              f"{user} {width}: orders on a cover are for admins")  # fmt: skip
+    if user == "vic":
+        await page.goto(f"{URL}/#/model/{MODEL}/price")
+        await expect(page.get_by_text("Prices and the shop are for editors and admins")
+                     ).to_be_visible(timeout=SLOW)  # fmt: skip
+        check(True, f"vic {width}: a viewer sees no prices on a cover")
 
 
 async def main() -> int:
