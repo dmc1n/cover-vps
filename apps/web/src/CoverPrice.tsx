@@ -7,7 +7,7 @@
 // orders, quotes and match requests. Admins set or remove its fixed price **in the draft** (the
 // same row Settings → Price rules used to hold); publishing stays one explicit action, here with
 // the preview's count first and a confirmation. Editors look; viewers see no prices (as before).
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CoverPrices, ModelDetail, prices } from "./api";
 import { deskHref, modelHref, questionHref } from "./nav";
 import { useUnsaved } from "./unsaved";
@@ -155,10 +155,34 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
   const [typed, setTyped] = useState<Record<string, string>>({});
   const [set, setSet] = useState<"current" | "draft">("current");
   const [moves, setMoves] = useState<number | null>(null);
+  // the unit (incl. or ex VAT) each channel's typed price was typed in: a reload that
+  // changes it drops that typed price rather than saving it in the other unit (Codex)
+  const units = useRef<Record<string, boolean | null>>({});
   const load = useCallback(() => {
     prices
       .cover(id)
       .then((x) => {
+        const now = Object.fromEntries(
+          Object.entries(x.channels).map(([k, ch]) => [
+            k,
+            x.draft ? ch.draft_show_vat : ch.show_vat,
+          ]),
+        );
+        const before = units.current;
+        units.current = now;
+        const changed = Object.keys(now).filter(
+          (k) => k in before && before[k] !== now[k],
+        );
+        setTyped((t) => {
+          const keep = Object.fromEntries(
+            Object.entries(t).filter(([k]) => !changed.includes(k)),
+          );
+          if (Object.keys(keep).length < Object.keys(t).length)
+            setMsg(
+              "The draft now shows a channel's price with or without VAT differently: type that price again.",
+            );
+          return keep;
+        });
         setC(x);
         setErr("");
         setMoves(null); // typed prices stay: only a saved channel's field is cleared
@@ -169,6 +193,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
   useEffect(() => {
     setC(null);
     setTyped({});
+    units.current = {};
     if (user?.role !== "viewer") load();
   }, [load, user?.role]);
   // a typed price not saved in the draft yet: leaving the cover asks first (Codex)
