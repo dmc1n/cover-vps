@@ -21,6 +21,7 @@ import io
 import json
 import re
 import sqlite3
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -59,14 +60,23 @@ def published(auth: Any) -> dict[str, Any] | None:
     return {**dict(row), "data": json.loads(row["data"])}
 
 
+# Every check-then-write of the price set (save, fixed price, import, publish, discard, rollback)
+# holds this lock, so a revision checked is still the revision written over (ADR-126).
+WRITE_LOCK = threading.RLock()
+
+
+def revision_of(pub: dict[str, Any] | None, d: dict[str, Any] | None) -> str:
+    """The revision of exactly these records: the response that shows them carries it."""
+    return f"v{pub['version'] if pub else 0}:{d['time'] if d else ''}"
+
+
 def revision(auth: Any) -> str:
     """Which prices a page saw: the live version and the draft's time ("v3:" when there is no
     draft). It changes with every save, fixed price, import, publish, discard and rollback, so a
     page that sends the one it loaded (`since`) cannot overwrite or publish what came after
     (ADR-126; Codex: a page loaded without a draft, then publish-and-clear elsewhere)."""
-    pub = published(auth)
     d: dict[str, Any] | None = auth.setting(DRAFT_SETTING, None)
-    return f"v{pub['version'] if pub else 0}:{d['time'] if d else ''}"
+    return revision_of(published(auth), d)
 
 
 def defaults(auth: Any) -> dict[str, Any]:
@@ -454,7 +464,7 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             "using_defaults": pub is None,
             "draft": d,
             "draft_errors": costing.validate(d["data"]) if d else [],
-            "revision": revision(auth),
+            "revision": revision_of(pub, d),  # of the records in this answer
             "defaults": defaults(auth),
             "can_edit": user.may("admin"),
             **marks(d["data"] if d else (pub["data"] if pub else defaults(auth))),
@@ -487,14 +497,16 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
         data = body.get("data") if isinstance(body, dict) else None
         if not isinstance(data, dict):
             raise HTTPException(400, "send {data: the price set}")
-        before = draft()
-        stale(body, before)
         data = costing.normalised(data)
-        d = {"data": data, "by": admin.username, "time": time.time()}
-        if before and before.get("note"):  # an import's note stays with the draft (ADR-113)
-            d["note"] = before["note"]
-        auth.set_setting(DRAFT_SETTING, d)
-        return {"draft": d, "errors": costing.validate(data), "revision": revision(auth)}
+        with WRITE_LOCK:
+            before = draft()
+            stale(body, before)
+            d = {"data": data, "by": admin.username, "time": time.time()}
+            if before and before.get("note"):  # an import's note stays with the draft (ADR-113)
+                d["note"] = before["note"]
+            auth.set_setting(DRAFT_SETTING, d)
+            rev = revision(auth)
+        return {"draft": d, "errors": costing.validate(data), "revision": rev}
 
     @app.put("/api/prices/draft/fixed")
     async def put_fixed(request: Request) -> dict[str, Any]:
@@ -520,27 +532,30 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
                 raise HTTPException(400, "price: a number, or null to remove the fixed price")
             if not (0 < float(price) < 1_000_000):  # noqa: PLR2004 - a sane price in euros
                 raise HTTPException(400, "price: more than 0 (null removes the fixed price)")
-        before = draft()
-        stale(body, before)
-        base = json.loads(json.dumps(before["data"] if before else current(auth)))
-        if channel not in base.get("channels", {}):
-            raise HTTPException(400, f"channel: one of {', '.join(base.get('channels', {}))}")
-        fixed = base["channels"][channel].setdefault("fixed", {})
-        if price is None:
-            fixed.pop(key, None)
-        else:
-            fixed[key] = float(price)
-        data = costing.normalised(base)
-        d = {"data": data, "by": admin.username, "time": time.time()}
-        if before and before.get("note"):  # an import's note stays with the draft (ADR-113)
-            d["note"] = before["note"]
-        auth.set_setting(DRAFT_SETTING, d)
-        return {"draft": d, "errors": costing.validate(data), "revision": revision(auth)}
+        with WRITE_LOCK:
+            before = draft()
+            stale(body, before)
+            base = json.loads(json.dumps(before["data"] if before else current(auth)))
+            if channel not in base.get("channels", {}):
+                raise HTTPException(400, f"channel: one of {', '.join(base.get('channels', {}))}")
+            fixed = base["channels"][channel].setdefault("fixed", {})
+            if price is None:
+                fixed.pop(key, None)
+            else:
+                fixed[key] = float(price)
+            data = costing.normalised(base)
+            d = {"data": data, "by": admin.username, "time": time.time()}
+            if before and before.get("note"):  # an import's note stays with the draft (ADR-113)
+                d["note"] = before["note"]
+            auth.set_setting(DRAFT_SETTING, d)
+            rev = revision(auth)
+        return {"draft": d, "errors": costing.validate(data), "revision": rev}
 
     @app.delete("/api/prices/draft")
     def discard_draft(request: Request) -> dict[str, Any]:
         require(request, "admin")
-        auth.set_setting(DRAFT_SETTING, None)
+        with WRITE_LOCK:
+            auth.set_setting(DRAFT_SETTING, None)
         return {"draft": None}
 
     @app.post("/api/prices/preview")
@@ -572,21 +587,22 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
             body = await request.json() or {}
         except ValueError:
             body = {}
-        d = draft()
-        if not d:
-            raise HTTPException(400, "no draft to publish")
-        stale(body, d)  # publish what the page showed, not a draft changed since (ADR-126)
-        data = checked(d["data"])
-        before = current(auth)
-        moved = compare(before, data, facts.all(), shop_params(auth))["changed"]
-        note = str(body.get("note") or d.get("note") or "")[:500]
-        with sqlite3.connect(auth.path) as db:
-            cur = db.execute(
-                "INSERT INTO price_sets (created, username, note, data) VALUES (?, ?, ?, ?)",
-                (time.time(), admin.username, note, json.dumps(data)),
-            )
-            version = cur.lastrowid
-        auth.set_setting(DRAFT_SETTING, None)
+        with WRITE_LOCK:
+            d = draft()
+            if not d:
+                raise HTTPException(400, "no draft to publish")
+            stale(body, d)  # publish what the page showed, not a draft changed since (ADR-126)
+            data = checked(d["data"])
+            before = current(auth)
+            moved = compare(before, data, facts.all(), shop_params(auth))["changed"]
+            note = str(body.get("note") or d.get("note") or "")[:500]
+            with sqlite3.connect(auth.path) as db:
+                cur = db.execute(
+                    "INSERT INTO price_sets (created, username, note, data) VALUES (?, ?, ?, ?)",
+                    (time.time(), admin.username, note, json.dumps(data)),
+                )
+                version = cur.lastrowid
+            auth.set_setting(DRAFT_SETTING, None)
         auth.log(
             admin,
             "prices published",
@@ -611,7 +627,7 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
     @app.post("/api/prices/rollback/{version}")
     def rollback(version: int, request: Request) -> dict[str, Any]:
         admin = require(request, "admin")
-        with sqlite3.connect(auth.path) as db:
+        with WRITE_LOCK, sqlite3.connect(auth.path) as db:
             row = db.execute("SELECT data FROM price_sets WHERE version=?", (version,)).fetchone()
             if row is None:
                 raise HTTPException(404, "no such version")
@@ -804,14 +820,15 @@ def import_draft(
 
     from coverapi import prices_import as pim
 
-    d: dict[str, Any] | None = auth.setting(DRAFT_SETTING, None)
-    base = dict(d["data"]) if d else current(auth)
-    data = costing.normalised(pim.into_draft(base, report["channel"], chosen))
-    note = pim.note_for(filename, len(chosen), report["channel"])
-    if d and d.get("note"):
-        note = f"{d['note']}; {note}"
-    new = {"data": data, "by": by, "time": time.time(), "note": note[:500]}
-    auth.set_setting(DRAFT_SETTING, new)
+    with WRITE_LOCK:
+        d: dict[str, Any] | None = auth.setting(DRAFT_SETTING, None)
+        base = dict(d["data"]) if d else current(auth)
+        data = costing.normalised(pim.into_draft(base, report["channel"], chosen))
+        note = pim.note_for(filename, len(chosen), report["channel"])
+        if d and d.get("note"):
+            note = f"{d['note']}; {note}"
+        new = {"data": data, "by": by, "time": time.time(), "note": note[:500]}
+        auth.set_setting(DRAFT_SETTING, new)
     auth.log(by, "prices imported to draft", {"file": filename, "channel": report["channel"],
                                               "prices": len(chosen)})  # fmt: skip
     return {"draft": new, "errors": costing.validate(data), "count": len(chosen), "note": note}

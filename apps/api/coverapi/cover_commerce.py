@@ -217,16 +217,18 @@ def install(app: FastAPI, auth: Any, store: Any, facts: Any, draft: Any) -> None
         d = Path(store.models) / model_id
         if not d.is_dir():
             raise HTTPException(404, "no such cover")
-        live = prices.current(auth)
+        # one read of each record; the revision is theirs, so the page can never be handed a
+        # token for prices it was not shown (Codex)
+        pub = prices.published(auth)
+        live = pub["data"] if pub else prices.defaults(auth)
         dr = draft()
         f = facts.get(model_id)
         out: dict[str, Any] = {
             "model": model_id,
             "can_edit": user.may("admin"),
-            "revision": prices.revision(auth),  # what this page saw (`since`)
+            "revision": prices.revision_of(pub, dr),  # what this page saw (`since`)
             "calculated": f is not None,
-            "published": (lambda p: p and {k: p[k] for k in ("version", "created", "username",
-                                                              "note")})(prices.published(auth)),
+            "published": pub and {k: pub[k] for k in ("version", "created", "username", "note")},
             "draft": dr and {"by": dr.get("by"), "time": dr.get("time"), "note": dr.get("note"),
                              **draft_changes(live, dr["data"])},
             "channels": {

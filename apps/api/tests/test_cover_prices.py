@@ -188,3 +188,36 @@ def test_interleaved_edits_are_refused_not_lost(app: Any) -> None:  # noqa: F811
     # with the prices it has seen, it may
     seen = {**stale, "since": d["revision"]}
     assert a.put("/api/prices/draft/fixed", json=seen).status_code == 200
+
+
+def test_a_save_during_a_read_never_gives_a_token_for_unseen_prices(
+    app: Any,  # noqa: F811
+    monkeypatch: Any,
+) -> None:
+    """Codex's third review: the revision a page gets belongs to the very records it is shown,
+    even when another admin saves while the answer is being put together."""
+    import time as clock
+
+    from coverapi import prices as pr
+
+    a = login(app, "rick")
+    a.put("/api/prices/draft/fixed", json={"model": MODEL, "channel": "b2c", "price": 600})
+    auth = app.state.auth
+    real = pr.published
+
+    def published_then_someone_saves(au: Any) -> Any:
+        out = real(au)
+        d = dict(au.setting(pr.DRAFT_SETTING, None))
+        d["time"] = clock.time() + 1  # another admin's newer draft, written mid-request
+        d["data"]["channels"]["b2c"]["fixed"][MODEL] = 650
+        au.set_setting(pr.DRAFT_SETTING, d)
+        return out
+
+    monkeypatch.setattr(pr, "published", published_then_someone_saves)
+    for answer in (a.get("/api/prices").json(), a.get(f"/api/prices/cover/{MODEL}").json()):
+        shown = answer["draft"]["time"]
+        assert answer["revision"] == f"v0:{shown}"  # the token is the shown draft's
+    monkeypatch.setattr(pr, "published", real)
+    latest = auth.setting(pr.DRAFT_SETTING, None)
+    shown_rev = a.get(f"/api/prices/cover/{MODEL}").json()["revision"]
+    assert shown_rev == f"v0:{latest['time']}"
