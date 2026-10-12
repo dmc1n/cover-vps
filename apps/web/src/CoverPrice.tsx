@@ -310,6 +310,10 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
               const lp = live?.channels[k];
               const dp = dc?.channels[k];
               const vat = ch.show_vat ? "incl. VAT" : "ex VAT";
+              // a fixed price typed here is stored in the draft's unit (it may differ)
+              const dvat = (c.draft ? ch.draft_show_vat : ch.show_vat)
+                ? "incl. VAT"
+                : "ex VAT";
               // the fixed price that applies in the draft (or live when there is no draft)
               const fx = c.draft ? ch.fixed_draft : ch.fixed_live;
               const shownLive = lp?.shown_eur ?? ch.fixed_live;
@@ -386,6 +390,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                           min="0"
                           inputMode="decimal"
                           aria-label={`${k} fixed price`}
+                          title={`In the draft's unit: ${dvat}`}
                           placeholder={fx ? String(fx) : "none"}
                           value={typed[k] ?? (fx ? String(fx) : "")}
                           onChange={(e) =>
@@ -412,12 +417,13 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                               return r.errors.length
                                 ? "Saved in the draft, but the draft has errors: " +
                                     r.errors.join("; ")
-                                : `${k.toUpperCase()} fixed price ${eur(Number(value))} (${vat}) saved in the draft — not live until it is published.`;
+                                : `${k.toUpperCase()} fixed price ${eur(Number(value))} (${dvat}) saved in the draft — not live until it is published.`;
                             })
                           }
                         >
                           Save in draft
                         </button>
+                        <span className="muted">{dvat}</span>
                         {fx ? (
                           <button
                             disabled={busy}

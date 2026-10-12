@@ -1067,6 +1067,9 @@ export interface CoverPrices {
       name: string;
       show_vat: boolean;
       vat_pct: number;
+      /** the draft's units, when there is a draft (a typed fixed price is stored in these) */
+      draft_show_vat: boolean | null;
+      draft_vat_pct: number | null;
       fixed_live: number | null;
       fixed_draft: number | null;
     }

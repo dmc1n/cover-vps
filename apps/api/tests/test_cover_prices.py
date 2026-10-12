@@ -237,3 +237,16 @@ def test_a_stale_discard_keeps_newer_cover_prices(app: Any) -> None:  # noqa: F8
     assert d["draft"]["data"]["channels"]["b2b"]["fixed"][MODEL] == 400
     assert a.delete("/api/prices/draft", params={"since": d["revision"]}).status_code == 200
     assert a.get("/api/prices").json()["draft"] is None
+
+
+def test_the_cover_names_the_drafts_vat_unit(app: Any) -> None:  # noqa: F811
+    """Codex's sixth review: a price typed on the cover goes into the draft in the draft's unit;
+    the page is told that unit when the draft shows a channel differently from the live set."""
+    a = login(app, "rick")
+    first = a.get("/api/prices").json()
+    doc = first["current"]
+    doc["channels"]["b2c"]["show_vat"] = False
+    a.put("/api/prices/draft", json={"data": doc, "since": first["revision"]})
+    ch = a.get(f"/api/prices/cover/{MODEL}").json()["channels"]["b2c"]
+    assert ch["show_vat"] is True and ch["draft_show_vat"] is False
+    assert ch["draft_vat_pct"] == doc["channels"]["b2c"]["vat_pct"]

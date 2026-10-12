@@ -231,13 +231,19 @@ def install(app: FastAPI, auth: Any, store: Any, facts: Any, draft: Any) -> None
             "published": pub and {k: pub[k] for k in ("version", "created", "username", "note")},
             "draft": dr and {"by": dr.get("by"), "time": dr.get("time"), "note": dr.get("note"),
                              **draft_changes(live, dr["data"])},
+            # per channel the live units and, when there is a draft, the draft's: a fixed price
+            # typed on the cover goes into the draft, in the draft's unit (incl. or ex VAT)
             "channels": {
-                k: {"name": ch.get("name", k), "show_vat": bool(ch.get("show_vat")),
-                    "vat_pct": ch.get("vat_pct"),
+                k: {"name": (ch or dch).get("name", k),
+                    "show_vat": bool((ch or dch).get("show_vat")),
+                    "vat_pct": (ch or dch).get("vat_pct"),
+                    "draft_show_vat": bool(dch.get("show_vat")) if dr else None,
+                    "draft_vat_pct": dch.get("vat_pct") if dr else None,
                     "fixed_live": (ch.get("fixed") or {}).get(model_id),
-                    "fixed_draft": ((dr["data"]["channels"].get(k) or {}).get("fixed") or {})
-                    .get(model_id) if dr else None}
-                for k, ch in live["channels"].items()
+                    "fixed_draft": (dch.get("fixed") or {}).get(model_id) if dr else None}
+                for k in dict.fromkeys([*live["channels"], *(dr["data"]["channels"] if dr else {})])
+                for ch, dch in [(live["channels"].get(k) or {},
+                                 (dr["data"]["channels"].get(k) or {}) if dr else {})]
             },
             "costing": None,
             "costing_draft": None,

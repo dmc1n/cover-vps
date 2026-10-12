@@ -84,10 +84,12 @@ export function AllCovers({
   const [priceMsg, setPriceMsg] = useState("");
   useEffect(() => {
     if (!priceCols) return;
+    let current = true; // a slower answer for the other choice is ignored (Codex)
     setRows(null);
     prices
       .list(priceCols === "draft" ? "draft" : "current")
       .then((r) => {
+        if (!current) return;
         setRows(r.rows);
         setPriceMsg(
           priceCols === "draft" && r.set !== "draft"
@@ -95,7 +97,10 @@ export function AllCovers({
             : "",
         );
       })
-      .catch((e) => setPriceMsg(String(e)));
+      .catch((e) => current && setPriceMsg(String(e)));
+    return () => {
+      current = false;
+    };
   }, [priceCols]);
   const setCols = (v: PriceCols) => {
     window.location.hash = v ? `#/covers/all?prices=${v}` : "#/covers/all";
