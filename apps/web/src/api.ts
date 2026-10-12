@@ -731,6 +731,8 @@ export interface FitFeedback {
   id: number;
   created: number;
   order_id: number;
+  /** the cover the order was cut from (once produced) */
+  model_id?: string | null;
   score: number;
   comment: string | null;
   photo: string | null;

@@ -4297,10 +4297,10 @@ and applied as before (step 4 waits for 93).
   Not "/" as the plan said: the Questions page uses "/" for its own search.
 - **Tidy-up:** Gallery.tsx and QuickSearch.tsx, the old Models list in App.tsx and the CSS of
   pages and tabs that no longer exist (the Desk's Covers/Questions tabs and their badge, the old
-  button tabs, the rain buttons, the old header) are removed. The redirect shim `#/models`
-  (made in ADR-122, never an address before) is gone; instead every address the studio never
-  had goes to the person's start page rather than "Not for your account". Every old address
-  uinav.py checks still redirects.
+  button tabs, the rain buttons, the old header) are removed. Every address the studio never
+  had now goes to the person's start page rather than "Not for your account". Every redirect
+  stays (uinav.py checks them), `#/models` included: it was a shim of ADR-122, but the handbook
+  has named it since v1.36.0, so a bookmark may hit it (Codex).
 - **Handbook:** rewritten around the map (docs/handbook/README.md as the index, workshop.md new,
   navigation.md, how-it-works.md, catalogue.md, admin.md, web-app.md, learning.md rewritten,
   the rest's page names fixed), in English.
@@ -4310,6 +4310,12 @@ and applied as before (step 4 waits for 93).
   Workshop's DXF links against the gate, the search and the theme button. test_desk.py checks
   the Workshop API (approved and produced only, the DXF link gone once the cut changes, nothing
   changed by reading). Screenshots: out/uinew2/.
+- **Codex's adversarial review** found three things: the Workshop joined the customers' fit
+  answers to covers through the latest 300 orders only, so older answers vanished (fixed: the
+  feedback API joins the order's model on the server; a failed read now says so instead of "no
+  answers"); `#/models` should keep its redirect (restored); and seam-plan labels unreadable in
+  dark mode (not taken: the plan carries the light tokens, `svg.plan` beside `.theme-light`,
+  and the dark screenshots show dark labels on white).
 
 Better, later: a workshop login with its own right (question 92); the Workshop's fit history per
 revision; server-side search when the lists grow past a few thousand.

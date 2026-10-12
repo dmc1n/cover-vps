@@ -199,7 +199,8 @@ Every old address still works and goes to its new place:
 | `#/` | your start page |
 | `#/desk`, `#/desk/<cover>` | `#/work/desk`, `#/work/desk/<cover>` |
 | `#/questions`, `#/questions/<n>` | `#/work/questions`, `#/work/questions/<n>` |
-| any address the studio never had (e.g. `#/models`) | your start page |
+| `#/models` | `#/covers/all` |
+| any address the studio never had | your start page |
 | `#/catalogue` | `#/covers/all?view=cards` |
 | `#/arrangements[/<id>]` | `#/covers/arrangements[/<id>]` |
 | `#/learning` | `#/covers/learning` |

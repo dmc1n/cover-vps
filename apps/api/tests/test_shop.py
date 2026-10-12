@@ -251,6 +251,7 @@ def test_the_fit_question_after_delivery(app: Any, monkeypatch: pytest.MonkeyPat
     assert photo.status_code == 200
     fb = admin.get("/api/admin/feedback").json()["feedback"][0]
     assert fb["score"] == 4 and fb["photo"] == f"order-{oid}.png"
+    assert "model_id" in fb  # the order's cover once produced (Work → Workshop, ADR-124)
 
 
 def test_the_film_is_served_with_byte_ranges(app: Any) -> None:

@@ -350,6 +350,7 @@ export function redirect(hash: string, user: Viewer): string | null {
   if ((m = p.match(/^#\/questions(?:\/(\d+))?$/)))
     return m[1] ? `#/work/questions/${m[1]}` : "#/work/questions";
   if (p === "#/catalogue") return "#/covers/all?view=cards";
+  if (p === "#/models") return "#/covers/all"; // in the handbook since v1.36.0: bookmarks
   if ((m = p.match(/^#\/arrangements(?:\/([a-z0-9-]+))?$/)))
     return m[1] ? `#/covers/arrangements/${m[1]}` : "#/covers/arrangements";
   if (p === "#/learning") return "#/covers/learning";

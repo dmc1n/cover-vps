@@ -1468,7 +1468,10 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         require(request, "edit")
         with sqlite3.connect(auth.path) as db:
             db.row_factory = sqlite3.Row
-            rows = [dict(x) for x in db.execute("SELECT * FROM fit_feedback ORDER BY id DESC")]
+            # the cover the order was cut from, for Work → Workshop (ADR-124), whatever its age
+            rows = [dict(x) for x in db.execute(
+                "SELECT f.*, o.model_id AS model_id FROM fit_feedback f "
+                "LEFT JOIN orders o ON o.id = f.order_id ORDER BY f.id DESC")]  # fmt: skip
         return {"feedback": rows}
 
     @app.get("/api/admin/feedback/photo/{name}")

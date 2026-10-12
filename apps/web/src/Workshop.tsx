@@ -26,23 +26,24 @@ const FILE_LABEL: Record<string, string> = {
 const day = (t?: number | null) =>
   t ? new Date(t * 1000).toLocaleDateString() : "";
 
-/** The customers' fit answers per cover: an order names its cover once it is produced. */
+/** The customers' fit answers per cover (the order's cover, joined on the server, so no answer
+ * is lost however old its order). null: loading; "error": could not be read. */
 function useCustomerFits(enabled: boolean) {
-  const [fits, setFits] = useState<Record<string, FitFeedback[]> | null>(null);
+  const [fits, setFits] = useState<
+    Record<string, FitFeedback[]> | "error" | null
+  >(null);
   useEffect(() => {
     if (!enabled) return;
     let live = true;
-    Promise.all([shopAdmin.feedback(), shopAdmin.orders()])
-      .then(([f, o]) => {
-        const model = new Map(o.orders.map((x) => [x.id, x.model_id]));
+    shopAdmin
+      .feedback()
+      .then((f) => {
         const by: Record<string, FitFeedback[]> = {};
-        for (const a of f.feedback) {
-          const m = model.get(a.order_id);
-          if (m) (by[m] ??= []).push(a);
-        }
+        for (const a of f.feedback)
+          if (a.model_id) (by[a.model_id] ??= []).push(a);
         if (live) setFits(by);
       })
-      .catch(() => live && setFits({}));
+      .catch(() => live && setFits("error"));
     return () => {
       live = false;
     };
@@ -153,7 +154,15 @@ export function Workshop() {
                 <Row
                   key={w.id}
                   w={w}
-                  customers={editor ? (customers?.[w.id] ?? []) : null}
+                  customers={
+                    !editor
+                      ? null
+                      : customers === "error"
+                        ? "error"
+                        : customers === null
+                          ? "loading"
+                          : (customers[w.id] ?? [])
+                  }
                 />
               ))}
               {shown.length === 0 && (
@@ -181,7 +190,7 @@ function Row({
   customers,
 }: {
   w: WorkshopItem;
-  customers: FitFeedback[] | null;
+  customers: FitFeedback[] | "loading" | "error" | null;
 }) {
   const who = w.produced ?? w.approved;
   return (
@@ -286,6 +295,10 @@ function Row({
       <td>
         {customers === null ? (
           <span className="muted small">—</span>
+        ) : customers === "loading" ? (
+          <span className="muted small">…</span>
+        ) : customers === "error" ? (
+          <span className="error small">could not be read</span>
         ) : customers.length === 0 ? (
           <span className="muted small">no answers</span>
         ) : (

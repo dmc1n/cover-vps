@@ -599,8 +599,8 @@ approvals, no workshop role, the defaults read-only, the start pages as below.
   DXF only past the approval gate), the revision to cut, the measured fit, the customers' fit
   answers (editors and admins); read-only, every role, no new right (question 92).
 - **Step 9 — tidy up:** Gallery.tsx, QuickSearch.tsx, the old Models list and the CSS of gone
-  pages and tabs removed; the `#/models` shim removed (every unknown address → the start page);
-  every redirect uinav.py checks stays. The header's search finds covers, Desk codes, questions
+  pages and tabs removed; every unknown address → the start page; every redirect stays
+  (`#/models` too: named in the handbook since v1.36.0). The header's search finds covers, Desk codes, questions
   and (admins) orders, Ctrl+K. The handbook rewritten around the map, in English
   (docs/handbook/README.md is its index, workshop.md new). CLAUDE.md's command list updated.
 - **Checks:** uinav.py light and dark at 1440 and 820 with a contrast check of every text; the

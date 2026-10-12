@@ -84,6 +84,7 @@ OLD = [
     ("#/questions", "#/work/questions"),
     ("#/questions/71", "#/work/questions/71"),
     ("#/catalogue", "#/covers/all?view=cards"),
+    ("#/models", "#/covers/all"),
     ("#/arrangements", "#/covers/arrangements"),
     (f"#/arrangements/{ARR}", f"#/covers/arrangements/{ARR}"),
     ("#/learning", "#/covers/learning"),
