@@ -554,7 +554,10 @@ def install(app: FastAPI, auth: Any, store: Any) -> None:
     @app.delete("/api/prices/draft")
     def discard_draft(request: Request) -> dict[str, Any]:
         require(request, "admin")
-        with WRITE_LOCK:
+        since = request.query_params.get("since")
+        with WRITE_LOCK:  # a page that saw other prices does not throw newer edits away
+            if since is not None:
+                stale({"since": since}, None)
             auth.set_setting(DRAFT_SETTING, None)
         return {"draft": None}
 

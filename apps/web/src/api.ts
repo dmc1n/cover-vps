@@ -1185,8 +1185,13 @@ export const prices = {
         revision: string;
       }>(r),
     ),
-  discard: () =>
-    send("DELETE", "/api/prices/draft").then((r) => json<unknown>(r)),
+  discard: (since?: string) =>
+    send(
+      "DELETE",
+      since === undefined
+        ? "/api/prices/draft"
+        : `/api/prices/draft?since=${encodeURIComponent(since)}`,
+    ).then((r) => json<unknown>(r)),
   preview: (data?: PriceSet) =>
     send("POST", "/api/prices/preview", data ? { data } : {}).then((r) =>
       json<{

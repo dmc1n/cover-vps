@@ -4399,7 +4399,8 @@ docs/plans/studio-ui.md §12; handbook: prices.md, navigation.md.
 - **No lost update, no surprise publish:** `PUT /api/prices/draft`, `PUT /api/prices/draft/fixed`
   and `POST /api/prices/publish` take an optional `since`: the `revision` the page was given
   (`v<live version>:<draft time>`, from `GET /api/prices`, the cover endpoint and every save).
-  It changes with every save, fixed price, import, publish, discard and rollback, so prices
+  It changes with every save, fixed price, import, publish, discard and rollback (Discard
+  draft checks it too), so prices
   changed elsewhere (a cover price, an import, a publish that cleared the draft) are refused
   with 409 and the page offers to load them; a page publishes exactly the draft it saved. Old
   clients without `since` behave as before. Codex found the holes of the first two versions (a

@@ -221,3 +221,19 @@ def test_a_save_during_a_read_never_gives_a_token_for_unseen_prices(
     latest = auth.setting(pr.DRAFT_SETTING, None)
     shown_rev = a.get(f"/api/prices/cover/{MODEL}").json()["revision"]
     assert shown_rev == f"v0:{latest['time']}"
+
+
+def test_a_stale_discard_keeps_newer_cover_prices(app: Any) -> None:  # noqa: F811
+    """Codex's fourth review: Discard draft from a page that loaded older prices does not throw
+    away a cover price saved since."""
+    a, b = login(app, "rick"), login(app, "rick")
+    a.put("/api/prices/draft/fixed", json={"model": MODEL, "channel": "b2c", "price": 600})
+    seen = a.get("/api/prices").json()["revision"]  # Settings loaded with this draft
+    rb = b.get(f"/api/prices/cover/{MODEL}").json()["revision"]
+    fix = {"model": MODEL, "channel": "b2b", "price": 400, "since": rb}
+    assert b.put("/api/prices/draft/fixed", json=fix).status_code == 200
+    assert a.delete("/api/prices/draft", params={"since": seen}).status_code == 409
+    d = a.get("/api/prices").json()
+    assert d["draft"]["data"]["channels"]["b2b"]["fixed"][MODEL] == 400
+    assert a.delete("/api/prices/draft", params={"since": d["revision"]}).status_code == 200
+    assert a.get("/api/prices").json()["draft"] is None

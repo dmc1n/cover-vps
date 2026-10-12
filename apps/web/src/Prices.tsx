@@ -324,7 +324,7 @@ export function Prices({
                 disabled={busy || (!state.draft && !dirty)}
                 onClick={() =>
                   run(async () => {
-                    await prices.discard();
+                    await prices.discard(state.revision);
                     load();
                     setMoves(null);
                     setMsg("Draft discarded.");
