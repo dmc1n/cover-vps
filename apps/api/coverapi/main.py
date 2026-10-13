@@ -245,7 +245,7 @@ def create_app(
         if name not in ALLOWED or not (d / name).is_file():
             raise HTTPException(404, f"no file {name!r}")
         if name.endswith(".dxf"):  # a cutting-table file: only an approved cover (ADR-079, 128)
-            desk.gate(d, model_id, request)
+            desk.gate(d, model_id, request, name=name)
         suffix = Path(name).suffix
         file, kind = _named(model_id, name)
         return FileResponse(d / name, media_type=MEDIA.get(suffix, "application/octet-stream"),

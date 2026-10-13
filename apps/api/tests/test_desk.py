@@ -334,3 +334,20 @@ def test_an_approval_older_than_its_cut_file_is_not_grandfathered(app: Any, tmp_
     st = desk.state(d)
     assert st["status"] == desk.WAITING and "cut" not in (st.get("approved") or {})
     assert st["history"][-1]["action"] == "changed after approval"
+
+
+def test_the_flat_pattern_dxf_is_only_served_as_the_approval_saw_it(
+    app: Any, tmp_path: Path
+) -> None:
+    """Codex review (ADR-128): a flatten run after the approval rewrites pattern.dxf but not
+    cut.dxf; the approval of the cut file must not let the new flat DXF through."""
+    d = tmp_path / "data/models/suns-chair"
+    (d / "pattern.dxf").write_text("0\nEOF\n")
+    vera, rens = login(app, "vera"), login(app, "rens")
+    url = "/api/models/suns-chair/files/pattern.dxf"
+    assert vera.get(url).status_code == 403
+    assert rens.post("/api/desk/suns-chair", json={"action": "approve"}).status_code == 200
+    assert vera.get(url).status_code == 200
+    (d / "pattern.dxf").write_text("0\nSECTION\n0\nEOF\n")  # flattened again
+    assert vera.get(url).status_code == 403
+    assert vera.get("/api/models/suns-chair/files/cut.dxf").status_code == 200

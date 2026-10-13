@@ -330,18 +330,24 @@ def gated(d: Path, params: Any) -> bool:
     return is_arrangement(d) and bool(params["desk.gate_arrangements"])
 
 
-def dxf_allowed(d: Path, params: Any, revision: Path | None = None) -> bool:
+def dxf_allowed(d: Path, params: Any, revision: Path | None = None, name: str = "cut.dxf") -> bool:
     """The cutting table's DXF: only for a cover the Desk approved for the cut file it has now
     (its fingerprint; an arrangement's placement too), or a kept revision whose cut file was
     approved at some time (ADR-079, 115, 120, 128). Never the catalogue status, which a person
-    can set by hand."""
+    can set by hand. Another DXF (the flat pattern.dxf) only as the approval saw it: a flatten
+    run after the approval rewrites it without touching cut.dxf (ADR-128)."""
     if not gated(d, params):
         return True
     st = state(d)
     if revision is not None:
         cut = cut_fingerprint(revision)
         return cut is not None and cut in st.get("approved_fingerprints", [])
-    return st["status"] in DONE and not _changed_since_approval(d, st)
+    if st["status"] not in DONE or _changed_since_approval(d, st):
+        return False
+    if name == "cut.dxf":
+        return True
+    seen = (st.get("approved") or {}).get("pattern" if name == "pattern.dxf" else name)
+    return seen is not None and seen == file_fingerprint(d / name)
 
 
 def stamped_ok(d: Path, name: str) -> bool:
@@ -365,12 +371,15 @@ def is_arrangement(d: Path) -> bool:
     return d.name.startswith(ARRANGEMENT_PREFIX) and (d / ARRANGEMENT_JSON).is_file()
 
 
-def cut_fingerprint(d: Path) -> str | None:
-    """The cutting table's file as it is now: what a Desk approval is for."""
+def file_fingerprint(f: Path) -> str | None:
     import hashlib
 
-    f = d / "cut.dxf"
     return hashlib.sha256(f.read_bytes()).hexdigest()[:20] if f.is_file() else None
+
+
+def cut_fingerprint(d: Path) -> str | None:
+    """The cutting table's file as it is now: what a Desk approval is for."""
+    return file_fingerprint(d / "cut.dxf")
 
 
 def _placement(d: Path) -> dict[str, Any]:
@@ -760,6 +769,8 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
                     raise HTTPException(409, "the cutting file changed while approving: look again")
                 st["status"] = "approved"
                 st["approved"] = {"by": who, "time": now, "cut": cut, "revision": revision}
+                if (pattern := file_fingerprint(d / "pattern.dxf")) is not None:
+                    st["approved"]["pattern"] = pattern  # the flat DXF it saw (ADR-128)
                 st["approved_fingerprints"] = list(
                     dict.fromkeys([*st.get("approved_fingerprints", []), cut])
                 )
@@ -1417,7 +1428,9 @@ def install(app: FastAPI, store: Any) -> None:
         return apply(folder(model_id), a, user, learning)
 
 
-def gate(d: Path, model_id: str, request: Request, revision: Path | None = None) -> None:
+def gate(
+    d: Path, model_id: str, request: Request, revision: Path | None = None, name: str = "cut.dxf"
+) -> None:
     """The cutting table's DXF only for an approved cover (ADR-079); an admin may override
     with ?override=1, which the desk's history keeps."""
     from coverengine.params import Registry
@@ -1425,7 +1438,7 @@ def gate(d: Path, model_id: str, request: Request, revision: Path | None = None)
     from coverapi.security import current_user
 
     params = Registry.load(None).resolve()
-    if dxf_allowed(d, params, revision):
+    if dxf_allowed(d, params, revision, name):
         return
     user = current_user(request)
     if request.query_params.get("override") == "1" and user.may("admin"):

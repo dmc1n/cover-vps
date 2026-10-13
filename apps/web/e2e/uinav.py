@@ -445,8 +445,9 @@ async def covers_and_workshop(page: Page, width: int, n: list[int]) -> None:
       return {links: links.length, bad: links.filter(m => !ok.has(m)), items: w.items.length};
     }""")
     check(not gate["bad"], f"rick {width}: Workshop offers the DXF only past the gate {gate}")
-    check(await page.locator("main button").count() == 0,
-          f"rick {width}: the Workshop has no buttons (read-only)")  # fmt: skip
+    other = page.locator("main button").filter(has_not_text="Send to production")
+    check(await other.count() == 0,
+          f"rick {width}: the Workshop has no buttons but Send to production")  # fmt: skip
 
 
 async def search_and_theme(page: Page, width: int, n: list[int]) -> None:

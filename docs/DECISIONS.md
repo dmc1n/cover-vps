@@ -4566,6 +4566,13 @@ list.
   status by hand, B2B outbox, restart recovery, two clicks), the quick approval and the queue's
   order, the workshop role's allowed and denied routes, its questions and its rights in auth,
   the migrations (dry run byte for byte, apply, apply again changes nothing).
+- **Codex's adversarial review** (branch, focus on the gate, the role, the click and the
+  grandfathering) found one thing, fixed: `pattern.dxf` was gated on the cut file's approval
+  only, so a flatten-only run after an approval (it rewrites pattern.dxf, not cut.dxf) would
+  have served an unapproved flat DXF. An approval now records `approved.pattern` and the flat
+  DXF is served only with those bytes (an older approval without it: locked, admin override).
+  Earlier, in my own review: an approval without a fingerprint whose cut file is newer than the
+  approval is not grandfathered but reopened (0 such covers on live).
 - **Not done**: the approvers' daily digest still names arrangements only (an order's production
   mail goes to the studio's address); whether the workshop may press *Send to production* or
   mark a cover *Produced* is for the owner to say (now: editors and admins, approvers).
