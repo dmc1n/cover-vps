@@ -209,16 +209,22 @@ export function PriceImport({
                 ))}
             </span>
           </div>
-          <Info label="About price import">
-            {rep.channel_name} shows its prices {unit}
-            {rep.channel_shows_vat
-              ? "; "
-              : `; a price incl. VAT is stored ex VAT (÷ ${1 + rep.vat_pct / 100}), exactly, so the price incl. VAT stays the sheet's to the cent; `}
-            no rounding is applied to a fixed price. <b>Exact</b> = named by its
-            code, drawing number or own name; <b>probable</b> = a SUNS model
-            whose family and type match the description, or one the product list
-            links to that drawing: please check those.
-          </Info>
+          <p className="row">
+            <span className="pill">
+              {rep.channel_name}: prices {unit}
+              {rep.channel_shows_vat ? "" : ", stored ex VAT"}
+            </span>
+            <Info label="About the matching">
+              {rep.channel_name} shows its prices {unit}
+              {rep.channel_shows_vat
+                ? "; "
+                : `; a price incl. VAT is stored ex VAT (÷ ${1 + rep.vat_pct / 100}), exactly, so the price incl. VAT stays the sheet's to the cent; `}
+              no rounding is applied to a fixed price. <b>Exact</b> = named by
+              its code, drawing number or own name; <b>probable</b> = a SUNS
+              model whose family and type match the description, or one the
+              product list links to that drawing: please check those.
+            </Info>
+          </p>
           <h5>
             <Icon name="csv" />
             Matched ({matched.length} rows)

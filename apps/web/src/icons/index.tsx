@@ -227,9 +227,10 @@ export function IconLink({
 // ---- the (i) popover -----------------------------------------------------------------------
 // A button (keyboard: Tab, then Enter or Space; a finger: a tap) that shows the explanation in a
 // small card; Escape, a tap outside or the button again closes it. A mouse also opens it by
-// hovering. The text stays in the page (hidden while closed), right after the button, so Tab
-// reaches a link inside it. Where the browser has the popover API (Chrome/Edge 114, Safari 17,
-// Firefox 125) the card is in the top layer, so no scrolling box or table clips it.
+// hovering. While open, the text sits right after the button, so Tab reaches a link inside it.
+// Where the browser has the popover API (Chrome/Edge 114, Safari 17,
+// Firefox 125) the card is in the top layer, so no scrolling box or table clips it. The text is
+// in the page only while the card is open (a closed (i) adds nothing to the page's text).
 const hasPopover =
   typeof HTMLElement !== "undefined" &&
   typeof (HTMLElement.prototype as { showPopover?: unknown }).showPopover ===
@@ -275,18 +276,12 @@ export function Info({
   useLayoutEffect(() => {
     const p = pop.current;
     if (!p) return;
-    if (hasPopover && !p.hasAttribute("popover"))
+    // the card is in the page only while open; in the top layer where the browser has it
+    if (hasPopover && !p.hasAttribute("popover")) {
       p.setAttribute("popover", "manual");
-    if (hasPopover) {
-      const el = p as HTMLElement & {
-        showPopover(): void;
-        hidePopover(): void;
-      };
-      const shown = p.matches(":popover-open");
-      if (open && !shown) el.showPopover();
-      if (!open && shown) el.hidePopover();
+      (p as HTMLElement & { showPopover(): void }).showPopover();
     }
-    if (open) place();
+    place();
   }, [open, place]);
 
   useEffect(() => {
@@ -343,23 +338,24 @@ export function Info({
         className="info-btn"
         aria-label={label}
         aria-expanded={!!open}
-        aria-controls={id}
+        aria-controls={open ? id : undefined}
         onClick={() => setOpen((o) => (o === "pinned" ? false : "pinned"))}
       >
         <InfoGlyph size={size} strokeWidth={1.9} aria-hidden="true" />
       </button>
-      <span
-        ref={pop}
-        id={id}
-        className="info-pop"
-        role="note"
-        aria-label={label}
-        hidden={hasPopover ? undefined : !open}
-        onPointerEnter={hoverIn}
-        onPointerLeave={hoverOut}
-      >
-        {children}
-      </span>
+      {open && (
+        <span
+          ref={pop}
+          id={id}
+          className="info-pop"
+          role="note"
+          aria-label={label}
+          onPointerEnter={hoverIn}
+          onPointerLeave={hoverOut}
+        >
+          {children}
+        </span>
+      )}
     </span>
   );
 }

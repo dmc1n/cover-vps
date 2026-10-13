@@ -212,7 +212,8 @@ CONTROLS_JS = """() => {
       out.placed.push((i.querySelector('.info-btn')?.getAttribute('aria-label') || '?'));
     const b = i.querySelector('.info-btn');
     const named = b && b.getAttribute('aria-label') && b.hasAttribute('aria-expanded');
-    if (!named || !b.getAttribute('aria-controls'))
+    const open = b && b.getAttribute('aria-expanded') === 'true';
+    if (!named || (open && !b.getAttribute('aria-controls')))
       out.unnamed.push('an (i) without its name or state');
   }
   for (const c of document.querySelectorAll('button, a, summary')) {
@@ -295,17 +296,17 @@ async def info_popover(page: Page, width: int) -> None:
     await page.goto(f"{URL}/#/settings/company")
     btn = page.locator(".set-name .info-btn").first
     await expect(btn).to_be_visible(timeout=SLOW)
-    pop = page.locator(f'[id="{await btn.get_attribute("aria-controls")}"]')
     if width in TOUCH:
         await btn.tap()
     else:
         await btn.focus()
         await page.keyboard.press("Enter")
+    pop = page.locator(f'[id="{await btn.get_attribute("aria-controls")}"]')
     await expect(pop).to_be_visible()
     check(await btn.get_attribute("aria-expanded") == "true", f"rick {width}: the (i) says open")
     await contrast(page, f"{width} (i) open")
     await page.keyboard.press("Escape")
-    await expect(pop).to_be_hidden()
+    await expect(pop).to_have_count(0)  # the card leaves the page when it closes
     check(
         await btn.evaluate("b => document.activeElement === b"),
         f"rick {width}: Escape closes the (i) and the focus is back on it",

@@ -84,7 +84,7 @@ async def main() -> None:
         await expect(status).to_contain_text("Waiting for approval at the Desk")
         await expect(status).to_contain_text("sent by Vera")
         await expect(status.get_by_role("link", name="Open its Desk card ↗")).to_be_visible()
-        pill = page.locator(".arrange-pill").first
+        pill = page.locator(".arr-state").first
         await expect(pill).to_have_text("waiting for approval")
         await shot(page, "02-arrangement-sent", full=True)
         assert await dxf(page, NEW) == 403
@@ -110,7 +110,7 @@ async def main() -> None:
         await expect(card.locator(".viewer canvas[data-loaded]")).to_be_visible(timeout=SLOW)
         await expect(card.get_by_role("link", name="Check list (PDF)").first).to_be_visible()
         tabs = card.get_by_role("navigation", name="Card")
-        await tabs.get_by_role("link", name="Pieces", exact=True).click()
+        await tabs.get_by_role("link", name=re.compile("^Pieces")).click()
         await expect(card.get_by_role("heading", name="Pieces", exact=True)).to_be_visible()
         await tabs.get_by_role("link", name="Check", exact=True).click()
         await page.wait_for_timeout(2500)

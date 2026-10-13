@@ -568,7 +568,7 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
               >
                 {l.name}{" "}
                 {l.desk && (
-                  <StatusChip status={l.desk.status}>
+                  <StatusChip status={l.desk.status} className="arr-state">
                     {
                       {
                         approved: "approved",
