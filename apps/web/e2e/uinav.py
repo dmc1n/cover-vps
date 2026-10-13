@@ -304,6 +304,11 @@ async def info_popover(page: Page, width: int) -> None:
     pop = page.locator(f'[id="{await btn.get_attribute("aria-controls")}"]')
     await expect(pop).to_be_visible()
     check(await btn.get_attribute("aria-expanded") == "true", f"rick {width}: the (i) says open")
+    inside = await pop.evaluate(
+        "p => { const r = p.getBoundingClientRect(); return r.top >= 0 && r.left >= 0 &&"
+        " r.bottom <= innerHeight && r.right <= document.documentElement.clientWidth; }"
+    )
+    check(inside, f"rick {width}: the open (i) stays inside the screen")
     await contrast(page, f"{width} (i) open")
     await page.keyboard.press("Escape")
     await expect(pop).to_have_count(0)  # the card leaves the page when it closes
@@ -553,6 +558,12 @@ async def covers_and_workshop(page: Page, width: int, n: list[int]) -> None:
       return {links: links.length, bad: links.filter(m => !ok.has(m)), items: w.items.length};
     }""")
     check(not gate["bad"], f"rick {width}: Workshop offers the DXF only past the gate {gate}")
+    if width in TOUCH:  # no hover on a tablet: every file says what it is under its icon
+        bare = await page.evaluate(
+            "() => [...document.querySelectorAll('.ws-file')].filter(a =>"
+            " !a.querySelector('.ws-file-label')?.checkVisibility()).length"
+        )
+        check(bare == 0, f"rick {width}: every Workshop file has its word on a touch screen")
     other = page.locator(
         "main button:not(.info-btn)"
     )  # an (i) only shows text.filter(has_not_text="Send to production")

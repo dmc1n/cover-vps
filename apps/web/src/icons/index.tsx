@@ -263,12 +263,20 @@ export function Info({
     const vh = window.innerHeight;
     const w = Math.min(380, vw - 24);
     p.style.maxWidth = `${w}px`;
+    // never taller than the screen: a long text scrolls inside the card (zoom, a phone's keyboard)
+    p.style.maxHeight = `${Math.max(120, vh - 16)}px`;
     const pw = Math.min(p.offsetWidth || w, w);
     const ph = p.offsetHeight;
     const left = Math.max(12, Math.min(b.left - 12, vw - pw - 12));
     const below = b.bottom + 6;
+    const above = b.top - ph - 6;
+    // below the button when it fits, else above, else as far down as the screen allows
     const top =
-      below + ph > vh - 8 && b.top - ph - 6 > 8 ? b.top - ph - 6 : below;
+      below + ph <= vh - 8
+        ? below
+        : above >= 8
+          ? above
+          : Math.max(8, Math.min(below, vh - ph - 8));
     p.style.left = `${left}px`;
     p.style.top = `${top}px`;
   }, []);

@@ -33,7 +33,44 @@ const FILE_LABEL: Record<string, string> = {
   "cut.svg": "Cut pieces (SVG)",
   "cut.dxf": "Cutting table (DXF)",
 };
-// the files as icons, the words in their tooltips (Studio 2.0, ADR-130)
+// the files as icons, the words in their tooltips and, on a touch screen, a short word under
+// each (Studio 2.0, ADR-130); an approved copy also carries a tick, not only a colour
+const FILE_SHORT: Record<string, string> = {
+  "cutting-list.pdf": "List",
+  "sizes.pdf": "Sizes",
+  "checklist.pdf": "Check",
+  "cut.svg": "SVG",
+};
+function FileLink({
+  icon,
+  label,
+  short,
+  href,
+  approved = false,
+}: {
+  icon: IconName;
+  label: string;
+  short: string;
+  href: string;
+  approved?: boolean;
+}) {
+  return (
+    <a
+      className={`icon-btn tinted ws-file ${approved ? "approved" : ""}`}
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      title={label}
+      aria-label={label}
+    >
+      <Icon name={icon} />
+      {approved && <Icon name="st-ok" size={13} className="ws-file-ok" />}
+      <span className="ws-file-label" aria-hidden="true">
+        {short}
+      </span>
+    </a>
+  );
+}
 const FILE_ICON: Record<string, IconName> = {
   "cutting-list.pdf": "cutting-list",
   "sizes.pdf": "sizes",
@@ -457,18 +494,16 @@ function Row({
           {w.files
             .filter((f) => f !== "cut.dxf")
             .map((f) => (
-              <IconLink
+              <FileLink
                 key={f}
                 icon={FILE_ICON[f] ?? "pdf"}
                 label={FILE_LABEL[f] ?? f}
-                className="tinted"
+                short={FILE_SHORT[f] ?? f}
                 href={fileUrl(w.id, f)}
-                target="_blank"
-                rel="noreferrer"
               />
             ))}
           {(w.stamped ?? []).map((f) => (
-            <IconLink
+            <FileLink
               key={`approved-${f}`}
               icon={f === "sizes.pdf" ? "sizes" : "cutting-list"}
               label={
@@ -476,10 +511,9 @@ function Row({
                   ? "Approved size drawing (stamped APPROVED by the Desk)"
                   : "Approved cutting list (stamped APPROVED by the Desk)"
               }
-              className="tinted approved"
+              short={f === "sizes.pdf" ? "Sizes ✓" : "List ✓"}
               href={`/api/models/${w.id}/approved/${f}`}
-              target="_blank"
-              rel="noreferrer"
+              approved
             />
           ))}
           {w.files.includes("cut.dxf") &&

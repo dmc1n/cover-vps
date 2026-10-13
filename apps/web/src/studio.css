@@ -6220,7 +6220,8 @@ button.info-btn[aria-expanded="true"] {
   text-align: left;
   text-transform: none;
   white-space: normal;
-  overflow: visible;
+  overflow-y: auto; /* never taller than the screen (max-height set when it opens) */
+  overscroll-behavior: contain;
 }
 .info-pop[hidden] {
   display: none;
@@ -6395,6 +6396,32 @@ td .infotip {
 .icon-btn.approved {
   background: var(--ok-soft);
   color: var(--ok);
+}
+/* a Workshop file: an icon; on a touch screen with its short word; an approved copy a tick */
+a.icon-btn.ws-file {
+  position: relative;
+  width: auto;
+  padding: 0 8px;
+  display: inline-flex;
+  gap: 4px;
+}
+.ws-file-label {
+  display: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+.ws-file .ws-file-ok {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ok);
+}
+@media (pointer: coarse) {
+  .ws-file-label {
+    display: inline;
+  }
 }
 .file-bar {
   gap: 8px;
