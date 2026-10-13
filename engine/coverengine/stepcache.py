@@ -16,6 +16,11 @@ another folder (`--out`) is never skipped.
 What the stamp records is what the step read; parameters copied whole into a file for the
 record (the full parameter set in pattern.json) do not count as read, so pattern.json keeps the
 record of the run that made its geometry.
+
+Its outputs are every file the step wrote, measured too (ADR-129): the stamp lists the files in
+the model folder that the run created or changed (cut.svg, cutting-list.pdf, pattern.svg, ...,
+not only the main ones in OUTPUTS). A step is skipped only while every one of them is still
+there and not empty: a cover is never "ready" with a file it needs missing.
 """
 
 from __future__ import annotations
@@ -103,17 +108,53 @@ def _value(params: EffectiveParams, key: str) -> Any:
         return "<gone>"
 
 
+# files in a model folder that are never a step's output: the stamps, temporary files, the
+# previous pattern kept for the diff
+NOT_OUTPUTS = (".tmp", ".partial", ".lock")
+NOT_OUTPUT_NAMES = ("pattern.prev.json",)
+
+
+def snapshot(model_dir: Path) -> dict[str, tuple[int, int]]:
+    """The model folder's own files (not its sub-folders) with their change time and size."""
+    out = {}
+    for p in model_dir.iterdir():
+        if p.is_file() and not p.name.endswith(NOT_OUTPUTS) and p.name not in NOT_OUTPUT_NAMES:
+            st = p.stat()
+            out[p.name] = (st.st_mtime_ns, st.st_size)
+    return out
+
+
+def written(before: dict[str, tuple[int, int]], model_dir: Path) -> set[str]:
+    """The files a step created or changed since `before` (its snapshot)."""
+    after = snapshot(model_dir)
+    return {name for name, sig in after.items() if before.get(name) != sig}
+
+
+def missing_outputs(step: str, model_dir: Path, doc: dict[str, Any] | None = None) -> list[str]:
+    """The outputs of the step's last run that are gone or empty: its main ones (OUTPUTS) and
+    every file the run wrote (the stamp's `outputs`)."""
+    names = set(OUTPUTS.get(step, ())) | set((doc or {}).get("outputs") or ())
+    out = []
+    for name in sorted(names):
+        p = model_dir / name
+        if not p.is_file() or p.stat().st_size == 0:
+            out.append(name)
+    return out
+
+
 def unchanged(step: str, model_dir: Path, params: EffectiveParams) -> bool:
     """True when the step's stamp matches: same code, same input files, same values of every
-    parameter it read last time, and its outputs are there."""
+    parameter it read last time, and every output it wrote is still there."""
     stamp = model_dir / STEPS_DIR / f"{step}.json"
     if step not in INPUTS or not stamp.is_file():
-        return False
-    if not all((model_dir / name).is_file() for name in OUTPUTS[step]):
         return False
     try:
         doc = json.loads(stamp.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
+        return False
+    if "outputs" not in doc:  # a stamp from before ADR-129: what it wrote is unknown
+        return False
+    if missing_outputs(step, model_dir, doc):
         return False
     if doc.get("engine") != engine_hash() or doc.get("files") != _files(step, model_dir):
         return False
@@ -121,7 +162,9 @@ def unchanged(step: str, model_dir: Path, params: EffectiveParams) -> bool:
     return all(_value(params, k) == v for k, v in read.items())
 
 
-def write(step: str, model_dir: Path, params: EffectiveParams, read: set[str]) -> None:
+def write(step: str, model_dir: Path, params: EffectiveParams, read: set[str],
+          outputs: set[str] | None = None) -> None:  # fmt: skip
+    """The stamp of a run that ended well; `outputs`: the files it wrote (`written`)."""
     folder = model_dir / STEPS_DIR
     folder.mkdir(exist_ok=True)
     doc = {
@@ -129,6 +172,8 @@ def write(step: str, model_dir: Path, params: EffectiveParams, read: set[str]) -
         "engine": engine_hash(),
         "files": _files(step, model_dir),
         "params": {k: _value(params, k) for k in sorted(read)},
+        # what it wrote, without the files it reads itself (cover.json, ...)
+        "outputs": sorted((set(outputs or ()) | set(OUTPUTS[step])) - set(INPUTS[step])),
     }
     tmp = folder / f"{step}.tmp"
     tmp.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n", encoding="utf-8")

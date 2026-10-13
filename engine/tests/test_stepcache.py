@@ -133,3 +133,36 @@ def test_a_seam_correction_from_the_desk_reruns_the_cut(
     shutil.copytree(box, d)
     (d / "part_edits.json").write_text(json.dumps({"edits": []}))
     assert _run(d, capsys)[0] == "cut"
+
+
+def test_a_missing_or_empty_output_is_calculated_again(
+    box: Path, tmp_path: Path, capsys: Any
+) -> None:
+    """ADR-129: a step is skipped only while every file it wrote is there, the secondary ones
+    too (cut.svg, the cutting list, ...): a cover is never "ready" with a file missing."""
+    d = tmp_path / "box"
+    shutil.copytree(box, d)
+    export = json.loads((d / "steps" / "export.json").read_text())
+    assert {"cut.dxf", "finished.json", "cut.svg"} <= set(export["outputs"])
+    assert "cover.json" not in export["outputs"] and "pattern.json" not in export["outputs"]
+    (d / "cut.svg").unlink()  # a secondary output, not in OUTPUTS
+    assert _run(d, capsys) == ["export"]
+    assert (d / "cut.svg").is_file()
+    flatten = json.loads((d / "steps" / "flatten.json").read_text())
+    other = next(n for n in flatten["outputs"] if n != "pattern.json")
+    (d / other).write_bytes(b"")  # one of flatten's own files, emptied
+    assert _run(d, capsys)[:1] == ["flatten"]
+    assert (d / other).stat().st_size > 0
+    assert _run(d, capsys) == []
+
+
+def test_a_stamp_without_its_outputs_calculates_again(
+    box: Path, tmp_path: Path, capsys: Any
+) -> None:
+    d = tmp_path / "box"
+    shutil.copytree(box, d)
+    stamp = d / "steps" / "export.json"
+    doc = json.loads(stamp.read_text())
+    del doc["outputs"]  # written before ADR-129: what it wrote is unknown
+    stamp.write_text(json.dumps(doc))
+    assert _run(d, capsys) == ["export"]
