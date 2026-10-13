@@ -431,6 +431,12 @@ limits:                          # what a request or an uploaded file may hold (
                                  # is capped at this times the number of cores. 0: no limit
   job_memory_mb: 12288           # ... and may reserve at most this much memory (address space, MiB; the
                                  # server has 16 GB); a step over it fails, the server goes on. 0: no limit
+  mail_attempts: 8               # a mail in the outbox (orders, reviews, digests) is tried this many times
+                                 # before it is shown as failed in Settings → System & logs (ADR-129) ...
+  mail_retry_first_s: 60         # ... the first retry after this long, each next one twice as long ...
+  mail_retry_max_s: 21600        # ... but never longer apart than this (6 h)
+  mail_keep_hours: 336           # a failed mail's text is kept this long (14 days) for "Send again", then
+                                 # removed; the log of send attempts (no texts) stays this long too
 
 spend:                           # what the AI costs, kept and guarded (owner, 6 Oct 2026; ADR-078)
                                  # [server-only] (ADR-123): no model, trial, rule or UI sets these

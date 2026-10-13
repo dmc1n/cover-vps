@@ -3,7 +3,12 @@ minutes and several GB), with each step's status and log in `jobs/<id>.json`.
 
 The drape (about 40 minutes with Style3D) has a queue of its own, so it never holds up the other
 models; after a calculation that ends with `export`, the drape follows by itself and its result
-is kept with the model (ADR-059)."""
+is kept with the model (ADR-059).
+
+A job is lost when the server stops (the queues live in memory). On start-up `recover()` marks
+the jobs a stopped server left queued or running as "interrupted", with the reason, and ends a
+step's process group that outlived its server; the studio offers "Run again" (`rerun`,
+ADR-129)."""
 
 from __future__ import annotations
 
@@ -34,6 +39,10 @@ DRAPE_WORKERS = 4  # drapes side by side (one core each; the server has 8)
 
 
 CACHED = ("hull", "cut", "flatten", "export")  # steps that skip themselves when unchanged
+FINISHED = ("done", "failed", "interrupted")  # a job in one of these never changes again
+# this server process: a job names the process that runs it, so a start-up only interrupts the
+# jobs of a server that is gone (ADR-129)
+PROCESS = uuid.uuid4().hex
 
 
 @dataclass
@@ -60,7 +69,7 @@ class Jobs:
         for _ in range(max(1, drape_workers)):
             threading.Thread(target=self._work, args=(self._long,), daemon=True).start()
 
-    def submit(self, spec: JobSpec) -> dict[str, Any]:
+    def submit(self, spec: JobSpec, rerun_of: str | None = None) -> dict[str, Any]:
         unknown = [s for s in spec.steps if s not in STEPS and s not in EXTRA_STEPS]
         if unknown:
             raise ValueError(f"unknown step(s): {', '.join(unknown)}")
@@ -72,7 +81,14 @@ class Jobs:
             "created": time.time(),
             "trial": spec.trial,
             "steps": [{"name": s, "status": "waiting", "log": ""} for s in spec.steps],
-        }
+            # what "Run again" needs, and who runs it (ADR-129)
+            "spec": {"source": spec.source, "units": spec.units, "up": spec.up,
+                     "force": spec.force},
+            "owner": {"pid": os.getpid(), "process": PROCESS},
+            "timeout_s": job_limits()[0],  # limits.job_timeout_s per step, shown in the studio
+        }  # fmt: skip
+        if rerun_of:
+            doc["rerun_of"] = rerun_of
         self._write(doc)
         long = bool(spec.steps) and set(spec.steps) <= LONG_STEPS
         (self._long if long else self._queue).put((job_id, spec))
@@ -98,10 +114,53 @@ class Jobs:
         end = time.time() + timeout
         while time.time() < end:
             doc = self.get(job_id)
-            if doc["status"] in ("done", "failed"):
+            if doc["status"] in FINISHED:
                 return doc
             time.sleep(0.2)
         raise TimeoutError(job_id)
+
+    def recover(self) -> list[str]:
+        """At start-up: the jobs a stopped server left queued or running become "interrupted",
+        with the reason; a step's process group that outlived its server is ended. Jobs of a
+        server process that still runs (another process on the same data) are left alone."""
+        out = []
+        for path in sorted(self.store.jobs.glob("*.json")):
+            try:
+                doc = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if doc.get("status") not in ("queued", "running") or _owner_alive(doc):
+                continue
+            running = [s for s in doc.get("steps", []) if s.get("status") == "running"]
+            for step in running:
+                _end_group(step.get("pid"))
+                step["status"], step["finished"] = "interrupted", time.time()
+            if doc["status"] == "running":
+                what = f"while the step {running[0]['name']} ran" if running else "while it ran"
+            else:
+                what = "before it started"
+            doc["status"], doc["finished"] = "interrupted", time.time()
+            doc["error"] = f"the server stopped {what} (a restart or a crash); run it again"
+            self._write(doc)
+            out.append(doc["id"])
+        return out
+
+    def rerun(self, job_id: str) -> dict[str, Any]:
+        """The same job again (the studio's "Run again"): only an interrupted or failed one."""
+        doc = self.get(job_id)
+        if doc["status"] not in ("interrupted", "failed"):
+            raise ValueError(f"job {job_id} is {doc['status']}; only an interrupted or failed "
+                             "job runs again")  # fmt: skip
+        if not (self.store.models / doc["model_id"]).is_dir():
+            raise ValueError(f"the model {doc['model_id']} is gone")
+        spec = doc.get("spec") or {}
+        steps = [s["name"] for s in doc["steps"]]
+        if "import" in steps and not (spec.get("source") and Path(spec["source"]).is_file()):
+            raise ValueError("the uploaded file is gone; upload it again")
+        new = self.submit(JobSpec(doc["model_id"], steps, doc.get("trial") or {},
+                                  spec.get("source"), spec.get("units"), spec.get("up"),
+                                  bool(spec.get("force"))), rerun_of=job_id)  # fmt: skip
+        return new
 
     def _write(self, doc: dict[str, Any]) -> None:
         self.store.jobs.mkdir(parents=True, exist_ok=True)
@@ -154,6 +213,8 @@ class Jobs:
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                 start_new_session=True,
             )  # fmt: skip
+            step["pid"] = proc.pid  # its process group, ended by recover() after a crash
+            self._write(doc)
             try:
                 out, err = proc.communicate(timeout=timeout_s or None)
                 code = proc.returncode
@@ -188,6 +249,36 @@ def job_limits() -> tuple[int, int, int]:
     timeout = int(p["limits.job_timeout_s"])  # type: ignore[arg-type]
     # CPU time: the wall time on every core; a backstop for a step that spins without end
     return timeout, int(p["limits.job_memory_mb"]), timeout * (os.cpu_count() or 1)  # type: ignore[arg-type]
+
+
+def _owner_alive(doc: dict[str, Any]) -> bool:
+    """Is the server process that runs this job still there? This process, started anew,
+    is not: a job of an earlier process with the same pid was interrupted."""
+    owner = doc.get("owner") or {}
+    if owner.get("process") == PROCESS:
+        return True
+    pid = owner.get("pid")
+    if not isinstance(pid, int) or pid == os.getpid():
+        return False
+    try:
+        cmd = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        return False
+    return b"cover" in cmd or b"pytest" in cmd  # else the pid was reused by another program
+
+
+def _end_group(pid: Any) -> None:
+    """End a step's process group that outlived its server: the recorded pid, and only when
+    it is still our own step runner (`coverapi.limited`)."""
+    if not isinstance(pid, int) or pid <= 1:
+        return
+    try:
+        cmd = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        return
+    if b"coverapi.limited" in cmd:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(pid, signal.SIGKILL)
 
 
 def _killed(code: int) -> str | None:

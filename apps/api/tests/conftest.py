@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 os.environ.setdefault("COVER_AUTO_DRAPE", "off")
+os.environ.setdefault("COVER_MAIL_WORKER", "off")  # the tests deliver the outbox themselves
 
 
 @pytest.fixture(autouse=True)

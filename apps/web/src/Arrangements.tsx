@@ -4,7 +4,7 @@
 // (arr-<name>) and calculates its cover like any model. "Send to the Desk" puts it before Rens or
 // Wout for approval; a change after that sends it back for approval by itself (ADR-115).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type Job, type ModelBrief } from "./api";
+import { api, jobFinished, type Job, type ModelBrief } from "./api";
 import { arrangementHref, deskHref, modelHref } from "./nav";
 
 interface Member {
@@ -376,12 +376,12 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
 
   // the job building the cover: followed until it is done
   useEffect(() => {
-    if (!job || job.status === "done" || job.status === "failed") return;
+    if (!job || jobFinished(job)) return;
     const t = setTimeout(async () => {
       try {
         const j = await api.job(job.id);
         setJob(j);
-        if (j.status === "done" || j.status === "failed") {
+        if (jobFinished(j)) {
           reload();
           refreshDesk(j.model_id);
         }
@@ -793,8 +793,8 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
             <p className="muted">
               {job.status === "done"
                 ? "The cover is ready."
-                : job.status === "failed"
-                  ? `Failed: ${job.error ?? ""}`
+                : job.status === "failed" || job.status === "interrupted"
+                  ? `${job.status === "failed" ? "Failed" : "Interrupted"}: ${job.error ?? ""} (open the cover to run it again)`
                   : "Calculating: cover surface, seams, flat patterns, cut pieces…"}
             </p>
           )}

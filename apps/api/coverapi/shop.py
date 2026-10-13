@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import gzip
 import json
+import logging
 import re
 import secrets
 import sqlite3
@@ -31,6 +32,7 @@ from pydantic import BaseModel, Field
 from coverapi import shop_legal
 from coverapi.match_list import STOCK_MODEL
 
+log = logging.getLogger("coverapi.shop")
 SHOP_SETTING = "shop"
 PREVIEW_SETTING = "shop_preview_token"
 MOLLIE_API = "https://api.mollie.com/v2"
@@ -492,7 +494,13 @@ class OrderIn(BaseModel):
     source_url: str | None = Field(default=None, max_length=2000)
     source_summary: str | None = Field(default=None, max_length=600)
     website: str | None = Field(default=None, max_length=200)  # the honeypot (ADR-103)
+    # one checkout, one order (ADR-129, as B2B's ADR-104): the page sends the same key again on
+    # a double click or a retry and gets the order it already made
+    idempotency_key: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{8,128}$")
 
+
+ORDER_REPLAY_S = 900  # without a key: the same proposal and address within this long is one order
+ORDER_WAIT_S = 15  # a repeat waits at most this long for the first request's payment link
 
 ORDERS_TABLE = """
 CREATE TABLE IF NOT EXISTS orders (
@@ -545,6 +553,14 @@ BANDS = ((95, 101), (90, 95), (85, 90), (80, 85), (0, 80))
 DAY_S = 86400.0
 PHOTO_MAX = 6_000_000
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[a-z]{2,24}$", re.I)
+
+
+def _fit_mail_sent(db_path: Path, ref: str) -> None:
+    """The fit question of an order was accepted by the mail server: now it counts as sent."""
+    oid = int(ref.removeprefix("fit:"))
+    with sqlite3.connect(db_path) as db:
+        db.execute("UPDATE orders SET feedback_sent=? WHERE id=? AND feedback_sent IS NULL",
+                   (time.time(), oid))  # fmt: skip
 
 
 def merged(base: dict[str, Any], over: dict[str, Any]) -> dict[str, Any]:
@@ -782,9 +798,11 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         db.execute(MATCH_TABLE)
         db.execute(FEEDBACK_TABLE)
         have = {r[1] for r in db.execute("PRAGMA table_info(orders)")}
-        for col in ("feedback_token TEXT", "feedback_sent REAL"):
+        for col in ("feedback_token TEXT", "feedback_sent REAL", "idempotency_key TEXT"):
             if col.split()[0] not in have:
                 db.execute(f"ALTER TABLE orders ADD COLUMN {col}")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS orders_idempotency ON "
+                   "orders(idempotency_key) WHERE idempotency_key IS NOT NULL")  # fmt: skip
     app.state.site = site
     recent: dict[str, list[float]] = {}
 
@@ -812,14 +830,19 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     def settings() -> dict[str, Any]:
         return merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
 
-    def notify(subject: str, text: str, to: str | None = None) -> None:
+    def notify(subject: str, text: str, to: str | None = None, kind: str = "shop",
+               ref: str | None = None) -> int | None:  # fmt: skip
+        """Through the outbox (ADR-129): tried at once, again later until the mail server
+        accepts it; a failure shows in Settings → System & logs, never stops an order."""
         s = settings()
         target = to or s["notify_email"] or "rick@s2dio.industries"
-        if mailer.configured(auth):
-            try:
-                mailer.send(auth, target, subject, text)
-            except Exception:  # noqa: BLE001 - a mail must never stop an order
-                pass
+        try:
+            return mailer.queue(auth, target, subject, text, kind, ref)
+        except Exception:  # noqa: BLE001 - a mail must never stop an order
+            log.exception("shop mail %r not queued", kind)
+            return None
+
+    mailer.ON_SENT["fit"] = _fit_mail_sent
 
     # ---- the website's link (ADR-066) --------------------------------------------------------
     from coverapi.security import SESSION_COOKIE
@@ -1082,6 +1105,44 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             doc: dict[str, Any] = json.loads(r.read())
             return doc
 
+    def repeated_order(req: OrderIn) -> sqlite3.Row | None:
+        """The order this checkout made before: by its key, or (a page without a key) the
+        same proposal for the same address, still unpaid, within ORDER_REPLAY_S."""
+        with sqlite3.connect(auth.path) as db:
+            db.row_factory = sqlite3.Row
+            if req.idempotency_key:
+                row = db.execute("SELECT * FROM orders WHERE idempotency_key=?",
+                                 (req.idempotency_key,)).fetchone()  # fmt: skip
+                if row is not None:
+                    d = json.loads(row["data"])
+                    if (row["email"] != req.email.strip()
+                            or d["customer"].get("quote_id") != req.quote_id):  # fmt: skip
+                        raise HTTPException(409, "this checkout was used for another order")
+                return row
+            row = db.execute(
+                "SELECT * FROM orders WHERE email=? AND status='awaiting_payment' AND created>? "
+                "AND json_extract(data, '$.customer.quote_id')=? AND json_extract(data, "
+                "'$.customer.street')=? ORDER BY id DESC LIMIT 1",
+                (req.email.strip(), time.time() - ORDER_REPLAY_S, req.quote_id, req.street),
+            ).fetchone()  # fmt: skip
+            return row  # type: ignore[no-any-return]
+
+    def replay(row: sqlite3.Row, request: Request) -> dict[str, Any]:
+        """The answer the first request gave (its payment link once it is there)."""
+        end = time.time() + ORDER_WAIT_S
+        d = json.loads(row["data"])
+        while "checkout_url" not in d and time.time() < end:
+            time.sleep(0.25)  # the first request is still asking Mollie for the link
+            with sqlite3.connect(auth.path) as db:
+                (raw,) = db.execute("SELECT data FROM orders WHERE id=?", (row["id"],)).fetchone()
+            d = json.loads(raw)
+        stock = d.get("stock")
+        return {"order": row["id"], "status_url": f"{shop_root(auth, request)}order/{row['token']}",
+                "checkout_url": d.get("checkout_url") or None, "total_eur": row["total_eur"],
+                "status": row["status"], "repeat": True,
+                "stock": {"model_id": stock["model_id"], "name": stock["name"]}
+                if stock else None}  # fmt: skip
+
     @app.post("/api/shop/order")
     def shop_order(req: OrderIn, request: Request) -> dict[str, Any]:
         limit(request, per_minute=10)
@@ -1104,15 +1165,26 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         token = secrets.token_urlsafe(18)
         # an existing cover (ADR-118): the order names the model and the price it was sold at
         stock = record.get("stock")
-        data = {"customer": req.model_dump(), "quote": record, "shipping_eur": shipping,
-                "lang": req.lang, "stock": stock}  # fmt: skip
-        with sqlite3.connect(auth.path) as db:
-            cur = db.execute(
-                "INSERT INTO orders (created, token, status, email, data, total_eur, updated) "
-                "VALUES (?, ?, 'awaiting_payment', ?, ?, ?, ?)",
-                (time.time(), token, req.email.strip(), json.dumps(data), total, time.time()),
-            )
-            oid = cur.lastrowid
+        data = {"customer": req.model_dump(exclude={"idempotency_key"}), "quote": record,
+                "shipping_eur": shipping, "lang": req.lang, "stock": stock}  # fmt: skip
+        # one checkout, one order (ADR-129): a repeat gets the order the first request made
+        earlier = repeated_order(req)
+        if earlier is not None:
+            return replay(earlier, request)
+        try:
+            with sqlite3.connect(auth.path) as db:
+                cur = db.execute(
+                    "INSERT INTO orders (created, token, status, email, data, total_eur, updated,"
+                    " idempotency_key) VALUES (?, ?, 'awaiting_payment', ?, ?, ?, ?, ?)",
+                    (time.time(), token, req.email.strip(), json.dumps(data), total, time.time(),
+                     req.idempotency_key),
+                )  # fmt: skip
+                oid = cur.lastrowid
+        except sqlite3.IntegrityError:  # the same key at the same moment: the other one won
+            earlier = repeated_order(req)
+            if earlier is None:
+                raise
+            return replay(earlier, request)
         status_url = f"{shop_root(auth, request)}order/{token}"
         hook = shop_root(auth, request).removesuffix("shop/") + "api/shop/mollie"
         checkout = None
@@ -1130,6 +1202,9 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                     db.execute("UPDATE orders SET mollie_id=? WHERE id=?", (pay["id"], oid))
             except Exception as exc:  # noqa: BLE001 - the order stays; payment can follow
                 notify(f"Order {oid}: Mollie refused the payment", str(exc))
+        with sqlite3.connect(auth.path) as db:  # what a repeat of this checkout answers
+            db.execute("UPDATE orders SET data=json_set(data, '$.checkout_url', ?) WHERE id=?",
+                       (checkout or "", oid))  # fmt: skip
         what = (f"EXISTING COVER {stock['name']} ({stock['model_id']}), "
                 f"EUR {record['quote']['price']['sale_eur']}" if stock
                 else json.dumps(record["quote"]["sizes_cm"]))  # fmt: skip
@@ -1399,23 +1474,25 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                 "NULL AND updated < ?", (time.time() - days * DAY_S,)).fetchall()  # fmt: skip
         words = site.read("live")["ui"]["words"]
         for oid, email, d in rows:
+            ref = f"fit:{oid}"  # one question per order, through the outbox (ADR-129)
+            if mailer.queued(auth, ref):
+                continue  # queued before; feedback_sent follows once the server accepts it
             lang = json.loads(d).get("lang") or "nl"
             token = secrets.token_urlsafe(18)
             link = f"{base}/{_lang_prefix(lang)}fit/{token}"
-            notify(tr(words["fit_title"], lang), f"{tr(words['fit_title'], lang)}\n{link}\n",
-                   to=email)  # fmt: skip
             with sqlite3.connect(auth.path) as db:
-                db.execute("UPDATE orders SET feedback_token=?, feedback_sent=? WHERE id=?",
-                           (token, time.time(), oid))  # fmt: skip
-            sent += 1
+                db.execute("UPDATE orders SET feedback_token=? WHERE id=?", (token, oid))
+            if notify(tr(words["fit_title"], lang), f"{tr(words['fit_title'], lang)}\n{link}\n",
+                      to=email, kind="fit", ref=ref) is not None:  # fmt: skip
+                sent += 1
         return sent
 
     def fit_loop() -> None:
         while True:
             try:
                 fit_mails()
-            except Exception:  # noqa: BLE001 - try again in an hour
-                pass
+            except Exception:  # noqa: BLE001 - said in the journal; again in an hour
+                log.exception("fit mails")
             time.sleep(3600)  # noqa: PLR2004 - hourly
 
     threading.Thread(target=fit_loop, daemon=True, name="fit-mails").start()

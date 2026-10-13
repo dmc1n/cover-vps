@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import secrets
 import sqlite3
@@ -208,23 +209,23 @@ def install(app: FastAPI, auth: Any, quotes_dir: Path, models_dir: Path) -> None
             rid = cur.lastrowid
         qd = record["quote"]
         to = auth.setting(REQUEST_EMAIL_SETTING, "rick@s2dio.industries")
-        if mailer.configured(auth):
-            try:
-                mailer.send(
-                    auth, to, f"Cover request #{rid}: {qd['product']} from {req.name.strip()}",
-                    f"A customer asks for a cover ({who}).\n\n"
-                    f"Name: {req.name}\nE-mail: {req.email}\nPhone: {req.phone or '-'}\n"
-                    f"Note: {req.note or '-'}\n\nProduct: {qd['product']} ({qd['shape']})\n"
-                    f"Sizes (cm, with room): {json.dumps(qd['sizes_cm'])}\n"
-                    f"Colour: {qd['colour']}\nPieces: {len(qd['pieces'])}, fabric "
-                    f"{qd['fabric_m2']} m2 ({qd['roll_m']} m of roll)\n"
-                    f"Cost price: EUR {qd['price']['cost_eur']}, selling price EUR "
-                    f"{qd['price']['sale_eur']} incl. VAT"
-                    + (" (indicative)" if qd["price"]["placeholder_prices"] else "") + "\n\n"
-                    "All requests: the admin page, Requests.\n",
-                )  # fmt: skip
-            except Exception:  # noqa: BLE001 - the request is stored; the mail is a courtesy
-                pass
+        # through the outbox: failures show in Settings → System & logs (ADR-129)
+        try:
+            mailer.queue(
+                auth, to, f"Cover request #{rid}: {qd['product']} from {req.name.strip()}",
+                f"A customer asks for a cover ({who}).\n\n"
+                f"Name: {req.name}\nE-mail: {req.email}\nPhone: {req.phone or '-'}\n"
+                f"Note: {req.note or '-'}\n\nProduct: {qd['product']} ({qd['shape']})\n"
+                f"Sizes (cm, with room): {json.dumps(qd['sizes_cm'])}\n"
+                f"Colour: {qd['colour']}\nPieces: {len(qd['pieces'])}, fabric "
+                f"{qd['fabric_m2']} m2 ({qd['roll_m']} m of roll)\n"
+                f"Cost price: EUR {qd['price']['cost_eur']}, selling price EUR "
+                f"{qd['price']['sale_eur']} incl. VAT"
+                + (" (indicative)" if qd["price"]["placeholder_prices"] else "") + "\n\n"
+                "All requests: the admin page, Requests.\n", "request",
+            )  # fmt: skip
+        except Exception:  # noqa: BLE001 - the request is stored; the mail is a courtesy
+            logging.getLogger("coverapi.webshop").exception("request mail not queued")
         return {"request": rid, "message": "Thank you: we have your request and will contact you."}
 
     @app.get("/api/admin/requests")

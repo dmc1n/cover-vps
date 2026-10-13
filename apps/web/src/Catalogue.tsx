@@ -323,7 +323,7 @@ export function BatchBar({
           {jobs.map((j) => (
             <span
               key={j.id}
-              className={`jobstep ${j.status === "done" ? "done" : j.status === "failed" ? "failed" : "running"}`}
+              className={`jobstep ${j.status === "done" ? "done" : j.status === "failed" || j.status === "interrupted" ? "failed" : "running"}`}
             >
               {j.model_id}: {j.status}
             </span>

@@ -2214,7 +2214,8 @@ td.bad {
   align-items: center;
   font-size: 14px;
 }
-.job.failed {
+.job.failed,
+.job.interrupted {
   border-color: var(--bad);
 }
 .job.running,
@@ -2233,7 +2234,8 @@ td.bad {
 .jobstep.running {
   background: var(--warn-soft);
 }
-.jobstep.failed {
+.jobstep.failed,
+.jobstep.interrupted {
   background: var(--bad-soft);
 }
 .diff .chip,

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { admin, api, ParamSpec, Scalar, shopAdmin } from "./api";
 import { Audit, EmbedAndKeys, Mail, Sessions, System, Users } from "./Admin";
 import { SETTINGS_TABS, visibleSettings } from "./nav";
+import { MailOutbox } from "./MailOutbox";
 import { PhotoTest } from "./PhotoTest";
 import { Prices } from "./Prices";
 import { useSession } from "./Session";
@@ -1257,6 +1258,7 @@ function AdminTab({ tab }: { tab: string }) {
       {tab === "system" && (
         <>
           <System />
+          <MailOutbox />
           <h2 className="set-h2" id="activity">
             Logged in now
           </h2>

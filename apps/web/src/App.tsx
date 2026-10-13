@@ -12,6 +12,7 @@ import {
   cm,
   fileUrl,
   Job,
+  jobFinished,
   Kind,
   ModelDetail,
   Scalar,
@@ -645,11 +646,11 @@ function ModelPage({
 
   // follow a running job
   useEffect(() => {
-    if (!job || job.status === "done" || job.status === "failed") return;
+    if (!job || jobFinished(job)) return;
     const t = window.setInterval(async () => {
       const j = await api.job(job.id);
       setJob(j);
-      if (j.status === "done" || j.status === "failed") {
+      if (jobFinished(j)) {
         setStamp(Date.now());
         load();
       }
@@ -780,7 +781,7 @@ function ModelPage({
           onSaved={load}
         />
       )}
-      {job && <JobBar job={job} />}
+      {job && <JobBar job={job} onJob={setJob} />}
       {model.desk_status === "rejected" && (
         <section className="card attention" role="status">
           <strong>Rejected at the Desk.</strong> The reasons and the pictures
@@ -912,17 +913,58 @@ function Changes({ model }: { model: ModelDetail }) {
   );
 }
 
-function JobBar({ job }: { job: Job }) {
+/** limits.job_timeout_s in words: "4 h", "90 min". */
+export function limitText(s: number): string {
+  return s >= 3600 && s % 3600 === 0
+    ? `${s / 3600} h`
+    : `${Math.round(s / 60)} min`;
+}
+
+function JobBar({ job, onJob }: { job: Job; onJob: (j: Job) => void }) {
   const trial = Object.keys(job.trial || {}).length;
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const again = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      onJob(await api.rerunJob(job.id));
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <section className={`card job ${job.status}`}>
+    <section className={`card job ${job.status}`} data-testid="jobbar">
       <span>
         {job.status === "queued" && "Waiting to run…"}
         {job.status === "running" && "Running…"}
         {job.status === "done" && "Last run finished."}
         {job.status === "failed" && `Last run failed: ${job.error ?? ""}`}
+        {job.status === "interrupted" &&
+          `Interrupted: ${job.error ?? "the server stopped while this ran"}`}
         {trial > 0 &&
           ` (trial with ${trial} changed setting${trial > 1 ? "s" : ""}, not saved)`}
+        {(job.status === "queued" || job.status === "running") &&
+          !!job.timeout_s && (
+            <span
+              className="muted"
+              title="limits.job_timeout_s: a step that runs longer is stopped and the run fails"
+            >
+              {" "}
+              · each step stops after {limitText(job.timeout_s)}
+            </span>
+          )}
+        {(job.status === "interrupted" || job.status === "failed") && (
+          <>
+            {" "}
+            <button type="button" disabled={busy} onClick={again}>
+              {busy ? "Starting…" : "Run again"}
+            </button>
+          </>
+        )}
+        {err && <span className="error"> {err}</span>}
       </span>
       <span className="steps">
         {job.steps.map((s) => (
