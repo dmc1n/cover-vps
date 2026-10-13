@@ -2,6 +2,7 @@
 // (the sub-menu), every page and tab in the address, and every old address sent to its new
 // place. Pure functions, so the browser check (e2e/uinav.py) and the code agree on one table.
 import type { User } from "./api";
+import type { IconName } from "./icons";
 
 export type Role = User["role"];
 /** Who sees a page: everyone, people who may edit (not viewers), or admins. */
@@ -12,6 +13,7 @@ export interface Page {
   label: string;
   who: Who;
   hint: string;
+  icon: IconName; // beside the label in the sub-menu (Studio 2.0, ADR-130)
   sep?: boolean; // a thin separator before this page in the sub-menu
   group?: string; // a small label before this page in the sub-menu (Shop: "Tools")
 }
@@ -20,30 +22,35 @@ export interface Section {
   label: string;
   who: Who;
   hint: string;
+  icon: IconName;
   pages: Page[];
 }
 
 export const SECTIONS: Section[] = [
   {
     id: "work",
+    icon: "work",
     label: "Work",
     who: "all",
     hint: "What waits for a person: the Desk, the questions, the workshop",
     pages: [
       {
         id: "desk",
+        icon: "desk",
         label: "Desk",
         who: "all",
         hint: "Approve or reject covers and arrangements",
       },
       {
         id: "questions",
+        icon: "questions",
         label: "Questions",
         who: "all",
         hint: "The owner's and the workshop's questions",
       },
       {
         id: "workshop",
+        icon: "workshop",
         label: "Workshop",
         who: "all", // the workshop login's start page (ADR-128)
         hint: "Orders to make, approved covers: their files, measured fits and the customers' answers",
@@ -52,30 +59,35 @@ export const SECTIONS: Section[] = [
   },
   {
     id: "covers",
+    icon: "covers",
     label: "Covers",
     who: "all",
     hint: "Every cover and model, arrangements, new covers",
     pages: [
       {
         id: "all",
+        icon: "all-covers",
         label: "All covers",
         who: "all",
         hint: "Every model and its cover, as a table or as cards",
       },
       {
         id: "arrangements",
+        icon: "arrangements",
         label: "Arrangements",
         who: "all",
         hint: "Furniture placed together under one cover",
       },
       {
         id: "new",
+        icon: "new-cover",
         label: "New cover",
         who: "edit",
         hint: "From a 3D file or a drawing (PDF)",
       },
       {
         id: "learning",
+        icon: "learning",
         label: "Learning",
         who: "all",
         hint: "Your covers against ours: pairs of drawings and 3D",
@@ -83,6 +95,7 @@ export const SECTIONS: Section[] = [
       },
       {
         id: "products",
+        icon: "product-list",
         label: "Product list",
         who: "edit",
         hint: "The product list (Excel) linked to the drawings",
@@ -91,30 +104,35 @@ export const SECTIONS: Section[] = [
   },
   {
     id: "shop",
+    icon: "shop",
     label: "Shop",
     who: "edit",
     hint: "Orders, requests, business customers, the website",
     pages: [
       {
         id: "orders",
+        icon: "orders",
         label: "Orders",
         who: "admin",
         hint: "Orders from the shop and the B2B shop",
       },
       {
         id: "requests",
+        icon: "requests",
         label: "Requests",
         who: "admin",
         hint: "What customers asked: quotes from the configurator, and which existing cover fits (matches, learning mode)",
       },
       {
         id: "b2b",
+        icon: "b2b",
         label: "B2B customers",
         who: "admin",
         hint: "Companies, their logins, own prices and orders",
       },
       {
         id: "website",
+        icon: "website",
         label: "Website (AI)",
         who: "edit",
         hint: "Change the website's text, preview it; an admin publishes",
@@ -124,6 +142,7 @@ export const SECTIONS: Section[] = [
   },
   {
     id: "settings",
+    icon: "settings",
     label: "Settings",
     who: "edit", // editors see only the Prices & costs tabs (read-only), as Prices before
     hint: "Everything that is set once: company, prices and costs, people, mail, keys, system",
@@ -134,40 +153,44 @@ export const SECTIONS: Section[] = [
 /** The Settings area's tabs, in groups (vertical on a wide screen, a row on a tablet). Since
  * ADR-126 the general price settings live here too (Prices & costs); what belongs to one cover
  * (its cost, prices, shop place, orders) is on the cover's own Price & shop tab. */
-export const SETTINGS_TABS: { group: string; tabs: [string, string][] }[] = [
+/** A Settings tab: id, label, icon and the colour of its tile (iOS Settings, ADR-130). */
+export type SettingsTab = [string, string, IconName, Tile];
+export type Tile =
+  "blue" | "orange" | "green" | "teal" | "indigo" | "purple" | "grey";
+export const SETTINGS_TABS: { group: string; tabs: SettingsTab[] }[] = [
   {
     group: "Business",
     tabs: [
-      ["company", "Company & shop"],
-      ["selling", "Selling"],
+      ["company", "Company & shop", "company", "blue"],
+      ["selling", "Selling", "selling", "orange"],
     ],
   },
   {
     group: "Prices & costs",
     tabs: [
-      ["costs", "Costs"],
-      ["pricing", "Price rules"],
-      ["publish", "Publish & versions"],
+      ["costs", "Costs", "costs", "green"],
+      ["pricing", "Price rules", "pricing", "teal"],
+      ["publish", "Publish & versions", "publish", "indigo"],
     ],
   },
   {
     group: "People & work",
     tabs: [
-      ["users", "Users & rights"],
-      ["defaults", "Rules & defaults"],
+      ["users", "Users & rights", "users", "blue"],
+      ["defaults", "Rules & defaults", "defaults", "grey"],
     ],
   },
   {
     group: "Connections",
     tabs: [
-      ["mail", "Mail & notifications"],
-      ["website", "Website & API keys"],
-      ["ai", "AI & spending"],
+      ["mail", "Mail & notifications", "mail", "teal"],
+      ["website", "Website & API keys", "keys", "orange"],
+      ["ai", "AI & spending", "ai", "purple"],
     ],
   },
   {
     group: "Server",
-    tabs: [["system", "System & logs"]],
+    tabs: [["system", "System & logs", "system", "grey"]],
   },
 ];
 /** Who sees a Settings tab: the price tabs are for editors too (they look, admins change, as the
@@ -188,15 +211,15 @@ export const visibleSettings = (user: Viewer) =>
     tabs: g.tabs.filter(([id]) => allowed(settingsWho(id), user)),
   })).filter((g) => g.tabs.length > 0);
 
-/** A cover's tabs (#/model/<id>/<tab>[/<sub>]). */
-export const MODEL_TABS: [string, string][] = [
-  ["3d", "3D"],
-  ["pieces", "Pieces"],
-  ["seams", "Seams"],
-  ["adjust", "Adjust"],
-  ["compare", "Compare"],
-  ["history", "History"],
-  ["price", "Price & shop"], // cost, prices, the shop, orders: this cover's own (ADR-126)
+/** A cover's tabs (#/model/<id>/<tab>[/<sub>]), each with its icon. */
+export const MODEL_TABS: [string, string, IconName][] = [
+  ["3d", "3D", "3d"],
+  ["pieces", "Pieces", "pieces"],
+  ["seams", "Seams", "seams"],
+  ["adjust", "Adjust", "adjust"],
+  ["compare", "Compare", "compare"],
+  ["history", "History", "history"],
+  ["price", "Price & shop", "price"], // cost, prices, the shop, orders: this cover's own (ADR-126)
 ];
 /** The sub-views inside a cover's tabs: the old twelve tabs, each still one click away. */
 export const MODEL_SUBS: Record<string, [string, string][]> = {
@@ -217,12 +240,12 @@ export const MODEL_SUBS: Record<string, [string, string][]> = {
     ["log", "Warnings and log"],
   ],
 };
-/** A Desk card's tabs (#/work/desk/<id>/<tab>). */
-export const DESK_TABS: [string, string][] = [
-  ["check", "Check"],
-  ["pieces", "Pieces & revisions"],
-  ["correct", "Correct this cover"],
-  ["history", "History"],
+/** A Desk card's tabs (#/work/desk/<id>/<tab>): a short label and an icon (ADR-130). */
+export const DESK_TABS: [string, string, IconName][] = [
+  ["check", "Check", "check"],
+  ["pieces", "Pieces", "desk-pieces"],
+  ["correct", "Correct", "correct"],
+  ["history", "History", "history"],
 ];
 
 export interface Viewer {

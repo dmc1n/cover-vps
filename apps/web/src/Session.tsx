@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from "react";
 import { auth, User } from "./api";
+import { Icon } from "./icons";
 import ProcessBackdrop from "./ProcessBackdrop";
 import { LABEL, NEXT, setTheme, useTheme } from "./theme";
 
@@ -122,7 +123,6 @@ export function Login({ onDone }: { onDone: (u: User) => void }) {
       >
         <Brand />
         <h1>Cover Studio</h1>
-        <p className="muted">Log in with your account.</p>
         <label>
           User name
           <input
@@ -244,22 +244,26 @@ export function UserMenu({
         data-theme-choice={theme}
         onClick={() => setTheme(NEXT[theme])}
       >
-        {theme === "auto" ? "◐" : theme === "light" ? "☀" : "☾"}
+        <Icon name={`theme-${theme}`} size={18} />
       </button>
       <a
         href="#/account"
         className="nav"
         title={`${user.username} · ${user.role}${user.can_approve ? " · may approve" : ""}`}
       >
+        <Icon name="me" size={19} />
         {user.name}
       </a>
       <button
+        className="logout"
+        title="Log out"
+        aria-label="Log out"
         onClick={async () => {
           await auth.logout().catch(() => undefined);
           onLogout();
         }}
       >
-        Log out
+        <Icon name="logout" size={18} />
       </button>
     </span>
   );

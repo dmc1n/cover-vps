@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, shopAdmin, type ModelBrief, type ShopOrder } from "./api";
 import { deskHref, modelHref, questionHref } from "./nav";
+import { Icon } from "./icons";
 import { useSession } from "./Session";
 
 interface DeskRef {
@@ -171,10 +172,11 @@ export function Search() {
 
   return (
     <div className="quick-search" ref={box} role="search">
+      <Icon name="search" size={16} />
       <input
         ref={input}
         type="search"
-        placeholder="Search everything…"
+        placeholder="Search"
         aria-label="Search covers, Desk codes, questions and orders"
         title="Covers, Desk codes, questions and orders (Ctrl+K)"
         value={q}

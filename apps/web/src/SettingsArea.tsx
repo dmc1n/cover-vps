@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { admin, api, ParamSpec, Scalar, shopAdmin } from "./api";
 import { Audit, EmbedAndKeys, Mail, Sessions, System, Users } from "./Admin";
+import { Icon, Info } from "./icons";
 import { SETTINGS_TABS, visibleSettings } from "./nav";
 import { MailOutbox } from "./MailOutbox";
 import { PhotoTest } from "./PhotoTest";
@@ -1083,13 +1084,16 @@ export function SettingsArea({ tab }: { tab: string }) {
         {visibleSettings(user).map((g) => (
           <div key={g.group} className="set-tabgroup">
             <span className="set-tabgroup-name">{g.group}</span>
-            {g.tabs.map(([id, l]) => (
+            {g.tabs.map(([id, l, icon, tile]) => (
               <a
                 key={id}
                 href={`#/settings/${id}`}
                 className={id === tab ? "on" : ""}
                 aria-current={id === tab ? "page" : undefined}
               >
+                <span className={`set-ico tile-${tile}`}>
+                  <Icon name={icon} size={15} />
+                </span>
                 {l}
               </a>
             ))}
@@ -1097,8 +1101,12 @@ export function SettingsArea({ tab }: { tab: string }) {
         ))}
       </nav>
       <section className="set-body">
-        <h1 className="page-title">{label}</h1>
-        {TAB_INTRO[tab] && <p className="muted">{TAB_INTRO[tab]}</p>}
+        <div className="head-row">
+          <h1 className="page-title">{label}</h1>
+          {TAB_INTRO[tab] && (
+            <Info label={`About ${label}`}>{TAB_INTRO[tab]}</Info>
+          )}
+        </div>
         {PRICE_TABS.includes(tab) ? (
           <Prices canEdit={user.role === "admin"} sub={tab} />
         ) : (

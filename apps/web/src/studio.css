@@ -1,73 +1,95 @@
-/* Cover Studio: the one stylesheet (ADR-124, docs/plans/studio-ui.md §7).
+/* Cover Studio: the one stylesheet (ADR-124; Studio 2.0 "A · iOS light", ADR-130).
 
-   Everything below is built from the tokens in this first block, per theme: light (the
-   website's paper, stone and warm ink, ADR-105, sized for work) and dark (the same roles on a
-   near-black ground). The theme follows the computer (prefers-color-scheme) unless the person
-   chose Light or Dark with the header's theme button (per browser: html[data-theme]). Status
-   colours are used only for state: ok, warn, bad, info. Work Sans everywhere, self-hosted.
+   Everything below is built from the tokens in this first block, per theme: light (a grouped
+   light-grey ground with white cards, as iOS Settings) and dark (the same roles on true black
+   with grey cards). The theme follows the computer (prefers-color-scheme) unless the person chose
+   Light or Dark with the header's theme button (per browser: html[data-theme]). One accent, iOS
+   blue, for everything a person can act on; status colours only for state: approved (ok, green),
+   waiting (wait, blue), rejected (bad, red), warning (warn, orange), produced (made, purple).
+   Type: the device's own (SF on a Mac or an iPad), Inter self-hosted everywhere else. Every text
+   pair is at least 4.5:1 and a field's border at least 3:1 (apps/api/tests/test_web_tokens.py).
 
    Sections, in order: tokens · the Desk and the Questions · the product list and B2B chips ·
    base and the pages · the shell (header, sub-menu) · the four page templates (list, queue,
-   object page, settings form) · search · the Workshop. The order is the cascade the separate
-   files had (the Desk's rules first, the shell's last), so equal selectors resolve as before. */
-@import "@fontsource-variable/work-sans/wght.css";
+   object page, settings form) · search · the Workshop · Studio 2.0 components (buttons, fields,
+   cards, chips, lists, tabs, the (i) popover). The order is the cascade the separate files had
+   (the Desk's rules first, the shell's last), so equal selectors resolve as before. */
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/work-sans/wght.css"; /* the customers' configurator only (.cfg) */
 
 :root {
   /* ---- colour: light ---- */
-  --bg: #f3f1ec; /* the page */
-  --surface: #ffffff; /* panels, cards, inputs */
-  --sunken: #f7f5f0; /* table heads, quiet boxes */
-  --stone: #e7e3da; /* hover fills, bars, tracks */
-  --line: #dedad0; /* hairlines */
-  --line-strong: #c9c1b3; /* input borders */
-  --ink: #26241f; /* type */
-  --ink-2: #4a463e; /* body copy in long text */
-  --muted: #625d52; /* secondary copy: 5.6:1 on --bg, 4.9:1 on --stone */
-  --sand: #c8b593; /* selection, accents, the cover colour */
-  --sand-deep: #8a744f; /* sand as text */
-  --sand-soft: #efe7d6; /* selected tints */
-  --accent: #4f5d36; /* links */
-  --accent-soft: #e9ecdc;
-  --primary: #31372c; /* the one primary button per view */
-  --primary-hover: #22261e;
-  --on-primary: #f9f6e8;
-  --green: #3c443c; /* the Desk's headings and big numbers */
-  --sage: #85886f;
-  --sage-soft: #a9ac9c;
-  --ok: #3f6b2c;
-  --ok-soft: #e3eedb;
-  --warn: #8a5a14;
-  --warn-soft: #f6ebd4;
-  --bad: #a8392a;
-  --bad-soft: #f7e0da;
-  --info: #2f6690;
-  --info-soft: #e1ecf5;
-  --head: #1d1f1b; /* the header: near black in both themes */
-  --head-ink: #ecebe6;
-  --head-dim: #a7a99d;
-  --head-line: #3b3e37;
-  --head-field: #2a2c27;
-  --code-bg: #272c23;
-  --code-ink: #f1efe7;
+  --bg: #f2f2f7; /* the page: grouped light grey */
+  --surface: #ffffff; /* cards, panels, inputs */
+  --sunken: #f7f7fa; /* table heads, quiet boxes */
+  --stone: #e9e9ee; /* hover fills, bars, tracks, segmented controls */
+  --line: #e3e3e8; /* hairlines */
+  --line-strong: #848489; /* a field's border: 3:1 on surface, bg, sunken and stone */
+  --ink: #1c1c1e; /* type */
+  --ink-2: #3a3a3c; /* body copy in long text */
+  --muted: #636366; /* secondary copy: 5.4:1 on --bg, 4.95:1 on --stone */
+  --sand: #007aff; /* selection, highlights (the name stays from the first studio) */
+  --sand-deep: #0062cc; /* the highlight as text */
+  --sand-soft: #e5f0ff; /* selected tints */
+  --accent: #0062cc; /* links, the active tab, icons in headings */
+  --accent-soft: #e5f0ff;
+  --primary: #0068d6; /* the one primary button per view */
+  --primary-hover: #0058b8;
+  --on-primary: #ffffff;
+  --green: #1c1c1e; /* the Desk's headings and big numbers */
+  --sage: #8e8e93;
+  --sage-soft: #c7c7cc;
+  --ok: #18753a; /* approved */
+  --ok-soft: #e3f6e8;
+  --wait: #0062cc; /* waiting */
+  --wait-soft: #e5f0ff;
+  --warn: #a34a00; /* a warning, to check */
+  --warn-soft: #fff1e0;
+  --bad: #d1001f; /* rejected, failed */
+  --bad-soft: #ffe8ea;
+  --made: #7a3fa8; /* produced */
+  --made-soft: #f3eafa;
+  --info: #0062cc;
+  --info-soft: #e5f0ff;
+  --count: #636366; /* a count in the menu: white figures */
+  --count-mine: #d70015; /* … waiting for you */
+  --head: #f9f9fb; /* the header and the sub-menu: light, translucent */
+  --head-ink: #1c1c1e;
+  --head-dim: #636366;
+  --head-line: #e3e3e8;
+  --head-field: #ececf0;
+  --code-bg: #2c2c2e;
+  --code-ink: #f5f5f7;
   --stage: #ffffff; /* behind drawings, patterns and pictures: they are drawn on white */
-  --overlay: rgba(20, 24, 20, 0.82);
-  --shadow: 0 1px 2px rgba(38, 36, 31, 0.06), 0 8px 24px rgba(38, 36, 31, 0.07);
-  --shadow-pop: 0 10px 30px rgba(38, 36, 31, 0.16);
-  --focus: #8a744f;
+  --overlay: rgba(0, 0, 0, 0.45);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.14);
+  --focus: #007aff;
+  /* the Settings tiles: iOS system colours behind white glyphs (each 3:1 or more with white) */
+  --tile-blue: #007aff;
+  --tile-orange: #e86a00;
+  --tile-green: #248a3d;
+  --tile-teal: #0a84a8;
+  --tile-indigo: #5856d6;
+  --tile-purple: #a550d1;
+  --tile-grey: #6e6e73;
 
   /* ---- type, size, shape ---- */
   --font:
-    "Work Sans Variable", "Work Sans", system-ui, -apple-system, "Segoe UI",
-    sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter Variable", Inter,
+    system-ui, "Segoe UI", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --fs: 14px;
   --fs-small: 12.5px;
-  --fs-h1: 22px;
-  --fs-h2: 19px;
+  --fs-h1: 26px;
+  --fs-h2: 20px;
   --fs-h3: 15px;
-  --radius: 8px;
-  --ctl: 32px; /* a control's height (40 px on a touch screen) */
-  --top-h: 92px; /* the header and the sub-menu: sticky things below start under them */
+  --radius: 10px; /* controls */
+  --radius-lg: 14px; /* cards, grouped lists */
+  --radius-sm: 8px; /* small things */
+  --icon-stroke: 1.9;
+  --ctl: 34px; /* a control's height (40 px on a touch screen) */
+  --top-h: 102px; /* the header and the sub-menu: sticky things below start under them */
 
   color-scheme: light;
   font-family: var(--font);
@@ -75,100 +97,154 @@
   font-weight: 400;
   color: var(--ink);
   background: var(--bg);
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ---- colour: dark (the computer's choice, unless Light was chosen) ---- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #151613;
-    --surface: #1d1e1a;
-    --sunken: #191a17;
-    --stone: #2a2b26;
-    --line: #34362f;
-    --line-strong: #4a4c43;
-    --ink: #ecebe6;
-    --ink-2: #d3cfc5;
-    --muted: #a7a398;
-    --sand: #c8b593;
-    --sand-deep: #d8c5a0;
-    --sand-soft: #3a3226;
-    --accent: #bccb9c;
-    --accent-soft: #283020;
-    --primary: #e3ddcf;
-    --primary-hover: #f3eee2;
-    --on-primary: #1a1b17;
-    --green: #b3c0ae;
-    --sage: #8d927f;
-    --sage-soft: #6f7364;
-    --ok: #93c77d;
-    --ok-soft: #1f2e1a;
-    --warn: #e6b05a;
-    --warn-soft: #3a2d17;
-    --bad: #f2917d;
-    --bad-soft: #3d211b;
-    --info: #8fbde3;
-    --info-soft: #1a2a37;
-    --head: #0e0f0d;
-    --head-ink: #ecebe6;
-    --head-dim: #a7a99d;
-    --head-line: #33352f;
-    --head-field: #1d1e1a;
-    --code-bg: #0e0f0d;
-    --code-ink: #e6e3da;
-    --stage: #ebe8e1;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
-    --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.5);
-    --focus: #d8c5a0;
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --sunken: #121214;
+    --stone: #2c2c2e;
+    --line: #38383a;
+    --line-strong: #757579;
+    --ink: #f5f5f7;
+    --ink-2: #e5e5ea;
+    --muted: #aeaeb2;
+    --sand: #0a84ff;
+    --sand-deep: #5eb0ff;
+    --sand-soft: #0b2a4a;
+    --accent: #5eb0ff;
+    --accent-soft: #0b2a4a;
+    --primary: #0a6cdb;
+    --primary-hover: #0a5fc2;
+    --on-primary: #ffffff;
+    --green: #f5f5f7;
+    --sage: #8e8e93;
+    --sage-soft: #636366;
+    --ok: #4cd964;
+    --ok-soft: #10321a;
+    --wait: #5eb0ff;
+    --wait-soft: #0b2a4a;
+    --warn: #ffb340;
+    --warn-soft: #3a2a0f;
+    --bad: #ff6961;
+    --bad-soft: #3d1414;
+    --made: #d6a3ff;
+    --made-soft: #2e1d3d;
+    --info: #5eb0ff;
+    --info-soft: #0b2a4a;
+    --count: #636366;
+    --count-mine: #d70015;
+    --head: #161618;
+    --head-ink: #f5f5f7;
+    --head-dim: #aeaeb2;
+    --head-line: #2c2c2e;
+    --head-field: #2c2c2e;
+    --code-bg: #000000;
+    --code-ink: #e5e5ea;
+    --stage: #ebebf0;
+    --overlay: rgba(0, 0, 0, 0.6);
+    --shadow: none;
+    --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.6);
+    --focus: #0a84ff;
     color-scheme: dark;
   }
 }
 /* ---- colour: dark, chosen in the header (the same values as above) ---- */
 :root[data-theme="dark"] {
-  --bg: #151613;
-  --surface: #1d1e1a;
-  --sunken: #191a17;
-  --stone: #2a2b26;
-  --line: #34362f;
-  --line-strong: #4a4c43;
-  --ink: #ecebe6;
-  --ink-2: #d3cfc5;
-  --muted: #a7a398;
-  --sand: #c8b593;
-  --sand-deep: #d8c5a0;
-  --sand-soft: #3a3226;
-  --accent: #bccb9c;
-  --accent-soft: #283020;
-  --primary: #e3ddcf;
-  --primary-hover: #f3eee2;
-  --on-primary: #1a1b17;
-  --green: #b3c0ae;
-  --sage: #8d927f;
-  --sage-soft: #6f7364;
-  --ok: #93c77d;
-  --ok-soft: #1f2e1a;
-  --warn: #e6b05a;
-  --warn-soft: #3a2d17;
-  --bad: #f2917d;
-  --bad-soft: #3d211b;
-  --info: #8fbde3;
-  --info-soft: #1a2a37;
-  --head: #0e0f0d;
-  --head-ink: #ecebe6;
-  --head-dim: #a7a99d;
-  --head-line: #33352f;
-  --head-field: #1d1e1a;
-  --code-bg: #0e0f0d;
-  --code-ink: #e6e3da;
-  --stage: #ebe8e1;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
-  --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.5);
-  --focus: #d8c5a0;
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --sunken: #121214;
+  --stone: #2c2c2e;
+  --line: #38383a;
+  --line-strong: #757579;
+  --ink: #f5f5f7;
+  --ink-2: #e5e5ea;
+  --muted: #aeaeb2;
+  --sand: #0a84ff;
+  --sand-deep: #5eb0ff;
+  --sand-soft: #0b2a4a;
+  --accent: #5eb0ff;
+  --accent-soft: #0b2a4a;
+  --primary: #0a6cdb;
+  --primary-hover: #0a5fc2;
+  --on-primary: #ffffff;
+  --green: #f5f5f7;
+  --sage: #8e8e93;
+  --sage-soft: #636366;
+  --ok: #4cd964;
+  --ok-soft: #10321a;
+  --wait: #5eb0ff;
+  --wait-soft: #0b2a4a;
+  --warn: #ffb340;
+  --warn-soft: #3a2a0f;
+  --bad: #ff6961;
+  --bad-soft: #3d1414;
+  --made: #d6a3ff;
+  --made-soft: #2e1d3d;
+  --info: #5eb0ff;
+  --info-soft: #0b2a4a;
+  --count: #636366;
+  --count-mine: #d70015;
+  --head: #161618;
+  --head-ink: #f5f5f7;
+  --head-dim: #aeaeb2;
+  --head-line: #2c2c2e;
+  --head-field: #2c2c2e;
+  --code-bg: #000000;
+  --code-ink: #e5e5ea;
+  --stage: #ebebf0;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow: none;
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --focus: #0a84ff;
   color-scheme: dark;
 }
 /* the customers' configurator (#/configure) sits inside other websites, and the seam plan is
    drawn on white: always light */
-.theme-light,
 svg.plan {
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --sunken: #f7f7fa;
+  --stone: #e9e9ee;
+  --line: #e3e3e8;
+  --line-strong: #848489;
+  --ink: #1c1c1e;
+  --ink-2: #3a3a3c;
+  --muted: #636366;
+  --sand-deep: #0062cc;
+  --sand-soft: #e5f0ff;
+  --accent: #0062cc;
+  --accent-soft: #e5f0ff;
+  --primary: #0068d6;
+  --primary-hover: #0058b8;
+  --on-primary: #ffffff;
+  --ok: #18753a;
+  --ok-soft: #e3f6e8;
+  --warn: #a34a00;
+  --warn-soft: #fff1e0;
+  --bad: #d1001f;
+  --bad-soft: #ffe8ea;
+  --stage: #ffffff;
+  color-scheme: light;
+  color: var(--ink);
+}
+/* the configurator is the customers' (public, in other websites): it keeps the first studio's
+   colours, type and shape, untouched by Studio 2.0 (ADR-130) */
+.theme-light {
+  --font:
+    "Work Sans Variable", "Work Sans", system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --radius: 8px;
+  --radius-lg: 8px;
+  --ctl: 32px;
+  --shadow: 0 1px 2px rgba(38, 36, 31, 0.06), 0 8px 24px rgba(38, 36, 31, 0.07);
+  --shadow-pop: 0 10px 30px rgba(38, 36, 31, 0.16);
+  --focus: #8a744f;
+  --sand: #c8b593;
+  font-family: var(--font);
   --bg: #f3f1ec;
   --surface: #ffffff;
   --sunken: #f7f5f0;
@@ -2108,6 +2184,7 @@ a {
 button {
   font: inherit;
   font-size: 14px;
+  font-weight: 500;
   min-height: var(--ctl);
   padding: 5px 12px;
   border: 1px solid var(--line);
@@ -2120,7 +2197,7 @@ button {
     border-color 0.15s;
 }
 button:hover:not(:disabled) {
-  border-color: var(--sand);
+  border-color: var(--line-strong);
 }
 button:disabled {
   opacity: 0.5;
@@ -2133,7 +2210,7 @@ button.primary {
 }
 button.primary:hover:not(:disabled) {
   background: var(--primary-hover);
-  border-color: var(--sand);
+  border-color: var(--primary-hover);
 }
 button.link {
   border: none;
@@ -4127,7 +4204,7 @@ input.search {
   border-radius: var(--radius);
 }
 
-/* ---- the header: one line ---- */
+/* ---- the header: one line, light and translucent (Studio 2.0) ---- */
 .topbar {
   position: sticky;
   top: 0;
@@ -4138,12 +4215,14 @@ header.hdr {
   align-items: center;
   gap: 4px;
   flex-wrap: nowrap;
-  height: 52px;
+  height: 56px;
   box-sizing: border-box;
   padding: 0 16px;
-  background: var(--head);
+  background: color-mix(in srgb, var(--head) 88%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
   color: var(--head-ink);
-  border-bottom: 0;
+  border-bottom: 1px solid var(--head-line);
   position: static;
 }
 header.hdr a.brand {
@@ -4163,7 +4242,8 @@ header.hdr .title {
   font-family: inherit;
   font-style: normal;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 header.hdr .sections {
@@ -4176,25 +4256,29 @@ header.hdr .hdr-icon {
   color: var(--head-dim);
   text-decoration: none;
   font-size: 14px;
-  padding: 7px 11px;
-  border-radius: 6px;
+  font-weight: 500;
+  padding: 7px 13px 7px 11px;
+  border-radius: 999px;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
+header.hdr .hdr-icon {
+  padding: 7px;
+}
 header.hdr .sections a:hover,
 header.hdr .hdr-icon:hover {
   color: var(--head-ink);
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--stone);
 }
 header.hdr .sections a.on {
-  color: var(--head-ink);
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 -2px 0 var(--sand);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 header.hdr .hdr-icon.on {
-  color: var(--head-ink);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 header.hdr .crumb {
   color: var(--head-dim);
@@ -4217,10 +4301,18 @@ header.hdr .quick-search input {
   width: 100%;
   box-sizing: border-box;
   border-radius: var(--radius);
-  padding: 6px 10px;
-  border: 1px solid var(--head-line);
-  background: var(--head-field);
+  padding: 7px 10px 7px 32px;
+  border: 1px solid var(--line-strong);
+  background-color: var(--head-field);
   color: var(--head-ink);
+}
+header.hdr .quick-search > .ico {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--head-dim);
+  pointer-events: none;
 }
 header.hdr .quick-search input::placeholder {
   color: var(--head-dim);
@@ -4228,35 +4320,45 @@ header.hdr .quick-search input::placeholder {
 header.hdr .user {
   margin-left: 6px;
   display: flex;
-  gap: 6px;
+  gap: 2px;
   align-items: center;
   color: var(--head-dim);
   font-size: 13px;
   flex: none;
 }
 header.hdr .user a.nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--head-ink);
   text-decoration: none;
   text-transform: none;
   letter-spacing: 0;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   margin: 0;
-  padding: 6px 8px;
+  padding: 6px 10px 6px 7px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 999px;
   white-space: nowrap;
 }
-header.hdr .user a.nav:hover {
-  background: rgba(255, 255, 255, 0.07);
+header.hdr .user a.nav:hover,
+header.hdr .user button:hover:not(:disabled) {
+  background: var(--stone);
+  color: var(--head-ink);
 }
 header.hdr .user button {
   background: transparent;
   color: var(--head-dim);
-  border: 1px solid var(--head-line);
-  min-height: 28px;
-  padding: 2px 10px;
+  border: 0;
+  border-radius: 999px;
+  min-height: 0;
+  min-width: 0;
+  padding: 7px;
   font-size: 13px;
   white-space: nowrap;
+  display: inline-grid;
+  place-items: center;
 }
 .nav-count {
   display: inline-grid;
@@ -4266,25 +4368,28 @@ header.hdr .user button {
   padding: 0 5px;
   box-sizing: border-box;
   border-radius: 9px;
-  background: #5a5d54;
-  color: #fff;
+  background: var(--count);
+  color: #ffffff;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 650;
 }
 .nav-count.mine {
-  background: #b2402c;
+  background: var(--count-mine);
 }
 
-/* the sub-menu: the section's pages, always visible (a tablet has no hover) */
+/* the sub-menu: the section's pages as pills with their icons, always visible (no hover on a
+   tablet) */
 nav.subnav {
   display: flex;
-  gap: 2px;
+  gap: 4px;
   align-items: center;
-  height: 40px;
+  height: 46px;
   box-sizing: border-box;
   padding: 0 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--head) 88%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--head-line);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -4292,8 +4397,9 @@ nav.subnav a {
   color: var(--muted);
   text-decoration: none;
   font-size: 14px;
-  padding: 6px 10px;
-  border-radius: 6px;
+  font-weight: 500;
+  padding: 6px 12px 6px 10px;
+  border-radius: 999px;
   white-space: nowrap;
   display: inline-flex;
   gap: 6px;
@@ -4301,13 +4407,11 @@ nav.subnav a {
 }
 nav.subnav a:hover {
   color: var(--ink);
-  background: var(--bg);
+  background: var(--stone);
 }
 nav.subnav a.on {
-  color: var(--ink);
-  font-weight: 500;
-  box-shadow: inset 0 -2px 0 var(--sand);
-  border-radius: 6px 6px 0 0;
+  color: var(--on-primary);
+  background: var(--primary);
 }
 nav.subnav a.sep {
   margin-left: 12px;
@@ -4316,7 +4420,7 @@ nav.subnav a.sep {
 nav.subnav a.sep::before {
   content: "";
   position: absolute;
-  left: -7px;
+  left: -8px;
   top: 8px;
   bottom: 8px;
   border-left: 1px solid var(--line);
@@ -4403,7 +4507,14 @@ summary.btn {
 }
 a.btn:hover,
 summary.btn:hover {
-  border-color: var(--sand);
+  border-color: var(--line-strong);
+}
+a.btn,
+summary.btn {
+  font-weight: 500;
+}
+a.btn.primary:hover {
+  background: var(--primary-hover);
 }
 a.btn.primary {
   background: var(--primary);
@@ -4414,8 +4525,9 @@ a.btn.primary {
   background: transparent;
 }
 button.on {
-  background: var(--sand-soft);
-  border-color: var(--sand);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .seg {
   display: inline-flex;
@@ -5468,4 +5580,727 @@ td.price-cell a:hover {
 .ws-h {
   font-size: 16px;
   margin: 16px 0 8px;
+}
+
+/* ==== Studio 2.0 components (ADR-130): type, buttons, fields, cards, chips, lists, tabs, (i) ====
+   Last in the file, so these win over the older page rules of equal weight. The configurator
+   (.theme-light, the customers') is left as it was. */
+
+/* ---- type ---- */
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+h1.page-title,
+.d-title h1,
+.tpl-queue .d-title h1,
+.desk .d-title h1 {
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+h2 {
+  font-size: var(--fs-h2);
+}
+h3 {
+  font-size: var(--fs-h3);
+}
+:is(h2, h3, h4):has(> .ico, > .info) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+:is(h2, h3, h4) > .ico {
+  color: var(--accent);
+}
+.ico {
+  flex: none;
+  vertical-align: -3px;
+}
+a {
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 2px;
+}
+
+/* ---- buttons: rounded, one blue primary, icon + short label, icon-only with a tooltip ---- */
+:where(button, a.btn, summary.btn, .d-btn, a.d-btn):has(> .ico) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+:where(button.danger) {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 40%, transparent);
+}
+button.link {
+  font-weight: 500;
+}
+.d-btn:hover:not(:disabled) {
+  transform: none;
+}
+/* an action as an icon: the words are its tooltip and its accessible name */
+.icon-btn,
+button.icon-btn,
+a.icon-btn,
+summary.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: var(--ctl);
+  min-height: var(--ctl);
+  width: var(--ctl);
+  height: var(--ctl);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: pointer;
+  flex: none;
+}
+.icon-btn:hover:not(:disabled) {
+  background: var(--stone);
+  color: var(--ink);
+  border-color: transparent;
+}
+.icon-btn.tinted {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.icon-btn.tinted:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  filter: brightness(0.96);
+}
+.icon-btn.sm {
+  min-width: 28px;
+  min-height: 28px;
+  width: 28px;
+  height: 28px;
+}
+.icon-btn.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+summary.icon-btn {
+  list-style: none;
+}
+summary.icon-btn::-webkit-details-marker {
+  display: none;
+}
+/* the cutting table's file: a short blue button */
+a.btn.dxf,
+.btn-dxf {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
+  font-size: 12.5px;
+  min-height: var(--ctl);
+  padding: 0 10px;
+}
+a.btn.dxf:hover {
+  background: var(--primary-hover);
+}
+
+/* ---- fields: a border of at least 3:1 against what is around them (WCAG 1.4.11) ---- */
+:is(
+  input:not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="file"],
+    [type="color"],
+    [type="hidden"],
+    [type="submit"],
+    [type="button"],
+    [type="image"]
+  ),
+  select,
+  textarea
+):not(.theme-light *) {
+  border: 1px solid var(--line-strong) !important;
+  border-radius: var(--radius);
+  background-color: var(--surface);
+  color: var(--ink);
+}
+:is(input, select, textarea):not(.theme-light *):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+:is(input, select, textarea)::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"] {
+  accent-color: var(--primary);
+}
+
+/* ---- cards and panels: white on the grey ground, 14 px corners, no border in light ---- */
+:is(
+  .card,
+  .set-group,
+  .d-panel,
+  .d-card,
+  .d-queue,
+  .d-kpi,
+  .d-placeholder,
+  .d-loading,
+  .table-wrap,
+  .cv-summary,
+  .q-card,
+  .product
+):not(.theme-light *) {
+  border-radius: var(--radius-lg);
+  border-color: transparent;
+  box-shadow: var(--shadow);
+}
+.card .card {
+  border-color: var(--line);
+  box-shadow: none;
+}
+.d-split > figure:first-child {
+  border-radius: 0;
+}
+
+/* ---- status chips: an icon and the word, in the state's colour ---- */
+.chip-s {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px 2px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.5;
+  white-space: nowrap;
+  background: var(--stone);
+  color: var(--ink-2);
+  vertical-align: middle;
+}
+.chip-s .ico {
+  vertical-align: 0;
+}
+.chip-s.t-ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.chip-s.t-wait {
+  background: var(--wait-soft);
+  color: var(--wait);
+}
+.chip-s.t-bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.chip-s.t-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.chip-s.t-made {
+  background: var(--made-soft);
+  color: var(--made);
+}
+.chip-s.t-draft {
+  background: var(--stone);
+  color: var(--muted);
+}
+.chip-s .st-running,
+.ico.spin {
+  animation: spin 1.2s linear infinite;
+}
+@keyframes spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip-s .st-running,
+  .ico.spin {
+    animation: none;
+  }
+}
+.count-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.badge {
+  border-radius: 999px;
+}
+.badge.status-draft {
+  background: var(--stone);
+  color: var(--muted);
+}
+.badge.status-checked {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.badge.status-production,
+.badge.status-approved {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+/* the Desk's own pills and pipeline in the status colours */
+.d-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 550;
+  padding: 2px 9px 2px 6px;
+}
+.d-pill.s-ai-checked,
+.d-pill.s-new {
+  background: var(--wait-soft);
+  color: var(--wait);
+}
+.d-pill.s-produced {
+  background: var(--made-soft);
+  color: var(--made);
+}
+.d-pipe {
+  height: 24px;
+  box-shadow: none;
+  background: transparent;
+}
+.d-seg {
+  font-size: 12px;
+  font-weight: 550;
+}
+.d-seg.s-approved {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.d-seg.s-ai-checked,
+.d-seg.s-new {
+  background: var(--wait-soft);
+  color: var(--wait);
+}
+.d-seg.s-rejected {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.d-seg.s-produced {
+  background: var(--made-soft);
+  color: var(--made);
+}
+.d-kpi {
+  border: 0;
+}
+.d-kpi:hover {
+  transform: none;
+}
+.d-kpi-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.d-kpi-value {
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.d-kpi.accent {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.d-kpi.accent .d-kpi-label {
+  opacity: 1;
+  color: var(--on-primary);
+}
+.d-kpi-bar i {
+  background: var(--primary);
+}
+.d-card-head h2 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.d-title h1 {
+  color: var(--ink);
+}
+.d-list li.sel {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* ---- tables: sentence-case heads, quiet links ---- */
+table.list th {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--sunken);
+}
+table.list tbody tr:hover {
+  background: var(--sunken);
+}
+table.list td a:not(.btn, .icon-btn) {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 500;
+}
+table.list td a:not(.btn, .icon-btn):hover {
+  color: var(--accent);
+}
+table.list tr.picked td {
+  background: var(--accent-soft);
+}
+
+/* ---- tabs: icon + label, the current one blue and underlined ---- */
+nav.tabs {
+  border-bottom: 1px solid var(--line);
+}
+nav.tabs a,
+.d-cardtabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: var(--muted);
+}
+nav.tabs a:hover,
+.d-cardtabs a:hover {
+  color: var(--ink);
+  border-bottom-color: var(--line-strong);
+}
+nav.tabs a.active,
+.d-cardtabs a.on {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+/* sub-views and choices: an iOS segmented control */
+.seg {
+  background: var(--stone);
+  border: 0;
+  border-radius: calc(var(--radius) + 2px);
+  padding: 2px;
+  gap: 2px;
+  overflow: visible;
+}
+.seg > a,
+.seg > button {
+  border: 0 !important;
+  border-radius: var(--radius) !important;
+  background: transparent;
+  color: var(--ink-2);
+  gap: 5px;
+  font-weight: 500;
+}
+.seg > a:hover,
+.seg > button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+.seg > .on,
+.seg > a.on,
+.seg > button.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.d-seg-ctl {
+  background: var(--stone);
+}
+.d-seg-ctl button {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.d-chips button.on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+
+/* ---- Settings: iOS Settings, coloured tiles beside the tabs, grouped inset lists ---- */
+.set-tabs a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px 5px 6px;
+  border-radius: var(--radius);
+  font-weight: 500;
+}
+.set-tabs a.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: none;
+}
+.set-tabgroup-name {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.set-ico {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  flex: none;
+  color: #ffffff;
+  background: var(--tile-grey);
+}
+.set-ico.tile-blue {
+  background: var(--tile-blue);
+}
+.set-ico.tile-orange {
+  background: var(--tile-orange);
+}
+.set-ico.tile-green {
+  background: var(--tile-green);
+}
+.set-ico.tile-teal {
+  background: var(--tile-teal);
+}
+.set-ico.tile-indigo {
+  background: var(--tile-indigo);
+}
+.set-ico.tile-purple {
+  background: var(--tile-purple);
+}
+.set-group {
+  padding: 4px 16px 2px;
+}
+.set-group h3 {
+  margin: 10px 0 6px;
+}
+.set-row {
+  grid-template-columns: minmax(200px, 1fr) minmax(220px, 1.3fr) minmax(
+      90px,
+      0.5fr
+    );
+  align-items: center;
+  border-top-color: var(--line);
+  padding: 9px 0;
+}
+.set-name {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 500;
+}
+.set-help {
+  justify-content: flex-end;
+  align-items: center;
+}
+/* a grouped list: rows with hairlines inset from the left, as in iOS Settings */
+.ios-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.ios-list > li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 16px;
+  box-sizing: border-box;
+  position: relative;
+}
+.ios-list > li + li::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 0;
+  top: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* ---- the (i): a button, and the explanation in a small card ---- */
+.info {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  position: relative;
+  font-size: var(--fs);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1;
+}
+button.info-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+button.info-btn:hover,
+button.info-btn[aria-expanded="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 0;
+}
+.info-pop {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  z-index: 90;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(380px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+  overflow: visible;
+}
+.info-pop[hidden] {
+  display: none;
+}
+.info-pop:popover-open {
+  display: block;
+}
+.info-pop p {
+  margin: 0 0 6px;
+}
+.info-pop p:last-child,
+.info-pop ul:last-child {
+  margin-bottom: 0;
+}
+.info-pop code {
+  font-size: 12px;
+}
+.info-pop kbd {
+  font: 500 11px/1 var(--font);
+  padding: 2px 5px;
+  margin: 0 1px;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+  background: var(--sunken);
+  color: var(--ink-2);
+}
+
+/* ---- banners: a state with its icon (rejected red, a warning orange) ---- */
+.card.attention {
+  border-left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+.card.attention > .ico {
+  color: var(--warn);
+}
+.card.attention.bad {
+  background: var(--bad-soft);
+}
+.card.attention.bad > .ico,
+.card.attention.bad > strong {
+  color: var(--bad);
+}
+
+/* ---- a page's head and a cover's head ---- */
+.page-head {
+  align-items: center;
+  margin: 6px 0 14px;
+}
+.cv-head h1 {
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.cv-summary dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.cv-summary a {
+  text-decoration: none;
+  font-weight: 500;
+}
+.cv-strip a {
+  text-decoration: none;
+}
+
+/* ---- the login and invitation pages ---- */
+.login-card,
+.welcome-card {
+  border-radius: var(--radius-lg);
+}
+
+/* ---- a finger: bigger targets for the new controls too ---- */
+@media (pointer: coarse) {
+  .icon-btn,
+  button.icon-btn,
+  a.icon-btn,
+  summary.icon-btn {
+    min-width: 40px;
+    min-height: 40px;
+    width: 40px;
+    height: 40px;
+  }
+  button.info-btn {
+    width: 36px;
+    height: 36px;
+  }
+  header.hdr .user button {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+@media (max-width: 900px) {
+  .set-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .set-row {
+    grid-template-columns: 1fr;
+  }
+}
+/* a heading and its (i) on one line */
+.head-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.set-group > .head-row > h3 {
+  margin: 10px 0 6px;
 }

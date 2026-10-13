@@ -22,6 +22,7 @@ import {
 import { AiAdvice } from "./AiAdvice";
 import { ModelInfo, Revisions } from "./Catalogue";
 import { AllCovers, NewCover } from "./Covers";
+import { Icon } from "./icons";
 import { Tpl } from "./layout";
 import { Search } from "./Search";
 import { Workshop } from "./Workshop";
@@ -229,6 +230,7 @@ function TopBar({
               aria-current={s.id === route.section ? "true" : undefined}
               title={s.hint}
             >
+              <Icon name={s.icon} />
               {s.label}
               {s.id === "work" && count("questions")}
             </a>
@@ -244,8 +246,9 @@ function TopBar({
           href="#/guide"
           className={`hdr-icon ${route.section === "guide" ? "on" : ""}`}
           title="The guide"
+          aria-label="Guide"
         >
-          Guide
+          <Icon name="guide" size={19} />
         </a>
         {loginRequired && <UserMenu user={user} onLogout={onLogout} />}
       </header>
@@ -264,6 +267,7 @@ function TopBar({
               aria-current={p.id === route.page ? "page" : undefined}
               title={p.hint}
             >
+              <Icon name={p.icon} size={16} />
               {p.label}
               {count(p.id)}
             </a>,
@@ -780,13 +784,14 @@ function ModelPage({
       )}
       {error && <p className="error">{error}</p>}
       <nav className="tabs" aria-label="Cover">
-        {MODEL_TABS.map(([t, label]) => (
+        {MODEL_TABS.map(([t, label, icon]) => (
           <a
             key={t}
             href={modelHref(id, t)}
             className={tab === t ? "active" : ""}
             aria-current={tab === t ? "page" : undefined}
           >
+            <Icon name={icon} size={16} />
             {label}
             {t === "history" && model.warnings.length > 0 && (
               <span className="count">{model.warnings.length}</span>

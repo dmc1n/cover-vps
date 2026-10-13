@@ -2,9 +2,11 @@
 //   list    a head, one filter row, a table (or cards) with a sticky head, a selection bar
 //   queue   a queue with its filters on the left, the detail beside it (Desk, Questions)
 //   object  one thing: a head with its facts and main actions, a status strip, tabs (a cover)
-//   form    settings: tabs, an intro, rows of name / control / explanation, a Save bar
+//   form    settings: tabs, rows of name (its (i)) / control / where the value comes from, a Save bar
+// A page explains itself in an (i) beside its title, never in a line under it (Studio 2.0, ADR-130).
 // The styles are in studio.css under "the four page templates".
 import type { ReactNode } from "react";
+import { Info } from "./icons";
 
 export type Template = "list" | "queue" | "object" | "form";
 
@@ -19,9 +21,9 @@ export function PageHead({
 }) {
   return (
     <div className="page-head">
-      <div>
+      <div className="head-row">
         <h1 className="page-title">{title}</h1>
-        {children && <p className="muted">{children}</p>}
+        {children && <Info label={`About ${title}`}>{children}</Info>}
       </div>
       {actions && <div className="page-actions">{actions}</div>}
     </div>

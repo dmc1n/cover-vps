@@ -24,6 +24,7 @@ import {
   uploadPictures,
   type Pending,
 } from "./DeskPictures";
+import { Icon } from "./icons";
 import { useSession } from "./Session";
 import {
   arrangementHref,
@@ -1064,13 +1065,14 @@ function CardView({
         </p>
       )}
       <nav className="d-cardtabs" aria-label="Card">
-        {DESK_TABS.map(([t, label]) => (
+        {DESK_TABS.map(([t, label, icon]) => (
           <a
             key={t}
             href={deskHref(card.id, t)}
             className={tab === t ? "on" : ""}
             aria-current={tab === t ? "page" : undefined}
           >
+            <Icon name={icon} size={16} />
             {label}
             {counts[t] && <span className="d-chip-n">{counts[t]}</span>}
           </a>
