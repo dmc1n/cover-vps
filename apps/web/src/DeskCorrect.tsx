@@ -1,3 +1,4 @@
+import { Info, Icon, IconButton, StatusChip } from "./icons";
 // Corrections that change the cover itself (ADR-082), on the Desk card: a seam removed or added,
 // the vents, a size read wrong, a shape that is missing. Each correction is saved on the cover,
 // recalculated at once and kept as a test case; the same correction on several covers of a
@@ -190,20 +191,26 @@ export function Corrections({
   if (!v)
     return (
       <section className="d-panel d-wide dc">
-        <h3>Correct this cover</h3>
+        <h3>
+          <Icon name="correct" />
+          Correct this cover
+        </h3>
         <p className="d-muted">{msg || "Loading…"}</p>
       </section>
     );
   return (
     <section className="d-panel d-wide dc">
       <div className="dc-head">
-        <h3>Correct this cover</h3>
-        <p className="dc-note">
+        <h3>
+          <Icon name="correct" />
+          Correct this cover
+        </h3>
+        <Info label="About correcting this cover">
           A correction changes the cover itself: it is saved on the cover,
           recalculated at once and kept as a test the program must keep passing.
           The same correction on several covers of one series becomes a proposed
           rule for that series.
-        </p>
+        </Info>
       </div>
       <div className="d-seg-ctl dc-tabs">
         {TABS.map((t) => (
@@ -212,6 +219,17 @@ export function Corrections({
             className={tab === t ? "on" : ""}
             onClick={() => setTab(t)}
           >
+            <Icon
+              name={
+                t === "seams"
+                  ? "seams"
+                  : t === "vents"
+                    ? "vents"
+                    : t === "sizes"
+                      ? "sizes"
+                      : "covers"
+              }
+            />{" "}
             {t === "seams"
               ? `Seams · ${v.seams.length}`
               : t === "vents"
@@ -226,10 +244,10 @@ export function Corrections({
       {tab === "seams" && (
         <div className="dc-body">
           {!v.drawn && (
-            <p className="d-muted">
+            <Info label="About correcting this cover">
               This cover's seams follow the furniture: set the skirt seam's
               height here, or place seams in the model's seam editor.
-            </p>
+            </Info>
           )}
           {v.seams.length > 0 && (
             <table className="d-table dc-seams">
@@ -249,11 +267,13 @@ export function Corrections({
                     </td>
                     <td>
                       {pending.has(s.id) ? (
-                        <em className="d-muted">removed · recalculating</em>
+                        <StatusChip status="running">
+                          removed · recalculating
+                        </StatusChip>
                       ) : (
                         canAct &&
                         v.drawn && (
-                          <button
+                          <IconButton
                             className="d-link"
                             disabled={busy}
                             onClick={() =>
@@ -262,9 +282,9 @@ export function Corrections({
                                 `Seam ${s.id} removed`,
                               )
                             }
-                          >
-                            remove seam
-                          </button>
+                            icon="delete"
+                            label="remove seam"
+                          />
                         )
                       )}
                     </td>
@@ -378,7 +398,7 @@ export function Corrections({
                   )
                 }
               >
-                Save
+                <Icon name="save" /> Save
               </button>
             )}
           </div>
@@ -436,7 +456,7 @@ export function Corrections({
                   )
                 }
               >
-                Save
+                <Icon name="save" /> Save
               </button>
             )}
           </div>
@@ -477,7 +497,7 @@ export function Corrections({
                   send({ kind: "shape", chips, text }, "Shape noted")
                 }
               >
-                Save
+                <Icon name="save" /> Save
               </button>
             )}
           </div>
@@ -571,8 +591,9 @@ export function RulesBar({
                   })
                   .catch((e) => setMsg(String(e.message ?? e)))
               }
+              title="Make it the rule"
             >
-              Make it the rule
+              <Icon name="approve" /> Adopt rule
             </button>
           )}
         </div>

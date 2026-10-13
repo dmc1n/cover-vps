@@ -1,3 +1,4 @@
+import { Info, Icon, StatusChip } from "./icons";
 // Questions at the Desk (ADR-109): the open questions for the owner and the workshop, answered
 // here instead of by mail. A list with filters (status, topic, search), one question at a time
 // with its context, the covers it is about, its pictures and every answer; an answer form
@@ -186,14 +187,17 @@ export function Questions({ selected }: { selected: number | null }) {
     <div className="desk tpl tpl-queue">
       <section className="d-top">
         <div className="d-title">
-          <h1>Questions</h1>
-          <p>
-            Questions for the owner and the workshop. Choose an answer, add a
-            comment or a picture; Claude processes the answers every day at
-            18:00. <kbd>j</kbd>
-            <kbd>k</kbd> move · <kbd>1</kbd>–<kbd>5</kbd> choose · <kbd>0</kbd>{" "}
-            anders · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> send · <kbd>/</kbd> search
-          </p>
+          <div className="head-row">
+            <h1>Questions</h1>
+            <Info label="About questions">
+              Questions for the owner and the workshop. Choose an answer, add a
+              comment or a picture; Claude processes the answers every day at
+              18:00. <kbd>j</kbd>
+              <kbd>k</kbd> move · <kbd>1</kbd>–<kbd>5</kbd> choose ·{" "}
+              <kbd>0</kbd> anders · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> send ·{" "}
+              <kbd>/</kbd> search
+            </Info>
+          </div>
         </div>
         <div className="d-kpis">
           <Tile label="Open" value={c.open ?? 0} accent />
@@ -261,9 +265,9 @@ export function Questions({ selected }: { selected: number | null }) {
                     )}
                   </span>
                   <span className="d-row-sub">
-                    <span className={`d-pill q-${q.status}`}>
+                    <StatusChip status={q.status}>
                       {STATUS_LABEL[q.status]}
-                    </span>
+                    </StatusChip>
                     <span>{q.topic}</span>
                     {q.answers.length > 0 && (
                       <span>
@@ -468,9 +472,7 @@ function QuestionCard({
           </span>
         </div>
         <div className="d-head-right">
-          <span className={`d-pill q-${q.status}`}>
-            {STATUS_LABEL[q.status]}
-          </span>
+          <StatusChip status={q.status}>{STATUS_LABEL[q.status]}</StatusChip>
         </div>
       </div>
 
@@ -481,8 +483,9 @@ function QuestionCard({
 
         {q.processed && (
           <div className="q-note-done" role="status">
-            <strong>Processed</strong> by {q.processed.by},{" "}
-            {when(q.processed.time)}: <span lang="nl">{q.processed.note}</span>
+            <StatusChip status="done">Processed</StatusChip> by {q.processed.by}
+            , {when(q.processed.time)}:{" "}
+            <span lang="nl">{q.processed.note}</span>
           </div>
         )}
 
@@ -577,7 +580,7 @@ function QuestionCard({
                         owner("final", { answer_id: a.id }, "Marked final.")
                       }
                     >
-                      Mark final
+                      <Icon name="approve" /> Mark final
                     </button>
                   )}
                   {isOwner && q.final_answer === a.id && (
@@ -592,7 +595,7 @@ function QuestionCard({
                         )
                       }
                     >
-                      Not final
+                      <Icon name="undo" /> Not final
                     </button>
                   )}
                 </div>
@@ -700,7 +703,8 @@ function QuestionCard({
                 className="d-btn d-primary"
                 disabled={sending}
               >
-                {sending ? "Sending…" : "Send answer"} <kbd>Ctrl</kbd>
+                <Icon name="comment" /> {sending ? "Sending…" : "Send answer"}{" "}
+                <kbd>Ctrl</kbd>
                 <kbd>Enter</kbd>
               </button>
               {msg && (
@@ -734,7 +738,7 @@ function QuestionCard({
                   disabled={!note.trim()}
                   onClick={() => owner("done", { note }, "Marked processed.")}
                 >
-                  Mark processed
+                  <Icon name="approve" /> Mark processed
                 </button>
               </div>
             ) : (
@@ -743,7 +747,7 @@ function QuestionCard({
                 className="d-btn d-ghost"
                 onClick={() => owner("reopen", {}, "Opened again.")}
               >
-                Reopen
+                <Icon name="undo" /> Reopen
               </button>
             )}
           </section>

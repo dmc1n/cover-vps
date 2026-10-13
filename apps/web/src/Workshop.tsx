@@ -14,6 +14,14 @@ import {
   type WorkshopItem,
   type WorkshopOrder,
 } from "./api";
+import {
+  Heading,
+  Icon,
+  IconLink,
+  Info,
+  StatusChip,
+  type IconName,
+} from "./icons";
 import { FilterRow, Tpl } from "./layout";
 import { deskHref, isEditor, isWorkshop, modelHref } from "./nav";
 import { useSession } from "./Session";
@@ -24,6 +32,14 @@ const FILE_LABEL: Record<string, string> = {
   "checklist.pdf": "Check list",
   "cut.svg": "Cut pieces (SVG)",
   "cut.dxf": "Cutting table (DXF)",
+};
+// the files as icons, the words in their tooltips (Studio 2.0, ADR-130)
+const FILE_ICON: Record<string, IconName> = {
+  "cutting-list.pdf": "cutting-list",
+  "sizes.pdf": "sizes",
+  "checklist.pdf": "checklist",
+  "cut.svg": "cut-svg",
+  "cut.dxf": "dxf",
 };
 const day = (t?: number | null) =>
   t ? new Date(t * 1000).toLocaleDateString() : "";
@@ -165,8 +181,16 @@ export function Workshop() {
                 <th>Cover</th>
                 <th>Status</th>
                 <th>Files</th>
-                <th>Fit on the sewn cover</th>
-                <th>Customers</th>
+                <th title="Fit on the sewn cover">Fit</th>
+                <th>
+                  Customers
+                  {!editor && (
+                    <Info label="About the customers' answers">
+                      The customers' fit answers are shown to editors and
+                      admins.
+                    </Info>
+                  )}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -195,11 +219,6 @@ export function Workshop() {
             </tbody>
           </table>
         </div>
-      )}
-      {!editor && (
-        <p className="muted">
-          The customers' fit answers are shown to editors and admins.
-        </p>
       )}
     </Tpl>
   );
@@ -243,13 +262,17 @@ function Orders({
   const waiting = orders.filter((o) => o.status === "waiting_production");
   return (
     <section className="ws-orders" data-testid="ws-orders">
-      <h2 className="ws-h">
-        Orders{" "}
-        <span className="muted small">
-          {waiting.length} waiting for production ·{" "}
+      <div className="head-row ws-h">
+        <Heading level={2} icon="orders">
+          Orders
+        </Heading>
+        <StatusChip status="waiting">
+          {waiting.length} waiting for production
+        </StatusChip>
+        <StatusChip status="in-production">
           {orders.length - waiting.length} in production
-        </span>
-      </h2>
+        </StatusChip>
+      </div>
       {msg && (
         <p className="muted" role="status">
           {msg}
@@ -295,11 +318,17 @@ function Orders({
                     )}
                   </td>
                   <td className="nowrap">
-                    <span
-                      className={`badge ${o.status === "waiting_production" ? "warn" : "status-checked"}`}
+                    <StatusChip
+                      status={
+                        o.status === "waiting_production"
+                          ? "waiting"
+                          : o.status === "in_production"
+                            ? "in-production"
+                            : o.status
+                      }
                     >
                       {ORDER_STATUS[o.status] ?? o.status}
-                    </span>
+                    </StatusChip>
                     {o.released_by && (
                       <div className="muted small">
                         sent by {o.released_by}, {day(o.released)}
@@ -314,6 +343,7 @@ function Orders({
                           disabled={busy !== null}
                           onClick={() => send(o)}
                         >
+                          <Icon name="send-production" />
                           {busy === o.id ? "Sending…" : "Send to production"}
                         </button>
                       ) : (
@@ -324,18 +354,32 @@ function Orders({
                     ) : o.model_id ? (
                       <>
                         <a href={deskHref(o.model_id)}>{o.model_id}</a>{" "}
-                        <span className="muted small">
-                          Desk: {o.desk_status ?? "?"}
-                        </span>
-                        <div>
+                        <StatusChip
+                          status={o.desk_status ?? "waiting"}
+                          title="On the Desk"
+                        >
+                          {o.desk_status ?? "?"}
+                        </StatusChip>
+                        <div className="ws-files">
                           {o.dxf_ok ? (
-                            <a href={fileUrl(o.model_id, "cut.dxf")} download>
-                              Cutting table (DXF)
+                            <a
+                              className="btn dxf"
+                              href={fileUrl(o.model_id, "cut.dxf")}
+                              download
+                              title="Cutting table (DXF)"
+                              aria-label="Cutting table (DXF)"
+                            >
+                              <Icon name="dxf" size={16} />
+                              DXF
                             </a>
                           ) : (
-                            <span className="dxf-locked">
-                              DXF waits for the Desk's approval
-                            </span>
+                            <StatusChip
+                              status="waiting"
+                              className="dxf-locked"
+                              title="DXF waits for the Desk's approval"
+                            >
+                              <Icon name="lock" size={13} /> DXF
+                            </StatusChip>
                           )}
                         </div>
                       </>
@@ -385,23 +429,23 @@ function Row({
             ) : (
               <strong>{w.code}</strong>
             )}{" "}
+            <IconLink
+              icon="desk"
+              label="Desk card"
+              href={deskHref(w.id)}
+              className="sm"
+              size={15}
+            />
             {w.arrangement && <span className="badge">arrangement</span>}
             <div className="muted small">
               {w.pieces} pieces · {w.vents} vents
               {w.products.length > 0 && ` · ${w.products.join(", ")}`}
             </div>
-            <a className="small" href={deskHref(w.id)}>
-              Desk card
-            </a>
           </div>
         </div>
       </td>
       <td className="nowrap">
-        <span
-          className={`badge ${w.status === "produced" ? "status-production" : "status-checked"}`}
-        >
-          {w.status}
-        </span>
+        <StatusChip status={w.status} />
         {who && (
           <div className="muted small">
             {who.by}, {day(who.time)}
@@ -413,56 +457,80 @@ function Row({
           {w.files
             .filter((f) => f !== "cut.dxf")
             .map((f) => (
-              <a
+              <IconLink
                 key={f}
+                icon={FILE_ICON[f] ?? "pdf"}
+                label={FILE_LABEL[f] ?? f}
+                className="tinted"
                 href={fileUrl(w.id, f)}
                 target="_blank"
                 rel="noreferrer"
-              >
-                {FILE_LABEL[f] ?? f}
-              </a>
+              />
             ))}
           {(w.stamped ?? []).map((f) => (
-            <a
+            <IconLink
               key={`approved-${f}`}
+              icon={f === "sizes.pdf" ? "sizes" : "cutting-list"}
+              label={
+                f === "sizes.pdf"
+                  ? "Approved size drawing (stamped APPROVED by the Desk)"
+                  : "Approved cutting list (stamped APPROVED by the Desk)"
+              }
+              className="tinted approved"
               href={`/api/models/${w.id}/approved/${f}`}
               target="_blank"
               rel="noreferrer"
-              title="Stamped APPROVED by the Desk's approval (ADR-128)"
-            >
-              {f === "sizes.pdf"
-                ? "Approved size drawing"
-                : "Approved cutting list"}
-            </a>
+            />
           ))}
           {w.files.includes("cut.dxf") &&
             (w.dxf_ok ? (
-              <a href={fileUrl(w.id, "cut.dxf")} download>
-                {FILE_LABEL["cut.dxf"]}
+              <a
+                className="btn dxf"
+                href={fileUrl(w.id, "cut.dxf")}
+                download
+                title={FILE_LABEL["cut.dxf"]}
+                aria-label={FILE_LABEL["cut.dxf"]}
+              >
+                <Icon name="dxf" size={16} />
+                DXF
               </a>
             ) : (
-              <span className="dxf-locked" title="approval gate (ADR-079)">
-                DXF waits for the Desk's (re)approval
-              </span>
+              <StatusChip
+                status="waiting"
+                className="dxf-locked"
+                title="DXF waits for the Desk's (re)approval (the approval gate, ADR-079)"
+              >
+                <Icon name="lock" size={13} /> DXF
+              </StatusChip>
             ))}
           {w.revision &&
             (w.revision.dxf_ok ? (
-              <a href={revisionUrl(w.id, w.revision.n, "cut.dxf")} download>
-                Revision {w.revision.n} to cut (DXF)
+              <a
+                className="btn dxf"
+                href={revisionUrl(w.id, w.revision.n, "cut.dxf")}
+                download
+                title={`Revision ${w.revision.n} to cut (DXF)`}
+              >
+                <Icon name="dxf" size={16} />
+                Rev. {w.revision.n}
               </a>
             ) : (
-              <span className="dxf-locked">
-                Revision {w.revision.n} to cut: not approved
-              </span>
+              <StatusChip
+                status="waiting"
+                className="dxf-locked"
+                title={`Revision ${w.revision.n} to cut: not approved`}
+              >
+                <Icon name="lock" size={13} /> Rev. {w.revision.n}
+              </StatusChip>
             ))}
         </div>
       </td>
       <td>
         {w.fit ? (
           <>
-            <span className={`badge ${w.fit.fits ? "ok" : "grade-failed"}`}>
+            <StatusChip status={w.fit.fits ? "fits" : "does-not-fit"}>
               {w.fit.fits ? "fits" : "does not fit"}
-            </span>{" "}
+            </StatusChip>{" "}
             <span className="muted small">
               {w.fit.by}, {day(w.fit.time)}
             </span>
@@ -476,7 +544,9 @@ function Row({
             )}
           </>
         ) : (
-          <span className="muted small">not measured yet</span>
+          <span className="muted small" title="not measured yet">
+            —
+          </span>
         )}
       </td>
       <td>
@@ -487,7 +557,9 @@ function Row({
         ) : customers === "error" ? (
           <span className="error small">could not be read</span>
         ) : customers.length === 0 ? (
-          <span className="muted small">no answers</span>
+          <span className="muted small" title="no answers">
+            —
+          </span>
         ) : (
           customers.map((c) => (
             <div key={c.id} className="small">

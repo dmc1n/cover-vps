@@ -1,3 +1,4 @@
+import { Heading, Info, Icon, StatusChip } from "./icons";
 import { useEffect, useState } from "react";
 import {
   api,
@@ -117,7 +118,7 @@ export function ModelInfo({
           />
         </label>
         <button className="primary" disabled={!changed} onClick={save}>
-          Save
+          <Icon name="save" /> Save
         </button>
         {message && <span className="muted">{message}</span>}
       </div>
@@ -145,10 +146,12 @@ export function Revisions({ model }: { model: ModelDetail }) {
     return <p className="muted">No revisions yet: every export keeps one.</p>;
   return (
     <>
-      <p className="muted">
-        Every run that makes cut pieces is kept here with its settings. Pick two
-        (A and B) to see what changed.
-      </p>
+      <Heading
+        icon="history"
+        info="Every run that makes cut pieces is kept here with its settings. Pick two (A and B) to see what changed."
+      >
+        Revisions
+      </Heading>
       <table className="list">
         <thead>
           <tr>
@@ -192,7 +195,9 @@ export function Revisions({ model }: { model: ModelDetail }) {
                 )}
               </td>
               <td>{new Date(r.time * 1000).toLocaleString()}</td>
-              <td>{r.status}</td>
+              <td>
+                <StatusChip status={r.status} />
+              </td>
               <td>{r.panels}</td>
               <td className={r.max_stretch_pct > 2 ? "bad" : "ok"}>
                 {r.max_stretch_pct.toFixed(1)} %
@@ -212,7 +217,7 @@ export function Revisions({ model }: { model: ModelDetail }) {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  pattern.json
+                  <Icon name="pieces" /> pattern.json
                 </a>
               </td>
             </tr>
@@ -314,7 +319,7 @@ export function BatchBar({
           disabled={!selected.length || !steps.length || running}
           onClick={start}
         >
-          Run these
+          <Icon name="run" /> Run these
         </button>
         {error && <span className="error">{error}</span>}
       </div>
@@ -328,7 +333,11 @@ export function BatchBar({
               {j.model_id}: {j.status}
             </span>
           ))}{" "}
-          {!running && "Open a model to see what changed (Revisions)."}
+          {!running && (
+            <Info label="About batch results">
+              Open a model to see what changed (Revisions).
+            </Info>
+          )}
         </p>
       )}
     </section>

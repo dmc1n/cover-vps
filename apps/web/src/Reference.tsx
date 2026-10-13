@@ -1,3 +1,4 @@
+import { Info, Icon, StatusChip } from "./icons";
 // The workshop's own reference for this model (ADR-070): upload a 3D model of the cover or a PDF
 // (the drawing or pattern), and see how the program's cover compares: the deviation in mm with a
 // coloured 3D view, the PDF's sizes found or not, the AI's differences, and lessons to accept.
@@ -83,7 +84,10 @@ function when(t?: number): string {
 function ReportCard({ title, report }: { title: string; report: Report }) {
   return (
     <section className="card">
-      <h3>What the program did with your {title}</h3>
+      <h3>
+        <Icon name="compare" />
+        What the program did with your {title}
+      </h3>
       <p
         style={{
           borderLeft: `4px solid ${TONE[report.verdict]}`,
@@ -91,7 +95,7 @@ function ReportCard({ title, report }: { title: string; report: Report }) {
           fontWeight: 600,
         }}
       >
-        {report.headline}
+        <StatusChip status={report.verdict}>{report.headline}</StatusChip>
       </p>
       <ol style={{ paddingLeft: 20 }}>
         {report.steps.map((s, i) => (
@@ -191,17 +195,20 @@ export function Reference({ id, canEdit }: { id: string; canEdit: boolean }) {
         <ReportCard key={c.title} title={c.title} report={c.r} />
       ))}
       <section className="card">
-        <h3>Your reference</h3>
-        <p className="muted">
+        <h3>
+          <Icon name="compare" />
+          Your reference
+        </h3>
+        <Info label="About your reference">
           Upload what you know is right for this model: a 3D model of the cover
           (STEP, IGES, STL, OBJ, GLB: a surface model) and/or a PDF (your
           drawing or pattern). The program compares it with its own cover; the
           differences are kept, and what you accept becomes a lesson for all
           covers.
-        </p>
+        </Info>
         {canEdit && (
           <label className="button">
-            {busy ? "Uploading…" : "Upload a reference"}
+            <Icon name="upload" /> {busy ? "Uploading…" : "Upload a reference"}
             <input
               type="file"
               hidden
@@ -211,7 +218,11 @@ export function Reference({ id, canEdit }: { id: string; canEdit: boolean }) {
           </label>
         )}
         {s.running && (
-          <p>Comparing… (a PDF with the AI takes about a minute)</p>
+          <p>
+            <StatusChip status="running">
+              Comparing… (a PDF with the AI takes about a minute)
+            </StatusChip>
+          </p>
         )}
         {msg && <p className="muted">{msg}</p>}
         {s.files.length > 0 && (
@@ -233,7 +244,10 @@ export function Reference({ id, canEdit }: { id: string; canEdit: boolean }) {
 
       {past.length > 0 && (
         <section className="card">
-          <h3>Earlier uploads</h3>
+          <h3>
+            <Icon name="compare" />
+            Earlier uploads
+          </h3>
           <table className="list">
             <thead>
               <tr>
@@ -275,7 +289,14 @@ export function Reference({ id, canEdit }: { id: string; canEdit: boolean }) {
 
       {sf && (
         <section className="card">
-          <h3>Your 3D model against the program's cover</h3>
+          <h3>
+            <Icon name="compare" />
+            Your 3D model against the program's cover
+          </h3>
+          <Info label="About your reference">
+            The program's cover coloured by the deviation: green within ±5 mm,
+            sand where it is roomier, red where it is tighter than yours.
+          </Info>
           {sf.error ? (
             <p className="error">{sf.error}</p>
           ) : (
@@ -312,11 +333,6 @@ export function Reference({ id, canEdit }: { id: string; canEdit: boolean }) {
               </table>
               {s.has_view && (
                 <>
-                  <p className="muted">
-                    The program's cover coloured by the deviation: green within
-                    ±5 mm, sand where it is roomier, red where it is tighter
-                    than yours.
-                  </p>
                   <div style={{ height: 420 }}>
                     <Scene
                       url={`/api/models/${id}/reference/compare.glb?${stamp}`}
@@ -331,7 +347,10 @@ export function Reference({ id, canEdit }: { id: string; canEdit: boolean }) {
 
       {dr && (
         <section className="card">
-          <h3>Your PDF against the program's pattern</h3>
+          <h3>
+            <Icon name="compare" />
+            Your PDF against the program's pattern
+          </h3>
           {dr.error ? (
             <p className="error">{dr.error}</p>
           ) : (
@@ -375,14 +394,20 @@ export function Reference({ id, canEdit }: { id: string; canEdit: boolean }) {
               )}
               {(dr.ai?.lessons?.length ?? 0) > 0 && (
                 <>
-                  <h4>What the program could learn</h4>
+                  <h4>
+                    <Icon name="compare" />
+                    What the program could learn
+                  </h4>
                   <ul>
                     {dr.ai!.lessons!.map((l, i) => (
                       <li key={i}>
                         {l.rule}{" "}
-                        <span className="muted">(check: {l.check})</span>{" "}
+                        <Info label="About checking this lesson">
+                          {l.check}
+                        </Info>{" "}
                         {canEdit && (
                           <button className="link" onClick={() => accept(i)}>
+                            <Icon name="approve" size={14} />
                             Accept
                           </button>
                         )}

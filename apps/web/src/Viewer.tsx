@@ -1,3 +1,4 @@
+import { Info, Icon, StatusChip } from "./icons";
 import { disposeObject, trackRenderer } from "./dispose3d";
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { UnfoldView, type FrameHook } from "./Unfold";
@@ -784,7 +785,7 @@ export function Viewer({
             title="Layers, vents and sizes on the cover"
             aria-label="Show"
           >
-            Show
+            <Icon name="menu" /> Show
             <span className="vbar-shown">
               {available
                 .filter((l) => shown[l.file])
@@ -829,22 +830,27 @@ export function Viewer({
               </label>
             )}
             {files.includes("vents.json") && (
-              <label title="Each air vent's opening, its bottom edge above the hem and the distance to the seam or corner on each side, as in the cutting file: to check a sewn cover">
-                <input
-                  type="checkbox"
-                  data-testid="vent-sizes-toggle"
-                  checked={ventSizes}
-                  onChange={(e) => {
-                    setVentSizes(e.target.checked);
-                    remember(VENT_SIZES_KEY, e.target.checked);
-                    if (e.target.checked && !showVents) {
-                      setShowVents(true);
-                      remember(VENTS_KEY, true);
-                    }
-                  }}
-                />
-                Vent sizes <small>opening, heights, to the seams</small>
-              </label>
+              <>
+                <label title="Each air vent's opening, its bottom edge above the hem and the distance to the seam or corner on each side, as in the cutting file: to check a sewn cover">
+                  <input
+                    type="checkbox"
+                    data-testid="vent-sizes-toggle"
+                    checked={ventSizes}
+                    onChange={(e) => {
+                      setVentSizes(e.target.checked);
+                      remember(VENT_SIZES_KEY, e.target.checked);
+                      if (e.target.checked && !showVents) {
+                        setShowVents(true);
+                        remember(VENTS_KEY, true);
+                      }
+                    }}
+                  />
+                  Vent sizes
+                </label>
+                <Info label="About vent sizes">
+                  opening, heights, to the seams
+                </Info>
+              </>
             )}
             <label title="The cover's overall length, depth and height in cm, to compare with the drawing">
               <input
@@ -864,9 +870,9 @@ export function Viewer({
               />
               Overall dimensions
             </label>
-            <span className="menu-hint">
+            <Info label="About navigating the 3D view">
               Drag to turn, scroll to zoom, right-drag to move.
-            </span>
+            </Info>
           </div>
         </details>
         {files.includes("vents.json") && (
@@ -879,7 +885,7 @@ export function Viewer({
               remember(VENTS_KEY, !showVents);
             }}
           >
-            Vents
+            <Icon name="vents" /> Vents
           </button>
         )}
         <button
@@ -891,7 +897,7 @@ export function Viewer({
             remember(DIMS_KEY, !showDims);
           }}
         >
-          Dimensions
+          <Icon name="dimensions" /> Dimensions
         </button>
         {views.length > 1 && (
           <span
@@ -907,6 +913,17 @@ export function Viewer({
                 title={title}
                 onClick={() => look(m)}
               >
+                <Icon
+                  name={
+                    m === "unfold"
+                      ? "unfold"
+                      : m === "rain"
+                        ? "rain"
+                        : m === "drape"
+                          ? "drape"
+                          : "design"
+                  }
+                />{" "}
                 {label}
               </button>
             ))}
@@ -929,18 +946,25 @@ export function Viewer({
             title="Click two points on the cover: the straight distance, the height difference and the distance along the fabric, in cm"
             onClick={() => setMeasuring(!measuring)}
           >
-            {measuring ? "Stop measuring" : "Measure"}
+            <Icon name="measure" /> {measuring ? "Stop measuring" : "Measure"}
           </button>
         )}
         <span className="vbar-grow" />
         {(rainBusy || drapeBusy) && (
           <span className="vbar-busy" role="status">
-            {drapeBusy ? "Draping… (about 40 min)" : "Simulating the rain…"}
+            <StatusChip
+              status="running"
+              title={drapeBusy ? "Draping takes about 40 minutes" : undefined}
+            >
+              {drapeBusy ? "Draping… (about 40 min)" : "Simulating the rain…"}
+            </StatusChip>
           </span>
         )}
         {(onRain || onDrape) && (
           <details className="menu right" data-menu>
-            <summary className="btn sm ghost">Simulate ▾</summary>
+            <summary className="btn sm ghost">
+              <Icon name="simulate" /> Simulate ▾
+            </summary>
             <div className="menu-list">
               {onRain && (
                 <button
@@ -955,11 +979,8 @@ export function Viewer({
                     onRain();
                   }}
                 >
-                  {rainBusy
-                    ? "Simulating…"
-                    : hasRain
-                      ? "Rain again"
-                      : "Rain simulation"}
+                  <Icon name="rain" />
+                  {rainBusy ? "Simulating…" : hasRain ? "Rain again" : "Rain"}
                   <small>about a minute</small>
                 </button>
               )}
@@ -975,11 +996,8 @@ export function Viewer({
                     onDrape("default");
                   }}
                 >
-                  {drapeBusy
-                    ? "Draping… (about 40 min)"
-                    : hasDrape
-                      ? "Drape again"
-                      : "Drape simulation"}
+                  <Icon name="drape" />
+                  {drapeBusy ? "Draping…" : hasDrape ? "Drape again" : "Drape"}
                   <small>about 40 minutes, in its own queue</small>
                 </button>
               )}
@@ -993,7 +1011,7 @@ export function Viewer({
             data-testid="checklist-link"
             title="One sheet for the workshop: the sides of the cover with its vents, and every size to measure on the sewn cover"
           >
-            Check list (PDF)
+            <Icon name="checklist" /> Check list (PDF)
           </a>
         )}
       </div>
@@ -1066,6 +1084,10 @@ function DrapeReport({ drape, water }: { drape: Drape; water: boolean }) {
     <section className={`card rain ${folds ? "risk" : "dry"}`}>
       <div className="rain-head">
         <strong>The sewn cover, dropped over the furniture</strong>
+        <Info label="About fabric estimates">
+          The fabric values are best guesses until the fabric is measured: the
+          places of the folds are right, their size is an estimate.
+        </Info>
         <span className="muted">
           {drape.engine === "style3d"
             ? "Style3D (lifelike), "
@@ -1116,10 +1138,6 @@ function DrapeReport({ drape, water }: { drape: Drape; water: boolean }) {
           )}
         </div>
       )}
-      <p className="muted">
-        The fabric values are best guesses until the fabric is measured: the
-        places of the folds are right, their size is an estimate.
-      </p>
     </section>
   );
 }
@@ -1137,6 +1155,11 @@ function RainReport({ rain }: { rain: Rain }) {
               ? "Water stays on this cover"
               : "Risk of standing water"}
         </strong>
+        <Info label="About rain estimates">
+          Streams and ponds computed from the cover's shape; the sag estimate
+          uses a fabric tension still to be measured. The verdict and advice are
+          DeepSeek's.
+        </Info>
         <span className="muted">
           {rain.ponds.length} pond{rain.ponds.length === 1 ? "" : "s"} (
           {rain.pond_volume_l} l) · flat {rain.flat_area_m2} m² · off at{" "}
@@ -1169,7 +1192,9 @@ function RainReport({ rain }: { rain: Rain }) {
       )}
       {ai?.risks && ai.risks.length > 0 && (
         <>
-          <h4>Risks</h4>
+          <h4>
+            <Icon name="st-warn" /> Risks
+          </h4>
           <ul>
             {ai.risks.map((r) => (
               <li key={r}>{r}</li>
@@ -1179,7 +1204,9 @@ function RainReport({ rain }: { rain: Rain }) {
       )}
       {ai?.suggestions && ai.suggestions.length > 0 && (
         <>
-          <h4>What would help</h4>
+          <h4>
+            <Icon name="ai" /> What would help
+          </h4>
           <ul>
             {ai.suggestions.map((r) => (
               <li key={r}>{r}</li>
@@ -1187,11 +1214,6 @@ function RainReport({ rain }: { rain: Rain }) {
           </ul>
         </>
       )}
-      <p className="muted small">
-        Streams and ponds computed from the cover's shape; the sag estimate uses
-        a fabric tension still to be measured. The verdict and advice are
-        DeepSeek's.
-      </p>
     </section>
   );
 }

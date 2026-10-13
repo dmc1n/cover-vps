@@ -1,3 +1,4 @@
+import { Info, Icon } from "./icons";
 import { useEffect, useState } from "react";
 import { ACTION_LABEL, AiReview, fileUrl, Job } from "./api";
 
@@ -47,12 +48,12 @@ export function AiAdvice({
     <div className="ai">
       <div className="row">
         <button className="primary" onClick={ask}>
-          {review ? "Ask the AI again" : "Ask the AI"}
+          <Icon name="ai" /> {review ? "Ask the AI again" : "Ask the AI"}
         </button>
-        <span className="muted">
+        <Info label="About AI advice">
           The AI gets this cover as text (pieces, sizes, stretch, seams) and
           says how to make it simpler. It changes nothing by itself.
-        </span>
+        </Info>
       </div>
       {error && <p className="error">{error}</p>}
       {!review ? (
@@ -67,7 +68,10 @@ export function AiAdvice({
           </p>
           {review.problems.length > 0 && (
             <>
-              <h3>Problems</h3>
+              <h3>
+                <Icon name="ai" />
+                Problems
+              </h3>
               <ul className="warnings">
                 {review.problems.map((p, i) => (
                   <li key={i}>{p}</li>
@@ -75,7 +79,10 @@ export function AiAdvice({
               </ul>
             </>
           )}
-          <h3>Suggestions</h3>
+          <h3>
+            <Icon name="ai" />
+            Suggestions
+          </h3>
           {review.suggestions.length === 0 && (
             <p className="muted">None: the AI finds the layout good.</p>
           )}
@@ -89,6 +96,7 @@ export function AiAdvice({
                   disabled={done}
                   onClick={() => apply(s.action, s.value)}
                 >
+                  <Icon name="approve" />
                   {done ? "Applied" : "Apply"}
                 </button>
                 <div>

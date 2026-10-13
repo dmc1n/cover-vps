@@ -1,3 +1,4 @@
+import { Info, Icon, StatusChip } from "./icons";
 // Arrangements (ADR-089): furniture from the catalogue placed together, then one cover over the
 // whole. The top view shows each member's real footprint; drag to move, turn by 90°, mirror,
 // or snap one member against another's side. "Build cover" makes the arrangement a model
@@ -169,7 +170,7 @@ function DeskStatus({
       (desk.status === "ai-checked" && !desk.sent));
   return (
     <div className={`arrange-desk t-${tone}`} data-testid="arr-desk-status">
-      <b>{words}</b>
+      <StatusChip status={desk.status}>{words}</StatusChip>
       {tone === "approved" && (
         <span className="muted">
           The cutting-table DXF is available. Changing the plan or the pieces
@@ -515,12 +516,15 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
   return (
     <div className="arrange">
       <section className="card">
-        <h2>Arrangements</h2>
-        <p className="muted">
+        <h2>
+          <Icon name="arrangements" />
+          Arrangements
+        </h2>
+        <Info label="About arrangements">
           Place furniture from the catalogue together, then build one cover over
           the whole. Drag a piece to move it; select it to turn, mirror or snap
           it against another piece.
-        </p>
+        </Info>
         <div className="arrange-head">
           <input
             placeholder="Name, e.g. Portofino corner left"
@@ -564,7 +568,7 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
               >
                 {l.name}{" "}
                 {l.desk && (
-                  <span className={`arrange-pill t-${deskWords(l.desk)[0]}`}>
+                  <StatusChip status={l.desk.status}>
                     {
                       {
                         approved: "approved",
@@ -573,7 +577,7 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
                         new: "not at the Desk",
                       }[deskWords(l.desk)[0]]
                     }
-                  </span>
+                  </StatusChip>
                 )}
                 {l.stale.length > 0 ? " (a member changed: build again)" : ""}
               </button>
@@ -591,9 +595,9 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
                 {((box.y1 - box.y0) / 10).toFixed(1)} cm
               </b>
             )}{" "}
-            <span className="muted">
+            <Info label="About the arrangement view">
               seen from above, the front at the bottom
-            </span>
+            </Info>
           </div>
           <svg
             ref={svgRef}
@@ -661,7 +665,10 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
         </section>
 
         <section className="card arrange-side">
-          <h3>Pieces</h3>
+          <h3>
+            <Icon name="arrangements" />
+            Pieces
+          </h3>
           <ol>
             {members.map((m, i) => (
               <li
@@ -773,6 +780,7 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
             disabled={!members.length || running}
             onClick={() => build()}
           >
+            <Icon name="run" />{" "}
             {running
               ? "Building the cover…"
               : editing
@@ -819,12 +827,15 @@ export function Arrangements({ openId }: { openId?: string | null } = {}) {
 
       {members.length > 0 && (
         <section className="card">
-          <h3>Cover plan</h3>
-          <p className="muted">
+          <h3>
+            <Icon name="arrangements" />
+            Cover plan
+          </h3>
+          <Info label="About arrangements">
             Seen from above at the hem. Choose how the cover runs round the
             pieces before it is built
             {built ? "; choosing another plan builds the cover again" : ""}.
-          </p>
+          </Info>
           {plans.length === 0 ? (
             <p className="muted">Working out the plans…</p>
           ) : (

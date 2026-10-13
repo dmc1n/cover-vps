@@ -1,3 +1,4 @@
+import { Heading, Info, Icon, IconButton, IconLink, StatusChip } from "./icons";
 import { useCallback, useEffect, useState } from "react";
 import {
   admin,
@@ -110,13 +111,20 @@ export function Users() {
     <>
       {error && <p className="error">{error}</p>}
       <section className="card invitations">
-        <h3>Invitations</h3>
-        <p className="muted">
-          Everyone gets an invitation in English: what Cover Studio is, how to
-          log in, their user name and a personal link to choose a password
-          (works once, for 7 days). The line below, if you write one, is put at
-          the top of the mail.
-        </p>
+        <Heading
+          icon="mail"
+          infoLabel="About Invitations"
+          info={
+            <>
+              Everyone gets an invitation in English: what Cover Studio is, how
+              to log in, their user name and a personal link to choose a
+              password (works once, for 7 days). The line below, if you write
+              one, is put at the top of the mail.
+            </>
+          }
+        >
+          Invitations
+        </Heading>
         <textarea
           rows={2}
           maxLength={600}
@@ -127,6 +135,8 @@ export function Users() {
         <div className="row">
           <button
             className="primary"
+            title={`Invite everyone not yet in (${waiting.length})`}
+            aria-label={`Invite everyone not yet in (${waiting.length})`}
             disabled={waiting.length === 0}
             onClick={async () => {
               setError("");
@@ -138,12 +148,12 @@ export function Users() {
               }
             }}
           >
-            Invite everyone not yet in ({waiting.length})
+            <Icon name="mail" /> Invite all ({waiting.length})
           </button>
-          <span className="muted">
+          <Info label="About inviting everyone">
             Users with an e-mail address and no password yet; use the buttons in
             the list for one person.
-          </span>
+          </Info>
         </div>
         {sentAll && (
           <ul>
@@ -231,26 +241,28 @@ export function Users() {
               <td className="access">
                 {u.has_password ? (
                   <>
-                    <span className="muted">has a password</span>{" "}
+                    <StatusChip status="ready">has a password</StatusChip>{" "}
                     {sure === u.id ? (
                       <>
                         <button
                           className="danger"
+                          title="Yes, reset and send a new link"
+                          aria-label="Yes, reset and send a new link"
                           onClick={() => sendInvite(u)}
                         >
-                          Yes, reset and send a new link
+                          <Icon name="roll-back" /> Reset
                         </button>
                         <button className="link" onClick={() => setSure(null)}>
-                          Cancel
+                          <Icon name="close" /> Cancel
                         </button>
                       </>
                     ) : (
-                      <button
+                      <IconButton
+                        icon="roll-back"
+                        label="Reset password"
                         onClick={() => setSure(u.id)}
                         title="The password stops working; they get a link to choose a new one"
-                      >
-                        Reset password
-                      </button>
+                      />
                     )}
                   </>
                 ) : (
@@ -260,7 +272,9 @@ export function Users() {
                         ? `invited, link until ${new Date(u.invited_until * 1000).toLocaleDateString()}`
                         : "not invited yet"}
                     </span>{" "}
-                    <button
+                    <IconButton
+                      icon="mail"
+                      label={u.invited_until ? "Send again" : "Send invitation"}
                       className={u.invited_until ? "" : "primary"}
                       disabled={!u.active}
                       title={
@@ -269,9 +283,7 @@ export function Users() {
                           : "No e-mail address: you get a link to pass on yourself"
                       }
                       onClick={() => sendInvite(u)}
-                    >
-                      {u.invited_until ? "Send again" : "Send invitation"}
-                    </button>
+                    />
                   </>
                 )}
               </td>
@@ -309,7 +321,9 @@ export function Users() {
           }
         }}
       >
-        <h3>New user</h3>
+        <h3>
+          <Icon name="users" /> New user
+        </h3>
         <div className="row">
           <input
             placeholder="user name"
@@ -355,10 +369,10 @@ export function Users() {
             send the invitation now
           </label>
           <button className="primary" disabled={!form.username}>
-            Add
+            <Icon name="add" /> Add
           </button>
         </div>
-        <p className="muted">
+        <Info label="About user rights">
           Viewer: looks and downloads. Editor: also uploads, calculates and
           changes settings. Admin: also this page. Workshop: the workshop's own
           login: Work → Workshop and the Desk read-only, fits, comments and
@@ -366,7 +380,7 @@ export function Users() {
           covers; it never approves and sees no prices or settings. “May
           approve”: approves at the Desk (the only approval), as the names in
           desk.approvers do.
-        </p>
+        </Info>
       </form>
     </>
   );
@@ -417,10 +431,15 @@ export function Mail() {
           }
         }}
       >
-        <h3>Outgoing mail (SMTP)</h3>
-        <p className="muted">
-          For invitations, password resets, approval requests and alerts.
-        </p>
+        <Heading
+          icon="mail"
+          infoLabel="About for invitations"
+          info={
+            <>For invitations, password resets, approval requests and alerts.</>
+          }
+        >
+          Outgoing mail (SMTP)
+        </Heading>
         <div className="fields">
           {field("host", "Server")}
           {field("port", "Port", "number")}
@@ -438,19 +457,23 @@ export function Mail() {
           {field("username", "User name")}
           <label className="field">
             Password{" "}
-            {m.password_set && (
-              <span className="muted">(saved; leave empty to keep it)</span>
-            )}
             <input
               type="password"
               value={m.password ?? ""}
               onChange={(e) => setM({ ...m, password: e.target.value })}
             />
           </label>
+          {m.password_set && (
+            <Info label="About the saved password">
+              Saved; leave empty to keep it.
+            </Info>
+          )}
           {field("sender", "Sender address")}
         </div>
         <div className="row">
-          <button className="primary">Save</button>
+          <button className="primary">
+            <Icon name="save" /> Save
+          </button>
           <input
             placeholder="send a test mail to…"
             value={to}
@@ -468,18 +491,25 @@ export function Mail() {
               }
             }}
           >
-            Test
+            <Icon name="run" /> Test
           </button>
         </div>
         {msg && <p className="muted">{msg}</p>}
       </form>
       <section className="card">
-        <h3>Login code by mail</h3>
-        <p className="muted">
-          After the password, a code of 6 digits by mail; a device that passed
-          it is remembered for 14 days. Needs the mail server above, and an
-          e-mail address for every user.
-        </p>
+        <Heading
+          icon="keys"
+          infoLabel="About Login code by mail"
+          info={
+            <>
+              After the password, a code of 6 digits by mail; a device that
+              passed it is remembered for 14 days. Needs the mail server above,
+              and an e-mail address for every user.
+            </>
+          }
+        >
+          Login code by mail
+        </Heading>
         <label className="check">
           <input
             type="checkbox"
@@ -509,15 +539,22 @@ export function Mail() {
           }
         }}
       >
-        <h3>Public address</h3>
-        <p className="muted">Used in the links in mails.</p>
+        <Heading
+          icon="website"
+          infoLabel="About Public address"
+          info={<>Used in the links in mails.</>}
+        >
+          Public address
+        </Heading>
         <div className="row">
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             className="link"
           />
-          <button className="primary">Save</button>
+          <button className="primary">
+            <Icon name="save" /> Save
+          </button>
         </div>
       </form>
     </>
@@ -652,11 +689,18 @@ export function System() {
       </table>
       {((s.releases as string[]) ?? []).length > 0 && (
         <section className="card">
-          <h3>Releases</h3>
-          <p className="muted">
-            The last switches of the app. Back to the release before, on the
-            server: <code>scripts/rollback.sh</code> (handbook: server).
-          </p>
+          <Heading
+            icon="publish"
+            infoLabel="About Releases"
+            info={
+              <>
+                The last switches of the app. Back to the release before, on the
+                server: <code>scripts/rollback.sh</code> (handbook: server).
+              </>
+            }
+          >
+            Releases
+          </Heading>
           <ul>
             {(s.releases as string[]).map((r) => (
               <li key={r}>{r}</li>
@@ -665,15 +709,22 @@ export function System() {
         </section>
       )}
       <section className="card">
-        <h3>Alerts</h3>
+        <h3>
+          <Icon name="st-warn" /> Alerts
+        </h3>
         <p className="muted">
+          <Icon name="mail" size={15} /> {String(s.alert_email ?? "—")}
+        </p>
+        <Info label="About server alerts">
           The server checks itself every 10 minutes (app, https, services, disk,
           certificate, backup, updates) and mails{" "}
           <b>{String(s.alert_email ?? "—")}</b> when something is wrong, and
           again when it is solved. The address: Settings →{" "}
           <a href="#/settings/mail">Mail &amp; notifications</a>.
-        </p>
-        <h3>Last alerts</h3>
+        </Info>
+        <h3>
+          <Icon name="history" /> Last alerts
+        </h3>
         {alerts.length === 0 ? (
           <p className="muted">None.</p>
         ) : (
@@ -700,11 +751,19 @@ export function Requests() {
     <>
       {msg && <p className="muted">{msg}</p>}
       <section className="card">
-        <h3 id="req-quotes">Quotes from the configurator</h3>
-        <p className="muted">
-          From the configurator (<a href="#/configure">#/configure</a>, also in
-          a webshop). The cost price is only shown here.
-        </p>
+        <Heading
+          id="req-quotes"
+          icon="requests"
+          infoLabel="About from the configurator"
+          info={
+            <>
+              From the configurator (<a href="#/configure">#/configure</a>, also
+              in a webshop). The cost price is only shown here.
+            </>
+          }
+        >
+          Quotes from the configurator
+        </Heading>
         <table className="list">
           <thead>
             <tr>
@@ -760,17 +819,17 @@ export function Requests() {
             ))}
           </tbody>
         </table>
-        <p className="muted">
+        <Info label="About indicative prices">
           * indicative: the prices in the cost model (quote.*) are still
           placeholders.
-        </p>
+        </Info>
       </section>
-      <p className="muted">
+      <Info label="About request settings">
         Who gets a request by mail: Settings →{" "}
         <a href="#/settings/mail">Mail &amp; notifications</a>. The configurator
         in a webshop and the API keys: Settings →{" "}
         <a href="#/settings/website">Website &amp; API keys</a>.
-      </p>
+      </Info>
     </>
   );
 }
@@ -812,15 +871,22 @@ export function EmbedAndKeys() {
           }
         }}
       >
-        <h3>Configurator in the webshop</h3>
-        <p className="muted">
-          Webshop addresses that may show the configurator in an iframe, one per
-          line (for example https://hello-suns.com). Embed with:{" "}
-          <code>
-            &lt;iframe src="https://covers.suns.nu/#/configure"
-            style="width:100%;height:900px;border:0"&gt;&lt;/iframe&gt;
-          </code>
-        </p>
+        <Heading
+          icon="website"
+          infoLabel="About Configurator in the webshop"
+          info={
+            <>
+              Webshop addresses that may show the configurator in an iframe, one
+              per line (for example https://hello-suns.com). Embed with:{" "}
+              <code>
+                &lt;iframe src="https://covers.suns.nu/#/configure"
+                style="width:100%;height:900px;border:0"&gt;&lt;/iframe&gt;
+              </code>
+            </>
+          }
+        >
+          Configurator in the webshop
+        </Heading>
         <textarea
           rows={3}
           value={origins}
@@ -828,27 +894,36 @@ export function EmbedAndKeys() {
           placeholder="https://hello-suns.com"
         />
         <div className="row">
-          <button className="primary">Save</button>
+          <button className="primary">
+            <Icon name="save" /> Save
+          </button>
         </div>
       </form>
       <section className="card">
-        <h3>API keys</h3>
-        <p className="muted">
-          For a webshop that calls the API from its own server
-          (docs/handbook/webshop-api.md). A key is shown once.
-        </p>
+        <Heading
+          icon="keys"
+          infoLabel="About API keys"
+          info={
+            <>
+              For a webshop that calls the API from its own server
+              (docs/handbook/webshop-api.md). A key is shown once.
+            </>
+          }
+        >
+          API keys
+        </Heading>
         <ul>
           {(set?.keys ?? []).map((k) => (
             <li key={k.name}>
-              {k.name} <span className="muted">(made {when(k.created)})</span>{" "}
-              <button
+              {k.name} <span className="muted">{when(k.created)}</span>{" "}
+              <IconButton
+                icon="delete"
+                label="revoke"
                 className="link"
                 onClick={async () => {
                   setSet(await admin.setWebshop({ revoke: k.name }));
                 }}
-              >
-                revoke
-              </button>
+              />
             </li>
           ))}
         </ul>
@@ -859,6 +934,7 @@ export function EmbedAndKeys() {
             onChange={(e) => setKeyName(e.target.value)}
           />
           <button
+            title="Make a key"
             disabled={!keyName}
             onClick={async () => {
               const r = await admin.newKey(keyName);
@@ -867,7 +943,7 @@ export function EmbedAndKeys() {
               load();
             }}
           >
-            Make a key
+            <Icon name="add" /> Create key
           </button>
         </div>
         {newKey && (
@@ -920,7 +996,9 @@ export function Orders({ focus = null }: { focus?: number | null }) {
       <p className="muted">
         The shop: <a href="/shop/">/shop/</a>.
         {focus && !orders.some((o) => o.id === focus) && orders.length > 0 && (
-          <> Order {focus} is not among the latest 300.</>
+          <Info label="About the requested order">
+            Order {focus} is not among the latest 300.
+          </Info>
         )}
       </p>
       {msg && <p className="error">{msg}</p>}
@@ -1018,9 +1096,12 @@ export function Orders({ focus = null }: { focus?: number | null }) {
                       <>
                         <a href={modelHref(o.model_id)}>{o.model_id}</a>
                         <br />
-                        <a className="small" href={deskHref(o.model_id)}>
-                          Desk card
-                        </a>
+                        <IconLink
+                          icon="desk"
+                          label="Desk card"
+                          className="small"
+                          href={deskHref(o.model_id)}
+                        />
                       </>
                     ) : RELEASABLE.includes(o.status) ? (
                       <button
@@ -1040,6 +1121,7 @@ export function Orders({ focus = null }: { focus?: number | null }) {
                           }
                         }}
                       >
+                        <Icon name="send-production" />
                         {busy === o.id ? "Sending…" : "Send to production"}
                       </button>
                     ) : (
@@ -1088,14 +1170,21 @@ export function Website({ canPublish = true }: { canPublish?: boolean }) {
   return (
     <>
       <section className="card cms">
-        <h3>Change the website with AI</h3>
-        <p className="muted">
-          Say in plain words what should change (Dutch or English): for example
-          "add a FAQ about how long delivery takes: about three weeks" or "make
-          the homepage title more inviting". The AI changes the draft in both
-          languages; check the preview, then publish. Also on the server:{" "}
-          <code>cover-site "…"</code>.
-        </p>
+        <Heading
+          icon="ai"
+          infoLabel="About Change the website with AI"
+          info={
+            <>
+              Say in plain words what should change (Dutch or English): for
+              example "add a FAQ about how long delivery takes: about three
+              weeks" or "make the homepage title more inviting". The AI changes
+              the draft in both languages; check the preview, then publish. Also
+              on the server: <code>cover-site "…"</code>.
+            </>
+          }
+        >
+          Change the website with AI
+        </Heading>
         <form
           className="cms-line"
           onSubmit={async (e) => {
@@ -1145,11 +1234,15 @@ export function Website({ canPublish = true }: { canPublish?: boolean }) {
       </section>
       {state && (
         <section className="card">
-          <h3>Preview and publish</h3>
+          <h3>
+            <Icon name="publish" /> Preview and publish
+          </h3>
           <p>
-            {state.changed
-              ? "The draft has changes that are not live yet."
-              : "The draft is the same as the live site."}{" "}
+            <StatusChip status={state.changed ? "draft" : "published"}>
+              {state.changed
+                ? "The draft has changes that are not live yet."
+                : "The draft is the same as the live site."}
+            </StatusChip>{" "}
             <a href={state.preview} target="_blank" rel="noreferrer">
               Open the preview
             </a>
@@ -1167,9 +1260,10 @@ export function Website({ canPublish = true }: { canPublish?: boolean }) {
                 load();
               }}
             >
-              Publish
+              <Icon name="publish" /> Publish
             </button>
             <button
+              title="Discard the draft"
               disabled={!state.changed}
               onClick={async () => {
                 await shopAdmin.discard();
@@ -1177,11 +1271,12 @@ export function Website({ canPublish = true }: { canPublish?: boolean }) {
                 load();
               }}
             >
-              Discard the draft
+              <Icon name="delete" /> Discard draft
             </button>
             <button
               disabled={busy}
-              title="DeepSeek fills in every language the shop is set to (Shop settings, languages)"
+              aria-label="Translate missing languages"
+              title="Translate missing languages: DeepSeek fills in every language the shop is set to (Shop settings, languages)"
               onClick={async () => {
                 setBusy(true);
                 setMsg("Translating…");
@@ -1198,7 +1293,7 @@ export function Website({ canPublish = true }: { canPublish?: boolean }) {
                 }
               }}
             >
-              Translate missing languages
+              <Icon name="ai" /> Translate
             </button>
           </div>
           {state.history.length > 0 && (
@@ -1283,13 +1378,21 @@ export function Matches() {
   return (
     <>
       <section className="card">
-        <h3 id="req-matches">Which existing cover fits (match requests)</h3>
-        <p className="muted">
-          {data.mode === "shadow"
-            ? "Learning mode: customers see nothing until you answer. Take the proposal, choose another cover, or custom."
-            : "Automatic: customers see the match at once; the requests are kept for learning."}{" "}
-          {limits}
-        </p>
+        <Heading
+          id="req-matches"
+          icon="covers"
+          infoLabel="About match mode"
+          info={
+            <>
+              {data.mode === "shadow"
+                ? "Learning mode: customers see nothing until you answer. Take the proposal, choose another cover, or custom."
+                : "Automatic: customers see the match at once; the requests are kept for learning."}{" "}
+            </>
+          }
+        >
+          Which existing cover fits (match requests)
+        </Heading>
+        <p className="muted">{limits}</p>
         {msg && <p>{msg}</p>}
         <table className="list">
           <thead>
@@ -1331,13 +1434,21 @@ export function Matches() {
                     </div>
                   ))}
                   {!r.result.matches.length && (
-                    <span className="muted">no cover of this kind</span>
+                    <StatusChip status="check">
+                      no cover of this kind
+                    </StatusChip>
                   )}
                 </td>
                 <td>
+                  <StatusChip status={r.status}>{r.status}</StatusChip>
                   {r.status === "answered" ? (
                     <span>
-                      {r.chosen} <span className="muted">by {r.chosen_by}</span>
+                      {r.chosen === "custom" ? (
+                        <StatusChip status="draft">Custom</StatusChip>
+                      ) : (
+                        r.chosen
+                      )}{" "}
+                      <span className="muted">by {r.chosen_by}</span>
                       {r.changed ? " · changed" : ""}
                     </span>
                   ) : (
@@ -1360,12 +1471,12 @@ export function Matches() {
                           setOther({ ...other, [r.id]: e.target.value })
                         }
                       />
-                      <button
+                      <IconButton
+                        icon="approve"
+                        label="Choose"
                         disabled={!other[r.id]}
                         onClick={() => answer(r, other[r.id])}
-                      >
-                        Choose
-                      </button>
+                      />
                       <input
                         placeholder="note for the customer (optional)"
                         value={notes[r.id] ?? ""}
@@ -1382,13 +1493,20 @@ export function Matches() {
         </table>
       </section>
       <section className="card">
-        <h3>What we learn</h3>
-        <p className="muted">
-          Per match band: how often a colleague changed the proposal, and how
-          the delivered covers fit (the customers' answers, 1–5) and came back.
-          When a band fits well with few changes, the threshold can move (Shop
-          settings, matching).
-        </p>
+        <Heading
+          icon="learning"
+          infoLabel="About what we learn"
+          info={
+            <>
+              Per match band: how often a colleague changed the proposal, and
+              how the delivered covers fit (the customers' answers, 1–5) and
+              came back. When a band fits well with few changes, the threshold
+              can move (Shop settings, matching).
+            </>
+          }
+        >
+          What we learn
+        </Heading>
         <table className="list">
           <thead>
             <tr>
@@ -1423,18 +1541,22 @@ export function Matches() {
       </section>
       {fits.length > 0 && (
         <section className="card">
-          <h3>How the covers fit (customers' answers)</h3>
+          <h3>
+            <Icon name="st-ok" /> How the covers fit (customers' answers)
+          </h3>
           <ul>
             {fits.map((f) => (
               <li key={f.order_id}>
                 Order {f.order_id}: {"★".repeat(f.score)} {f.comment}{" "}
                 {f.photo && (
                   <a
+                    aria-label="photo"
+                    title="photo"
                     href={`/api/admin/feedback/photo/${f.photo}`}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    photo
+                    <Icon name="camera" />
                   </a>
                 )}
               </li>

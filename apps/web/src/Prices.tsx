@@ -1,3 +1,4 @@
+import { Icon, IconButton, IconLink, Info, StatusChip } from "./icons";
 import { useUnsaved } from "./unsaved";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -215,16 +216,26 @@ export function Prices({
   return (
     <div className="prices">
       <section className="card prices-bar">
-        <p className="muted">
-          The configurator, the shop and every costing use the <b>published</b>{" "}
-          version.{" "}
-          {edit
-            ? "Change numbers, save them as a draft, look at which prices move, then publish."
-            : "You can look; an admin changes the prices."}{" "}
-          A cover's own cost, prices and fixed price: open the cover →{" "}
-          <i>Price &amp; shop</i>, or switch on <i>Prices</i> on{" "}
-          <a href="#/covers/all?prices=1">All covers</a>.
-        </p>
+        <Info label="About prices and costs">
+          <p>
+            The configurator, the shop and every costing use the published
+            version.
+          </p>
+          {edit && (
+            <p>
+              Change numbers, save them as a draft, look at which prices move,
+              then publish.
+            </p>
+          )}
+          <p>
+            A cover's own cost, prices and fixed price: open the cover →{" "}
+            <i>Price &amp; shop</i>, or switch on <i>Prices</i> on{" "}
+            <a href="#/covers/all?prices=1">All covers</a>.
+          </p>
+        </Info>
+        {!edit && (
+          <p className="muted">You can look; an admin changes the prices.</p>
+        )}
         <p className="prices-status">
           {pub ? (
             <>
@@ -257,11 +268,13 @@ export function Prices({
               all {phTotal} values confirmed
             </span>
           )}
-          <span className="muted">
-            {ph.size > 0
-              ? "Marked “placeholder — please confirm” below: our assumptions, waiting for your real numbers. Type the real number, or tap “keep this value” if it is right."
-              : "Every number is your own (or confirmed)."}
-          </span>
+          {ph.size > 0 && (
+            <Info label="About placeholder values">
+              Marked “placeholder — please confirm” below: our assumptions,
+              waiting for your real numbers. Type the real number, or tap “keep
+              this value” if it is right.
+            </Info>
+          )}
         </p>
         {shownErrors.length > 0 && (
           <ul className="error">
@@ -277,9 +290,12 @@ export function Prices({
                 disabled={busy || !dirty}
                 onClick={() => run(async () => void (await saveDraft()).errors)}
               >
+                <Icon name="save" />
                 Save draft
               </button>
               <button
+                aria-label="Preview changes"
+                title="Preview changes: every price that would move"
                 disabled={busy}
                 onClick={() =>
                   run(async () => {
@@ -289,7 +305,8 @@ export function Prices({
                   })
                 }
               >
-                Preview changes
+                <Icon name="view" />
+                Preview
               </button>
               <input
                 className="note"
@@ -318,9 +335,12 @@ export function Prices({
                   })
                 }
               >
+                <Icon name="publish" />
                 Publish
               </button>
-              <button
+              <IconButton
+                icon="delete"
+                label="Discard draft"
                 disabled={busy || (!state.draft && !dirty)}
                 onClick={() =>
                   run(async () => {
@@ -330,19 +350,17 @@ export function Prices({
                     setMsg("Draft discarded.");
                   })
                 }
-              >
-                Discard draft
-              </button>
+              />
             </div>
             {sub === "publish" && (
-              <p className="help">
+              <Info label="About this section">
                 <b>Save draft</b> keeps your numbers without changing the shop.{" "}
                 <b>Preview changes</b> lists every price that would move, before
                 → after. <b>Publish</b> makes the whole draft live for the shop
                 and every costing (also the fixed prices set on covers' pages);
                 each published version is kept and can be rolled back below.{" "}
                 <b>Discard draft</b> throws the draft away.
-              </p>
+              </Info>
             )}
           </>
         )}
@@ -355,12 +373,14 @@ export function Prices({
             cover's page, an import, a publish). Your numbers here are not
             saved.{" "}
             <button
+              title="Load the newer draft (drops the numbers typed here)"
               onClick={() => {
                 setMsg("");
                 load();
               }}
             >
-              Load the newer draft (drops the numbers typed here)
+              <Icon name="refresh" />
+              Reload draft
             </button>
           </p>
         )}
@@ -370,14 +390,17 @@ export function Prices({
         {sub === "costs" && (
           <>
             <h2 className="set-h2" id="materials">
+              <Icon name="pieces" />
               Materials
             </h2>
             <Materials {...ctx} />
             <h2 className="set-h2" id="labour">
+              <Icon name="workshop" />
               Labour
             </h2>
             <Labour {...ctx} />
             <h2 className="set-h2" id="rate">
+              <Icon name="costs" />
               Exchange rate
             </h2>
             <Rate {...ctx} />
@@ -394,6 +417,7 @@ export function Prices({
         )}
         {sub === "publish" && (
           <h2 className="set-h2" id="import">
+            <Icon name="upload" />
             Import a price list (Excel)
           </h2>
         )}
@@ -417,7 +441,7 @@ export function Prices({
         {sub === "pricing" && (
           <>
             <h2 className="set-h2" id="configurator">
-              A configurator product's costing
+              <Icon name="costs" />A configurator product's costing
             </h2>
             <CostingView
               hasDraft={!!state.draft}
@@ -567,7 +591,7 @@ function Mark({
   if (!ph.has(id)) return null;
   return (
     <span className="ph" data-field={id}>
-      placeholder — please confirm
+      <StatusChip status="check">placeholder — please confirm</StatusChip>
       {edit && (
         <button
           className="link"
@@ -577,6 +601,7 @@ function Mark({
             confirm(id);
           }}
         >
+          <Icon name="approve" size={14} />
           keep this value
         </button>
       )}
@@ -599,10 +624,19 @@ function Field({
   return (
     <div className="field">
       <div className="field-label">
-        {label} {mark}
+        {label}
+        {help && (
+          <Info
+            label={
+              typeof label === "string" ? `About ${label}` : "About this field"
+            }
+          >
+            {help}
+          </Info>
+        )}{" "}
+        {mark}
       </div>
       <div className="field-input">{children}</div>
-      <p className="help">{help}</p>
     </div>
   );
 }
@@ -633,9 +667,9 @@ function Example({
     <aside className="prices-example" data-testid="live-example">
       <div className="example-head">
         <b>Live example</b>
-        <span className="muted">
+        <Info label="About live example">
           with the numbers on this page, before saving
-        </span>
+        </Info>
         {models.length > 0 && (
           <select
             aria-label="example cover"
@@ -689,19 +723,21 @@ function Materials(ctx: Ctx) {
   return (
     <>
       <Intro>
-        <p>
-          <b>What every cover is made of, at purchase price.</b> Fill in the
-          fabric first (the biggest cost), then each component. Prices may be in
-          euros or rupiah; rupiah are converted with the rate on{" "}
-          <i>Exchange rate</i> below.
-        </p>
-        <p>
-          For each cover the program takes the metres from its own cut plan and
-          counts its vents, cord and pieces, so: fabric metres × price per metre
-          + components × how many the cover has. Together with <i>Labour</i>{" "}
-          (below) this is the <b>cost price</b>; <i>Price rules</i> turns it
-          into the shop price.
-        </p>
+        <Info label="About this part">
+          <p>
+            <b>What every cover is made of, at purchase price.</b> Fill in the
+            fabric first (the biggest cost), then each component. Prices may be
+            in euros or rupiah; rupiah are converted with the rate on{" "}
+            <i>Exchange rate</i> below.
+          </p>
+          <p>
+            For each cover the program takes the metres from its own cut plan
+            and counts its vents, cord and pieces, so: fabric metres × price per
+            metre + components × how many the cover has. Together with{" "}
+            <i>Labour</i> (below) this is the <b>cost price</b>;{" "}
+            <i>Price rules</i> turns it into the shop price.
+          </p>
+        </Info>
       </Intro>
       {doc.fabrics.map((f, i) => {
         const id = (a: string) => `fabric:${f.code}.${a}`;
@@ -711,15 +747,18 @@ function Materials(ctx: Ctx) {
         return (
           <section key={i} className="card" data-fabric={f.code}>
             <div className="row">
-              <h4>Fabric: {f.name || f.code}</h4>
+              <h4>
+                <Icon name="costs" />
+                Fabric: {f.name || f.code}
+              </h4>
               <span className="spacer" />
               {edit && (
-                <button
+                <IconButton
+                  icon="delete"
+                  label="Remove fabric"
                   disabled={doc.fabrics.length < 2}
                   onClick={() => update((d) => void d.fabrics.splice(i, 1))}
-                >
-                  Remove fabric
-                </button>
+                />
               )}
             </div>
             <div className="fields">
@@ -847,17 +886,21 @@ function Materials(ctx: Ctx) {
             )
           }
         >
+          <Icon name="add" />
           Add fabric
         </button>
       )}
       <section className="card">
-        <h4>Components</h4>
-        <p className="help">
+        <h4>
+          <Icon name="costs" />
+          Components
+        </h4>
+        <Info label="About this section">
           Everything else that goes into a cover, at purchase price.{" "}
           <b>Counted per</b> is what the program multiplies the price by, from
           each cover's own pieces: its vents, its metres of cord, ... You can
           add your own (thread, labels, a strap) and say what it is counted per.
-        </p>
+        </Info>
         <table className="list prices-table">
           <thead>
             <tr>
@@ -967,7 +1010,9 @@ function Materials(ctx: Ctx) {
                   </td>
                   {edit && (
                     <td>
-                      <button
+                      <IconButton
+                        icon="delete"
+                        label="Remove"
                         disabled={BUILT_IN.includes(x.code)}
                         title={
                           BUILT_IN.includes(x.code)
@@ -977,9 +1022,7 @@ function Materials(ctx: Ctx) {
                         onClick={() =>
                           update((d) => void d.components.splice(i, 1))
                         }
-                      >
-                        Remove
-                      </button>
+                      />
                     </td>
                   )}
                 </tr>
@@ -1002,6 +1045,7 @@ function Materials(ctx: Ctx) {
               )
             }
           >
+            <Icon name="add" />
             Add component
           </button>
         )}
@@ -1029,17 +1073,19 @@ function Labour(ctx: Ctx) {
   return (
     <>
       <Intro>
-        <p>
-          <b>The workshop's time.</b> Fill in the hourly rate first, then the
-          minutes of each operation. The program counts every operation for each
-          cover from its own cut pieces (how many pieces, metres of seam, vents,
-          metres of hem) and adds it to the <b>cost price</b>: total minutes ÷
-          60 × hourly rate.
-        </p>
-        <p>
-          Tip: time one real cover in the workshop and compare it with the live
-          example below; adjust the minutes until they match.
-        </p>
+        <Info label="About this part">
+          <p>
+            <b>The workshop's time.</b> Fill in the hourly rate first, then the
+            minutes of each operation. The program counts every operation for
+            each cover from its own cut pieces (how many pieces, metres of seam,
+            vents, metres of hem) and adds it to the <b>cost price</b>: total
+            minutes ÷ 60 × hourly rate.
+          </p>
+          <p>
+            Tip: time one real cover in the workshop and compare it with the
+            live example below; adjust the minutes until they match.
+          </p>
+        </Info>
       </Intro>
       <section className="card">
         <div className="fields">
@@ -1066,12 +1112,15 @@ function Labour(ctx: Ctx) {
             <Both amount={lab.rate} currency={lab.currency} rate={rate} />
           </Field>
         </div>
-        <h5>Operations: minutes each</h5>
-        <p className="help">
+        <h5>
+          <Icon name="costs" />
+          Operations: minutes each
+        </h5>
+        <Info label="About this section">
           <b>Minutes</b> is the time for one of what it is <b>counted per</b>:
           per cover (once), per piece, per metre of seam, per vent, ... You can
           add your own operation (e.g. a quality check per cover).
-        </p>
+        </Info>
         <table className="list prices-table">
           <thead>
             <tr>
@@ -1157,13 +1206,13 @@ function Labour(ctx: Ctx) {
                   </td>
                   {edit && (
                     <td>
-                      <button
+                      <IconButton
+                        icon="delete"
+                        label="Remove"
                         onClick={() =>
                           update((d) => void d.labour.operations.splice(i, 1))
                         }
-                      >
-                        Remove
-                      </button>
+                      />
                     </td>
                   )}
                 </tr>
@@ -1185,6 +1234,7 @@ function Labour(ctx: Ctx) {
               )
             }
           >
+            <Icon name="add" />
             Add operation
           </button>
         )}
@@ -1226,17 +1276,19 @@ function Rate(ctx: Ctx) {
   return (
     <>
       <Intro>
-        <p>
-          <b>One fixed rate between rupiah and euros.</b> Production costs are
-          in rupiah, sales in euros: every IDR amount on this page is converted
-          to euros with this rate, and every costing shows both. It never
-          changes by itself: enter a new rate when you want prices to follow the
-          currency, then publish.
-        </p>
-        <p>
-          Below it, <b>indicative</b> decides whether the shop says the prices
-          are not final yet.
-        </p>
+        <Info label="About this part">
+          <p>
+            <b>One fixed rate between rupiah and euros.</b> Production costs are
+            in rupiah, sales in euros: every IDR amount on this page is
+            converted to euros with this rate, and every costing shows both. It
+            never changes by itself: enter a new rate when you want prices to
+            follow the currency, then publish.
+          </p>
+          <p>
+            Below it, <b>indicative</b> decides whether the shop says the prices
+            are not final yet.
+          </p>
+        </Info>
       </Intro>
       <section className="card">
         <div className="fields">
@@ -1319,7 +1371,10 @@ function Rate(ctx: Ctx) {
         </aside>
       </section>
       <section className="card">
-        <h4>Indicative</h4>
+        <h4>
+          <Icon name="pricing" />
+          Indicative
+        </h4>
         <label className="check">
           <input
             type="checkbox"
@@ -1331,13 +1386,13 @@ function Rate(ctx: Ctx) {
           />{" "}
           Prices are indicative (still placeholders)
         </label>
-        <p className="help">
+        <Info label="About this section">
           While this is on, the shop shows “indicative” next to every price, so
           customers know it is not final. Switch it off, and publish, once the
           real purchase prices, labour and margins are in.
           {ph.size > 0 &&
             ` ${ph.size} values on this page are still placeholders.`}
-        </p>
+        </Info>
       </section>
     </>
   );
@@ -1445,12 +1500,12 @@ function Channels(ctx: Ctx) {
   return (
     <>
       <Intro>
-        <p>
+        <Info label="About this section">
           <b>Where the cost price becomes a selling price</b>, per channel:{" "}
           <b>B2C</b> = consumers in the webshop, <b>B2B</b> = Sunsit and
           dealers. For each, fill in first the <b>extra costs</b> of getting a
           cover to that customer, then the <b>price list</b>.
-        </p>
+        </Info>
         <p>
           Cost price + shipping + duties + packaging = <b>landed cost</b> → ×
           markup (or ÷ margin) = price ex VAT → + VAT → rounded up = the price
@@ -1513,6 +1568,7 @@ function Channels(ctx: Ctx) {
           return (
             <section key={k} className="card" data-channel={k}>
               <h4>
+                <Icon name="price" />
                 {k.toUpperCase()}: {ch.name}
               </h4>
               <div className="fields one">
@@ -1526,7 +1582,10 @@ function Channels(ctx: Ctx) {
                   />
                 </Field>
               </div>
-              <h5>Extra costs per cover (lines of their own)</h5>
+              <h5>
+                <Icon name="costs" />
+                Extra costs per cover (lines of their own)
+              </h5>
               <div className="fields one">
                 <Field
                   label="Shipping per cover (EUR or IDR)"
@@ -1645,7 +1704,10 @@ function Channels(ctx: Ctx) {
                   )}
                 </Field>
               </div>
-              <h5>Price list</h5>
+              <h5>
+                <Icon name="price" />
+                Price list
+              </h5>
               <div className="fields one">
                 <Field
                   label="Rule: markup or margin (%), and on what"
@@ -1726,8 +1788,11 @@ function Channels(ctx: Ctx) {
                   </label>
                 </Field>
               </div>
-              <h5>Fixed prices of other products ({vatWord} VAT)</h5>
-              <p className="help">
+              <h5>
+                <Icon name="price" />
+                Fixed prices of other products ({vatWord} VAT)
+              </h5>
+              <Info label="About this section">
                 A price set by hand wins over the rule above, without rounding.
                 A cover's own fixed price is set on its page (
                 <i>Price &amp; shop</i>)
@@ -1740,7 +1805,7 @@ function Channels(ctx: Ctx) {
                 )}
                 . Here: the balloon, the frame, and fixed prices of products
                 that have no calculated cover.
-              </p>
+              </Info>
               {(() => {
                 const fixedTable = (rows: [string, number][]) => (
                   <table className="list">
@@ -1763,13 +1828,13 @@ function Channels(ctx: Ctx) {
                           </td>
                           {edit && (
                             <td>
-                              <button
+                              <IconButton
+                                icon="delete"
+                                label="Remove"
                                 onClick={() =>
                                   set((x) => void delete x.fixed[key])
                                 }
-                              >
-                                Remove
-                              </button>
+                              />
                             </td>
                           )}
                         </tr>
@@ -1819,6 +1884,7 @@ function Channels(ctx: Ctx) {
                       setNewKey({ ...newKey, [k]: "" });
                     }}
                   >
+                    <Icon name="add" />
                     Add fixed price
                   </button>
                 </div>
@@ -1866,13 +1932,14 @@ function Moves({
   return (
     <section className="card prices-moves">
       <h4>
+        <Icon name="stats" />
         {moves.changed} of {moves.total} prices move
       </h4>
-      <p className="muted">
+      <Info label="About price changes">
         Before = the live prices, after = this draft. Covers, the configurator's
         products at their default sizes, the balloon and the frame. B2C incl.
         VAT, B2B as its price list shows it. Nothing is live until you publish.
-      </p>
+      </Info>
       {moves.changed > 0 && (
         <table className="list">
           <thead>
@@ -1971,17 +2038,6 @@ function CostingView({
   return (
     <>
       <Intro>
-        <p>
-          <b>What a configurator product costs and sells for, line by line,</b>{" "}
-          at the sizes you give. A cover's own costing (catalogue, drawing,
-          arrangement, order) is on the cover's page, tab{" "}
-          <i>Price &amp; shop</i>.
-        </p>
-        <p>
-          <b>Prices:</b> “live” = what the shop uses now; “saved draft” = your
-          saved, unpublished numbers; “this page” = the numbers on this page,
-          also before saving. <b>CSV</b> opens in Excel, <b>PDF</b> to print.
-        </p>
         <Explain title="What the lines mean">
           <dl className="terms">
             <dt>Cost price</dt>
@@ -2018,6 +2074,21 @@ function CostingView({
             </dd>
           </dl>
         </Explain>
+        <Info label="About this part">
+          <p>
+            <b>
+              What a configurator product costs and sells for, line by line,
+            </b>{" "}
+            at the sizes you give. A cover's own costing (catalogue, drawing,
+            arrangement, order) is on the cover's page, tab{" "}
+            <i>Price &amp; shop</i>.
+          </p>
+          <p>
+            <b>Prices:</b> “live” = what the shop uses now; “saved draft” = your
+            saved, unpublished numbers; “this page” = the numbers on this page,
+            also before saving. <b>CSV</b> opens in Excel, <b>PDF</b> to print.
+          </p>
+        </Info>
       </Intro>
       <section className="card">
         <div className="row">
@@ -2100,6 +2171,7 @@ export function CostingSheet({ c, qs }: { c: Costing; qs: string }) {
     <section className="card costing" data-testid="costing">
       <div className="row">
         <h4>
+          <Icon name="price" />
           {c.name}
           {c.model ? <span className="muted"> · {c.model}</span> : null}
         </h4>
@@ -2107,17 +2179,20 @@ export function CostingSheet({ c, qs }: { c: Costing; qs: string }) {
         {c.indicative && <span className="pill warn">indicative</span>}
         {qs && (
           <>
-            <a className="button" href={`/api/prices/costing.csv?${qs}`}>
-              CSV
-            </a>
-            <a
+            <IconLink
+              icon="csv"
+              label="CSV"
+              className="button"
+              href={`/api/prices/costing.csv?${qs}`}
+            />
+            <IconLink
+              icon="pdf"
+              label="PDF"
               className="button"
               href={`/api/prices/costing.pdf?${qs}`}
               target="_blank"
               rel="noreferrer"
-            >
-              PDF
-            </a>
+            />
           </>
         )}
       </div>
@@ -2178,6 +2253,7 @@ export function CostingSheet({ c, qs }: { c: Costing; qs: string }) {
         {Object.entries(c.channels).map(([k, ch]) => (
           <div key={k} className="card channel-price" data-channel={k}>
             <h5>
+              <Icon name="price" />
               {k.toUpperCase()}: {ch.name}
             </h5>
             <table className="list">
@@ -2262,15 +2338,18 @@ function Versions({ edit, onChange }: { edit: boolean; onChange: () => void }) {
   useEffect(load, [load]);
   const intro = (
     <Intro>
-      <p>
-        <b>The history of the prices.</b> Every publish stores the whole price
-        set as a new version, with who, when and the note you wrote. The newest
-        is <b>live</b>: the shop, the configurator and every costing use it.
-      </p>
-      <p>
-        <b>Roll back</b> makes an older version live again; that too is stored
-        as a new version, so nothing is ever lost.
-      </p>
+      <b>The history of the prices.</b>
+      <Info label="About this part">
+        <p>
+          Every publish stores the whole price set as a new version, with who,
+          when and the note you wrote. The newest is <b>live</b>: the shop, the
+          configurator and every costing use it.
+        </p>
+        <p>
+          <b>Roll back</b> makes an older version live again; that too is stored
+          as a new version, so nothing is ever lost.
+        </p>
+      </Info>
     </Intro>
   );
   if (!vs)
@@ -2293,7 +2372,10 @@ function Versions({ edit, onChange }: { edit: boolean; onChange: () => void }) {
     <>
       {intro}
       <section className="card">
-        <h4>Published versions</h4>
+        <h4>
+          <Icon name="history" />
+          Published versions
+        </h4>
         {msg && <p className="error">{msg}</p>}
         <table className="list">
           <thead>
@@ -2330,7 +2412,9 @@ function Versions({ edit, onChange }: { edit: boolean; onChange: () => void }) {
                 {edit && (
                   <td>
                     {i > 0 && (
-                      <button
+                      <IconButton
+                        icon="roll-back"
+                        label="Roll back to this"
                         onClick={async () => {
                           if (
                             !window.confirm(
@@ -2346,9 +2430,7 @@ function Versions({ edit, onChange }: { edit: boolean; onChange: () => void }) {
                             setMsg(String(e));
                           }
                         }}
-                      >
-                        Roll back to this
-                      </button>
+                      />
                     )}
                   </td>
                 )}

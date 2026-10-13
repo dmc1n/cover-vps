@@ -22,7 +22,7 @@ import {
 import { AiAdvice } from "./AiAdvice";
 import { ModelInfo, Revisions } from "./Catalogue";
 import { AllCovers, NewCover } from "./Covers";
-import { Icon } from "./icons";
+import { Heading, Icon, IconButton, IconLink, Info, StatusChip } from "./icons";
 import { Tpl } from "./layout";
 import { Search } from "./Search";
 import { Workshop } from "./Workshop";
@@ -475,12 +475,14 @@ function ApprovalCard({
       <div className="approval-state">
         {holds && ok ? (
           <strong>
+            <Icon name="st-ok" size={16} />
             Approved on the Desk by {ok.by} on{" "}
             {new Date(ok.time * 1000).toLocaleString()}
             {ok.revision != null && `, revision ${ok.revision}`}
           </strong>
         ) : (
           <strong>
+            <Icon name="st-wait" size={16} />
             Not approved yet: the cutting-table DXF waits for the Desk
             {model.desk_status ? ` (now: ${model.desk_status})` : ""}
           </strong>
@@ -491,28 +493,45 @@ function ApprovalCard({
           stamped.map((f) => (
             <a
               key={f}
+              className="btn sm"
               href={`/api/models/${model.id}/approved/${f}`}
               target="_blank"
               rel="noreferrer"
             >
+              <Icon name={f === "sizes.pdf" ? "sizes" : "cutting-list"} />
               {f === "sizes.pdf"
                 ? "Approved size drawing"
                 : "Approved cutting list"}
             </a>
           ))}
-        <a href={deskHref(model.id)}>Its Desk card ↗</a>
+        <a
+          className="btn sm"
+          href={deskHref(model.id)}
+          aria-label="Its Desk card"
+        >
+          <Icon name="desk" />
+          Desk card
+        </a>
         {!holds && isEditor(user) && model.desk_status !== "ai-checked" && (
-          <button onClick={ask}>Send to the Desk for approval</button>
+          <button
+            className="sm"
+            onClick={ask}
+            title="Send to the Desk for approval"
+            aria-label="Send to the Desk for approval"
+          >
+            <Icon name="send" />
+            Send to Desk
+          </button>
+        )}
+        {old && (
+          <Info label="About the old approval">
+            History: before the Desk became the only approval (ADR-128) the
+            definitive drawing was approved by {old.name} on{" "}
+            {new Date(old.time * 1000).toLocaleDateString()}
+            {old.revision != null && `, revision ${old.revision}`}.
+          </Info>
         )}
       </div>
-      {old && (
-        <p className="muted small">
-          History: before the Desk became the only approval (ADR-128) the
-          definitive drawing was approved by {old.name} on{" "}
-          {new Date(old.time * 1000).toLocaleDateString()}
-          {old.revision != null && `, revision ${old.revision}`}.
-        </p>
-      )}
       {msg && <p className="muted">{msg}</p>}
     </section>
   );
@@ -535,11 +554,21 @@ function KindCheck({
   const other = guess === "product" ? "cover" : "product";
   return (
     <section className="card kind-check">
-      <h3>Check: what is this file?</h3>
+      <Heading
+        icon="st-check"
+        info={
+          <>
+            Look at the 3D view below and confirm. Complete product: the program
+            makes the cover round it. Cover surface only: the surface is the
+            cover, and only its pieces are drawn.
+          </>
+        }
+      >
+        Check: what is this file?
+      </Heading>
       <p>
         The program thinks this is <strong>{KIND_LABEL[guess]}</strong>
-        {kind.sure ? "." : ", but it is not sure."} Look at the 3D view below
-        and confirm.
+        {kind.sure ? "." : ", but it is not sure."}
       </p>
       {kind.reasons && (
         <ul className="muted">
@@ -548,10 +577,6 @@ function KindCheck({
           ))}
         </ul>
       )}
-      <p className="muted">
-        Complete product: the program makes the cover round it. Cover surface
-        only: the surface is the cover, and only its pieces are drawn.
-      </p>
       <div className="row">
         <button className="primary" onClick={() => onConfirm(guess)}>
           Yes, {KIND_LABEL[guess]}
@@ -682,40 +707,45 @@ function ModelPage({
               ` · about ${(model.finished.sheet.roll_length_mm / 1000).toFixed(2)} m of roll`}
           </p>
           <div className="cv-strip" data-testid="status-strip">
-            <span
-              className={`badge grade-${model.grade}`}
-              title={model.reasons.join("\n")}
+            <StatusChip
+              status={model.grade}
+              title={["The cover", ...model.reasons].join("\n")}
             >
               cover: {model.grade}
-            </span>
-            <span className={`badge status-${model.status}`}>
-              {model.status}
-            </span>
+            </StatusChip>
+            <StatusChip status={model.status} title="Catalogue status" />
             {model.no_cover && <span className="badge no-cover">no cover</span>}
             {model.desk_status && (
-              <a className="badge" href={deskHref(id)} title="Its Desk card">
-                Desk: {model.desk_status}
+              <a href={deskHref(id)} title="Its Desk card">
+                <StatusChip status={model.desk_status}>
+                  Desk: {model.desk_status}
+                </StatusChip>
               </a>
             )}
-            <span
-              className={`badge ${approvedNow ? "ok" : ""}`}
+            <StatusChip
+              status={approvedNow ? "approved" : "waiting"}
               title="The Desk's approval, the only one (ADR-128)"
             >
               {approvedNow && model.desk_approved
                 ? `approved by ${model.desk_approved.by}`
                 : "not approved"}
-            </span>
+            </StatusChip>
             {model.dxf_ok === false && (
-              <span
-                className="badge"
+              <StatusChip
+                status="waiting"
                 title="Approve the cover on the Desk first"
               >
-                🔒 DXF
-              </span>
+                <Icon name="lock" size={13} /> DXF
+              </StatusChip>
             )}
             {nChanges > 0 && (
-              <a className="badge" href={modelHref(id, "history", "changes")}>
-                {nChanges} change{nChanges > 1 ? "s" : ""} since the run before
+              <a
+                className="badge"
+                href={modelHref(id, "history", "changes")}
+                title="Changes since the run before"
+              >
+                <Icon name="history" size={13} /> {nChanges} change
+                {nChanges > 1 ? "s" : ""}
               </a>
             )}
           </div>
@@ -725,19 +755,20 @@ function ModelPage({
             className="primary"
             disabled={!!running || !has("model.json")}
             onClick={() => run(null, {})}
+            title="Run again: every step that changed"
+            aria-label="Run again"
           >
-            Run again
+            <Icon name="run" />
+            Run
           </button>
-          <button
+          <IconButton
+            icon="edit"
+            label="Edit details"
             className={details ? "on" : ""}
             aria-expanded={details}
             onClick={() => setDetails(!details)}
-          >
-            Edit details
-          </button>
-          <a className="btn" href={deskHref(id)}>
-            Desk card ↗
-          </a>
+          />
+          <IconLink icon="desk" label="Desk card" href={deskHref(id)} />
         </div>
       </section>
       <CoverSummary model={model} />
@@ -765,14 +796,21 @@ function ModelPage({
       )}
       {job && <JobBar job={job} onJob={setJob} />}
       {model.desk_status === "rejected" && (
-        <section className="card attention" role="status">
-          <strong>Rejected at the Desk.</strong> The reasons and the pictures
-          are on its <a href={deskHref(id)}>Desk card</a>; correct the cover,
-          then it goes back to the Desk.
+        <section className="card attention bad" role="status">
+          <Icon name="st-bad" />
+          <strong>Rejected at the Desk</strong>
+          <a className="btn sm" href={deskHref(id)}>
+            Reasons
+          </a>
+          <Info label="What now">
+            The reasons and the pictures are on its Desk card; correct the
+            cover, then it goes back to the Desk.
+          </Info>
         </section>
       )}
       {model.warnings.length > 0 && (
         <section className="card attention" data-testid="warnings-now">
+          <Icon name="st-warn" />
           <strong>
             {model.warnings.length} warning
             {model.warnings.length > 1 ? "s" : ""} now:
@@ -855,20 +893,29 @@ function Changes({ model }: { model: ModelDetail }) {
     model.desk_status === "approved" || model.desk_status === "produced";
   return (
     <>
-      <h3>Approval</h3>
+      <Heading
+        icon="approve"
+        info={
+          <>
+            The Desk's approval is the only approval (ADR-128).
+            {a &&
+              ` Before that, the definitive drawing was approved by ${a.name} on ${new Date(a.time * 1000).toLocaleString()} (history).`}{" "}
+            The Desk card holds its history, the pictures and the measured fits.
+          </>
+        }
+      >
+        Approval
+      </Heading>
       <p>
         {holds && ok
           ? `Approved on the Desk by ${ok.by} on ${new Date(ok.time * 1000).toLocaleString()}${ok.revision != null ? `, revision ${ok.revision}` : ""}.`
-          : "Not approved on the Desk yet (the only approval, ADR-128)."}{" "}
-        {a &&
-          `Before that, the definitive drawing was approved by ${a.name} on ${new Date(a.time * 1000).toLocaleString()} (history).`}{" "}
+          : "Not approved on the Desk yet."}{" "}
         At the Desk:{" "}
         <a href={deskHref(model.id, "history")}>
           {model.desk_status ?? "not on the Desk"}
-        </a>{" "}
-        (its history, the pictures and the measured fits).
+        </a>
       </p>
-      <h3>Since the run before</h3>
+      <Heading icon="history">Since the run before</Heading>
       {settings.length === 0 && panels.length === 0 ? (
         <p className="muted">
           No setting and no panel changed (new defaults that this cover did not
@@ -1023,33 +1070,48 @@ function CutPieces({ model, stamp }: { model: ModelDetail; stamp: number }) {
   if (!model.finished) return <p className="muted">No cut pieces yet.</p>;
   return (
     <>
-      <p>
+      <div className="row file-bar">
         {model.dxf_ok === false ? (
-          <span
-            className="dxf-locked"
-            title="Approve the cover on the Desk first"
-          >
-            🔒 DXF for the cutting table: approve this cover on the{" "}
-            <a href={deskHref(model.id)}>Desk</a> first
-          </span>
+          <>
+            <StatusChip status="waiting" className="dxf-locked">
+              <Icon name="lock" size={13} /> DXF
+            </StatusChip>
+            <Info label="About the DXF">
+              The DXF for the cutting table waits: approve this cover on the{" "}
+              <a href={deskHref(model.id)}>Desk</a> first.
+            </Info>
+          </>
         ) : (
-          <a href={fileUrl(model.id, "cut.dxf")} download>
-            Download the DXF for the cutting table
+          <a
+            className="btn dxf"
+            href={fileUrl(model.id, "cut.dxf")}
+            download
+            title="Download the DXF for the cutting table"
+            aria-label="Download the DXF for the cutting table"
+          >
+            <Icon name="dxf" size={16} />
+            DXF
           </a>
-        )}{" "}
-        ·{" "}
+        )}
         <a
+          className="btn"
           href={fileUrl(model.id, "cutting-list.pdf")}
           target="_blank"
           rel="noreferrer"
+          title="Cutting list (PDF)"
         >
-          cutting list (PDF)
-        </a>{" "}
-        ·{" "}
-        <a href={fileUrl(model.id, "checklist.pdf")}>
-          check list for the sewn cover (PDF)
+          <Icon name="cutting-list" />
+          Cutting list
         </a>
-      </p>
+        <a
+          className="btn"
+          href={fileUrl(model.id, "checklist.pdf")}
+          title="Check list for the sewn cover (PDF)"
+        >
+          <Icon name="checklist" />
+          Check list
+        </a>
+      </div>
       <div className="svgbox">
         <img
           src={`${fileUrl(model.id, "cut.svg")}?v=${stamp}`}
@@ -1097,7 +1159,12 @@ function Pdf({
   has: boolean;
   stamp: number;
 }) {
-  if (!has) return <p className="muted">Not made yet.</p>;
+  if (!has)
+    return (
+      <p className="muted">
+        <StatusChip status="draft">Not made yet</StatusChip>
+      </p>
+    );
   return (
     <iframe
       className="pdf"
@@ -1135,10 +1202,10 @@ function Files({ model }: { model: ModelDetail }) {
           <tr key={f}>
             <td>
               <a href={fileUrl(model.id, f)} download>
-                {f}
+                <Icon name="download" size={15} /> {f}
               </a>
+              {FILE_HELP[f] && <Info label={`About ${f}`}>{FILE_HELP[f]}</Info>}
             </td>
-            <td className="muted">{FILE_HELP[f] ?? ""}</td>
           </tr>
         ))}
       </tbody>
@@ -1149,7 +1216,7 @@ function Files({ model }: { model: ModelDetail }) {
 function Log({ model, job }: { model: ModelDetail; job: Job | null }) {
   return (
     <>
-      <h3>Warnings</h3>
+      <Heading icon="st-warn">Warnings</Heading>
       {model.warnings.length ? (
         <ul className="warnings">
           {model.warnings.map((w, i) => (
@@ -1161,7 +1228,7 @@ function Log({ model, job }: { model: ModelDetail; job: Job | null }) {
       )}
       {job && (
         <>
-          <h3>Last run</h3>
+          <Heading icon="run">Last run</Heading>
           {job.steps.map((s) => (
             <details key={s.name} open={s.status === "failed"}>
               <summary>

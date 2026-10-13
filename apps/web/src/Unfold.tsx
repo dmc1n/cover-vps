@@ -1,3 +1,4 @@
+import { StatusChip } from "./icons";
 // "Unfold" (ADR-085): the cover's pieces pulled apart and laid flat on a table, with their net
 // and cut outlines, the allowance bands (seams, hem), the vent openings and hoods, a label per
 // piece and a list of where the fabric goes. The data: /api/models/{id}/unfold.json and .bin.
@@ -385,7 +386,7 @@ export function UnfoldView({
           onChange={(e) => seek(Number(e.target.value))}
           aria-label="Unfold: from the cover to flat on the table"
         />
-        <span className="muted">
+        <StatusChip status="draft">
           {t < 0.05
             ? "on the cover"
             : t < SPLIT + 0.05
@@ -393,7 +394,7 @@ export function UnfoldView({
               : t < 0.97
                 ? "laying flat"
                 : "flat on the table"}
-        </span>
+        </StatusChip>
       </div>
       {error && <p className="error">{error}</p>}
       {!meta && !error && <p className="muted">Unfolding the pieces…</p>}

@@ -1,3 +1,4 @@
+import { Heading, Info, Icon, IconButton, StatusChip } from "./icons";
 // Admin → B2B customers (ADR-104): the business accounts of the B2B shop, apart from the
 // studio's users. Invite a company by mail, approve a request, block, give a company another
 // price list or its own fixed prices, its delivery addresses, its people, and see its orders.
@@ -151,18 +152,27 @@ export function B2BCustomers() {
     <>
       {error && <p className="error">{error}</p>}
       <section className="card">
-        <h3>B2B customers</h3>
-        <p className="muted">
-          Business customers (Sunsit, dealers) log in at{" "}
+        <div className="head-row">
+          <Icon name="b2b" />
           <a href={s.shop_url} target="_blank" rel="noreferrer">
             {s.shop_url}
-          </a>{" "}
-          with their own account (not a studio login). They see the same
-          configurator and the catalogue covers at their price list, ex VAT, and
-          order on account; each order line appears under Orders, flagged B2B.
-          Nobody gets in without an invitation from here: a request from the
-          site waits below for your approval.
-        </p>
+          </a>
+          <Info label="About the B2B shop">
+            <p>
+              Business customers (Sunsit, dealers) log in at the B2B shop with
+              their own account (not a studio login). They see the same
+              configurator and the catalogue covers at their price list, ex VAT,
+              and order on account; each order line appears under Orders,
+              flagged B2B. Nobody gets in without an invitation from here: a
+              request from the site waits below for your approval.
+            </p>
+            <p>
+              The terms (minimum order, shipping, payment days): Settings →{" "}
+              <a href="#/settings/selling">Selling</a>. An order on account
+              waits for Send to production on Shop → Orders (ADR-128).
+            </p>
+          </Info>
+        </div>
         {invite && (
           <p className={invite.mailed ? "" : "error"}>
             {invite.mailed
@@ -174,7 +184,9 @@ export function B2BCustomers() {
       </section>
       {requests.length > 0 && (
         <section className="card">
-          <h3>Requests ({requests.length})</h3>
+          <h3>
+            <Icon name="requests" /> Requests ({requests.length})
+          </h3>
           <table className="list">
             <tbody>
               {requests.map((c) => (
@@ -190,6 +202,8 @@ export function B2BCustomers() {
                   </td>
                   <td className="nowrap">
                     <button
+                      title="Approve and invite"
+                      aria-label="Approve and invite"
                       className="primary"
                       onClick={async () => {
                         const r = await run(() =>
@@ -201,9 +215,11 @@ export function B2BCustomers() {
                         if (r) setInvite({ ...r, who: c.email ?? c.name });
                       }}
                     >
-                      Approve and invite
+                      <Icon name="approve" /> Approve
                     </button>{" "}
-                    <button
+                    <IconButton
+                      icon="reject"
+                      label="Reject"
                       onClick={() =>
                         run(() =>
                           call("PUT", `companies/${c.id}`, {
@@ -211,9 +227,7 @@ export function B2BCustomers() {
                           }),
                         )
                       }
-                    >
-                      Reject
-                    </button>
+                    />
                   </td>
                 </tr>
               ))}
@@ -222,7 +236,9 @@ export function B2BCustomers() {
         </section>
       )}
       <section className="card">
-        <h3>Companies</h3>
+        <h3>
+          <Icon name="b2b" /> Companies
+        </h3>
         <table className="list">
           <thead>
             <tr>
@@ -254,7 +270,7 @@ export function B2BCustomers() {
                   </span>
                 </td>
                 <td>
-                  <span className={`b2b-status ${c.status}`}>{c.status}</span>
+                  <StatusChip status={c.status}>{c.status}</StatusChip>
                 </td>
                 <td>
                   {s.price_lists[c.price_list] ?? c.price_list}
@@ -280,12 +296,13 @@ export function B2BCustomers() {
         />
       )}
       <section className="card">
-        <h3>Invite a company</h3>
-        <p className="muted">
-          The company gets an account at once; its contact gets a mail with a
-          link to choose a password (valid for 7 days), in the language chosen
-          here.
-        </p>
+        <Heading
+          icon="mail"
+          infoLabel="About inviting a company"
+          info="The company gets an account at once; its contact gets a mail with a link to choose a password (valid for 7 days), in the language chosen here."
+        >
+          Invite a company
+        </Heading>
         <form
           className="fields b2b-fields"
           onSubmit={async (e) => {
@@ -349,14 +366,11 @@ export function B2BCustomers() {
               ))}
             </select>
           </label>
-          <button className="primary">Invite</button>
+          <button className="primary">
+            <Icon name="mail" /> Invite
+          </button>
         </form>
       </section>
-      <p className="muted">
-        The terms (minimum order, shipping, payment days): Settings →{" "}
-        <a href="#/settings/selling">Selling</a>. An order on account waits for
-        Send to production on Shop → Orders (ADR-128).
-      </p>
     </>
   );
 }
@@ -409,17 +423,20 @@ function CompanyCard({
   return (
     <section className="card">
       <h3>
-        {c.name} <span className={`b2b-status ${c.status}`}>{c.status}</span>
+        <Icon name="b2b" />
+        {c.name} <StatusChip status={c.status}>{c.status}</StatusChip>
       </h3>
       <p>
         {c.status !== "blocked" ? (
           <button
+            title="Block (logs everyone out)"
+            aria-label="Block (logs everyone out)"
             className="danger"
             onClick={() =>
               run(() => call("PUT", `companies/${c.id}`, { status: "blocked" }))
             }
           >
-            Block (logs everyone out)
+            <Icon name="block" /> Block
           </button>
         ) : (
           <button
@@ -427,7 +444,7 @@ function CompanyCard({
               run(() => call("PUT", `companies/${c.id}`, { status: "active" }))
             }
           >
-            Unblock
+            <Icon name="approve" /> Unblock
           </button>
         )}
       </p>
@@ -503,7 +520,9 @@ function CompanyCard({
             onChange={(e) => setF({ ...f, note: e.target.value })}
           />
         </label>
-        <button className="primary">Save</button>
+        <button className="primary">
+          <Icon name="save" /> Save
+        </button>
       </form>
       <h4>Delivery addresses</h4>
       {c.addresses.length === 0 ? (
@@ -538,6 +557,12 @@ function CompanyCard({
               </td>
               <td className="nowrap">
                 <button
+                  aria-label={u.has_password ? "Reset password" : "Reinvite"}
+                  title={
+                    u.has_password
+                      ? "New password link"
+                      : "Send the invitation again"
+                  }
                   onClick={async () => {
                     const r = await run(() =>
                       call<InviteResult>("POST", `users/${u.id}/invite`),
@@ -545,19 +570,18 @@ function CompanyCard({
                     if (r) onInvite(r, u.email);
                   }}
                 >
-                  {u.has_password
-                    ? "New password link"
-                    : "Send the invitation again"}
+                  <Icon name="mail" />
+                  {u.has_password ? "Reset password" : "Reinvite"}
                 </button>{" "}
-                <button
+                <IconButton
+                  icon={u.active ? "block" : "approve"}
+                  label={u.active ? "Switch off" : "Switch on"}
                   onClick={() =>
                     run(() =>
                       call("PUT", `users/${u.id}`, { active: !u.active }),
                     )
                   }
-                >
-                  {u.active ? "Switch off" : "Switch on"}
-                </button>
+                />
               </td>
             </tr>
           ))}
@@ -588,7 +612,9 @@ function CompanyCard({
           value={person.name}
           onChange={(e) => setPerson({ ...person, name: e.target.value })}
         />
-        <button>Invite</button>
+        <button>
+          <Icon name="mail" /> Invite
+        </button>
       </form>
       <h4>Orders</h4>
       {orders === null ? (
@@ -604,12 +630,17 @@ function CompanyCard({
                   B2B {o.id} · {when(o.created)} {o.po ? `· PO ${o.po}` : ""}
                   <br />
                   <span className="muted">
-                    {o.lines
-                      .map(
-                        (l) =>
-                          `${l.qty} × ${l.label ?? l.product} ${l.colour} (order ${l.order_id}: ${l.status ?? "?"})`,
-                      )
-                      .join("; ")}
+                    {o.lines.map((l, i) => (
+                      <span key={l.order_id}>
+                        {i > 0 ? "; " : ""}
+                        {l.qty} × {l.label ?? l.product} {l.colour} (order{" "}
+                        {l.order_id}:{" "}
+                        <StatusChip status={l.status ?? "unknown"}>
+                          {l.status ?? "?"}
+                        </StatusChip>
+                        )
+                      </span>
+                    ))}
                   </span>
                 </td>
                 <td className="nowrap">

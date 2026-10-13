@@ -1,3 +1,4 @@
+import { Info, Icon, IconButton, StatusChip } from "./icons";
 // Settings → System & logs: the mail outbox (ADR-129). Order notices, reviews and the Desk's
 // digests are tried again until the mail server accepts them; what still waits or failed is
 // listed here with its last error, and a failed mail can be sent again. The texts are not shown.
@@ -29,11 +30,15 @@ export function MailOutbox() {
   if (!o) return msg ? <p className="error">{msg}</p> : null;
   return (
     <section className="card" data-testid="mail-outbox">
-      <h3>Mail</h3>
-      <p className="muted">
+      <h3>
+        <Icon name="mail" /> Mail
+      </h3>
+      <Info label="About the mail outbox">
         Every mail the studio and the shop send is logged (to whom, the subject,
         sent or why not; never the text). Order notices, reviews and digests are
-        tried again until the mail server accepts them.{" "}
+        tried again until the mail server accepts them.
+      </Info>
+      <p className="muted">
         {o.failed > 0 ? (
           <b className="error">{o.failed} failed</b>
         ) : (
@@ -62,16 +67,20 @@ export function MailOutbox() {
                 <td>{m.recipient}</td>
                 <td>{m.subject}</td>
                 <td className={m.status === "failed" ? "error" : ""}>
-                  {m.status === "failed"
-                    ? `failed after ${m.attempts} tries`
-                    : `waiting (try ${m.attempts + 1} at ${when(m.next_try)})`}
+                  <StatusChip status={m.status}>
+                    {m.status === "failed"
+                      ? `failed after ${m.attempts} tries`
+                      : `waiting (try ${m.attempts + 1} at ${when(m.next_try)})`}
+                  </StatusChip>
                 </td>
                 <td>{m.last_error ?? ""}</td>
                 <td>
                   {m.status === "failed" && m.can_retry ? (
-                    <button type="button" onClick={() => again(m.id)}>
-                      Send again
-                    </button>
+                    <IconButton
+                      icon="mail"
+                      label="Send again"
+                      onClick={() => again(m.id)}
+                    />
                   ) : null}
                 </td>
               </tr>
@@ -90,7 +99,7 @@ export function MailOutbox() {
                 <td>{l.recipient}</td>
                 <td>{l.subject}</td>
                 <td className={l.result === "sent" ? "" : "error"}>
-                  {l.result}
+                  <StatusChip status={l.result}>{l.result}</StatusChip>
                   {l.error ? `: ${l.error}` : ""}
                 </td>
               </tr>

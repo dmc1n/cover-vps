@@ -1,3 +1,4 @@
+import { Info, Icon, StatusChip } from "./icons";
 // Admin → Photo test (ADR-112): the shop's "start from a photo" on a photo of your own, with
 // every step's own result: Google's search by image, the identification, the web searches, each
 // found picture held against the photo, the final answer. Nothing is kept: the photo lives only
@@ -48,13 +49,15 @@ export function PhotoTest() {
   return (
     <div className="photo-test">
       <section className="card">
-        <h3>Photo test</h3>
-        <p className="muted">
+        <h3>
+          <Icon name="camera" /> Photo test
+        </h3>
+        <Info label="About Photo test">
           The shop's “start from a photo or a link”, step by step. Nothing is
           kept: the photo is only used for this test and the result only shows
           here. Each test costs what a customer's does (about €0.03), on the
           month's AI budget.
-        </p>
+        </Info>
         <div className="photo-test-form">
           <input
             type="file"
@@ -78,9 +81,11 @@ export function PhotoTest() {
           <button
             className="primary"
             disabled={busy || (!photos.length && !url.trim())}
+            title="Test (up to a minute)"
             onClick={run}
           >
-            {busy ? "Testing… (up to a minute)" : "Test"}
+            <Icon name="run" />
+            {busy ? "Testing…" : "Test"}
           </button>
         </div>
         {error && <p className="error">{error}</p>}
@@ -89,7 +94,9 @@ export function PhotoTest() {
       {got && (
         <>
           <section className="card">
-            <h3>Result</h3>
+            <h3>
+              <Icon name="camera" /> Result
+            </h3>
             {got.error && <p className="error">{got.error}</p>}
             {got.proposal && (
               <>
@@ -133,17 +140,23 @@ export function PhotoTest() {
           </section>
 
           <section className="card">
-            <h3>1. Search by image (Google Cloud Vision)</h3>
+            <h3>
+              <Icon name="camera" /> 1. Search by image (Google Cloud Vision)
+            </h3>
             {!vis ? (
-              <p className="muted">Not run (a link was given).</p>
+              <StatusChip status="draft">
+                Not run (a link was given).
+              </StatusChip>
             ) : vis.off ? (
-              <p className="muted">Switched off (suggest.reverse_search).</p>
+              <StatusChip status="draft">
+                Switched off (suggest.reverse_search).
+              </StatusChip>
             ) : (
               <>
                 {vis.error && <p className="error">{vis.error}</p>}
                 <p>
                   <b>Best guess:</b> {vis.labels.join(", ") || "—"}{" "}
-                  <span className="muted">(not used as a query)</span>
+                  <Info label="About best guess">Not used as a query.</Info>
                 </p>
                 <p>
                   <b>Entities:</b>{" "}
@@ -152,8 +165,10 @@ export function PhotoTest() {
                     .join(", ") || "—"}
                 </p>
                 <p>
-                  <b>Names of the matching pictures and pages</b> (given to the
-                  identification):
+                  <b>Names of the matching pictures and pages</b>{" "}
+                  <Info label="About matching names">
+                    Given to the identification.
+                  </Info>
                 </p>
                 <ul>
                   {vis.names.map((n) => (
@@ -162,7 +177,10 @@ export function PhotoTest() {
                 </ul>
                 <p>
                   <b>Pages showing the photo</b> ({vis.pages.length}; and{" "}
-                  {vis.other_pages} pages about the label only, dropped):
+                  {vis.other_pages} dropped)
+                  <Info label="About dropped pages">
+                    Pages about the label only are dropped.
+                  </Info>
                 </p>
                 <ol>
                   {vis.pages.map((p) => (
@@ -201,7 +219,9 @@ export function PhotoTest() {
           </section>
 
           <section className="card">
-            <h3>2. Identification (Gemini)</h3>
+            <h3>
+              <Icon name="camera" /> 2. Identification (Gemini)
+            </h3>
             {t.identify_error && <p className="error">{t.identify_error}</p>}
             <p>
               <b>
@@ -216,11 +236,13 @@ export function PhotoTest() {
           </section>
 
           <section className="card">
-            <h3>3. Web searches (Gemini + Google Search)</h3>
+            <h3>
+              <Icon name="camera" /> 3. Web searches (Gemini + Google Search)
+            </h3>
             {Object.entries(t.searches ?? {}).map(([k, pages]) => (
               <div key={k}>
                 <p>
-                  <b>By {k}</b> ({pages.length})
+                  <b>{k}</b> ({pages.length})
                 </p>
                 <ol>
                   {pages.map((p) => (
@@ -235,11 +257,14 @@ export function PhotoTest() {
                 </ol>
               </div>
             ))}
-            {!t.searches && <p className="muted">Not run.</p>}
+            {!t.searches && <StatusChip status="draft">Not run.</StatusChip>}
           </section>
 
           <section className="card">
-            <h3>4. Each found picture held against the photo</h3>
+            <h3>
+              <Icon name="camera" /> 4. Each found picture held against the
+              photo
+            </h3>
             {(t.candidates ?? []).length === 0 && (
               <p className="muted">No candidates.</p>
             )}
@@ -289,7 +314,9 @@ export function PhotoTest() {
           </section>
 
           <section className="card">
-            <h3>5. The final answer (Gemini)</h3>
+            <h3>
+              <Icon name="camera" /> 5. The final answer (Gemini)
+            </h3>
             {t.page && (
               <details>
                 <summary>The link's page as read</summary>

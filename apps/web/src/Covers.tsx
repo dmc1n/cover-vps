@@ -19,6 +19,7 @@ import {
 } from "./api";
 import { BatchBar } from "./Catalogue";
 import { DrawingUpload } from "./DrawingUpload";
+import { Heading, Icon, IconLink, StatusChip } from "./icons";
 import { FilterRow, Tpl } from "./layout";
 import { ReferenceUpload } from "./Learning";
 import { isEditor, modelHref } from "./nav";
@@ -177,34 +178,41 @@ export function AllCovers({
       actions={
         <>
           <span className="seg" role="group" aria-label="View">
-            <a
+            <IconLink
+              icon="table"
+              label="Table"
               href="#/covers/all"
               className={cards ? "" : "on"}
               aria-current={cards ? undefined : "true"}
-            >
-              Table
-            </a>
-            <a
+            />
+            <IconLink
+              icon="cards"
+              label="Cards"
               href="#/covers/all?view=cards"
               className={cards ? "on" : ""}
               aria-current={cards ? "true" : undefined}
-            >
-              Cards
-            </a>
+            />
           </span>
           {isEditor(user) && (
-            <a className="btn primary" href="#/covers/new">
-              + New cover
+            <a
+              className="btn primary"
+              href="#/covers/new"
+              title="New cover"
+              aria-label="New cover"
+            >
+              <Icon name="new-cover" />
+              New
             </a>
           )}
         </>
       }
     >
       {models && (
-        <h2 className="count-line">
-          {all.length} covers: {count("ready")} ready, {count("check")} to
-          check, {count("failed")} failed
-        </h2>
+        <div className="count-chips" aria-label={`${all.length} covers`}>
+          <StatusChip status="ready">{count("ready")} ready</StatusChip>
+          <StatusChip status="check">{count("check")} to check</StatusChip>
+          <StatusChip status="failed">{count("failed")} failed</StatusChip>
+        </div>
       )}
       {error && <p className="error">{error}</p>}
       <FilterRow
@@ -436,7 +444,7 @@ function Table({
                 ))}
               </td>
               <td title={m.reasons.join("\n")}>
-                <span className={`badge grade-${m.grade}`}>{m.grade}</span>
+                <StatusChip status={m.grade} />
                 {m.no_cover && (
                   <span
                     className="badge no-cover"
@@ -452,7 +460,7 @@ function Table({
                 {m.category ? m.category.split(" › ")[1] : ""}
               </td>
               <td>
-                <span className={`badge status-${m.status}`}>{m.status}</span>
+                <StatusChip status={m.status} />
               </td>
               <td>
                 {m.size_mm
@@ -493,8 +501,8 @@ function Table({
                     )}
                   </>
                 ) : (
-                  <td colSpan={5} className="muted">
-                    not calculated
+                  <td colSpan={5} className="muted" title="not calculated">
+                    —
                   </td>
                 ))}
             </tr>
@@ -534,7 +542,9 @@ function Cards({ models, picked, pick }: PickProps) {
                   alt="product"
                 />
               ) : (
-                <div className="nopic">no photo</div>
+                <div className="nopic" title="no photo">
+                  <Icon name="camera" size={20} />
+                </div>
               )}
               {m.files.includes("cover.png") ? (
                 <img
@@ -543,15 +553,17 @@ function Cards({ models, picked, pick }: PickProps) {
                   alt="cover"
                 />
               ) : (
-                <div className="nopic">no cover yet</div>
+                <div className="nopic" title="no cover yet">
+                  <Icon name="covers" size={20} />
+                </div>
               )}
             </div>
             <div className="name">{title(m.id)}</div>
             <div className="facts">
-              <span className={`badge grade-${m.grade}`}>
+              <StatusChip status={m.grade}>
                 {m.grade === "check" ? "to check" : m.grade}
-              </span>
-              <span className={`badge status-${m.status}`}>{m.status}</span>
+              </StatusChip>
+              <StatusChip status={m.status} />
               {m.no_cover && <span className="badge no-cover">no cover</span>}
               {m.category && (
                 <span className="badge">{m.category.split(" › ")[1]}</span>
@@ -566,14 +578,20 @@ function Cards({ models, picked, pick }: PickProps) {
                   {m.size_mm.map((v) => Math.round(v / 10)).join("×")} cm
                 </span>
               )}
-              {m.panels != null && <span>{m.panels} panels</span>}
+              {m.panels != null && (
+                <span title="panels">
+                  <Icon name="pieces" size={14} /> {m.panels}
+                </span>
+              )}
               {m.max_stretch_pct != null && (
                 <span className={m.max_stretch_pct > 2 ? "bad" : "ok"}>
                   {m.max_stretch_pct.toFixed(1)} %
                 </span>
               )}
               {m.roll_length_mm ? (
-                <span>{(m.roll_length_mm / 1000).toFixed(1)} m fabric</span>
+                <span title="fabric on the roll">
+                  {(m.roll_length_mm / 1000).toFixed(1)} m
+                </span>
               ) : null}
             </div>
           </a>
@@ -640,13 +658,13 @@ function Upload() {
   };
   return (
     <section className="card upload">
-      <h2>From a 3D file</h2>
-      <p className="muted">
-        STEP, IGES, STL, OBJ, PLY or GLB: the complete product, or only the
-        cover surface. After the import the program shows which one it thinks it
-        is; you confirm, and the rest runs by itself: cover, seams, patterns and
-        the cut pieces.
-      </p>
+      <Heading
+        level={2}
+        icon="3d"
+        info="STEP, IGES, STL, OBJ, PLY or GLB: the complete product, or only the cover surface. After the import the program shows which one it thinks it is; you confirm, and the rest runs by itself: cover, seams, patterns and the cut pieces."
+      >
+        From a 3D file
+      </Heading>
       <div className="row">
         <input
           type="file"
@@ -676,6 +694,7 @@ function Upload() {
           </select>
         </label>
         <button className="primary" disabled={!file || busy} onClick={send}>
+          <Icon name="upload" />
           {busy ? "Uploading…" : "Upload and run"}
         </button>
       </div>

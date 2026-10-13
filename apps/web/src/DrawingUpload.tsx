@@ -1,3 +1,4 @@
+import { Info, Icon, StatusChip } from "./icons";
 // Route A (ADR-081): upload a drawing (PDF); the program reads it itself and builds the cover,
 // or says why it could not ("needs a person"). Nothing is guessed.
 import { useEffect, useState } from "react";
@@ -47,14 +48,17 @@ export function DrawingUpload() {
   const conflicts = read?.outline?.conflicts ?? [];
   return (
     <section className="card upload">
-      <h2>From a drawing (PDF)</h2>
-      <p className="muted">
+      <h2>
+        <Icon name="upload" />
+        From a drawing (PDF)
+      </h2>
+      <Info label="About drawing uploads">
         Your drawing as a PDF. The program reads the views, the sizes (by their
         arrows) and the number of air vents itself, builds the cover, puts the
         vents by your rule and splits the pieces to fit the roll. When it is not
         sure it says why and builds nothing: the cover then waits at the top of
         the Desk for a person.
-      </p>
+      </Info>
       <div className="row">
         <input
           type="file"
@@ -66,6 +70,7 @@ export function DrawingUpload() {
           disabled={!file || busy || running}
           onClick={send}
         >
+          <Icon name="upload" />{" "}
           {busy
             ? "Uploading…"
             : running
@@ -81,7 +86,7 @@ export function DrawingUpload() {
       )}
       {read && read.status === "built" && model && (
         <p>
-          <b>Built</b> from the{" "}
+          <StatusChip status="ready">Built</StatusChip> from the{" "}
           {read.reader === "outline" ? "drawn outline" : "drawing's views"}:{" "}
           {read.pieces} pieces, {read.vents} air vents
           {read.features?.vents_from
@@ -101,18 +106,14 @@ export function DrawingUpload() {
       )}
       {read && read.status === "needs a person" && (
         <div className="warn">
-          <b>Needs a person:</b> the program could not read this drawing surely
-          and built nothing.
+          <StatusChip status="needs-a-person">Needs a person</StatusChip> the
+          program could not read this drawing surely and built nothing.
           <ul>
             {read.reasons.map((r) => (
               <li key={r}>{r}</li>
             ))}
           </ul>
           <a href={deskHref(model)}>It waits at the top of the Desk.</a>
-          <p className="muted">
-            Or let the AI read it: a proposal (about 1–5 cents), marked "read by
-            the AI", that a person approves at the Desk.
-          </p>
           <button
             disabled={running || !model}
             onClick={async () => {
@@ -126,8 +127,12 @@ export function DrawingUpload() {
               }
             }}
           >
-            Let the AI read it
+            <Icon name="ai" /> Let the AI read it
           </button>
+          <Info label="About drawing uploads">
+            Or let the AI read it: a proposal (about 1–5 cents), marked "read by
+            the AI", that a person approves at the Desk.
+          </Info>
         </div>
       )}
     </section>

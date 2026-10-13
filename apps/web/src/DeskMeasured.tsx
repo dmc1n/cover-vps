@@ -1,3 +1,4 @@
+import { Info } from "./icons";
 // After sewing (ADR-111): what the workshop measured on the sewn cover, against the check
 // list's points. The values go with "Fits" / "Does not fit"; the Desk keeps measured,
 // calculated and the difference per point in desk.json, for the learning step (ADR-082) to
@@ -66,11 +67,11 @@ export function MeasuredForm({
   );
   return (
     <div className="d-measured" data-testid="measured-form">
-      <p className="d-muted">
+      <Info label="About measuring the sewn cover">
         Write what you measured on the sewn cover, in cm, along the fabric (the
         same points as the check list). Leave a field empty when you did not
         measure it. Then press Fits or Does not fit.
-      </p>
+      </Info>
       {GROUPS.map((g) => {
         const rows = shown.filter((p) => p.group === g);
         if (!rows.length) return null;

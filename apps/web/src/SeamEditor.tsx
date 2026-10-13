@@ -1,3 +1,4 @@
+import { Info, Icon } from "./icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fileUrl, Job } from "./api";
 
@@ -182,6 +183,7 @@ export function SeamEditor({
           <button
             key={m}
             className={mode === m ? "active-mode" : ""}
+            aria-pressed={mode === m}
             onClick={() => {
               setMode(m);
               setDrawing(null);
@@ -197,19 +199,30 @@ export function SeamEditor({
             }
           </button>
         ))}
-        {drawing && <button onClick={finish}>Finish seam</button>}
+        {drawing && (
+          <button onClick={finish}>
+            <Icon name="seams" /> Finish seam
+          </button>
+        )}
         <button
           className="primary"
           disabled={!dirty}
           onClick={() => save(false)}
+          title="Save and recut"
+          aria-label="Save and recut"
         >
-          Save and recut
-        </button>
-        <button onClick={() => save(true)} title="Forget the hand-placed seams">
-          Use automatic seams
+          <Icon name="run" /> Recut
         </button>
         <button
-          title="The program takes its own proposals round by round while the stretch goes down (kept apart from your seams)"
+          onClick={() => save(true)}
+          title="Use automatic seams: forget the hand-placed seams"
+          aria-label="Use automatic seams"
+        >
+          <Icon name="seams" /> Automatic seams
+        </button>
+        <button
+          title="Let the program add seams: it takes its own proposals round by round while the stretch goes down (kept apart from your seams)"
+          aria-label="Let the program add seams"
           onClick={async () => {
             const r = await fetch(`/api/models/${id}/run`, {
               method: "POST",
@@ -221,19 +234,19 @@ export function SeamEditor({
             else setError(out.detail ?? r.statusText);
           }}
         >
-          Let the program add seams
+          <Icon name="seams" /> Suggest seams
         </button>
         <span className="muted">{MODE_HELP[mode]}</span>
       </div>
       {error && <p className="error">{error}</p>}
-      <p className="muted">
+      <Info label="About seams">
         Grey: the seams of the last run. Blue: your seams (
         {plan.manual ? "from seams.json" : "starting from the automatic ones"});
         orange dashed: a seam the program proposes where a piece stretches too
         much (click it to add it); squares: vertical skirt seams
         {skirtAuto ? " (automatic until you move one)" : ""}. The contour lines
         (equal height) show where the top folds.
-      </p>
+      </Info>
       <svg
         ref={svg}
         className="plan"

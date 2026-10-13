@@ -1,3 +1,4 @@
+import { Info, Icon, IconButton } from "./icons";
 import { useEffect, useMemo, useState } from "react";
 import { api, ModelParams, ParamSpec, Scalar, Step } from "./api";
 
@@ -100,21 +101,36 @@ export function Settings({
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        <button disabled={!changed} onClick={() => onRun(firstStep(), edits)}>
-          Try without saving
+        <button
+          title="Try without saving"
+          aria-label="Try without saving"
+          disabled={!changed}
+          onClick={() => onRun(firstStep(), edits)}
+        >
+          <Icon name="run" /> Try
         </button>
-        <button className="primary" disabled={!changed} onClick={save}>
-          Save for this model
+        <button
+          title="Save for this model"
+          aria-label="Save for this model"
+          className="primary"
+          disabled={!changed}
+          onClick={save}
+        >
+          <Icon name="save" /> Save
         </button>
-        <button disabled={!changed} onClick={() => setEdits({})}>
-          Undo changes
-        </button>
+        <IconButton
+          icon="undo"
+          label="Undo changes"
+          disabled={!changed}
+          onClick={() => setEdits({})}
+        />
         {message && <span className="muted">{message}</span>}
       </div>
       {Object.entries(groups).map(([group, list]) => (
         <section key={group} className="group">
           <h3 onClick={() => setOpen({ ...open, [group]: !open[group] })}>
-            {open[group] || filter ? "▾" : "▸"} {GROUP_LABEL[group] ?? group}
+            <Icon name="adjust" /> {open[group] || filter ? "▾" : "▸"}{" "}
+            {GROUP_LABEL[group] ?? group}
             <span className="muted"> ({list.length})</span>
           </h3>
           {(open[group] || filter) &&
@@ -132,7 +148,8 @@ export function Settings({
               return (
                 <div key={s.key} className="param">
                   <div className="param-name">
-                    <code>{s.key.slice(s.group.length + 1)}</code>
+                    <code title={s.key}>{s.key.slice(s.group.length + 1)}</code>
+                    <Info label={`About ${s.key}`}>{s.comment}</Info>
                     {s.to_confirm && (
                       <span className="badge warn" title="Still to confirm">
                         to confirm
@@ -140,15 +157,17 @@ export function Settings({
                     )}
                     <span className={`badge ${source}`}>{source}</span>
                     {source === "model" && (
-                      <button className="link" onClick={() => reset(s.key)}>
-                        use default
-                      </button>
+                      <IconButton
+                        icon="roll-back"
+                        label="use default"
+                        className="link"
+                        onClick={() => reset(s.key)}
+                      />
                     )}
                   </div>
                   <div className="param-input">
                     <Input spec={s} value={value} onChange={set} />
                   </div>
-                  <div className="param-help">{s.comment}</div>
                 </div>
               );
             })}

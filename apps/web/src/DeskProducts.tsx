@@ -1,3 +1,4 @@
+import { Info, Icon } from "./icons";
 // The workshop's product list at the Desk (ADR-091): upload an .xlsx, .csv or a .zip of them,
 // see what was linked through which column, pick another column and apply again; and on a
 // card the products of a drawing cover, or the drawings a SUNS model is linked to.
@@ -231,6 +232,7 @@ export function ProductsSummary({
       {unmatched.length > 0 && (
         <div className="dp-unmatched">
           <h4>
+            <Icon name="product-list" />
             Not linked: {res.unmatched_count} rows{" "}
             <span className="d-muted">(no drawing with that code yet)</span>
           </h4>
@@ -279,11 +281,17 @@ export function ProductsPanel({ list }: { list: ProductList }) {
     const { linked, suggested } = list.drawings;
     return (
       <section className="d-panel d-wide dp-panel">
-        <h3>Drawings for this product</h3>
+        <h3>
+          <Icon name="product-list" />
+          Drawings for this product
+        </h3>
         <DrawingRefs refs={linked} />
         {suggested.length > 0 && (
           <>
-            <p className="dp-sub">Suggested (same family, type not certain)</p>
+            <strong>Suggested</strong>
+            <Info label="About suggested drawings">
+              Same family, type not certain
+            </Info>
             <DrawingRefs refs={suggested} soft />
           </>
         )}
@@ -294,7 +302,10 @@ export function ProductsPanel({ list }: { list: ProductList }) {
   const suns = list.suns ?? { linked: [], suggested: [] };
   return (
     <section className="d-panel d-wide dp-panel">
-      <h3>Products</h3>
+      <h3>
+        <Icon name="product-list" />
+        Products
+      </h3>
       <div className="dp-scroll">
         <table className="d-table">
           <thead>

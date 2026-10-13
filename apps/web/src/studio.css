@@ -3844,13 +3844,28 @@ fieldset.card legend {
   font-size: 12px;
 }
 .prices .prices-intro {
-  margin: 12px 0;
-  padding: 10px 16px;
-  border-left: 4px solid var(--sage);
-  background: var(--accent-soft);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  margin: 4px 0 12px;
   font-size: 14px;
   line-height: 1.45;
+}
+/* an intro that is only its (i): on the line of the heading above it (Studio 2.0) */
+.prices .prices-intro:has(> .info:only-child) {
+  display: inline-flex;
+  margin: 0 0 0 6px;
+  vertical-align: middle;
+}
+.prices :is(h2, h3):has(+ .prices-intro > .info:only-child) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.prices-bar > .info {
+  float: right;
+}
+.approval-state strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .prices .prices-intro p {
   margin: 4px 0;
@@ -6303,4 +6318,65 @@ button.info-btn[aria-expanded="true"] {
 }
 .set-group > .head-row > h3 {
   margin: 10px 0 6px;
+}
+/* a heading followed by its (i): the (i) stays on the heading's line */
+:is(h2, h3, h4, h5, strong, b):has(+ .info) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 2px;
+  vertical-align: middle;
+}
+:is(h2, h3, h4, h5):has(+ .info) + .info {
+  margin-bottom: 4px;
+}
+.field-label .info,
+.set-name .info,
+th .info,
+td .info {
+  margin-left: 2px;
+}
+.chip-s {
+  white-space: normal;
+}
+/* the Desk: a menu item with its icon, counts with their icon */
+.d-mi,
+.d-n {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.d-n {
+  gap: 3px;
+}
+/* the Workshop: files as tinted icons, the DXF a short blue button */
+.ws-files {
+  gap: 6px;
+  align-items: center;
+  max-width: none;
+}
+.icon-btn.approved {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.file-bar {
+  gap: 8px;
+}
+.ws-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ws-h h2 {
+  margin: 0 6px 0 0;
+}
+.ws-h .head-row {
+  margin: 0;
+}
+.d-actions .d-undo {
+  margin-left: 2px;
+}
+.d-actions .d-btn .ico {
+  margin-left: -2px;
 }

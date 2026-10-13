@@ -1,3 +1,4 @@
+import { Icon } from "./icons";
 import { useCallback, useEffect, useState } from "react";
 import { fileUrl } from "./api";
 import { modelHref } from "./nav";
@@ -64,7 +65,10 @@ export function ReferenceUpload() {
 
   return (
     <section className="card upload">
-      <h2>Reference pairs (learn from your own covers)</h2>
+      <h2>
+        <Icon name="learning" />
+        Reference pairs (learn from your own covers)
+      </h2>
       <p className="muted">
         One zip with your drawings and their 3D models, with the same name for
         each pair: <code>1.step</code> + <code>1.pdf</code>, <code>2.stp</code>{" "}
@@ -142,7 +146,10 @@ export function Learning() {
       }
     >
       {error && <p className="error">{error}</p>}
-      <h2 className="count-line">Uploaded</h2>
+      <h2 className="count-line">
+        <Icon name="learning" />
+        Uploaded
+      </h2>
       {!batches ? (
         <p className="muted">Loading…</p>
       ) : !batches.length ? (
@@ -269,7 +276,10 @@ export function Drawing({
       )}
       <div className="side">
         <section>
-          <h3>Sizes in your drawing</h3>
+          <h3>
+            <Icon name="learning" />
+            Sizes in your drawing
+          </h3>
           <table className="list">
             <tbody>
               {(ref?.sizes ?? [])
@@ -284,7 +294,10 @@ export function Drawing({
           </table>
         </section>
         <section>
-          <h3>Calculated</h3>
+          <h3>
+            <Icon name="learning" />
+            Calculated
+          </h3>
           <table className="list">
             <tbody>
               {calc.map((c) => (

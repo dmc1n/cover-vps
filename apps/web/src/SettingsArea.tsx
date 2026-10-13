@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { admin, api, ParamSpec, Scalar, shopAdmin } from "./api";
 import { Audit, EmbedAndKeys, Mail, Sessions, System, Users } from "./Admin";
-import { Icon, Info } from "./icons";
+import { Heading, Icon, Info } from "./icons";
 import { SETTINGS_TABS, visibleSettings } from "./nav";
 import { MailOutbox } from "./MailOutbox";
 import { PhotoTest } from "./PhotoTest";
@@ -383,15 +383,12 @@ export function Row({
 }) {
   return (
     <div className="set-row">
-      <div className="set-name">
+      <div className="set-name" title={keyName}>
         {label}
-        {keyName && <code>{keyName}</code>}
+        {help && <Info label={`About ${label}`}>{help}</Info>}
       </div>
       <div className="set-value">{children}</div>
-      <div className="set-help">
-        {help && <span>{help}</span>}
-        {chip}
-      </div>
+      <div className="set-help">{chip}</div>
     </div>
   );
 }
@@ -539,8 +536,10 @@ function Secret({
           setEditing(false);
           onChange(stored);
         }}
+        title="Keep the stored one"
+        aria-label="Keep the stored one"
       >
-        Keep the stored one
+        <Icon name="undo" size={15} /> Keep stored
       </button>
     </span>
   );
@@ -632,13 +631,16 @@ function ShopForm({
             <summary>
               {g.title} <span className="muted">(advanced)</span>
             </summary>
-            {g.intro && <p className="muted">{g.intro}</p>}
+            {g.intro && (
+              <p className="set-group-info">
+                <Info label={`About ${g.title}`}>{g.intro}</Info>
+              </p>
+            )}
             {rows(g)}
           </details>
         ) : (
           <section key={g.title} className="set-group">
-            <h3>{g.title}</h3>
-            {g.intro && <p className="muted">{g.intro}</p>}
+            <Heading info={g.intro}>{g.title}</Heading>
             {rows(g)}
           </section>
         ),
@@ -722,10 +724,6 @@ function Defaults({
   );
 }
 
-function Intro({ children }: { children: React.ReactNode }) {
-  return <p className="set-intro">{children}</p>;
-}
-
 // ---- the tabs that are not a plain form ------------------------------------------------------
 
 interface B2BSettings {
@@ -803,13 +801,6 @@ function B2BTerms() {
         }
       }}
     >
-      <Intro>
-        The terms for business customers in the B2B shop (ADR-104). The
-        companies, their logins and orders: Shop →{" "}
-        <a href="#/shop/b2b">B2B customers</a>; their price list: Settings →{" "}
-        <a href="#/settings/pricing">Price rules</a>; a company's own price for
-        one cover also shows on that cover's Price &amp; shop tab.
-      </Intro>
       <section className="set-group">
         {num("min_order_eur", "Minimum order", "Ex VAT; 0: no minimum.", "€")}
         {num(
@@ -887,12 +878,12 @@ function Recipients({ specs }: { specs: ParamSpec[] | null }) {
   };
   return (
     <section className="set-group">
-      <h3>Who gets which mail</h3>
-      <p className="muted">
-        Every mail the studio and the shop send to us, in one list. Customers
-        and business customers get their own mails; those are written in the
-        website's text (Shop → Website).
-      </p>
+      <Heading
+        icon="mail"
+        info="Every mail the studio and the shop send to us, in one list. Customers and business customers get their own mails; those are written in the website's text (Shop → Website)."
+      >
+        Who gets which mail
+      </Heading>
       <Row
         label="Configurator requests"
         keyName="request_email"
@@ -990,12 +981,6 @@ function AiSpending({ specs }: { specs: ParamSpec[] | null }) {
   }, []);
   return (
     <>
-      <Intro>
-        What the AI costs and the limits that guard it (ADR-078). The values are
-        company defaults in <code>config/defaults.yaml</code>, read-only here:
-        the developer changes them (which ones you want to change yourself is an
-        open question).
-      </Intro>
       {spend && (
         <section className="set-group">
           <h3>This month</h3>
@@ -1026,13 +1011,19 @@ function WebsiteKey({ linkKeySet }: { linkKeySet?: boolean }) {
   const [msg, setMsg] = useState("");
   return (
     <section className="set-group">
-      <h3>The website's key</h3>
-      <p className="muted">
-        The website on its own domain (Cloudflare) reaches this studio with a
-        key (ADR-066). A new key is shown once and stops the old one: put it in
-        the Worker with <code>npx wrangler secret put LINK_KEY</code>.
-        {linkKeySet === false && " No key is set yet."}
-      </p>
+      <Heading
+        icon="keys"
+        info={
+          <>
+            The website on its own domain (Cloudflare) reaches this studio with
+            a key (ADR-066). A new key is shown once and stops the old one: put
+            it in the Worker with <code>npx wrangler secret put LINK_KEY</code>.
+          </>
+        }
+      >
+        The website's key
+      </Heading>
+      {linkKeySet === false && <p className="muted">No key is set yet.</p>}
       {key && (
         <p>
           <code>{key}</code>
@@ -1047,8 +1038,10 @@ function WebsiteKey({ linkKeySet }: { linkKeySet?: boolean }) {
             setMsg(String(e));
           }
         }}
+        title="New website key: the old one stops working"
+        aria-label="New website key"
       >
-        New website key
+        <Icon name="refresh" /> New key
       </button>
       {msg && <p className="muted">{msg}</p>}
     </section>
@@ -1067,7 +1060,7 @@ const TAB_INTRO: Record<string, string> = {
   defaults: "",
   mail: "The mail server, the login code and every address that receives mail.",
   website: "How the website and webshops reach the studio.",
-  ai: "",
+  ai: "What the AI costs and the limits that guard it (ADR-078). The values are company defaults in config/defaults.yaml, read-only here: the developer changes them (which ones you want to change yourself is an open question).",
   system:
     "The server's state, the releases, the last alerts; who is logged in and every login, change and approval. Read-only.",
 };
@@ -1149,9 +1142,9 @@ function AdminTab({ tab }: { tab: string }) {
       {tab === "company" && <Shipping />}
       {tab === "selling" && (
         <>
-          <h2 className="set-h2" id="matching">
+          <Heading level={2} className="set-h2" id="matching" icon="selling">
             Matching and direct orders
-          </h2>
+          </Heading>
           <ShopForm
             key="matching"
             specs={specs}
@@ -1162,24 +1155,36 @@ function AdminTab({ tab }: { tab: string }) {
             <summary>How a match is scored (developer values)</summary>
             <Defaults specs={specs} groups={["match"]} filter={false} />
           </details>
-          <h2 className="set-h2" id="b2b">
+          <Heading
+            level={2}
+            className="set-h2"
+            id="b2b"
+            icon="b2b"
+            info={
+              <>
+                The terms for business customers in the B2B shop (ADR-104). The
+                companies, their logins and orders: Shop →{" "}
+                <a href="#/shop/b2b">B2B customers</a>; their price list:
+                Settings → <a href="#/settings/pricing">Price rules</a>; a
+                company's own price for one cover also shows on that cover's
+                Price &amp; shop tab.
+              </>
+            }
+          >
             B2B terms
-          </h2>
+          </Heading>
           <B2BTerms />
         </>
       )}
       {tab === "users" && <Users />}
       {tab === "defaults" && (
-        <h2 className="set-h2" id="desk">
-          Desk &amp; approval
-        </h2>
-      )}
-      {tab === "defaults" && (
-        <Defaults
-          specs={specs}
-          groups={["desk", "questions", "products"]}
-          intro={
-            <Intro>
+        <Heading
+          level={2}
+          className="set-h2"
+          id="desk"
+          icon="desk"
+          info={
+            <>
               How the Desk works: which covers need an approval before the
               cutting-table DXF (every cover since ADR-128), who approves, when
               a repeated correction becomes a rule, how often the question mails
@@ -1187,14 +1192,33 @@ function AdminTab({ tab }: { tab: string }) {
               admins, users marked <b>may approve</b> (Users &amp; rights) and
               the names in <code>desk.approvers</code> below; the workshop role
               never.
-            </Intro>
+            </>
           }
-        />
+        >
+          Desk &amp; approval
+        </Heading>
       )}
       {tab === "defaults" && (
-        <h2 className="set-h2" id="cover">
+        <Defaults specs={specs} groups={["desk", "questions", "products"]} />
+      )}
+      {tab === "defaults" && (
+        <Heading
+          level={2}
+          className="set-h2"
+          id="cover"
+          icon="covers"
+          info={
+            <>
+              The company defaults every new cover starts from (
+              <code>config/defaults.yaml</code>); a cover's own values are on
+              its <i>Adjust</i> tab. Read-only here: the developer changes them,
+              one commit per change (which ones you want to change yourself is
+              open question 5).
+            </>
+          }
+        >
           Cover defaults
-        </h2>
+        </Heading>
       )}
       {tab === "defaults" && (
         <Defaults
@@ -1207,15 +1231,6 @@ function AdminTab({ tab }: { tab: string }) {
             "features",
             "seams",
           ]}
-          intro={
-            <Intro>
-              The company defaults every new cover starts from (
-              <code>config/defaults.yaml</code>); a cover's own values are on
-              its <i>Adjust</i> tab. Read-only here: the developer changes them,
-              one commit per change (which ones you want to change yourself is
-              open question 5).
-            </Intro>
-          }
         />
       )}
       {tab === "mail" && (
@@ -1255,11 +1270,13 @@ function AdminTab({ tab }: { tab: string }) {
         <>
           <System />
           <MailOutbox />
-          <h2 className="set-h2" id="activity">
+          <Heading level={2} className="set-h2" id="activity" icon="users">
             Logged in now
-          </h2>
+          </Heading>
           <Sessions />
-          <h2 className="set-h2">Audit log</h2>
+          <Heading level={2} className="set-h2" icon="history">
+            Audit log
+          </Heading>
           <Audit />
         </>
       )}
@@ -1291,11 +1308,12 @@ function Shipping() {
   if (!rows || !state) return null;
   return (
     <section className="set-group">
-      <h3>Shipping per country</h3>
-      <p className="muted">
-        What a consumer pays for shipping, incl. VAT; an empty price shows as
-        “to fill in” in the shop.
-      </p>
+      <Heading
+        icon="delivery"
+        info="What a consumer pays for shipping, incl. VAT; an empty price shows as “to fill in” in the shop."
+      >
+        Shipping per country
+      </Heading>
       <table className="list compact">
         <thead>
           <tr>

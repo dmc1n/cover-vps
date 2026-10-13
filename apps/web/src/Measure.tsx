@@ -1,3 +1,4 @@
+import { Info, Icon } from "./icons";
 // Measuring on the 3D cover (ADR-111). The owner, 9 Oct 2026: "we have sewn some covers, and
 // for checking it's easier if we have sizes in the 3D part, for example the height of the air
 // vents and their placement."
@@ -553,7 +554,7 @@ export function MeasureTool({
         )}
         {list.length > 0 && (
           <button className="measure-clear" onClick={clear}>
-            Clear all
+            <Icon name="delete" /> Clear all
           </button>
         )}
       </div>
@@ -712,10 +713,10 @@ export function VentSizes({
     <section className="measure card" data-testid="vent-sizes">
       <div className="measure-head">
         <strong>Air vent sizes</strong>
-        <span className="muted">
+        <Info label="About vent sizes">
           From the cutting file, along the fabric. Left and right as seen from
           outside.
-        </span>
+        </Info>
       </div>
       {vents.length === 0 ? (
         <p className="muted">No air vents on this cover.</p>

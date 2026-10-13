@@ -1,3 +1,4 @@
+import { Icon, IconButton, Info, StatusChip } from "./icons";
 import { useMemo, useRef, useState } from "react";
 import {
   ChannelKey,
@@ -95,15 +96,18 @@ export function PriceImport({
   const unit = rep?.channel_shows_vat ? "incl. VAT" : "ex VAT";
   return (
     <section className="card price-import" data-testid="price-import">
-      <h4>Import prices (Excel)</h4>
-      <p className="help">
+      <h4>
+        <Icon name="upload" />
+        Import prices (Excel)
+      </h4>
+      <Info label="About price import">
         Have a price list in Excel? Upload it: every row is matched to our
         covers (by code like S40, the drawing's “Cover 66”, or the SUNS name)
         and its price becomes that cover's <b>fixed price</b> in the channel.
         You see every match first; the prices go into the <b>draft</b>, so
         nothing is live until you preview and publish. .xlsx, .csv or a .zip of
         them.
-      </p>
+      </Info>
       <div className="row">
         <label className="inline">
           Price list
@@ -122,11 +126,13 @@ export function PriceImport({
           </select>
         </label>
         <button
+          title="Upload price list (Excel)"
           className="primary"
           disabled={busy}
           onClick={() => input.current?.click()}
         >
-          {busy ? "Reading…" : "Upload price list (Excel)"}
+          <Icon name="upload" />
+          {busy ? "Reading…" : "Upload"}
         </button>
         <input
           ref={input}
@@ -203,7 +209,7 @@ export function PriceImport({
                 ))}
             </span>
           </div>
-          <p className="help">
+          <Info label="About price import">
             {rep.channel_name} shows its prices {unit}
             {rep.channel_shows_vat
               ? "; "
@@ -212,8 +218,11 @@ export function PriceImport({
             code, drawing number or own name; <b>probable</b> = a SUNS model
             whose family and type match the description, or one the product list
             links to that drawing: please check those.
-          </p>
-          <h5>Matched ({matched.length} rows)</h5>
+          </Info>
+          <h5>
+            <Icon name="csv" />
+            Matched ({matched.length} rows)
+          </h5>
           <table className="list pi-table" data-testid="pi-matched">
             <thead>
               <tr>
@@ -250,7 +259,10 @@ export function PriceImport({
           </table>
           {rep.conflicts.length > 0 && (
             <>
-              <h5>One cover, two prices ({rep.conflicts.length})</h5>
+              <h5>
+                <Icon name="pricing" />
+                One cover, two prices ({rep.conflicts.length})
+              </h5>
               <p className="help">
                 These covers are named by more than one row with different
                 prices. Choose which row's price counts, or leave the cover out.
@@ -296,11 +308,14 @@ export function PriceImport({
           )}
           {open.length > 0 && (
             <>
-              <h5>Not matched or not sure ({open.length} rows)</h5>
-              <p className="help">
+              <h5>
+                <Icon name="csv" />
+                Not matched or not sure ({open.length} rows)
+              </h5>
+              <Info label="About price import">
                 Choose the cover by hand (type a code, a name or an id), or
                 leave the row out.
-              </p>
+              </Info>
               <table className="list pi-table" data-testid="pi-open">
                 <thead>
                   <tr>
@@ -355,15 +370,19 @@ export function PriceImport({
                 })
               }
             >
+              <Icon name="save" />
               Put {chosenIds.size} prices in the draft
             </button>
-            <button disabled={busy} onClick={() => setRep(null)}>
-              Cancel
-            </button>
-            <span className="muted">
+            <IconButton
+              icon="close"
+              label="Cancel"
+              disabled={busy}
+              onClick={() => setRep(null)}
+            />
+            <Info label="About draft prices">
               Not published: afterwards <b>Preview changes</b> shows every price
               that moves, then <b>Publish</b>.
-            </span>
+            </Info>
           </div>
         </>
       )}
@@ -413,10 +432,8 @@ function TargetRow({
       </td>
       {first && (
         <td rowSpan={span} className="pi-row">
-          <span className="muted">row {row.line}</span> {row.label}
-          {row.price_raw && (
-            <div className="muted">price cell: “{row.price_raw}”</div>
-          )}
+          <span className="muted">{row.line}</span> {row.label}
+          {row.price_raw && <div className="muted">“{row.price_raw}”</div>}
         </td>
       )}
       <td>
@@ -437,7 +454,7 @@ function TargetRow({
       <td className="num">{eur(t.shown_incl)}</td>
       <td className="num">
         {eur(t.current?.incl)}
-        {t.current?.fixed && <div className="muted">fixed now</div>}
+        {t.current?.fixed && <span className="pill">fixed now</span>}
         {diff != null && Math.abs(diff) >= 0.005 && (
           <div className={diff > 0 ? "up" : "down"}>
             {diff > 0 ? "+" : "−"}
@@ -469,7 +486,7 @@ function OpenRow({
   return (
     <tr className="static">
       <td className="pi-row">
-        <span className="muted">row {row.line}</span> {row.label}
+        <span className="muted">{row.line}</span> {row.label}
       </td>
       <td className="num">{eur(row.price_given)}</td>
       <td>
@@ -478,7 +495,7 @@ function OpenRow({
       </td>
       <td>
         {row.price_given == null ? (
-          <span className="muted">no price to import</span>
+          <StatusChip status="warning">no price to import</StatusChip>
         ) : (
           <>
             {row.candidates.length > 0 && (

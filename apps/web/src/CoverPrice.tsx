@@ -1,3 +1,4 @@
+import { Heading, Icon, IconButton, IconLink, Info } from "./icons";
 // A cover's own commerce on its own page (ADR-126, docs/plans/studio-ui.md §12): the tab
 // "Price & shop" (#/model/<id>/price) and the summary at the top of every cover's page.
 //
@@ -270,6 +271,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                   })
                 }
               >
+                <Icon name="view" />
                 Preview
               </button>
               {moves !== null && (
@@ -292,8 +294,10 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                       return `Published version ${r.version}: ${r.prices_changed} prices changed.`;
                     })
                   }
+                  title={`Publish (${moves} price${moves === 1 ? "" : "s"} move)`}
                 >
-                  Publish ({moves} price{moves === 1 ? "" : "s"} move)
+                  <Icon name="publish" />
+                  Publish <span className="pill">{moves}</span>
                 </button>
               )}{" "}
             </>
@@ -308,11 +312,27 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
         <p className="error">
           The prices changed after this page loaded them (someone else set a
           price, imported a list or published); nothing was saved or published.{" "}
-          <button onClick={load}>Load them again</button>
+          <button title="Load them again" onClick={load}>
+            <Icon name="refresh" />
+            Reload
+          </button>
         </p>
       )}
       <section className="card" data-testid="cover-prices">
-        <h3>Prices</h3>
+        <Heading
+          icon="price"
+          infoLabel="About prices"
+          info={
+            <>
+              A fixed price wins over the channel's rule, without rounding (B2C
+              incl. VAT, B2B ex VAT). The rules, VAT and rounding:{" "}
+              <a href="#/settings/pricing">Settings → Price rules</a>; materials
+              and labour: <a href="#/settings/costs">Settings → Costs</a>.
+            </>
+          }
+        >
+          Prices
+        </Heading>
         {!c.calculated && (
           <p className="muted">
             No calculated cover yet (no finished pieces): no cost and no
@@ -423,6 +443,8 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                           }
                         />
                         <button
+                          title="Save in draft"
+                          aria-label="Save in draft"
                           disabled={
                             busy ||
                             !(Number(typed[k]) > 0) ||
@@ -446,11 +468,14 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                             })
                           }
                         >
-                          Save in draft
+                          <Icon name="save" />
+                          Save
                         </button>
                         <span className="muted">{dvat}</span>
                         {fx ? (
-                          <button
+                          <IconButton
+                            icon="delete"
+                            label="Remove"
                             disabled={busy}
                             title="The calculated price applies again (in the draft)"
                             onClick={() =>
@@ -461,9 +486,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                                 return `${k.toUpperCase()} fixed price removed in the draft: the calculated price applies once published.`;
                               })
                             }
-                          >
-                            Remove
-                          </button>
+                          />
                         ) : null}
                       </div>
                     </td>
@@ -473,18 +496,16 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
             })}
           </tbody>
         </table>
-        <p className="help">
-          A fixed price wins over the channel's rule, without rounding (B2C
-          incl. VAT, B2B ex VAT). The rules, VAT and rounding:{" "}
-          <a href="#/settings/pricing">Settings → Price rules</a>; materials and
-          labour: <a href="#/settings/costs">Settings → Costs</a>.
-          {!edit && " An admin changes prices."}
-        </p>
+
+        {!edit && <p className="muted">An admin changes prices.</p>}
       </section>
       {sheet && (
         <section className="cover-cost" data-testid="cover-cost">
           <div className="row">
-            <h3>Cost</h3>
+            <h3>
+              <Icon name="costs" />
+              Cost
+            </h3>
             <span className="spacer" />
             {dc && (
               <span className="seg" role="group" aria-label="Price set">
@@ -515,7 +536,18 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
       <ShopPart c={c} id={id} />
       {c.companies !== undefined && (
         <section className="card" data-testid="cover-b2b">
-          <h3>B2B: companies with their own price</h3>
+          <Heading
+            icon="b2b"
+            infoLabel="About company prices"
+            info={
+              <>
+                A company's own prices are set on the company: Shop →{" "}
+                <a href="#/shop/b2b">B2B customers</a>.
+              </>
+            }
+          >
+            B2B: companies with their own price
+          </Heading>
           {c.companies.length === 0 ? (
             <p className="muted">
               None: business customers buy it at their price list's price (
@@ -532,16 +564,12 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
                       <span className="muted">({x.status})</span>
                     </td>
                     <td>{eur(x.price_eur)} ex VAT</td>
-                    <td className="muted">list: {x.price_list_name}</td>
+                    <td className="muted">{x.price_list_name}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-          <p className="help">
-            A company's own prices are set on the company: Shop →{" "}
-            <a href="#/shop/b2b">B2B customers</a>.
-          </p>
         </section>
       )}
       {c.orders !== undefined && <OrdersPart c={c} />}
@@ -555,7 +583,10 @@ function ShopPart({ c, id }: { c: CoverPrices; id: string }) {
   const notes = Object.entries(d.delivery_note);
   return (
     <section className="card" data-testid="cover-shop">
-      <h3>Shop</h3>
+      <h3>
+        <Icon name="shop" />
+        Shop
+      </h3>
       <p>
         {s.offered ? (
           <span className="badge ok">offered as an existing cover</span>
@@ -580,7 +611,10 @@ function ShopPart({ c, id }: { c: CoverPrices; id: string }) {
       )}
       {s.price_list.length > 0 && (
         <>
-          <h4>In the price list</h4>
+          <h4>
+            <Icon name="price" />
+            In the price list
+          </h4>
           <table className="list">
             <thead>
               <tr>
@@ -611,12 +645,17 @@ function ShopPart({ c, id }: { c: CoverPrices; id: string }) {
       {s.doubts.length > 0 && (
         <p className="muted">Doubts: {s.doubts.join("; ")}</p>
       )}
-      <h4>Ordered directly ("Bestel direct")</h4>
+      <h4>
+        <Icon name="selling" />
+        Ordered directly ("Bestel direct")
+      </h4>
       <p>
         {d.price_source === "fixed" ? (
           <>
-            At its fixed B2C price, <b>{eur(d.fixed_eur)}</b> incl. VAT (no
-            discount on top).
+            <b>{eur(d.fixed_eur)}</b> incl. VAT{" "}
+            <Info label="About the direct price">
+              At its fixed B2C price, with no discount on top.
+            </Info>
           </>
         ) : (
           <>
@@ -624,7 +663,10 @@ function ShopPart({ c, id }: { c: CoverPrices; id: string }) {
             {d.discount_pct > 0
               ? `, minus the direct-order discount of ${d.discount_pct} %`
               : " (no direct-order discount set)"}
-            . Set a fixed B2C price above to sell it at a price of its own.
+            .{" "}
+            <Info label="About a fixed B2C price">
+              Set a fixed B2C price above to sell it at a price of its own.
+            </Info>
           </>
         )}
       </p>
@@ -639,15 +681,17 @@ function ShopPart({ c, id }: { c: CoverPrices; id: string }) {
         ) : (
           <>none (hidden in the shop)</>
         )}
-        . The discount and the promise are the same for every cover: Settings →{" "}
-        <a href="#/settings/selling">Selling</a>,{" "}
-        <a href="#/settings/company">Company &amp; shop</a>.
+        <Info label="About selling settings">
+          The discount and the promise are the same for every cover: Settings →{" "}
+          <a href="#/settings/selling">Selling</a>,{" "}
+          <a href="#/settings/company">Company &amp; shop</a>.
+        </Info>
       </p>
       {!s.offered && id.startsWith("drawing-") && (
-        <p className="help">
+        <Info label="About this section">
           A drawing cover is offered once the Desk approved it and its kind is
           sure (ADR-114).
-        </p>
+        </Info>
       )}
     </section>
   );
@@ -659,19 +703,31 @@ function OrdersPart({ c }: { c: CoverPrices }) {
   const matches = c.matches ?? [];
   return (
     <section className="card" data-testid="cover-orders">
-      <h3>Orders, quotes and requests</h3>
+      <h3>
+        <Icon name="orders" />
+        Orders, quotes and requests
+      </h3>
       {orders.length === 0 && quotes.length === 0 && matches.length === 0 && (
         <p className="muted">None yet for this cover.</p>
       )}
       {orders.length > 0 && (
         <>
-          <h4>Orders</h4>
+          <h4>
+            <Icon name="orders" />
+            Orders
+          </h4>
           <table className="list">
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id} className="static">
                   <td>
-                    <a href={`#/shop/orders/${o.id}`}>Order {o.id}</a>
+                    <a
+                      href={`#/shop/orders/${o.id}`}
+                      title={`Order ${o.id}`}
+                      aria-label={`Order ${o.id}`}
+                    >
+                      {o.id}
+                    </a>
                   </td>
                   <td>{when(o.created)}</td>
                   <td>
@@ -692,7 +748,10 @@ function OrdersPart({ c }: { c: CoverPrices }) {
       )}
       {quotes.length > 0 && (
         <>
-          <h4>Recent quotes</h4>
+          <h4>
+            <Icon name="stats" />
+            Recent quotes
+          </h4>
           <table className="list">
             <tbody>
               {quotes.map((q) => (
@@ -715,13 +774,22 @@ function OrdersPart({ c }: { c: CoverPrices }) {
       )}
       {matches.length > 0 && (
         <>
-          <h4>Match requests</h4>
+          <h4>
+            <Icon name="requests" />
+            Match requests
+          </h4>
           <table className="list">
             <tbody>
               {matches.map((m) => (
                 <tr key={m.id} className="static">
                   <td>
-                    <a href="#/shop/requests">Request {m.id}</a>
+                    <a
+                      href="#/shop/requests"
+                      title={`Request ${m.id}`}
+                      aria-label={`Request ${m.id}`}
+                    >
+                      {m.id}
+                    </a>
                   </td>
                   <td>{when(m.created)}</td>
                   <td>
@@ -739,10 +807,8 @@ function OrdersPart({ c }: { c: CoverPrices }) {
           </table>
         </>
       )}
-      <p className="help">
-        All orders and requests: Shop → <a href="#/shop/orders">Orders</a>,{" "}
-        <a href="#/shop/requests">Requests</a>.
-      </p>
+      <IconLink icon="orders" label="Orders" href="#/shop/orders" />{" "}
+      <IconLink icon="requests" label="Requests" href="#/shop/requests" />
     </section>
   );
 }

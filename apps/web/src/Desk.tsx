@@ -24,7 +24,7 @@ import {
   uploadPictures,
   type Pending,
 } from "./DeskPictures";
-import { Icon } from "./icons";
+import { Icon, IconButton, IconLink, Info, type IconName } from "./icons";
 import { useSession } from "./Session";
 import {
   arrangementHref,
@@ -381,36 +381,43 @@ export function Desk({
     <div className="desk tpl tpl-queue">
       <section className="d-top">
         <div className="d-title">
-          <h1>Desk</h1>
-          <p>
-            The AI sorts, people approve. {q.items.length} covers · <kbd>j</kbd>
-            <kbd>k</kbd> move
-            {q.can_approve ? (
-              <>
-                {" "}
-                · <kbd>a</kbd> approve · <kbd>r</kbd> reject · <kbd>c</kbd>{" "}
-                comment · <kbd>p</kbd> produced · <kbd>u</kbd> undo
-              </>
-            ) : q.can_note ? (
-              <>
-                {" "}
-                · <kbd>c</kbd> comment
-              </>
-            ) : null}
-          </p>
+          <div className="head-row">
+            <h1>Desk</h1>
+            <Info label="About the Desk and its keys">
+              The AI sorts, people approve. {q.items.length} covers ·{" "}
+              <kbd>j</kbd>
+              <kbd>k</kbd> move
+              {q.can_approve ? (
+                <>
+                  {" "}
+                  · <kbd>a</kbd> approve · <kbd>r</kbd> reject · <kbd>c</kbd>{" "}
+                  comment · <kbd>p</kbd> produced · <kbd>u</kbd> undo
+                </>
+              ) : q.can_note ? (
+                <>
+                  {" "}
+                  · <kbd>c</kbd> comment
+                </>
+              ) : null}
+            </Info>
+          </div>
         </div>
         <div className="d-kpis">
-          <Kpi label="To review" value={toReview} accent />
-          <Kpi label="Approved" value={c.approved ?? 0} />
-          <Kpi label="Produced" value={c.produced ?? 0} />
-          <Kpi label="Rejected" value={c.rejected ?? 0} />
+          <Kpi label="To review" icon="st-wait" value={toReview} accent />
+          <Kpi label="Approved" icon="st-ok" value={c.approved ?? 0} />
+          <Kpi label="Produced" icon="st-made" value={c.produced ?? 0} />
+          <Kpi label="Rejected" icon="st-bad" value={c.rejected ?? 0} />
           <Kpi
-            label="Avg AI score"
+            label="AI score"
+            title="The average AI score"
+            icon="st-ai"
             value={q.avg_score == null ? "–" : q.avg_score.toFixed(0)}
           />
           {q.spend && user?.role === "admin" && (
             <Kpi
-              label="AI spend this month"
+              icon="stats"
+              title="AI spend this month"
+              label="AI spend"
               value={`€${q.spend.month_eur.toFixed(2)}`}
               sub={`${q.spend.pct.toFixed(0)} % of €${q.spend.budget_eur}`}
               bar={Math.min(q.spend.pct, 100)}
@@ -540,7 +547,8 @@ export function Desk({
                               quick(i);
                             }}
                           >
-                            ✓ Approve
+                            <Icon name="approve" size={14} />
+                            Approve
                           </button>
                         ) : (
                           <span className="d-muted">being calculated…</span>
@@ -558,10 +566,17 @@ export function Desk({
                         <Score label="D" v={i.scores.deepseek} />
                       </>
                     )}
-                    <span className={i.pieces > 30 ? "d-flag" : ""}>
-                      {i.pieces} pcs
+                    <span
+                      className={`d-n ${i.pieces > 30 ? "d-flag" : ""}`}
+                      title={`${i.pieces} pieces`}
+                    >
+                      <Icon name="pieces" size={13} />
+                      {i.pieces}
                     </span>
-                    <span>{i.vents} vents</span>
+                    <span className="d-n" title={`${i.vents} vents`}>
+                      <Icon name="vents" size={13} />
+                      {i.vents}
+                    </span>
                     {i.tags.includes("shape-to-check") && (
                       <span className="d-flag">shape to check</span>
                     )}
@@ -571,8 +586,12 @@ export function Desk({
                       </span>
                     )}
                     {i.arrangement && i.sent && i.status === "ai-checked" && (
-                      <span title={`sent ${when(i.sent.time)}`}>
-                        sent by {i.sent.by}
+                      <span
+                        className="d-n"
+                        title={`sent by ${i.sent.by}, ${when(i.sent.time)}`}
+                      >
+                        <Icon name="send" size={13} />
+                        {i.sent.by}
                       </span>
                     )}
                   </div>
@@ -616,20 +635,27 @@ export function Desk({
 
 function Kpi({
   label,
+  icon,
+  title,
   value,
   sub,
   accent,
   bar,
 }: {
   label: string;
+  icon?: IconName;
+  title?: string;
   value: number | string;
   sub?: string;
   accent?: boolean;
   bar?: number;
 }) {
   return (
-    <div className={`d-kpi ${accent ? "accent" : ""}`}>
-      <span className="d-kpi-label">{label}</span>
+    <div className={`d-kpi ${accent ? "accent" : ""}`} title={title}>
+      <span className="d-kpi-label">
+        {icon && <Icon name={icon} size={15} />}
+        {label}
+      </span>
       <span className="d-kpi-value">{value}</span>
       {sub && <span className="d-kpi-sub">{sub}</span>}
       {bar != null && (
@@ -641,6 +667,14 @@ function Kpi({
   );
 }
 
+const PILL_ICON: Record<string, IconName> = {
+  approved: "st-ok",
+  produced: "st-made",
+  rejected: "st-bad",
+  "ai-checked": "st-ai",
+  new: "st-wait",
+};
+
 function Pill({
   status,
   arrangement,
@@ -650,6 +684,7 @@ function Pill({
 }) {
   return (
     <span className={`d-pill s-${status}${arrangement ? " arr" : ""}`}>
+      <Icon name={PILL_ICON[status] ?? "st-wait"} size={13} />
       {statusLabel(status, arrangement)}
     </span>
   );
@@ -983,12 +1018,17 @@ function CardView({
           )}
           <Pill status={st.status} arrangement={!!arr} />
           {!workshopLogin && (
-            <a className="d-open" href={modelHref(card.id)}>
-              Open cover ↗
-            </a>
+            <IconLink
+              icon="open"
+              label="Open cover"
+              className="d-open"
+              href={modelHref(card.id)}
+            />
           )}
           <details className="d-menu" data-menu>
-            <summary className="d-btn d-ghost d-small">More</summary>
+            <summary className="icon-btn" title="More" aria-label="More">
+              <Icon name="more" />
+            </summary>
             <div className="d-menu-list">
               {showAi && (
                 <button
@@ -1008,33 +1048,61 @@ function CardView({
                     }
                   }}
                 >
-                  {aiJob
-                    ? "AI is reading… (about a minute)"
-                    : "Let the AI read it"}
+                  <span className="d-mi">
+                    <Icon name="ai" size={16} />
+                    {aiJob ? "Reading… (a minute)" : "Let the AI read it"}
+                  </span>
                   <small>about 1–5 cents</small>
                 </button>
               )}
               {checklist && (
-                <a href={checklist}>
-                  Check list (PDF)
-                  <small>sizes to measure on the sewn cover</small>
+                <a
+                  href={checklist}
+                  title="Check list (PDF): the sizes to measure on the sewn cover"
+                >
+                  <span className="d-mi">
+                    <Icon name="checklist" size={16} />
+                    Check list (PDF)
+                  </span>
                 </a>
               )}
               {arr && !workshopLogin && (
-                <a href={arrangementHref(card.id)}>Edit arrangement ↗</a>
-              )}
-              {!workshopLogin && (
-                <a href={modelHref(card.id, "pieces")}>Cut pieces and DXF ↗</a>
-              )}
-              {workshopLogin && card.dxf_ok && (
-                <a href={`/api/models/${card.id}/files/cut.dxf`} download>
-                  Cutting table (DXF)<small>approved at the Desk</small>
+                <a href={arrangementHref(card.id)}>
+                  <span className="d-mi">
+                    <Icon name="arrangements" size={16} />
+                    Edit arrangement
+                  </span>
                 </a>
               )}
               {!workshopLogin && (
-                <a href="#/covers/products">
-                  Product list ↗
-                  <small>upload the workshop's list (Excel)</small>
+                <a href={modelHref(card.id, "pieces")}>
+                  <span className="d-mi">
+                    <Icon name="pieces" size={16} />
+                    Cut pieces and DXF
+                  </span>
+                </a>
+              )}
+              {workshopLogin && card.dxf_ok && (
+                <a
+                  href={`/api/models/${card.id}/files/cut.dxf`}
+                  download
+                  title="Cutting table (DXF), approved at the Desk"
+                >
+                  <span className="d-mi">
+                    <Icon name="dxf" size={16} />
+                    Cutting table (DXF)
+                  </span>
+                </a>
+              )}
+              {!workshopLogin && (
+                <a
+                  href="#/covers/products"
+                  title="Product list: upload the workshop's list (Excel)"
+                >
+                  <span className="d-mi">
+                    <Icon name="product-list" size={16} />
+                    Product list
+                  </span>
                 </a>
               )}
             </div>
@@ -1080,7 +1148,9 @@ function CardView({
       </nav>
       {measuring && (
         <section className="d-panel d-measuring">
-          <h3>Measured on the sewn cover</h3>
+          <h3>
+            <Icon name="measure" /> Measured on the sewn cover
+          </h3>
           <MeasuredForm id={card.id} onChange={setMeasured} />
         </section>
       )}
@@ -1214,7 +1284,7 @@ function CardView({
                     className="d-more"
                     onClick={() => setAllDiffs(!allDiffs)}
                   >
-                    {allDiffs ? "Show fewer" : "Show all differences"}
+                    {allDiffs ? "Show fewer" : "Show all"}
                   </button>
                 )}
               </section>
@@ -1285,7 +1355,7 @@ function CardView({
                         onClick={() => setAllRevs(!allRevs)}
                       >
                         {allRevs
-                          ? "Show the last 4"
+                          ? "Show fewer"
                           : `Show all ${card.revisions.length}`}
                       </button>
                     </caption>
@@ -1384,13 +1454,15 @@ function CardView({
                   }
                   onClick={() => act({ action: "approve" }, "Approved", true)}
                 >
-                  ✓ Approve <kbd>a</kbd>
+                  <Icon name="approve" />
+                  Approve <kbd>a</kbd>
                 </button>
                 <button
                   className="d-btn d-danger"
                   onClick={() => openDialog("reject")}
                 >
-                  ✕ Reject <kbd>r</kbd>
+                  <Icon name="reject" />
+                  Reject <kbd>r</kbd>
                 </button>
               </>
             )}
@@ -1399,6 +1471,7 @@ function CardView({
               title="A remark with pictures, without changing the status"
               onClick={() => openDialog("note")}
             >
+              <Icon name="comment" />
               Comment <kbd>c</kbd>
             </button>
             <span className="d-grow" />
@@ -1409,15 +1482,16 @@ function CardView({
               title="Produced, the fit after sewing and what was measured"
               onClick={() => setSewing(!(sewing || measuring))}
             >
+              <Icon name="sewing" />
               After sewing {sewing || measuring ? "▴" : "▾"}
             </button>
             {canAct && st.history.length > 0 && (
-              <button
-                className="d-btn d-ghost d-small"
+              <IconButton
+                icon="undo"
+                label="Undo (u)"
+                className="d-undo"
                 onClick={() => act({ action: "undo" }, "Undone")}
-              >
-                Undo <kbd>u</kbd>
-              </button>
+              />
             )}
             {(sewing || measuring) && (
               <div className="d-sewing">

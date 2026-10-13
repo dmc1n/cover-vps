@@ -1,3 +1,4 @@
+import { Info, Icon, IconButton } from "./icons";
 // Pictures at the Desk (ADR-096): the approver attaches pictures to a reject or a comment
 // himself, instead of mailing a screenshot. A picture comes from a snapshot of the 3D view or
 // of the drawing, a file, a drop or a paste (Ctrl+V); it is then marked in red (arrow, circle,
@@ -237,7 +238,7 @@ export function PictureTray({
               else setMarking({ source: shot });
             }}
           >
-            Snapshot 3D
+            <Icon name="camera" /> Snapshot 3D
           </button>
         )}
         {drawingUrl && (
@@ -247,7 +248,7 @@ export function PictureTray({
             disabled={full}
             onClick={() => setMarking({ source: drawingUrl })}
           >
-            Snapshot drawing
+            <Icon name="camera" /> Snapshot drawing
           </button>
         )}
         {sources.map((src) => (
@@ -267,7 +268,7 @@ export function PictureTray({
           disabled={full}
           onClick={() => fileRef.current?.click()}
         >
-          Upload…
+          <Icon name="upload" /> Upload…
         </button>
         <input
           ref={fileRef}
@@ -281,9 +282,9 @@ export function PictureTray({
             if (f) fromFile(f);
           }}
         />
-        <span className="d-pics-hint">
+        <Info label="About DeskPictures">
           or drop / paste (Ctrl+V) a picture here
-        </span>
+        </Info>
       </div>
       {pending.length > 0 && (
         <ul className="d-pics-list">
@@ -504,13 +505,13 @@ export function Marker({
             Clear
           </button>
           <span className="d-marker-grow" />
-          <button
+          <IconButton
             type="button"
             className="d-btn d-ghost d-small"
             onClick={onCancel}
-          >
-            Cancel
-          </button>
+            icon="close"
+            label="Cancel"
+          />
           <button
             type="button"
             className="d-btn d-primary d-small"
@@ -524,9 +525,15 @@ export function Marker({
                 onFail("The marked picture could not be saved", e);
               }
             }}
+            title="Use this picture"
+            aria-label="Use this picture"
           >
-            Use this picture
+            <Icon name="approve" /> Use picture
           </button>
+          <Info label="About marking the picture">
+            Drag to draw: an arrow points where you let go. Ctrl+Z undoes, Esc
+            closes.
+          </Info>
         </div>
         {err ? (
           <p className="d-err">{err}</p>
@@ -557,10 +564,6 @@ export function Marker({
             />
           </div>
         )}
-        <p className="d-marker-help">
-          Drag to draw: an arrow points where you let go. Ctrl+Z undoes, Esc
-          closes.
-        </p>
       </div>
     </div>,
     document.querySelector(".desk") ?? document.body,
