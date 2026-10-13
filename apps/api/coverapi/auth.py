@@ -4,8 +4,11 @@ The app is reachable from the internet (covers.suns.nu), so every request needs 
 user. Users live in `<data>/app.db` (SQLite) with:
 
 - a role: admin (everything, and the admin page), editor (upload, calculate, change settings),
-  viewer (look and download);
-- `can_approve`: may approve the definitive drawing of a cover (set by an admin per user);
+  viewer (look and download), workshop (Work → Workshop, the Desk read-only, fits, notes and
+  pictures on the Desk card, its own questions, the DXF of approved covers; no approving, no
+  prices, no settings: ADR-128, enforced by an allow-list in security.py);
+- `can_approve`: approves at the Desk, as a name in `desk.approvers` does (the one approval,
+  ADR-128; never for the workshop role);
 - a password, stored as a scrypt hash with its own salt; never the password itself.
 
 A login gives a session: a random token in an HttpOnly, SameSite=Strict cookie (Secure when
@@ -28,7 +31,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-ROLES = ("admin", "editor", "viewer")
+ROLES = ("admin", "editor", "viewer", "workshop")
+WORKSHOP = "workshop"  # the workshop's own login (owner, 13 Oct 2026, question 92; ADR-128)
 SESSION_COOKIE = "cover_session"
 TRUSTED_COOKIE = "cover_device"  # a device that passed the mailed code (TRUSTED_DAYS)
 TRUSTED_DAYS = 14
@@ -157,7 +161,7 @@ class User:
         if right == "edit":
             return self.role in ("admin", "editor")
         if right == "approve":
-            return self.can_approve
+            return self.can_approve and self.role != WORKSHOP
         return right == "view"
 
 
@@ -293,6 +297,8 @@ class Auth:
             raise AuthError("a user name has letters, digits, dots and dashes only", 400)
         if role not in ROLES:
             raise AuthError(f"role must be one of {', '.join(ROLES)}", 400)
+        if role == WORKSHOP and can_approve:
+            raise AuthError("the workshop role never approves", 400)
         with self._lock, self._db() as db:
             try:
                 cur = db.execute(
@@ -314,6 +320,10 @@ class Auth:
         if "role" in changes and changes["role"] not in ROLES:
             raise AuthError(f"role must be one of {', '.join(ROLES)}", 400)
         current = self.user(user_id)
+        if changes.get("role", current.role) == WORKSHOP:
+            if changes.get("can_approve"):
+                raise AuthError("the workshop role never approves", 400)
+            changes = {**changes, "can_approve": False}  # a workshop login never approves
         losing_admin = current.role == "admin" and (
             changes.get("role", "admin") != "admin" or changes.get("active") is False
         )

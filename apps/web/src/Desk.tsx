@@ -25,7 +25,13 @@ import {
   type Pending,
 } from "./DeskPictures";
 import { useSession } from "./Session";
-import { arrangementHref, DESK_TABS, deskHref, modelHref } from "./nav";
+import {
+  arrangementHref,
+  DESK_TABS,
+  deskHref,
+  isWorkshop,
+  modelHref,
+} from "./nav";
 import {
   ArrangementPlan,
   FOOTPRINT_NAMES,
@@ -54,6 +60,10 @@ interface Item {
   products?: string[];
   has_picture: boolean;
   last: { action: string; by: string; time: number } | null;
+  /** a shop order's cover sent to production: first in the queue, one click approves it
+   * (ADR-128); `built`: its cutting file exists */
+  order?: { order: number; b2b: boolean; by: string; time: number } | null;
+  built?: boolean;
 }
 interface Spend {
   month_eur: number;
@@ -67,6 +77,8 @@ interface Queue {
   avg_score: number | null;
   spend: Spend | null;
   can_approve: boolean;
+  /** the workshop login: a fit, a comment, pictures; never approve (ADR-128) */
+  can_note?: boolean;
   reasons: string[];
   pictures_max?: number;
 }
@@ -193,6 +205,12 @@ const natural = (a: string, b: string) =>
   a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 const STATUS_ORDER = ["new", "ai-checked", "rejected", "approved", "produced"];
 function sortItems(items: Item[], by: string): Item[] {
+  // a shop order waiting for its quick approval stays on top, whatever the sort (ADR-128)
+  const orders = items.filter((i) => i.order);
+  const rest = items.filter((i) => !i.order);
+  return [...orders, ...sortRest(rest, by)];
+}
+function sortRest(items: Item[], by: string): Item[] {
   if (by === "need") return items;
   const out = [...items];
   const prod = (i: Item) => i.products?.[0] ?? "";
@@ -307,6 +325,18 @@ export function Desk({
     setFlash(done);
     window.location.hash = deskHref(id);
   };
+  // an order's quick approval from the queue: one click (ADR-128)
+  const [quickMsg, setQuickMsg] = useState("");
+  const quick = async (i: Item) => {
+    setQuickMsg("");
+    try {
+      await getJSON(`/api/desk/${i.id}`, { action: "approve" });
+      setQuickMsg(`Approved order ${i.order?.order}: ${i.code}`);
+      load();
+    } catch (e) {
+      setQuickMsg(String((e as Error).message ?? e));
+    }
+  };
   const idx = items.findIndex((i) => i.id === selected);
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
@@ -353,8 +383,19 @@ export function Desk({
           <h1>Desk</h1>
           <p>
             The AI sorts, people approve. {q.items.length} covers · <kbd>j</kbd>
-            <kbd>k</kbd> move · <kbd>a</kbd> approve · <kbd>r</kbd> reject ·{" "}
-            <kbd>c</kbd> comment · <kbd>p</kbd> produced · <kbd>u</kbd> undo
+            <kbd>k</kbd> move
+            {q.can_approve ? (
+              <>
+                {" "}
+                · <kbd>a</kbd> approve · <kbd>r</kbd> reject · <kbd>c</kbd>{" "}
+                comment · <kbd>p</kbd> produced · <kbd>u</kbd> undo
+              </>
+            ) : q.can_note ? (
+              <>
+                {" "}
+                · <kbd>c</kbd> comment
+              </>
+            ) : null}
           </p>
         </div>
         <div className="d-kpis">
@@ -453,6 +494,11 @@ export function Desk({
               </select>
             </label>
           </div>
+          {quickMsg && (
+            <p className="d-msg" role="status">
+              {quickMsg}
+            </p>
+          )}
           <ul className="d-list">
             {items.map((i) => (
               <li
@@ -474,6 +520,32 @@ export function Desk({
                     <strong>{i.code}</strong>
                     <Pill status={i.status} arrangement={i.arrangement} />
                   </div>
+                  {i.order && (
+                    <div className="d-order" data-testid="desk-order">
+                      <span
+                        className="d-order-tag"
+                        title={`sent to production by ${i.order.by}, ${when(i.order.time)}`}
+                      >
+                        ORDER #{i.order.order}
+                        {i.order.b2b ? " · B2B" : ""}
+                      </span>
+                      {q.can_approve &&
+                        (i.built ? (
+                          <button
+                            className="d-btn d-primary d-small"
+                            title="The order's quick approval: the DXF follows at once"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              quick(i);
+                            }}
+                          >
+                            ✓ Approve
+                          </button>
+                        ) : (
+                          <span className="d-muted">being calculated…</span>
+                        ))}
+                    </div>
+                  )}
                   <div className="d-row-sub">
                     {i.arrangement ? (
                       <span className="d-arr-tag" title="An arrangement">
@@ -521,6 +593,7 @@ export function Desk({
               id={selected}
               tab={DESK_TABS.some(([t]) => t === tab) ? tab : "check"}
               canAct={q.can_approve}
+              canNote={!!q.can_note}
               reasons={q.reasons}
               picturesMax={q.pictures_max ?? 8}
               onChanged={load}
@@ -601,16 +674,21 @@ function CardView({
   onChanged,
   onNext,
   flash = "",
+  canNote = false,
 }: {
   id: string;
   tab: string;
   flash?: string;
   canAct: boolean;
+  /** the workshop login: Comment and After sewing (a fit, measured sizes), nothing else */
+  canNote?: boolean;
   reasons: string[];
   picturesMax: number;
   onChanged: () => void;
   onNext: (done: string) => void;
 }) {
+  const { user } = useSession();
+  const workshopLogin = isWorkshop(user); // no cover page, no product list (ADR-128)
   const [card, setCard] = useState<Card | null>(null);
   const [model, setModel] = useState<ModelDetail | null>(null);
   const [page, setPage] = useState(0);
@@ -748,8 +826,12 @@ function CardView({
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (!canAct || !card) return;
+      if (!card || !(canAct || canNote)) return;
       if (t && ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) return;
+      if (!canAct) {
+        if (e.key === "c") openDialog("note"); // the workshop: a comment only
+        return;
+      }
       if (e.key === "a") act({ action: "approve" }, "Approved", true);
       if (e.key === "r") openDialog("reject");
       if (e.key === "c") openDialog("note");
@@ -762,7 +844,7 @@ function CardView({
     };
     window.addEventListener("keydown", on);
     return () => window.removeEventListener("keydown", on);
-  }, [canAct, card, act]);
+  }, [canAct, canNote, card, act]);
 
   if (!card) return <div className="d-card d-loading">{msg || "Loading…"}</div>;
   const ck = card.check;
@@ -899,9 +981,11 @@ function CardView({
             </>
           )}
           <Pill status={st.status} arrangement={!!arr} />
-          <a className="d-open" href={modelHref(card.id)}>
-            Open cover ↗
-          </a>
+          {!workshopLogin && (
+            <a className="d-open" href={modelHref(card.id)}>
+              Open cover ↗
+            </a>
+          )}
           <details className="d-menu" data-menu>
             <summary className="d-btn d-ghost d-small">More</summary>
             <div className="d-menu-list">
@@ -935,11 +1019,23 @@ function CardView({
                   <small>sizes to measure on the sewn cover</small>
                 </a>
               )}
-              {arr && <a href={arrangementHref(card.id)}>Edit arrangement ↗</a>}
-              <a href={modelHref(card.id, "pieces")}>Cut pieces and DXF ↗</a>
-              <a href="#/covers/products">
-                Product list ↗<small>upload the workshop's list (Excel)</small>
-              </a>
+              {arr && !workshopLogin && (
+                <a href={arrangementHref(card.id)}>Edit arrangement ↗</a>
+              )}
+              {!workshopLogin && (
+                <a href={modelHref(card.id, "pieces")}>Cut pieces and DXF ↗</a>
+              )}
+              {workshopLogin && card.dxf_ok && (
+                <a href={`/api/models/${card.id}/files/cut.dxf`} download>
+                  Cutting table (DXF)<small>approved at the Desk</small>
+                </a>
+              )}
+              {!workshopLogin && (
+                <a href="#/covers/products">
+                  Product list ↗
+                  <small>upload the workshop's list (Excel)</small>
+                </a>
+              )}
             </div>
           </details>
         </div>
@@ -1265,26 +1361,37 @@ function CardView({
       </div>
 
       <div className="d-actions">
-        {!canAct && (
+        {!canAct && !canNote && (
           <span className="d-muted">
             Only Rens, Rick, Wouter or an admin can decide here.
           </span>
         )}
-        {canAct && !dialog && (
+        {!canAct && canNote && !dialog && (
+          <span className="d-muted" data-testid="workshop-note">
+            The workshop adds fits and comments; an approver decides.
+          </span>
+        )}
+        {(canAct || canNote) && !dialog && (
           <>
-            <button
-              className="d-btn d-primary"
-              disabled={st.status === "approved" || st.status === "produced"}
-              onClick={() => act({ action: "approve" }, "Approved", true)}
-            >
-              ✓ Approve <kbd>a</kbd>
-            </button>
-            <button
-              className="d-btn d-danger"
-              onClick={() => openDialog("reject")}
-            >
-              ✕ Reject <kbd>r</kbd>
-            </button>
+            {canAct && (
+              <>
+                <button
+                  className="d-btn d-primary"
+                  disabled={
+                    st.status === "approved" || st.status === "produced"
+                  }
+                  onClick={() => act({ action: "approve" }, "Approved", true)}
+                >
+                  ✓ Approve <kbd>a</kbd>
+                </button>
+                <button
+                  className="d-btn d-danger"
+                  onClick={() => openDialog("reject")}
+                >
+                  ✕ Reject <kbd>r</kbd>
+                </button>
+              </>
+            )}
             <button
               className="d-btn d-ghost"
               title="A remark with pictures, without changing the status"
@@ -1302,7 +1409,7 @@ function CardView({
             >
               After sewing {sewing || measuring ? "▴" : "▾"}
             </button>
-            {st.history.length > 0 && (
+            {canAct && st.history.length > 0 && (
               <button
                 className="d-btn d-ghost d-small"
                 onClick={() => act({ action: "undo" }, "Undone")}
@@ -1312,24 +1419,26 @@ function CardView({
             )}
             {(sewing || measuring) && (
               <div className="d-sewing">
-                <label
-                  className={`d-check ${st.status === "approved" || st.status === "produced" ? "" : "off"}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={st.status === "produced"}
-                    disabled={
-                      !(st.status === "approved" || st.status === "produced")
-                    }
-                    onChange={(e) =>
-                      act(
-                        { action: "produced", done: e.target.checked },
-                        e.target.checked ? "Marked produced" : "Not produced",
-                      )
-                    }
-                  />
-                  Produced <kbd>p</kbd>
-                </label>
+                {canAct && (
+                  <label
+                    className={`d-check ${st.status === "approved" || st.status === "produced" ? "" : "off"}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={st.status === "produced"}
+                      disabled={
+                        !(st.status === "approved" || st.status === "produced")
+                      }
+                      onChange={(e) =>
+                        act(
+                          { action: "produced", done: e.target.checked },
+                          e.target.checked ? "Marked produced" : "Not produced",
+                        )
+                      }
+                    />
+                    Produced <kbd>p</kbd>
+                  </label>
+                )}
                 <span className="d-fit">
                   <input
                     placeholder="After sewing: note…"
@@ -1373,7 +1482,7 @@ function CardView({
             )}
           </>
         )}
-        {canAct && dialog && (
+        {(canAct || canNote) && dialog && (
           <div className="d-reject" ref={dialogRef}>
             {dialog === "reject" ? (
               <div className="d-chips">

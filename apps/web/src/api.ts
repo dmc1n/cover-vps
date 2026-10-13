@@ -128,9 +128,14 @@ export interface ModelBrief {
   reasons: string[];
   roll_length_mm?: number | null;
   kind?: Kind | null;
+  /** the retired definitive approval (ADR-047), history only since ADR-128 */
   approval?: Approval | null;
-  dxf_ok?: boolean; // the cutting table's DXF: only for an approved cover (ADR-079)
+  dxf_ok?: boolean; // the cutting table's DXF: only for an approved cover (ADR-079, 128)
   desk_status?: string;
+  /** the Desk's approval, the only one (ADR-128) */
+  desk_approved?: { by: string; time: number; revision: number | null } | null;
+  /** the PDFs stamped by that approval, while it holds (approved/<name>) */
+  stamped?: string[];
 }
 
 /** What an uploaded file is: the furniture, or only the cover surface (kind.json). */
@@ -405,7 +410,8 @@ export interface User {
   username: string;
   name: string;
   email: string | null;
-  role: "admin" | "editor" | "viewer";
+  /** workshop: Work → Workshop, the Desk read-only, fits and notes (ADR-128) */
+  role: "admin" | "editor" | "viewer" | "workshop";
   can_approve: boolean;
   active: boolean;
   last_login: number | null;
@@ -414,6 +420,7 @@ export interface User {
   desk_approver?: boolean; // approves at the Desk (admin or desk.approvers): starts on Work → Desk
 }
 
+/** The retired definitive approval (approval.json, ADR-047): history since ADR-128. */
 export interface Approval {
   approved_by: string;
   name: string;
@@ -421,6 +428,7 @@ export interface Approval {
   revision: number | null;
   note: string;
   valid: boolean;
+  legacy?: boolean;
 }
 
 export interface MailSettings {
@@ -707,6 +715,8 @@ export interface WorkshopItem {
   files: string[];
   /** the approval gate lets the cutting table's DXF through (ADR-079/115/120) */
   dxf_ok: boolean;
+  /** the PDFs stamped by the Desk's approval, while it holds (ADR-128) */
+  stamped?: string[];
   /** the revision the Desk marked to cut */
   revision: { n: number; dxf: boolean; dxf_ok: boolean } | null;
   fit: {
@@ -722,10 +732,35 @@ export interface WorkshopItem {
   products: string[];
   has_picture: boolean;
 }
+/** A shop order waiting for production or in it, as Work → Workshop shows it: no price, no
+ * e-mail address (the workshop login sees it; ADR-128). */
+export interface WorkshopOrder {
+  id: number;
+  created: number;
+  status: string;
+  model_id: string | null;
+  released: number | null;
+  released_by: string | null;
+  product: string | null;
+  colour: string | null;
+  sizes_cm: Record<string, number | boolean | string> | null;
+  stock: string | null;
+  qty: number;
+  company: string | null;
+  customer: string | null;
+  city: string | null;
+  desk_status?: string;
+  dxf_ok?: boolean;
+}
 export const workshop = {
   list: () =>
     fetch("/api/workshop").then((r) =>
-      json<{ items: WorkshopItem[]; gate: boolean }>(r),
+      json<{
+        items: WorkshopItem[];
+        gate: boolean;
+        orders?: WorkshopOrder[];
+        can_produce?: boolean;
+      }>(r),
     ),
 };
 
@@ -748,6 +783,9 @@ export interface ShopOrder {
   total_eur: number;
   model_id: string | null;
   token: string;
+  /** when and by whom it was sent to production (ADR-128) */
+  released?: number | null;
+  released_by?: string | null;
   data: {
     customer: Record<string, string | boolean>;
     shipping_eur: number;
@@ -862,13 +900,9 @@ export const admin = {
     ),
 };
 
+/** Approval is the Desk's (ADR-128): "Ask for approval" sends a built cover to the Desk and
+ * mails its approvers. */
 export const approvals = {
-  approve: (id: string, note: string) =>
-    send("POST", `/api/models/${id}/approve`, { note }).then((r) =>
-      json<{ approval: Approval }>(r),
-    ),
-  withdraw: (id: string) =>
-    send("DELETE", `/api/models/${id}/approve`).then((r) => json<unknown>(r)),
   ask: (id: string) =>
     send("POST", `/api/models/${id}/approval-request`).then((r) =>
       json<{ mailed: string[]; not_mailed: string[] }>(r),

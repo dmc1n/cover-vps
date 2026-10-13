@@ -21,7 +21,7 @@ import { BatchBar } from "./Catalogue";
 import { DrawingUpload } from "./DrawingUpload";
 import { FilterRow, Tpl } from "./layout";
 import { ReferenceUpload } from "./Learning";
-import { modelHref } from "./nav";
+import { isEditor, modelHref } from "./nav";
 import { useSession } from "./Session";
 
 type Sort = "name" | "grade" | "stretch" | "size" | "b2c" | "margin";
@@ -74,7 +74,7 @@ export function AllCovers({
   priceCols?: string;
 }) {
   const { user } = useSession();
-  const mayPrices = !!user && user.role !== "viewer";
+  const mayPrices = isEditor(user);
   const wanted = colsIn === "1" ? "live" : colsIn; // ?prices=1: the live prices
   const priceCols: PriceCols =
     mayPrices && !cards && (wanted === "live" || wanted === "draft")
@@ -192,7 +192,7 @@ export function AllCovers({
               Cards
             </a>
           </span>
-          {user?.role !== "viewer" && (
+          {isEditor(user) && (
             <a className="btn primary" href="#/covers/new">
               + New cover
             </a>

@@ -42,7 +42,7 @@ async def admin_page(browser: Browser, errors: list[str]) -> Page:
     await page.get_by_role("button", name="Log in").click()
     await expect(page.get_by_role("button", name="Log out")).to_be_visible()
     await page.goto(URL + "/#/shop/b2b")  # Shop → B2B customers (ADR-122)
-    await expect(page.get_by_role("heading", name="B2B customers")).to_be_visible()
+    await expect(page.get_by_role("heading", name="B2B customers", level=1)).to_be_visible()
     return page
 
 
@@ -218,7 +218,7 @@ async def main() -> int:  # noqa: PLR0915 - one story, step by step
         await expect(npage.get_by_text("Bedankt!")).to_be_visible()
 
         await admin.reload()  # Shop → B2B customers is a page of its own since ADR-122
-        await expect(admin.get_by_role("heading", name="B2B customers")).to_be_visible()
+        await expect(admin.get_by_role("heading", name="B2B customers", level=1)).to_be_visible()
         await expect(admin.get_by_role("heading", name="Requests (1)")).to_be_visible()
         await shot(admin, "17-admin-request")
         await admin.get_by_role("button", name="Approve and invite").click()
@@ -230,7 +230,16 @@ async def main() -> int:  # noqa: PLR0915 - one story, step by step
             admin.get_by_role("navigation", name="Shop").get_by_role("link", name="Orders").click()
         )
         await expect(admin.get_by_text("B2B 1 · PO PO-2026-118").first).to_be_visible()
+        # on account: the lines wait for production until someone sends them (ADR-128)
+        lines = admin.locator("tr", has_text="B2B 1 · PO PO-2026-118")
+        n = await lines.count()
+        send = lines.get_by_role("button", name="Send to production")
+        await expect(send).to_have_count(n)
         await shot(admin, "19-admin-orders-flagged")
+        await send.first.click()
+        await expect(send).to_have_count(n - 1, timeout=30_000)
+        await expect(lines.first.get_by_role("link", name="Desk card")).to_be_visible()
+        await shot(admin, "19b-admin-order-sent-to-production")
         # and on the cover's own page: its orders, the B2B one among them (ADR-126)
         await admin.goto(URL + f"/#/model/{FIXED}/price")
         orders = admin.get_by_test_id("cover-orders")

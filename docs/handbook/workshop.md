@@ -1,19 +1,31 @@
 # The Workshop page: what to cut, and how it fitted
 
-**Work → Workshop** (`#/work/workshop`, ADR-124). For the workshop and the owner: one list of
+**Work → Workshop** (`#/work/workshop`, ADR-124, ADR-128). For the workshop and the owner: one list of
 every cover the Desk has **approved** or marked **produced**, with the files to cut and sew it
 and what we know about how it fitted.
 
-**Nothing on this page changes anything.** It only shows. Approving, marking a cover produced,
+**Editors and admins can Send to production here.** Approving, marking a cover produced,
 and entering the measured sizes and Fits / Does not fit stay on the cover's Desk card, under
 **After sewing ▾** (see [desk.md](desk.md) and [measuring.md](measuring.md)).
 
 ## Who sees it
 
-Every login of the studio (viewer, editor, admin) can open the Workshop page for now. The
-customers' fit answers are shown to editors and admins only; a viewer sees a note in their
-place. A separate workshop login or right (for example: see this page and download, but not
-approve) does not exist yet: that is open owner question #92.
+Every studio role can open the Workshop page. The **workshop** login starts here. It sees
+Work only: Desk, Questions and Workshop. It can answer its own questions and download files
+for approved covers. On a Desk card it can **Comment**, with pictures, and enter **Fits /
+Does not fit / Measured…** under **After sewing ▾**. It cannot approve, reject, mark Produced,
+Undo, correct covers, calculate, start the AI or Send to production. It sees no prices,
+e-mail addresses or Settings. A cover's own page says **Not for your account**.
+
+The customers' fit answers are shown to editors and admins only; viewers and the workshop
+login see a note in their place.
+
+The **Orders** block at the top lists orders **waiting for production** and **in production**,
+without prices. Paid orders and B2B orders on account wait for the studio's click. Editors
+and admins press **Send to production** here, or an admin does it on **Shop → Orders**.
+The cover then goes to the Desk as an order, first in the queue. The cutting-table DXF
+follows the Desk's approval. A catalogue cover whose current cut is already approved is
+ready to cut at once.
 
 ## What each line shows
 
@@ -25,8 +37,8 @@ approve) does not exist yet: that is open owner question #92.
   - the **check list** (PDF), to measure the sewn cover against
     ([measuring.md](measuring.md));
   - the **cut pieces** as a picture (SVG);
-  - the **cutting table's DXF**, but only when the approval allows it. The DXF belongs to the
-    approved cutting file (ADR-079, ADR-115, ADR-120): when the cover was built again after
+  - the **cutting-table DXF**, but only when the approval allows it. The DXF belongs to the
+    approved cutting file (ADR-079, ADR-115, ADR-120, ADR-128): when the cover was built again after
     the approval and the cutting file changed, or an arrangement was changed, the line says
     the DXF **waits for (re)approval at the Desk** and links the Desk card. Once an approver
     approves it again, the DXF is back here.
@@ -37,6 +49,11 @@ approve) does not exist yet: that is open owner question #92.
   - how many sizes were measured, and the largest difference against the check list.
 - **The customers' fit answers**, for covers sold from the shop: 1 to 5 stars, the
   customer's comment and photo (editors and admins; a viewer sees a note).
+
+Beside the ordinary **Size drawing** and **Cutting list**, a line shows **Approved size
+drawing** and **Approved cutting list**: the copies the Desk's approval stamped with
+`APPROVED <name> <date> revision <n>` on every page. They go away when a change invalidates
+the approval (and come back with the next approval).
 
 ## Filters
 

@@ -6,7 +6,6 @@ import Configure from "./Configure";
 import Guide from "./Guide";
 import {
   api,
-  Approval,
   approvals,
   auth,
   cm,
@@ -57,6 +56,8 @@ import {
   SECTIONS,
   sectionHome,
   settingsWho,
+  isEditor,
+  isWorkshop,
   visibleSections,
 } from "./nav";
 
@@ -291,12 +292,17 @@ function Page({ route, user }: { route: Route; user: User }) {
   const sec = SECTIONS.find((s) => s.id === section);
   if (sec) {
     const pg = sec.pages.find((p) => p.id === page);
-    if (!allowed(sec.who, user) || (pg && !allowed(pg.who, user)))
+    if (
+      !allowed(sec.who, user, sec.id) ||
+      (pg && !allowed(pg.who, user, `${sec.id}/${pg.id}`))
+    )
       return <NotAllowed />;
     if (sec.id === "settings" && !allowed(settingsWho(page), user))
       return <NotAllowed />;
   }
   const isAdmin = user.role === "admin";
+  // the workshop login: Work, the guide and its account only (ADR-128; the server agrees)
+  if (isWorkshop(user) && section === "model") return <NotAllowed />;
   switch (section) {
     case "model":
       return page ? (
@@ -329,7 +335,7 @@ function Page({ route, user }: { route: Route; user: User }) {
           <Tpl
             kind="list"
             title="Orders"
-            intro="Orders from the shop. A paid order goes into production by itself (its pattern, then the drape); a status change mails the customer."
+            intro="Orders from the shop and the B2B shop. A paid order (or one on account) waits for production until you press Send to production: then its cover is made and goes to the Desk for a quick approval; the DXF follows that approval. A status change mails the customer."
           >
             <Orders focus={Number(rest[0] ?? "") || null} />
           </Tpl>
@@ -423,7 +429,9 @@ function ProductList() {
   );
 }
 
-/** The approval of the definitive drawing (ADR-047): who approved which revision, or why not. */
+/** The approval: the Desk's, the only one (owner, 13 Oct 2026, question 83; ADR-128). Who approved
+ * which revision and its stamped PDFs while it holds; otherwise where to get it approved. The
+ * old "definitive drawing" approval shows as history only. */
 function ApprovalCard({
   model,
   onChange,
@@ -432,103 +440,74 @@ function ApprovalCard({
   onChange: () => void;
 }) {
   const { user } = useSession();
-  const [note, setNote] = useState("");
   const [msg, setMsg] = useState("");
   if (!model.files.includes("cut.dxf")) return null;
-  const a: Approval | null | undefined = model.approval;
-  const act = async (f: () => Promise<unknown>, done: string) => {
+  const ok = model.desk_approved;
+  const holds =
+    !!ok &&
+    (model.desk_status === "approved" || model.desk_status === "produced");
+  const old = model.approval;
+  const stamped = model.stamped ?? [];
+  const ask = async () => {
     setMsg("");
     try {
-      await f();
-      setMsg(done);
+      const r = await approvals.ask(model.id);
+      setMsg(
+        r.mailed.length
+          ? `On the Desk; asked ${r.mailed.join(", ")} by mail.`
+          : "On the Desk, ready for approval (no approver could be mailed).",
+      );
       onChange();
     } catch (e) {
       setMsg(String(e).replace(/^Error: /, ""));
     }
   };
-  const date = a ? new Date(a.time * 1000).toLocaleString() : "";
   return (
     <section
-      className={`card approval ${a ? (a.valid ? "ok" : "stale") : "none"}`}
+      className={`card approval ${holds ? "ok" : "none"}`}
+      data-testid="desk-approval"
     >
       <div className="approval-state">
-        {!a && <strong>Definitive drawing: not approved yet</strong>}
-        {a && a.valid && (
+        {holds && ok ? (
           <strong>
-            Approved by {a.name} on {date}
-            {a.revision !== null && `, revision ${a.revision}`}
+            Approved on the Desk by {ok.by} on{" "}
+            {new Date(ok.time * 1000).toLocaleString()}
+            {ok.revision != null && `, revision ${ok.revision}`}
+          </strong>
+        ) : (
+          <strong>
+            Not approved yet: the cutting-table DXF waits for the Desk
+            {model.desk_status ? ` (now: ${model.desk_status})` : ""}
           </strong>
         )}
-        {a && !a.valid && (
-          <strong>
-            Changed after the approval by {a.name} ({date}): approve again
-            before cutting
-          </strong>
-        )}
-        {a?.note && <span className="muted"> · {a.note}</span>}
       </div>
       <div className="row">
-        {a?.valid && (
-          <>
+        {holds &&
+          stamped.map((f) => (
             <a
-              href={`/api/models/${model.id}/approved/sizes.pdf`}
+              key={f}
+              href={`/api/models/${model.id}/approved/${f}`}
               target="_blank"
               rel="noreferrer"
             >
-              Approved size drawing
+              {f === "sizes.pdf"
+                ? "Approved size drawing"
+                : "Approved cutting list"}
             </a>
-            <a
-              href={`/api/models/${model.id}/approved/cutting-list.pdf`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Approved cutting list
-            </a>
-          </>
-        )}
-        {user?.can_approve && (!a || !a.valid) && (
-          <>
-            <input
-              placeholder="note (optional)"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-            <button
-              className="primary"
-              onClick={() =>
-                act(() => approvals.approve(model.id, note), "Approved.")
-              }
-            >
-              Approve the definitive drawing
-            </button>
-          </>
-        )}
-        {user?.can_approve && a && (
-          <button
-            onClick={() =>
-              act(() => approvals.withdraw(model.id), "Approval withdrawn.")
-            }
-          >
-            Withdraw
-          </button>
-        )}
-        {!user?.can_approve && user?.role !== "viewer" && (!a || !a.valid) && (
-          <button
-            onClick={() =>
-              act(async () => {
-                const r = await approvals.ask(model.id);
-                setMsg(
-                  r.mailed.length
-                    ? `Asked ${r.mailed.join(", ")} by mail.`
-                    : "No approver could be mailed.",
-                );
-              }, "")
-            }
-          >
-            Ask for approval
-          </button>
+          ))}
+        <a href={deskHref(model.id)}>Its Desk card ↗</a>
+        {!holds && isEditor(user) && model.desk_status !== "ai-checked" && (
+          <button onClick={ask}>Send to the Desk for approval</button>
         )}
       </div>
+      {old && (
+        <p className="muted small">
+          History: before the Desk became the only approval (ADR-128) the
+          definitive drawing was approved by {old.name} on{" "}
+          {new Date(old.time * 1000).toLocaleDateString()}
+          {old.revision != null && `, revision ${old.revision}`}.
+        </p>
+      )}
       {msg && <p className="muted">{msg}</p>}
     </section>
   );
@@ -671,7 +650,8 @@ function ModelPage({
   const has = (f: string) => model.files.includes(f);
   const changes = realChanges(model);
   const nChanges = changes.settings.length + changes.panels.length;
-  const a = model.approval;
+  const approvedNow =
+    model.desk_status === "approved" || model.desk_status === "produced";
 
   return (
     <div className="tpl tpl-object">
@@ -713,13 +693,11 @@ function ModelPage({
               </a>
             )}
             <span
-              className={`badge ${a ? (a.valid ? "ok" : "warn") : ""}`}
-              title="The definitive drawing (approval below)"
+              className={`badge ${approvedNow ? "ok" : ""}`}
+              title="The Desk's approval, the only one (ADR-128)"
             >
-              {a
-                ? a.valid
-                  ? `approved by ${a.name}`
-                  : "changed after approval"
+              {approvedNow && model.desk_approved
+                ? `approved by ${model.desk_approved.by}`
                 : "not approved"}
             </span>
             {model.dxf_ok === false && (
@@ -822,13 +800,9 @@ function ModelPage({
             id={id}
             files={model.files}
             stamp={stamp}
-            onRain={
-              user?.role === "viewer" ? undefined : () => run(["rain"], {})
-            }
+            onRain={!isEditor(user) ? undefined : () => run(["rain"], {})}
             rainBusy={!!running && job?.steps.some((s) => s.name === "rain")}
-            onDrape={
-              user?.role === "viewer" ? undefined : () => run(["drape"], {})
-            }
+            onDrape={!isEditor(user) ? undefined : () => run(["drape"], {})}
             drapeBusy={!!running && job?.steps.some((s) => s.name === "drape")}
           />
         )}
@@ -849,7 +823,7 @@ function ModelPage({
           <Drawing id={id} files={model.files} stamp={stamp} />
         )}
         {tab === "compare" && sub === "reference" && (
-          <Reference id={id} canEdit={user?.role !== "viewer"} />
+          <Reference id={id} canEdit={isEditor(user)} />
         )}
         {tab === "compare" && sub === "ai" && (
           <AiAdvice id={id} files={model.files} stamp={stamp} onJob={setJob} />
@@ -870,13 +844,18 @@ function ModelPage({
 function Changes({ model }: { model: ModelDetail }) {
   const { settings, panels } = realChanges(model);
   const a = model.approval;
+  const ok = model.desk_approved;
+  const holds =
+    model.desk_status === "approved" || model.desk_status === "produced";
   return (
     <>
       <h3>Approval</h3>
       <p>
-        {!a && "The definitive drawing is not approved yet."}
+        {holds && ok
+          ? `Approved on the Desk by ${ok.by} on ${new Date(ok.time * 1000).toLocaleString()}${ok.revision != null ? `, revision ${ok.revision}` : ""}.`
+          : "Not approved on the Desk yet (the only approval, ADR-128)."}{" "}
         {a &&
-          `${a.valid ? "Approved" : "Approved, then changed"} by ${a.name} on ${new Date(a.time * 1000).toLocaleString()}${a.revision !== null ? `, revision ${a.revision}` : ""}.`}{" "}
+          `Before that, the definitive drawing was approved by ${a.name} on ${new Date(a.time * 1000).toLocaleString()} (history).`}{" "}
         At the Desk:{" "}
         <a href={deskHref(model.id, "history")}>
           {model.desk_status ?? "not on the Desk"}

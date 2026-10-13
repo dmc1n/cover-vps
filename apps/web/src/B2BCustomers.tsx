@@ -49,7 +49,6 @@ interface Settings {
   min_order_eur: number;
   shipping_eur: number;
   payment_days: number;
-  auto_produce: boolean;
 }
 interface State {
   companies: Company[];
@@ -354,8 +353,9 @@ export function B2BCustomers() {
         </form>
       </section>
       <p className="muted">
-        The terms (minimum order, shipping, payment days, into production at
-        once): Settings → <a href="#/settings/selling">Selling</a>.
+        The terms (minimum order, shipping, payment days): Settings →{" "}
+        <a href="#/settings/selling">Selling</a>. An order on account waits for
+        Send to production on Shop → Orders (ADR-128).
       </p>
     </>
   );

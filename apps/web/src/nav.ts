@@ -45,8 +45,8 @@ export const SECTIONS: Section[] = [
       {
         id: "workshop",
         label: "Workshop",
-        who: "all", // a workshop right of its own is open owner question 92
-        hint: "Approved covers: their files, measured fits and the customers' answers",
+        who: "all", // the workshop login's start page (ADR-128)
+        hint: "Orders to make, approved covers: their files, measured fits and the customers' answers",
       },
     ],
   },
@@ -231,20 +231,39 @@ export interface Viewer {
   desk_approver?: boolean;
 }
 
-export const allowed = (who: Who, user: Viewer): boolean =>
-  who === "all" ||
-  (who === "edit" && user.role !== "viewer") ||
-  (who === "admin" && user.role === "admin");
+/** The workshop login (ADR-128) sees Work only: the Desk (read-only), its questions and the
+ * Workshop; the server refuses everything else anyway (an allow-list in security.py). */
+export const WORKSHOP_PAGES = new Set([
+  "work",
+  "work/desk",
+  "work/questions",
+  "work/workshop",
+]);
+export const isWorkshop = (user?: Viewer | null): boolean =>
+  user?.role === "workshop";
+/** May change things: editors and admins (not viewers, not the workshop login). */
+export const isEditor = (user?: Viewer | null): boolean =>
+  user?.role === "admin" || user?.role === "editor";
+
+/** `id`: the section ("work") or the page ("work/desk") the check is for; the workshop login
+ * sees only WORKSHOP_PAGES. */
+export const allowed = (who: Who, user: Viewer, id?: string): boolean =>
+  isWorkshop(user)
+    ? id !== undefined && WORKSHOP_PAGES.has(id)
+    : who === "all" ||
+      (who === "edit" && isEditor(user)) ||
+      (who === "admin" && user.role === "admin");
 
 export const visibleSections = (user: Viewer): Section[] =>
-  SECTIONS.filter((s) => allowed(s.who, user)).map((s) => ({
+  SECTIONS.filter((s) => allowed(s.who, user, s.id)).map((s) => ({
     ...s,
-    pages: s.pages.filter((p) => allowed(p.who, user)),
+    pages: s.pages.filter((p) => allowed(p.who, user, `${s.id}/${p.id}`)),
   }));
 
-/** Approvers (the Desk's, or the definitive drawing's) start at Work → Desk; everyone else at
- * Covers → All covers (the owner, 11 Oct 2026: existing roles only; open question 3). */
+/** Approvers at the Desk start at Work → Desk, the workshop login at Work → Workshop (ADR-128);
+ * everyone else at Covers → All covers (the owner, 11 Oct 2026; open question 3). */
 export const startPage = (user: Viewer): string => {
+  if (isWorkshop(user)) return "#/work/workshop";
   // an admin starts where he was last (his last section, remembered in this browser)
   if (user.role === "admin") {
     const last = rememberedPage();

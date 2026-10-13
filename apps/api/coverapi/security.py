@@ -17,6 +17,7 @@ user is "local".
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from typing import Any
 from urllib.parse import urlparse
@@ -33,6 +34,7 @@ from coverapi.auth import (
     SESSION_DAYS,
     TRUSTED_COOKIE,
     TRUSTED_DAYS,
+    WORKSHOP,
     Auth,
     AuthError,
     User,
@@ -47,6 +49,32 @@ OPEN_PATHS = (
     "/api/shop/",  # the cover webshop: its own limits; payments only through Mollie (ADR-062)
     "/api/b2b/",  # the B2B shop: its own logins, sessions and CSRF (b2b.py, ADR-104)
 )
+# The workshop login (ADR-128, owner question 92): an allow-list, so a route added later stays
+# closed to it until it is named here. It reads Work → Workshop, the Desk (queue, card, drawing
+# pages), its questions, a cover's files (cut.dxf still behind the Desk gate) and what the
+# Desk card's 3D view and check list need; it writes only a fit, a note and pictures on a Desk
+# card (the route refuses every other action), an answer to its own questions and a geodesic
+# measurement. Never prices, settings, orders, admin pages or paid AI runs.
+_MODEL = r"[a-z0-9][a-z0-9-]*"
+WORKSHOP_READ = re.compile(
+    r"^/api/(?:auth/me|desk|workshop|questions|questions/count|questions/\d+"
+    r"|questions/\d+/pictures/[^/]+|desk/" + _MODEL + r"(?:/page/\d+|/correct)?"
+    r"|models|models/" + _MODEL + r"(?:/(?:files/.+|revisions/\d+/[^/]+|approved/[^/]+"
+    r"|sizes|measure\.json|checkpoints))?|jobs/[a-z0-9]+)$"
+)
+WORKSHOP_WRITE = re.compile(
+    r"^/api/(?:auth/(?:logout|password)|desk/" + _MODEL + r"|desk/" + _MODEL + r"/pictures"
+    r"|questions/\d+/(?:answer|pictures)|models/" + _MODEL + r"/measure/geodesic)$"
+)
+
+
+def workshop_may(method: str, path: str) -> bool:
+    """Whether the workshop role may call this route at all (the route checks the rest)."""
+    if method in CHANGING:
+        return method == "POST" and bool(WORKSHOP_WRITE.match(path))
+    return bool(WORKSHOP_READ.match(path))
+
+
 TWO_FACTOR_KEY = "two_factor"  # a code by mail after the password (owner, 2 Oct 2026)
 CHANGING = ("POST", "PUT", "PATCH", "DELETE")
 PUBLIC_URL_KEY = "public_url"
@@ -168,6 +196,15 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
                 user = auth.session_user(request.cookies.get(SESSION_COOKIE))
                 if user is None and not path.startswith(OPEN_PATHS):
                     return JSONResponse({"detail": "please log in"}, status_code=401)
+                if (
+                    user is not None
+                    and user.role == WORKSHOP
+                    and not path.startswith(OPEN_PATHS)
+                    and not workshop_may(request.method, path)
+                ):
+                    return JSONResponse(
+                        {"detail": "the workshop login may not open this"}, status_code=403
+                    )
                 if request.method in CHANGING and not path.startswith(
                     ("/api/public/", "/api/shop/", "/api/b2b/")
                 ):
@@ -212,14 +249,14 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
     def _change_allowed(user: User, path: str) -> bool:
         if path.startswith("/api/auth/"):
             return True
+        if user.role == WORKSHOP:  # its allow-list passed; the route checks the action
+            return True  # the front door checked its allow-list with the real method
         if path.startswith(("/api/admin/cms", "/api/admin/matches")):
             return user.may("edit")  # colleagues edit the site, answer matches (ADR-062, 064)
         if path.startswith("/api/admin/"):
             return user.may("admin")
         if path.startswith("/api/questions"):
             return user.may("view")  # the route checks who may answer (ADR-109)
-        if path.endswith("/approve") or path.endswith("/approval-request"):
-            return user.may("view")  # the route itself checks can_approve / edit
         return user.may("edit")
 
     # ---- login

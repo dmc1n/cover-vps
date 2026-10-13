@@ -275,7 +275,9 @@ export function Account({ user }: { user: User }) {
       <h2>My account</h2>
       <p className="muted">
         {user.name} · {user.username} · {user.role}
-        {user.can_approve ? " · may approve definitive drawings" : ""}
+        {user.can_approve && user.role !== "workshop"
+          ? " · approves at the Desk"
+          : ""}
         {user.email ? ` · ${user.email}` : ""}
       </p>
       <form

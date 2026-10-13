@@ -2,7 +2,7 @@
 
 Cover Studio is on the internet at **https://covers.suns.nu**. Everyone logs in with their own
 account; nothing can be seen or changed without one. This page is for admins: the people,
-the approval of the definitive drawing, the **Settings** page and the **Shop** pages. The map
+the Desk's approval, the **Settings** page and the **Shop** pages. The map
 of the studio: [navigation.md](navigation.md).
 
 ## Logging in for the first time
@@ -53,34 +53,34 @@ end the codes still open.
 
 | role | may |
 |---|---|
-| viewer | look at everything and download files |
+| workshop | Work only: Workshop, Desk and its own Questions; approved files, comments, pictures and fit measurements |
+| viewer | look at everything its role allows and download files |
 | editor | also upload models, calculate, change a cover's settings and seams; draft the website; look at Prices |
 | admin | also Settings (users, rights, mail, keys, system, logins, audit log), the Shop pages, and change and publish Prices |
 
-Besides the role, an admin sets per user **may approve**: only those users can approve the
-definitive drawing of a cover. Who approves at the **Desk** is a separate list, the setting
-`desk.approvers` (plus every admin; see [desk.md](desk.md)). Whether these become one list and
-one approval is still open with the owner (#83, #84). There is no separate workshop role yet
-(open owner question #92); the Workshop page is open to every role
-([workshop.md](workshop.md)). Exactly which page each role sees: [navigation.md](navigation.md).
+In **Settings → Users & rights**, **may approve** now means **approves at the Desk**
+(ADR-128). Admins and user names in `desk.approvers` may also approve
+([desk.md](desk.md)). **May approve** cannot be set for the **workshop** role.
 
-## Approving the definitive drawing
+The workshop login starts on **Work → Workshop**. It can comment with pictures on a Desk
+card, enter **Fits / Does not fit / Measured…**, answer its own questions and download
+approved files. It cannot Approve, Reject, mark Produced, Undo, correct covers, calculate,
+start the AI or Send to production. It sees no prices, cover pages, Shop or Settings.
+See [workshop.md](workshop.md) and [navigation.md](navigation.md).
 
-On every cover with cut pieces there is a block at the top of its page (above the tabs; its
-state is also in the cover's status strip):
+## Approving at the Desk (ADR-128)
 
-- **not approved yet**: an approver presses *Approve the definitive drawing* (with a note if
-  wanted). The approval belongs to the current revision. *Approved size drawing* and *Approved
-  cutting list* are copies with "APPROVED name date revision" on every page.
-- **approved by … on …**: the cover may be cut. Its status is *production*.
-- **changed after the approval**: the cover was calculated again and the files are different;
-  approve again before cutting.
+The Desk is the only approval. The cover page's separate definitive-drawing approval is
+retired; old approvals remain as history. Its approval card shows who approved at the Desk,
+when and which revision. **Its Desk card** opens that card. An editor or admin can use
+**Send to the Desk for approval** when it is not already waiting there; the approvers get
+a mail with the link.
 
-An editor who may not approve presses *Ask for approval*: the approvers get a mail with the
-link. Status *production* can only be set with a valid approval.
-
-This approval is separate from the Desk's **Approve** (open owner question #83/#84: one
-approval or two steps).
+A Desk approval stamps the size drawing and cutting list, when available, with
+`APPROVED <name> <date> revision <n>` on every page. Download **Approved size drawing**
+and **Approved cutting list** from that approval card. When a change invalidates the
+approval, these downloads disappear and the cutting-table DXF waits for approval again.
+See [desk.md](desk.md).
 
 ## Settings
 
@@ -100,7 +100,8 @@ the same stored values as before; nothing moved in the data.
 - **Selling**: *Matching and direct orders*: mode (learning or automatic), the thresholds
   with the value that applies, the discount on an existing cover; how a match is scored
   (read-only), see *Matches* below. *B2B terms*: minimum order, shipping per order, payment
-  term, into production at once ([b2b.md](b2b.md)).
+  term ([b2b.md](b2b.md)). **Into production at once** is gone (ADR-128);
+  every B2B order waits for **Send to production**.
 
 **Prices & costs** (editors see these three, to look): **Costs**, **Price rules**, **Publish &
 versions** ([prices.md](prices.md)). One cover's cost and prices are on its Price & shop tab.
@@ -148,8 +149,14 @@ website's own domain; the public consumer shop: [webshop.md](webshop.md).
 - **Orders** (`#/shop/orders`): every order with its customer, cover, total and status. The
   search in the top bar finds an order by number, customer or product and opens this page with
   that order highlighted (`#/shop/orders/<n>`).
-  - A paid order goes into production by itself: its pattern, then the drape. **Into
-    production** does it by hand (for a payment by bank transfer).
+  - A paid order waits with status **waiting for production** (ADR-128). B2B orders on
+    account wait too. **Send to production** makes the cover and sends it to the Desk for
+    approval. Editors and admins can also press it on **Work → Workshop**. For a bank
+    transfer, mark the order paid first.
+  - Setting the status by hand to **in production** is refused before that click.
+  - The click sends the studio a production mail with the cover and who sent it. The
+    cutting-table DXF follows the Desk's approval. A current catalogue approval stays valid.
+    Clicking again does not make a second cover or send the production mail twice.
   - Changing the status mails the customer.
   - B2B orders have a green **B2B n · PO …** mark ([b2b.md](b2b.md)).
 - **Requests** (`#/shop/requests`): what customers asked, on one page: *which existing cover
@@ -274,6 +281,7 @@ How to start each is at the top of the file. The pictures go to `out/sitepolish/
 
 ```
 COVER_DATA_DIR=~/cover-data uv run cover-users list
+COVER_DATA_DIR=~/cover-data uv run cover-users add werkplaats --name Werkplaats --role workshop
 COVER_DATA_DIR=~/cover-data uv run cover-users add <name> --name "Full Name" --email … \
     --role editor [--approve]
 COVER_DATA_DIR=~/cover-data uv run cover-users invite <name>      # a new password link

@@ -1,6 +1,6 @@
 # The consumer webshop (B2C, public)
 
-The shop for consumers is at **https://shop.s2dio.living** (ADR-066, ADR-103). Everyone can use
+The shop for consumers is at **https://shop.s2dio.living** (ADR-066, ADR-103, ADR-128). Everyone can use
 it without logging in. The business shop (B2B, Sunsit and dealers) is separate and has a login
 under `/b2b`.
 
@@ -71,13 +71,15 @@ Settings → Costs, under Exchange rate.
 Settings → **Website & API keys** → Payment → Mollie key (shown masked; *Replace* to give a
 new one):
 
-- empty: orders are placed and wait for payment (bank transfer; **Into production** by hand);
+- empty: orders are placed and wait for payment (bank transfer; mark paid, then **Send to production**);
 - `test_…`: Mollie's test mode; the checkout says "Testbetalingen: er wordt geen geld
   afgeschreven";
 - `live_…`: real payments.
 
 To go live: finish the Mollie account, place one test order with the test key end to end
-(pay, the order turns *paid*, it goes into production), then paste the live key.
+(pay, the customer sees **paid**, the studio sees **waiting for production**; press
+**Send to production** on **Shop → Orders** or **Work → Workshop**, then approve at the Desk
+before downloading the cutting-table DXF), then paste the live key.
 
 ## Safety and limits
 

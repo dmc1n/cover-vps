@@ -3,6 +3,7 @@
     COVER_DATA_DIR=~/cover-data uv run cover-users list
     COVER_DATA_DIR=~/cover-data uv run cover-users add rick --name Rick --email rick@... \\
         --role admin --approve
+    cover-users add werkplaats --name Werkplaats --role workshop
     COVER_DATA_DIR=~/cover-data uv run cover-users invite rick     # a new password link
     COVER_DATA_DIR=~/cover-data uv run cover-users two-factor off|on|status
 
@@ -31,7 +32,9 @@ def main() -> int:
     a.add_argument("--name", default="")
     a.add_argument("--email")
     a.add_argument("--role", choices=ROLES, default="viewer")
-    a.add_argument("--approve", action="store_true", help="may approve the definitive drawing")
+    a.add_argument(
+        "--approve", action="store_true", help="approves at the Desk (never with --role workshop)"
+    )
     i = sub.add_parser("invite")
     i.add_argument("username")
     t = sub.add_parser("two-factor", help="the login code by mail: on, off or status")
@@ -46,7 +49,7 @@ def main() -> int:
             for u in auth.users():
                 flags = ("may approve " if u.can_approve else "") + ("" if u.active else "inactive")
                 pw = "password set" if u.has_password else "no password yet"
-                print(f"{u.username:<12} {u.name:<16} {u.role:<7} {pw:<16} {u.email or ''} {flags}")
+                print(f"{u.username:<12} {u.name:<16} {u.role:<8} {pw:<16} {u.email or ''} {flags}")
             return 0
         if args.cmd == "two-factor":
             from coverapi import mailer

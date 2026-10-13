@@ -507,9 +507,14 @@ CREATE TABLE IF NOT EXISTS orders (
   model_id TEXT,
   updated REAL
 )"""
-# on_account: a B2B order, invoiced (ADR-104)
-STATUSES = ("awaiting_payment", "paid", "in_production", "sewn", "shipped", "cancelled", "failed",
-            "returned", "on_account")  # fmt: skip
+# on_account: a B2B order, invoiced (ADR-104); waiting_production: paid (or on account) and waiting
+# for someone in the studio to send it to production (owner, 13 Oct 2026, question 86 b; ADR-128)
+STATUSES = ("awaiting_payment", "paid", "waiting_production", "in_production", "sewn", "shipped",
+            "cancelled", "failed", "returned", "on_account")  # fmt: skip
+WAITING_PRODUCTION = "waiting_production"
+# what "Send to production" takes: paid or on account and not yet sent (paid and on_account are
+# the statuses such orders had before ADR-128)
+RELEASABLE = ("paid", WAITING_PRODUCTION, "on_account")
 MATCH_TABLE = """
 CREATE TABLE IF NOT EXISTS match_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -782,7 +787,9 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         db.execute(MATCH_TABLE)
         db.execute(FEEDBACK_TABLE)
         have = {r[1] for r in db.execute("PRAGMA table_info(orders)")}
-        for col in ("feedback_token TEXT", "feedback_sent REAL"):
+        # released: when someone in the studio sent it to production, and who (ADR-128)
+        for col in ("feedback_token TEXT", "feedback_sent REAL", "released REAL",
+                    "released_by TEXT"):  # fmt: skip
             if col.split()[0] not in have:
                 db.execute(f"ALTER TABLE orders ADD COLUMN {col}")
     app.state.site = site
@@ -1148,7 +1155,9 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         if row is None:
             raise HTTPException(404, "no such order")
         d = json.loads(row["data"])
-        return {"order": row["id"], "status": row["status"], "total_eur": row["total_eur"],
+        # to the customer, waiting for production is simply "paid" (ADR-128)
+        shown = "paid" if row["status"] == WAITING_PRODUCTION else row["status"]
+        return {"order": row["id"], "status": shown, "total_eur": row["total_eur"],
                 "created": row["created"], "product": d["quote"]["quote"]["product"],
                 "colour": d["quote"]["quote"]["colour"],
                 "stock": (d["quote"].get("stock") or {}).get("name")}  # fmt: skip
@@ -1175,11 +1184,17 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                 if problem:  # never produce on a payment that is not this order's (ADR-123)
                     notify(f"Order {row[0]}: Mollie payment {pid} does not match", problem)
                     return {"ok": True}
+            # paid: waiting for production until someone in the studio sends it (ADR-128); the
+            # update takes an order only once, so a repeated webhook changes nothing
+            new = WAITING_PRODUCTION if status == "paid" else status
             with sqlite3.connect(auth.path) as db:
-                db.execute("UPDATE orders SET status=?, updated=? WHERE mollie_id=? "
-                           "AND status='awaiting_payment'", (status, time.time(), pid))  # fmt: skip
-            if status == "paid":
-                produce(int(row[0]))
+                cur = db.execute("UPDATE orders SET status=?, updated=? WHERE mollie_id=? "
+                                 "AND status='awaiting_payment'",
+                                 (new, time.time(), pid))  # fmt: skip
+            if status == "paid" and cur.rowcount:
+                notify(f"Order {row[0]} is paid: waiting for production",
+                       f"Order {row[0]} is paid (EUR {row[1]}). It waits for production: Shop → "
+                       "Orders or Work → Workshop, Send to production.")  # fmt: skip
         return {"ok": True}
 
     # ---- the customer's sizes against our range, and the learning mode (ADR-064) -------------
@@ -1485,30 +1500,51 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         return Response((photos / name).read_bytes(), media_type=media)
 
     # ---- orders (admin) and the way into production ------------------------------------------
+    producing = threading.Lock()  # one order made at a time: two clicks never build it twice
+
     def produce(oid: int) -> str:
-        """The paid order as a cover model, calculated to the end (then the drape follows)."""
+        """An order someone in the studio sent to production (`released`, ADR-128) as a cover
+        model, calculated to the end, on the Desk as an order for its quick approval; the
+        cutting table's DXF follows that approval. Never an order that was not released."""
+        with producing:
+            return _produce(oid)
+
+    def _produce(oid: int) -> str:
         from coverengine import drawn
         from coverengine.catalogue import set_info
         from coverengine.cli import main as cover
         from coverengine.io.kind import confirm
 
+        from coverapi import desk
         from coverapi.jobs import JobSpec
 
         with sqlite3.connect(auth.path) as db:
-            row = db.execute("SELECT data, model_id FROM orders WHERE id=?", (oid,)).fetchone()
+            row = db.execute("SELECT data, model_id, released, released_by FROM orders WHERE id=?",
+                             (oid,)).fetchone()  # fmt: skip
         if row is None:
             raise HTTPException(404, "no such order")
         if row[1]:
             return str(row[1])
+        if row[2] is None:  # the click is the only way in (owner, 13 Oct 2026, question 86 b)
+            raise HTTPException(409, f"order {oid} is not sent to production yet")
+        who = str(row[3] or "the studio")
         d = json.loads(row[0])
+        b2b = bool(d.get("b2b"))
+        learning = store.root / "learning"
         if d["quote"].get("stock"):  # an existing cover: cut from its own, tested pattern
             model_id = str(d["quote"]["stock"]["model_id"])
+            if not (store.models / model_id).is_dir():
+                raise HTTPException(409, f"order {oid}: the existing cover {model_id} is gone")
+            st = desk.mark_order(store.models / model_id, oid, who, learning, b2b)
             with sqlite3.connect(auth.path) as db:
                 db.execute("UPDATE orders SET model_id=?, status='in_production', updated=? "
                            "WHERE id=?", (model_id, time.time(), oid))  # fmt: skip
+            held = (st.get("order") or {}).get("approved")
+            ready = ("its approval holds: the DXF is ready" if held
+                     else "it waits on the Desk for a quick approval; the DXF follows")  # fmt: skip
             notify(f"Order {oid}: cut the existing cover {model_id}",
-                   f"Order {oid} is an existing cover from the range: {model_id} "
-                   f"(cut.dxf of that model).")  # fmt: skip
+                   f"Order {oid} was sent to production by {who}. It is an existing cover from "
+                   f"the range: {model_id} (cut.dxf of that model); {ready}.")  # fmt: skip
             return model_id
         qd = d["quote"]["quote"]
         p = shop_params(auth)
@@ -1532,13 +1568,87 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         notes = (f"Shop order {oid}: {c['name']} ({c['city']}), {qd['product']} {sizes}, "
                  f"{qd['colour']}, support {support}")  # fmt: skip
         set_info(model, {"status": "draft", "tags": ["order", "shop"], "notes": notes})
+        desk.mark_order(model, oid, who, learning, b2b)  # first in the Desk's queue (ADR-128)
         jobs.submit(JobSpec(model_id, ["hull", "cut", "flatten", "export"], {}))
         with sqlite3.connect(auth.path) as db:
             db.execute("UPDATE orders SET model_id=?, status='in_production', updated=? "
                        "WHERE id=?", (model_id, time.time(), oid))  # fmt: skip
+        notify(f"Order {oid} in production: {model_id}",
+               f"Order {oid} was sent to production by {who}. Its cover {model_id} is being "
+               "calculated and waits on the Desk for a quick approval; the DXF "
+               "follows.")  # fmt: skip
         return model_id
 
     app.state.shop_produce = produce  # a B2B order on account goes the same way (ADR-104)
+
+    def release(oid: int, who: str) -> str:
+        """Send to production (ADR-128): marks the order released, once, then makes its cover.
+        A second click finds it released and returns the same cover. A B2B line's outbox row is
+        marked dispatched after the cover is made; a crash in between is picked up by the B2B
+        outbox's restart recovery, which drains released lines only."""
+        now = time.time()
+        marks = ",".join("?" * len(RELEASABLE))
+        with sqlite3.connect(auth.path) as db:
+            row = db.execute("SELECT status, released, model_id FROM orders WHERE id=?",
+                             (oid,)).fetchone()  # fmt: skip
+            if row is None:
+                raise HTTPException(404, "no such order")
+            if row[1] is None and not row[2]:
+                cur = db.execute(
+                    f"UPDATE orders SET released=?, released_by=?, updated=? WHERE id=? "  # noqa: S608
+                    f"AND released IS NULL AND status IN ({marks})",
+                    (now, who, now, oid, *RELEASABLE),
+                )  # fmt: skip
+                if not cur.rowcount:
+                    raise HTTPException(409, f"order {oid} is {row[0]}: only a paid order, or one "
+                                        "on account, goes to production")  # fmt: skip
+            elif row[2]:
+                return str(row[2])  # sent before and made: the same cover, nothing again
+            try:
+                done = db.execute("SELECT dispatched FROM b2b_dispatch WHERE order_id=?",
+                                  (oid,)).fetchone()  # fmt: skip
+            except sqlite3.OperationalError:  # no B2B shop installed
+                done = None
+            if done and done[0]:
+                return ""  # a B2B line already dispatched: never twice
+        model_id = str(app.state.shop_produce(oid) or "")
+        with sqlite3.connect(auth.path) as db:
+            try:
+                db.execute("UPDATE b2b_dispatch SET dispatched=1 WHERE order_id=?", (oid,))
+            except sqlite3.OperationalError:  # no B2B shop installed
+                pass
+        return model_id
+
+    def workshop_orders() -> list[dict[str, Any]]:
+        """The orders waiting for production or in it, for Work → Workshop: what to make, never
+        a price or an e-mail address (the workshop login sees this, ADR-128)."""
+        with sqlite3.connect(auth.path) as db:
+            db.row_factory = sqlite3.Row
+            rows = db.execute(
+                "SELECT id, created, status, data, model_id, released, released_by FROM orders "
+                "WHERE status IN ('paid', 'waiting_production', 'on_account', 'in_production') "
+                "ORDER BY id DESC LIMIT 300"
+            ).fetchall()  # fmt: skip
+        out = []
+        for r in rows:
+            d = json.loads(r["data"])
+            q = (d.get("quote") or {}).get("quote") or {}
+            c = d.get("customer") or {}
+            b = d.get("b2b") or {}
+            waiting = r["released"] is None and r["status"] in RELEASABLE
+            out.append({
+                "id": r["id"], "created": r["created"],
+                "status": WAITING_PRODUCTION if waiting else r["status"],
+                "model_id": r["model_id"], "released": r["released"],
+                "released_by": r["released_by"], "product": q.get("product"),
+                "colour": q.get("colour"), "sizes_cm": q.get("sizes_cm"),
+                "stock": ((d.get("quote") or {}).get("stock") or {}).get("name"),
+                "qty": b.get("qty") or 1, "company": b.get("company"),
+                "customer": c.get("name"), "city": c.get("city"),
+            })  # fmt: skip
+        return out
+
+    app.state.workshop_orders = workshop_orders
 
     @app.get("/api/admin/orders")
     def orders(request: Request) -> dict[str, Any]:
@@ -1556,6 +1666,12 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         status = str(req.get("status", ""))
         if status not in STATUSES:
             raise HTTPException(400, f"status: one of {', '.join(STATUSES)}")
+        if status == "in_production":  # only through Send to production (ADR-128)
+            with sqlite3.connect(auth.path) as db:
+                row = db.execute("SELECT released FROM orders WHERE id=?", (oid,)).fetchone()
+            if row is None or row[0] is None:
+                raise HTTPException(400, "use Send to production: it makes the cover and sends it "
+                                    "to the Desk")  # fmt: skip
         with sqlite3.connect(auth.path) as db:
             db.execute(
                 "UPDATE orders SET status=?, updated=? WHERE id=?", (status, time.time(), oid)
@@ -1574,8 +1690,12 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
 
     @app.post("/api/admin/orders/{oid}/produce")
     def order_produce(oid: int, request: Request) -> dict[str, Any]:
-        require(request, "edit")
-        return {"model_id": produce(oid)}
+        """Send to production: someone in the studio decides when a paid order (or one on
+        account) is made (owner, 13 Oct 2026, question 86 b; ADR-128)."""
+        user = require(request, "edit")
+        model_id = release(oid, user.name or user.username)
+        auth.log(user, "order to production", {"order": oid, "model": model_id})
+        return {"model_id": model_id}
 
 
 # ---- the shop's pages for people, search engines and AI assistants (ADR-062) ------------------

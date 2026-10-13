@@ -21,6 +21,9 @@
   follows the consumer orders' production flow (Admin → Orders, into production); the B2B order
   itself (PO number, delivery address, lines) is `b2b_orders`, which the customer's "previous
   orders" and "order again" read. A confirmation goes to the customer and to the alert address.
+  Each line waits for production ("waiting_production") until someone in the studio sends it
+  (owner, 13 Oct 2026, question 86 b; ADR-128); the outbox (`b2b_dispatch`) is drained for
+  released lines only, so a restart still finishes a line that was sent but not yet made.
 """
 
 from __future__ import annotations
@@ -61,7 +64,7 @@ DEFAULTS: dict[str, Any] = {
     "min_order_eur": 0,  # ex VAT; 0: no minimum (to confirm, QUESTIONS 72)
     "shipping_eur": 0,  # ex VAT per order on top; 0: shipping is in the price list's extras
     "payment_days": 30,  # the invoice's term, shown in the confirmation (to confirm)
-    "auto_produce": True,  # an order on account goes into production at once, like a paid one
+    # no "auto_produce" since ADR-128: a line goes to production only by a click in the studio
 }
 COOKIE = "b2b_session"
 COOKIE_PATH = "/api/b2b/"
@@ -1176,9 +1179,9 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
                                 "po": req.po.strip(), "qty": line["qty"],
                                 "unit_eur": line["unit_eur"], "ex_vat": True,
                                 "payment": "account"}}  # fmt: skip
-                cur = c.execute(
+                cur = c.execute(  # on account, waiting for the studio's click (ADR-128)
                     "INSERT INTO orders (created, token, status, email, data, total_eur, updated) "
-                    "VALUES (?, ?, 'on_account', ?, ?, ?, ?)",
+                    "VALUES (?, ?, 'waiting_production', ?, ?, ?, ?)",
                     (time.time(), secrets.token_urlsafe(18), user["email"], json.dumps(data),
                      line["total_eur"], time.time()),
                 )  # fmt: skip
@@ -1187,7 +1190,6 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
             c.execute("UPDATE b2b_orders SET lines=? WHERE id=?", (json.dumps(lines), bid))
         auth.log(who(user), "b2b order", {"order": bid, "lines": len(lines), "net_eur": net,
                                           "po": req.po})  # fmt: skip
-        produce_later()
         doc = {"order": bid, "net_eur": net, "vat_eur": vat, "gross_eur": round(net + vat, 2),
                "lines": lines, "address": addr, "po": req.po.strip()}  # fmt: skip
         confirm_mails(doc, user, company, req.lang, s)
@@ -1196,15 +1198,18 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
     dispatch_lock = threading.Lock()
 
     def produce_later() -> None:
-        """Drain the committed outbox. Failed/interrupted lines remain for restart recovery."""
-        if not settings()["auto_produce"] or getattr(app.state, "shop_produce", None) is None:
+        """Drain the committed outbox: the lines someone in the studio sent to production
+        (`released`, ADR-128) whose cover was not made yet (a restart in between). A line that
+        waits for its click stays in the outbox. Failed lines remain for the next try."""
+        if getattr(app.state, "shop_produce", None) is None:
             return
 
         def run() -> None:
             with dispatch_lock:
                 with sqlite3.connect(auth.path) as c:
                     pending = c.execute(
-                        "SELECT order_id FROM b2b_dispatch WHERE dispatched=0"
+                        "SELECT d.order_id FROM b2b_dispatch d JOIN orders o ON o.id=d.order_id "
+                        "WHERE d.dispatched=0 AND o.released IS NOT NULL"
                     ).fetchall()
                 for (oid,) in pending:
                     try:
@@ -1216,7 +1221,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
                     except Exception as exc:  # noqa: BLE001 - retain the pending line
                         studio_mail(
                             f"B2B order line {oid}: not into production",
-                            f"{exc}\nAdmin → Orders → Into production.",
+                            f"{exc}\nShop → Orders → Send to production (again).",
                         )
 
         threading.Thread(target=run, daemon=True, name="b2b-produce").start()
@@ -1288,6 +1293,8 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         for o in out:  # the customer sees no internal fields
             for x in o["lines"]:
                 x.pop("input", None)
+                if x.get("status") == "waiting_production":  # to the customer: on account
+                    x["status"] = "on_account"
         return {"orders": out}
 
     @app.post("/api/b2b/orders/{bid}/reorder")

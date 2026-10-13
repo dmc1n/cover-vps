@@ -60,7 +60,8 @@ def test_rights(app: Any) -> None:
     assert viewer.get("/api/admin/users").status_code == 403
     editor = login(app, "eddy", "a-long-editor-password")
     assert editor.get("/api/admin/users").status_code == 403
-    assert editor.post("/api/models/x/approve", json={}).status_code == 403  # no can_approve
+    # the definitive approval is retired: the Desk approves (ADR-128)
+    assert editor.post("/api/models/x/approve", json={}).status_code == 410
     admin = login(app, "rick", "a-long-admin-password")
     users = admin.get("/api/admin/users").json()["users"]
     assert {u["username"] for u in users} == {"rick", "vera", "eddy"}

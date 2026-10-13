@@ -538,7 +538,17 @@ def is_owner(user: Any, params: Any) -> bool:
     when logins are off)."""
     if user.id == 0 and user.may("admin"):
         return True
+    if getattr(user, "role", None) == "workshop":  # never the owner, whatever its name (ADR-128)
+        return False
     return _matches(user, _names(str(params["questions.owners"])))
+
+
+def visible(user: Any, q: dict[str, Any] | sqlite3.Row, params: Any) -> bool:
+    """The workshop login sees only the questions it may answer (ADR-128): a question about
+    prices or the shop for the owner is not its business. Everyone else sees them all."""
+    if getattr(user, "role", None) != "workshop":
+        return True
+    return may_answer(user, q, params)
 
 
 # ---- mail, quietly --------------------------------------------------------------------------
@@ -700,7 +710,7 @@ def install(app: FastAPI, auth: Any, root: Path, models_dir: Path) -> None:
         user = current_user(request)
         p = params()
         with db() as c:
-            items = [decorate(q, user, p) for q in listing(c)]
+            items = [decorate(q, user, p) for q in listing(c) if visible(user, q, p)]
         return {
             "items": items,
             "counts": {s: sum(1 for q in items if q["status"] == s) for s in STATUSES},
@@ -720,7 +730,7 @@ def install(app: FastAPI, auth: Any, root: Path, models_dir: Path) -> None:
         user = current_user(request)
         p = params()
         with db() as c:
-            items = listing(c)
+            items = [q for q in listing(c) if visible(user, q, p)]
         mine = [
             q
             for q in items
@@ -742,12 +752,20 @@ def install(app: FastAPI, auth: Any, root: Path, models_dir: Path) -> None:
     @app.get("/api/questions/{qid}")
     def questions_one(qid: int, request: Request) -> dict[str, Any]:
         user = current_user(request)
+        p = params()
         with db() as c:
-            return decorate(get(c, qid), user, params())
+            q = get(c, qid)
+        if not visible(user, q, p):
+            raise HTTPException(404, "no such question")
+        return decorate(q, user, p)
 
     @app.get("/api/questions/{qid}/pictures/{name}")
     def questions_picture(qid: int, name: str, request: Request) -> FileResponse:
-        current_user(request)
+        user = current_user(request)
+        with db() as c:
+            row = _row(c, qid)
+        if not visible(user, row, params()):
+            raise HTTPException(404, "no such picture")
         path = picture_path(root, qid, name)
         if path is None:
             raise HTTPException(404, "no such picture")

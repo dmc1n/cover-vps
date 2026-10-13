@@ -55,11 +55,17 @@ async def main() -> int:
         await tabs.get_by_role("link", name=re.compile(r"^History")).click()
         await show.get_by_role("link", name="Revisions", exact=True).click()
         await expect(page.get_by_role("cell").filter(has_text="pattern.json").first).to_be_visible()
-        await expect(page.get_by_text("Definitive drawing: not approved yet")).to_be_visible()
-        await page.get_by_role("button", name="Approve the definitive drawing").click()
-        await expect(
-            page.locator(".card.approval").get_by_text("Approved by Tester")
-        ).to_be_visible()
+        # one approval, the Desk's (ADR-128): the cover page points there; the approval stamps
+        # the size drawing and the cutting list
+        card = page.locator(".card.approval")
+        await expect(card.get_by_text("Not approved yet")).to_be_visible()
+        cover_url = page.url
+        await card.get_by_role("link", name=re.compile("Its Desk card")).click()
+        await page.locator(".d-actions").get_by_role("button", name=re.compile("Approve")).click()
+        await expect(page.locator(".d-msg").first).to_contain_text("Approved", timeout=RUN_MS)
+        await page.goto(cover_url)
+        await expect(card.get_by_text("Approved on the Desk by Tester")).to_be_visible()
+        await expect(card.get_by_role("link", name="Approved size drawing")).to_be_visible()
         await tabs.get_by_role("link", name="Adjust", exact=True).click()
         await page.get_by_placeholder("Search settings…").fill("clearance_mm")
         field = page.locator(".param", has_text="clearance_mm").first.locator("input")

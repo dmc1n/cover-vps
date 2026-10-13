@@ -1,6 +1,7 @@
 """The drawing desk (ADR-079): the AI sorts, Rens, Rick and Wouter approve; the DXF waits."""
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -118,8 +119,15 @@ def test_the_cutting_dxf_waits_for_approval(app: Any) -> None:
     assert hist[-1]["action"] == "dxf override"
     rens.post("/api/desk/drawing-e", json={"action": "approve"})
     assert vera.get(url).status_code == 200
-    assert vera.get("/api/models/suns-chair/files/cut.dxf").status_code == 200  # scope: drawings
+    # every cover since ADR-128 (Rens, question 84 b): a SUNS cover waits too
+    assert vera.get("/api/models/suns-chair/files/cut.dxf").status_code == 403
     assert vera.get("/api/desk/drawing-a").json()["dxf_ok"] is False
+    # the catalogue status set by hand never opens the gate
+    cover = app.state.store.models / "suns-chair" / "cover.json"
+    cover.write_text(cover.read_text().replace('"draft"', '"production"'))
+    assert vera.get("/api/models/suns-chair/files/cut.dxf").status_code == 403
+    rens.post("/api/desk/suns-chair", json={"action": "approve"})
+    assert vera.get("/api/models/suns-chair/files/cut.dxf").status_code == 200
 
 
 def test_drawing_fingerprint_reopens_and_revision_gate(app: Any, tmp_path: Path) -> None:
@@ -163,7 +171,9 @@ def test_drawing_legacy_approval_is_grandfathered(app: Any, tmp_path: Path, stat
 
     d = tmp_path / "data/models/drawing-a"
     (d / "desk.json").write_text(
-        json.dumps({"status": status, "approved": {"by": "Rens", "time": 123}, "history": []})
+        json.dumps(
+            {"status": status, "approved": {"by": "Rens", "time": time.time() + 60}, "history": []}
+        )
     )
     assert login(app, "vera").get("/api/models/drawing-a/files/cut.dxf").status_code == 200
     st = desk.state(d)
@@ -242,3 +252,85 @@ def test_the_workshop_lists_approved_covers_read_only(app: Any, tmp_path: Path) 
     assert vera.get("/api/models/drawing-b/files/cut.dxf").status_code == 403
     # the page changes nothing: the Desk's decisions are as they were
     assert vera.get("/api/desk/drawing-c").json()["desk"]["status"] == "produced"
+
+
+@pytest.mark.parametrize(
+    "name", ["drawing-k", "suns-lounger", "bbq-bge-large", "order-12", "blocchi-sofa", "2026-x"]
+)
+def test_every_cover_kind_waits_for_the_desk(app: Any, tmp_path: Path, name: str) -> None:
+    """ADR-128 (Rens, question 84 b): the cut DXF of every cover is behind the Desk gate;
+    a kept revision too, until its cut file was approved."""
+    d = _model(tmp_path / "data", name, None, None)
+    rev = d / "revisions" / "001"
+    rev.mkdir(parents=True)
+    (rev / "cut.dxf").write_bytes((d / "cut.dxf").read_bytes())
+    vera, rens = login(app, "vera"), login(app, "rens")
+    assert vera.get(f"/api/models/{name}/files/cut.dxf").status_code == 403
+    assert vera.get(f"/api/models/{name}/revisions/1/cut.dxf").status_code == 403
+    assert rens.post(f"/api/desk/{name}", json={"action": "approve"}).status_code == 200
+    assert vera.get(f"/api/models/{name}/files/cut.dxf").status_code == 200
+    assert vera.get(f"/api/models/{name}/revisions/1/cut.dxf").status_code == 200
+    (d / "cut.dxf").write_text("0\nSECTION\n0\nEOF\n")  # a new cut: approve again
+    assert vera.get(f"/api/models/{name}/files/cut.dxf").status_code == 403
+    assert vera.get(f"/api/desk/{name}").json()["desk"]["status"] == "ai-checked"
+
+
+def test_an_order_lands_first_in_the_queue_and_one_click_approves(app: Any, tmp_path: Path) -> None:
+    """ADR-128: a shop order's cover sent to production is on the Desk as an order, first in
+    the queue whatever the AIs said; its approval is one click and lets the DXF through."""
+    from coverapi import desk
+
+    root = tmp_path / "data"
+    learning = root / "learning"
+    d = _model(root, "order-7", "agreed: same", 99)
+    st = desk.mark_order(d, 7, "Rick", learning)
+    assert st["status"] == "ai-checked" and st["sent"]["by"] == "Rick"
+    rens, vera = login(app, "rens"), login(app, "vera")
+    q = vera.get("/api/desk").json()["items"]
+    assert q[0]["id"] == "order-7" and q[0]["order"]["order"] == 7 and q[0]["built"]
+    assert rens.post("/api/desk/order-7", json={"action": "approve"}).status_code == 200
+    q = vera.get("/api/desk").json()["items"]
+    assert q[0]["id"] != "order-7"
+    st = desk.state(d)
+    assert st["order"]["approved"] and st["history"][-1]["order"] == 7
+    assert vera.get("/api/models/order-7/files/cut.dxf").status_code == 200
+    # a catalogue cover already approved for its cut stays approved: ready to cut
+    again = desk.mark_order(d, 8, "Rick", learning)
+    assert again["status"] == "approved" and again["order"]["approved"]
+    # one that is not built yet waits, without a quick approval
+    (d / "cut.dxf").unlink()
+    q = vera.get("/api/desk").json()["items"]
+    assert next(i for i in q if i["id"] == "order-7")["built"] is False
+    assert rens.post("/api/desk/order-7", json={"action": "approve"}).status_code == 400
+
+
+def test_a_name_on_the_list_or_may_approve_approves_never_the_workshop(app: Any) -> None:
+    """The one approval (ADR-128): admins, `desk.approvers`, and users marked may approve."""
+
+    from coverapi import desk
+    from coverapi.auth import User
+    from coverengine.params import Registry
+
+    p = Registry.load(None).resolve()
+    flagged = User(9, "anna", "Anna", None, "editor", True, True)
+    plain = User(10, "bert", "Bert", None, "editor", False, True)
+    bench = User(11, "rens", "Rens", None, "workshop", False, True)
+    assert desk.approver(flagged, p) and not desk.approver(plain, p)
+    assert not desk.approver(bench, p) and desk.worker(bench, p)
+    assert desk.may_act(bench, p, "fit") and not desk.may_act(bench, p, "approve")
+    assert not desk.worker(plain, p)
+
+
+def test_an_approval_older_than_its_cut_file_is_not_grandfathered(app: Any, tmp_path: Path) -> None:
+    """ADR-128: an earlier approval without a fingerprint is amended with the current cut file
+    only when that file is not newer than the approval; else the cover goes back to waiting."""
+    from coverapi import desk
+
+    d = tmp_path / "data/models/suns-chair"
+    (d / "desk.json").write_text(
+        json.dumps({"status": "approved", "approved": {"by": "Rens", "time": 123}, "history": []})
+    )
+    assert login(app, "vera").get("/api/models/suns-chair/files/cut.dxf").status_code == 403
+    st = desk.state(d)
+    assert st["status"] == desk.WAITING and "cut" not in (st.get("approved") or {})
+    assert st["history"][-1]["action"] == "changed after approval"

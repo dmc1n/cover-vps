@@ -5,7 +5,7 @@ Business customers (Sunsit, dealers, garden centres) order at **/b2b** on the we
 configurator and the covers of our range as consumers, but at **their own prices, ex VAT**,
 with **quantities**, their **order reference (PO number)**, their **delivery addresses**, their
 **previous orders** ("order again"), and they order **on account**: an invoice, no online
-payment. Decision: ADR-104.
+payment. Decision: ADR-104, ADR-128.
 
 ## A new business customer
 
@@ -42,9 +42,11 @@ Shop → **B2B customers**, click a company in the list:
 ## Orders
 
 Every line of a B2B order appears under Shop → **Orders** with a green **B2B n · PO …** mark,
-its quantity and its price ex VAT, status *on_account*. It goes into production at once, the
-same way as a paid consumer order (a made-to-measure cover becomes `order-<n>`, a catalogue
-cover is cut from its own pattern). The buyer, the company's e-mail and the alert address get a
+its quantity and its price ex VAT, status **waiting for production**. It waits for
+**Send to production** on **Shop → Orders** or **Work → Workshop**, like a paid consumer
+order. The customer sees **on account** meanwhile. After the click, a made-to-measure cover
+becomes `order-<n>`; a catalogue cover uses its own pattern. The cover goes to the Desk and
+the cutting-table DXF follows its approval. The buyer, the company's e-mail and the alert address get a
 confirmation. The customer sees each line's status under *Previous orders*.
 
 ## B2B terms (Settings → Selling)
@@ -56,7 +58,6 @@ terms** (they used to be at the bottom of the B2B customers page):
 - **Minimum order** ex VAT (0: none).
 - **Shipping per order on top** ex VAT (0: shipping is in the price list's extra costs).
 - **Payment term** in days (in the confirmation).
-- **Into production at once** (on).
 - **Online payment:** later; every order is on account now.
 
 ## Safety

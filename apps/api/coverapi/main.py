@@ -27,10 +27,6 @@ from coverapi.references import ZipTooLarge, register, unpack
 from coverapi.store import ALLOWED, MEDIA, STEPS, UPLOAD_SUFFIXES, Store, registry_specs
 
 
-class ApproveRequest(BaseModel):
-    note: str = ""
-
-
 class RunRequest(BaseModel):
     # default: everything after import; the steps whose inputs did not change skip themselves
     # (the server decides, ADR-080), unless `force`
@@ -204,17 +200,23 @@ def create_app(
 
     @app.get("/api/models/{model_id}")
     def model(model_id: str) -> dict[str, Any]:
-        from coverapi.approval import state
+        from coverapi.approval import STAMPED, legacy
 
         d = model_or_404(model_id)
         out = store.summary(model_id)
         out["job"] = jobs.latest(model_id)
-        out["approval"] = state(d)
+        # the retired definitive approval (ADR-047), kept as history only (ADR-128)
+        out["approval"] = legacy(d)
         from coverengine.params import Registry
 
         params = Registry.load(None).resolve()
         out["dxf_ok"] = desk.dxf_allowed(d, params)  # ADR-079
-        out["desk_status"] = desk.state(d)["status"]
+        st = desk.state(d)
+        out["desk_status"] = st["status"]
+        # the Desk's approval, the only one (ADR-128): who, when, which revision, its stamped PDFs
+        ok = st.get("approved") or {}
+        out["desk_approved"] = {k: ok.get(k) for k in ("by", "time", "revision")} if ok else None
+        out["stamped"] = [f for f in STAMPED if desk.stamped_ok(d, f)]
         # the Workshop's line for this cover (approved or produced; fit, the revision to cut),
         # for the summary at the top of its page (ADR-126); None before the Desk approves
         out["workshop"] = desk.workshop_item(d, params)
@@ -242,7 +244,7 @@ def create_app(
             ensure_checklist(d)
         if name not in ALLOWED or not (d / name).is_file():
             raise HTTPException(404, f"no file {name!r}")
-        if name == "cut.dxf":  # the cutting table's file: only an approved cover (ADR-079)
+        if name.endswith(".dxf"):  # a cutting-table file: only an approved cover (ADR-079, 128)
             desk.gate(d, model_id, request)
         suffix = Path(name).suffix
         file, kind = _named(model_id, name)
@@ -410,13 +412,13 @@ def create_app(
 
     @app.put("/api/models/{model_id}/info")
     def model_info(model_id: str, req: InfoRequest) -> dict[str, Any]:
-        from coverapi.approval import state
-
         d = model_or_404(model_id)
         changes = {k: v for k, v in req.model_dump().items() if k in req.model_fields_set}
-        approved = state(d)
-        if changes.get("status") == "production" and not (approved and approved["valid"]):
-            raise HTTPException(400, "production needs an approval of the current drawing")
+        st = desk.state(d)
+        approved = st["status"] in desk.DONE and not desk._changed_since_approval(d, st)
+        if changes.get("status") == "production" and not approved:
+            raise HTTPException(400, "production needs the Desk's approval of the current cutting "
+                                "file: approve the cover on the Desk first")  # fmt: skip
         try:
             return set_info(d, changes)
         except CoverError as exc:
@@ -440,7 +442,7 @@ def create_app(
         path = revision_file(d, number, name)
         if not path.is_file():
             raise HTTPException(404, f"revision {number} has no {name}")
-        if name == "cut.dxf":
+        if name.endswith(".dxf"):
             desk.gate(d, model_id, request, revision=path.parent)
         file, kind = _named(model_id, name, number)
         return FileResponse(path, media_type=MEDIA.get(path.suffix, "application/octet-stream"),
@@ -464,52 +466,44 @@ def create_app(
 
     @app.get("/api/models/{model_id}/approval")
     def approval_state(model_id: str) -> dict[str, Any]:
-        from coverapi.approval import state
+        """The retired definitive approval as history (ADR-128); the Desk decides now."""
+        from coverapi.approval import legacy
 
-        return {"approval": state(model_or_404(model_id))}
+        return {"approval": legacy(model_or_404(model_id))}
 
     @app.post("/api/models/{model_id}/approve")
-    def approve_model(model_id: str, req: ApproveRequest, request: Request) -> dict[str, Any]:
-        from coverapi.approval import approve
-
-        user = require(request, "approve")
-        d = model_or_404(model_id)
-        try:
-            doc = approve(d, user.username, user.name, req.note)
-        except ValueError as exc:
-            raise HTTPException(400, str(exc)) from None
-        auth.log(user, "approved", {"model": model_id, "revision": doc["revision"]})
-        return {"approval": doc}
-
     @app.delete("/api/models/{model_id}/approve")
-    def withdraw_approval(model_id: str, request: Request) -> dict[str, Any]:
-        from coverapi.approval import withdraw
-
-        user = require(request, "approve")
-        withdraw(model_or_404(model_id))
-        auth.log(user, "approval withdrawn", {"model": model_id})
-        return {"approval": None}
+    def retired_approval(model_id: str) -> dict[str, Any]:
+        """The separate "definitive drawing" approval is retired (owner, 13 Oct 2026, question
+        83: only the Desk; ADR-128)."""
+        raise HTTPException(410, f"approve the cover on the Desk: #/work/desk/{model_id}")
 
     @app.post("/api/models/{model_id}/approval-request")
     def ask_approval(model_id: str, request: Request) -> dict[str, Any]:
+        """A built cover to the Desk, ready for approval, and a mail to the Desk's approvers
+        with a link to its card (ADR-128)."""
+        from coverengine.params import Registry
+
         from coverapi import mailer
         from coverapi.security import DEFAULT_PUBLIC_URL, PUBLIC_URL_KEY
 
         user = require(request, "edit")
-        model_or_404(model_id)
+        d = model_or_404(model_id)
+        desk.send(d, user, store.root / "learning", "approval asked from the cover's page")
+        params = Registry.load(None).resolve()
         base = str(auth.setting(PUBLIC_URL_KEY, DEFAULT_PUBLIC_URL)).rstrip("/")
         sent, skipped = [], []
         for u in auth.users():
-            if not (u.can_approve and u.active and u.email):
+            if not (u.active and u.email and desk.approver(u, params)):
                 continue
             if not mailer.configured(auth):
                 skipped.append(u.username)
                 continue
             try:
                 mailer.send(
-                    auth, u.email, f"Please approve the cover {model_id}",
-                    f"Hello {u.name},\n\n{user.name} asks you to approve the definitive "
-                    f"drawing of {model_id}:\n\n{base}/#/model/{model_id}/3d\n",
+                    auth, u.email, f"Please approve the cover {model_id} on the Desk",
+                    f"Hello {u.name},\n\n{user.name} asks you to approve {model_id} on the Desk:"
+                    f"\n\n{base}/#/work/desk/{model_id}\n",
                 )  # fmt: skip
                 sent.append(u.username)
             except Exception:  # noqa: BLE001
@@ -519,11 +513,12 @@ def create_app(
 
     @app.get("/api/models/{model_id}/approved/{name}")
     def approved_file(model_id: str, name: str) -> FileResponse:
+        """A PDF stamped by the Desk's approval, while that approval holds (ADR-128)."""
         from coverapi.approval import APPROVED_DIR, STAMPED
 
         d = model_or_404(model_id)
-        if name not in STAMPED or not (d / APPROVED_DIR / name).is_file():
-            raise HTTPException(404, f"no approved {name!r}")
+        if name not in STAMPED or not desk.stamped_ok(d, name):
+            raise HTTPException(404, f"no approved {name!r}: approve the cover on the Desk")
         return FileResponse(d / APPROVED_DIR / name, media_type="application/pdf")
 
     @app.get("/api/jobs/{job_id}")

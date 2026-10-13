@@ -172,10 +172,22 @@ def test_an_order_on_account_goes_to_the_studio_orders_flagged_b2b(app: Any) -> 
     assert "inkoop@dealer.example" in to and "rick@s2dio.industries" in to
     assert "PO-2026-118" in app.state.mails[n][2]
     rows = admin.get("/api/admin/orders").json()["orders"]
-    assert len(rows) == 2 and all(x["status"] == "on_account" for x in rows)
+    # on account, waiting for the studio's click (owner, question 86 b; ADR-128)
+    assert len(rows) == 2 and all(x["status"] == "waiting_production" for x in rows)
     assert {x["data"]["b2b"]["po"] for x in rows} == {"PO-2026-118"}
     assert {x["data"]["b2b"]["qty"] for x in rows} == {3, 1}
+    time.sleep(0.2)
+    assert app.state.produced == []  # nothing goes to production by itself
+    waiting = app.state.workshop_orders()
+    assert {w["status"] for w in waiting} == {"waiting_production"}
+    assert all("total_eur" not in w and "email" not in w for w in waiting)
+    for x in rows:  # Send to production, twice: one production each
+        assert admin.post(f"/api/admin/orders/{x['id']}/produce").status_code == 200
+        assert admin.post(f"/api/admin/orders/{x['id']}/produce").status_code == 200
     assert sorted(app.state.produced) == sorted(x["id"] for x in rows)  # into production
+    with sqlite3.connect(app.state.auth.path) as c:
+        assert c.execute("SELECT COUNT(*) FROM b2b_dispatch WHERE dispatched=0").fetchone()[0] == 0
+        assert c.execute("SELECT COUNT(*) FROM orders WHERE released_by='Rick'").fetchone()[0] == 2
     # stock lines go into production from their own pattern (shop.produce reads the record)
     stock_row = next(x for x in rows if x["data"]["quote"]["stock"])
     assert stock_row["data"]["quote"]["stock"]["model_id"] == "suns-dining-table-a-240"
@@ -256,6 +268,14 @@ def _checkout(dealer: TestClient, key: str = "checkout-test") -> dict[str, Any]:
     return {"idempotency_key": key, "lines": [{"quote_id": q["id"], "qty": 1}]}
 
 
+def _waiting(app: Any, n: int) -> None:
+    """The committed outbox holds the lines; none goes to production before the click."""
+    time.sleep(0.1)
+    with sqlite3.connect(app.state.auth.path) as c:
+        assert c.execute("SELECT COUNT(*) FROM b2b_dispatch WHERE dispatched=0").fetchone()[0] == n
+    assert not app.state.produced
+
+
 def _drained(app: Any) -> None:
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
@@ -284,7 +304,7 @@ def test_checkout_rolls_back_all_rows_on_middle_failure(app: Any) -> None:
         c.execute("DROP TRIGGER fail_second_line")
     assert not app.state.produced
     assert dealer.post("/api/b2b/order", json=body).status_code == 200
-    _drained(app)
+    _waiting(app, 2)
 
 
 def test_checkout_retry_returns_original_without_dispatching_twice(app: Any) -> None:
@@ -295,6 +315,9 @@ def test_checkout_retry_returns_original_without_dispatching_twice(app: Any) -> 
     assert dealer.post("/api/b2b/order", json=missing).status_code == 400
     first = dealer.post("/api/b2b/order", json=body)
     assert first.status_code == 200
+    _waiting(app, 1)
+    line = first.json()["lines"][0]["order_id"]
+    assert admin.post(f"/api/admin/orders/{line}/produce").status_code == 200
     _drained(app)
     n = len(app.state.mails)
     # Returning the original must not depend on quotes or today's minimum order.
@@ -310,23 +333,32 @@ def test_checkout_retry_returns_original_without_dispatching_twice(app: Any) -> 
     assert (
         other.post("/api/b2b/order", json=_checkout(other)).json()["order"] != first.json()["order"]
     )
-    _drained(app)
+    time.sleep(0.1)
+    assert len(app.state.produced) == 1  # the other order waits for its click
 
 
 def test_restart_recovers_committed_undispatched_lines(app: Any) -> None:
     dealer, _ = _dealer(app, _admin(app))
     app.state.shop_produce = None  # commit succeeds, but dispatch cannot start
     first = dealer.post("/api/b2b/order", json=_checkout(dealer)).json()
+    second = dealer.post("/api/b2b/order", json=_checkout(dealer, "checkout-two")).json()
     assert not app.state.produced
+    # the first line was sent to production, but the server stopped before it was made
+    with sqlite3.connect(app.state.auth.path) as c:
+        c.execute("UPDATE orders SET released=1, released_by='Rick' WHERE id=?",
+                  (first["lines"][0]["order_id"],))  # fmt: skip
     restarted = create_app(app.state.store.root, login_required=True)
     produced: list[int] = []
     restarted.state.shop_produce = produced.append
     with TestClient(restarted):
-        _drained(restarted)
-    assert produced == [first["lines"][0]["order_id"]]
+        time.sleep(0.3)
+    assert produced == [first["lines"][0]["order_id"]]  # the waiting line stays waiting
     with TestClient(restarted):
-        _drained(restarted)
+        time.sleep(0.3)
     assert len(produced) == 1
+    with sqlite3.connect(app.state.auth.path) as c:
+        left = c.execute("SELECT order_id FROM b2b_dispatch WHERE dispatched=0").fetchall()
+    assert left == [(second["lines"][0]["order_id"],)]
 
 
 def test_b2b_has_the_barbecues_only_once_they_are_on(app: Any) -> None:

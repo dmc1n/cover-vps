@@ -12,8 +12,9 @@ page and the server. The map itself, with every address and who sees what:
    password of at least 12 characters. The first time on a device you also get a 6-digit code
    by mail. See [admin.md — Logging in for the first time](admin.md#logging-in-for-the-first-time).
 2. **Where you land** ([navigation.md — Where you start](navigation.md#where-you-start)):
-   - approvers (who approve at the Desk or approve definitive drawings) on **Work → Desk**;
+   - approvers (who approve at the Desk) on **Work → Desk**;
    - an admin on the page he used last (in that browser);
+   - the workshop login on **Work → Workshop** (ADR-128);
    - everyone else on **Covers → All covers**.
 
    These start pages are still to be confirmed with the owner (open question 3).
@@ -23,19 +24,18 @@ page and the server. The map itself, with every address and who sees what:
 4. **Light or dark:** the round button left of your name: As the computer (◐), Light (☀),
    Dark (☾).
 
-The studio's language is English; whether it becomes Dutch (or a choice per person) is an open
-owner question (#91).
+The studio's buttons stay English (owner question #91, ADR-128).
 
 ## Work
 
-- **Desk** — approve, reject or comment on drawing covers and arrangements; after sewing:
+- **Desk** — approve, reject or comment on covers, including orders; after sewing:
   produced, measured, fits: [desk.md](desk.md)
   - Correct this cover: [desk.md — Correct this cover](desk.md#correct-this-cover-adr-082)
   - Arrangements at the Desk: [desk.md — Arrangements at the Desk](desk.md#arrangements-at-the-desk-adr-115)
   - Measuring the sewn cover and entering it: [measuring.md](measuring.md)
 - **Questions** — the owner's and the workshop's questions, answered in the studio:
   [desk.md — Vragen beantwoorden](desk.md#vragen-beantwoorden-voor-rens-adr-109)
-- **Workshop** — what the Desk approved or marked produced, its files and how it fitted:
+- **Workshop** — orders waiting for production or in production; approved covers, files and fit:
   [workshop.md](workshop.md)
 
 ## Covers
@@ -56,8 +56,8 @@ owner question (#91).
 
 - **The cover's page and its seven tabs** (3D · Pieces · Seams · Adjust · Compare · History ·
   Files): [web-app.md — A cover's page](web-app.md#a-covers-page)
-- **The approval of the definitive drawing:**
-  [admin.md — Approving the definitive drawing](admin.md#approving-the-definitive-drawing)
+- **The Desk's approval and stamped PDFs:**
+  [admin.md — Approving at the Desk](admin.md#approving-at-the-desk-adr-128)
 - **3D:** the drape and the water on it:
   [web-app.md — The drape simulation](web-app.md#the-drape-simulation-3d-view); measuring:
   [measuring.md](measuring.md)

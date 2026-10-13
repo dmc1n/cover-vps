@@ -283,6 +283,12 @@ apps/web/e2e/measure.py                     Measure, Vent sizes, the check list 
 Arrangements → Send to the Desk; Desk → ARR   an arrangement approved by Rens or Wout; a change reopens it; DXF after approval (ADR-115)
                                             approval requires cut.dxf; missing approval fingerprints require reapproval
 COVER_DATA_DIR=~/cover-data uv run python scripts/desk_arrangements.py [--apply] [--only a,b]   the existing arr-* to "ready for approval" (ADR-115)
+COVER_DATA_DIR=~/cover-data uv run python scripts/desk_definitive.py --dry-run|--apply [--only a,b] [--json OUT]
+                                             old definitive approvals (approval.json) that still match their cut file
+                                             become Desk approvals with a history note (ADR-128; only the main session applies)
+COVER_DATA_DIR=~/cover-data uv run python scripts/desk_gate_all.py --dry-run|--apply [--only a,b] [--db F] [--json OUT]
+                                             the covers newly behind the Desk gate: grandfathered when already cut, produced or
+                                             in active use, else to the Desk as "ready for approval" (ADR-128; dry run first)
 apps/web/e2e/arrangements_desk.py           the arrangement → Desk workflow in a real browser (ADR-115; usage in its docstring)
 uv run python scripts/bbq_models.py OUT [--only a,b] [--steps build,cover,check]   premium barbecues as catalogue models in
                                              staging (bbq-<brand>-<model>): built from published sizes or 3D Warehouse, covered,
@@ -292,7 +298,10 @@ apps/web/e2e/bbq.py                         the configurator's barbecue option i
 apps/web/e2e/uinav.py                       the studio's map (ADR-122, 124, 126): every menu item per role, every old address, a
                                              cover's and a Desk card's tabs, a cover's Price & shop, All covers' prices, All covers' filters, the search, the theme,
                                              1440/820 px, light and dark with a contrast check, screenshots; docs/handbook/navigation.md
-Work → Workshop (#/work/workshop)           approved covers: files (DXF behind the gate), fits, customers' answers; read-only (ADR-124)
+Work → Workshop (#/work/workshop)           the orders to make (Send to production, editors and admins), approved covers: files
+                                             (DXF behind the gate), fits, customers' answers (ADR-124, ADR-128); the workshop login's start page
+Shop → Orders → Send to production          a paid order (or one on account) waits until someone in the studio sends it: then its cover is
+                                             made, goes to the Desk as an ORDER (first, one-click approval) and the DXF follows (ADR-128)
 Covers → All covers (#/covers/all[?view=cards])   Models + Catalogue: one filter row, Table / Cards, batch selection (ADR-124)
 Covers → New cover (#/covers/new)           a 3D file, a drawing (PDF), reference pairs (zip) on one page (ADR-124)
 header: Search (Ctrl+K) · ◐/☀/☾ theme       covers, Desk codes, questions, orders (admins); light/dark per browser (ADR-124)
@@ -307,7 +316,9 @@ make golden     regenerate testdata/golden/info/ and hull/ (golden outputs), the
 make api-dev    web app and API on :8080     make web-dev   Vite dev server on :5173
 make web-build  build the pages (apps/web/dist)
 make deploy     build the app image and `docker compose up -d app` (127.0.0.1:8080)
-cover-users list | add <name> --role admin --approve | invite <name>   users (ADR-047)
+cover-users list | add <name> --role admin|editor|viewer|workshop [--approve] | invite <name>   users (ADR-047);
+                                             --approve: approves at the Desk; the workshop role never approves, sees no prices
+                                             or settings, reads the Desk and adds fits and comments (ADR-128, security.WORKSHOP_*)
 cover-users two-factor status|off|on       the login code by mail; on without a mail server refuses logins (ADR-123)
 COVER_DATA_DIR=~/cover-data uv run python scripts/quotes_clean.py [--dry-run]   price proposals older than
                                              limits.quotes_keep_days that no order names (housekeeping.sh daily, ADR-123)
@@ -357,6 +368,11 @@ Staging scripts validate output roots and model destinations with
 - Write the operator handbook in docs/handbook/ as features land; the owner is the first user.
 - Keep this file current in the same commit as the change it describes.
 
-Drawing Desk approvals record the cut fingerprint (ADR-120); changed cuts return to waiting.
+The Desk's approval is the only approval (ADR-128: the cover page's definitive drawing is
+retired; a Desk approval stamps sizes.pdf and cutting-list.pdf into approved/). Every cover's
+cutting-table DXF waits for it (`desk.gate_scope: all`; drawings, arrangements, SUNS, barbecues,
+orders). Desk approvals record the cut fingerprint (ADR-120); changed cuts return to waiting.
 Historical DXFs require an approved fingerprint. Earlier approvals are grandfathered lazily or
 with `uv run python scripts/desk_fingerprints.py --dry-run|--apply` (COVER_DATA_DIR/models).
+The workshop role's API access is an allow-list (`coverapi/security.py`): a new route stays closed
+to it until it is named there.

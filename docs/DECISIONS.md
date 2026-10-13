@@ -4477,3 +4477,95 @@ the scene is now a real photograph instead of our Blender stills, which never lo
 - **Rejected**: Veo 3.1 (non-Fast, $0.40/s) before Fast has shown a flaw that it would fix;
   Gemini's image model for motion; making covers for models without one (the Puglia sea photo
   waits for a Pesaro cover).
+
+
+## ADR-128 — One approval (the Desk's), every cover's DXF behind it, orders by a click, a workshop login
+
+The owner answered four questions in the Questions tab (12–13 Oct 2026): #83 "Goedkeuring: één of
+twee?" **a) only the Desk**; #84 "Moet elke snijfile goedgekeurd zijn?" **b) all covers,
+catalogue and custom** (Rens), with a quick approval for custom covers; #86 "Wanneer gaat een
+bestelling naar productie?" **b) after a click by someone in the studio**; #92 "Een
+werkplaats-login?" **a) yes**. (#91: the buttons stay English; #90: a stability round, done
+elsewhere.) This settles docs/plans/studio-ui.md open questions 2 and 4 and step 3's approver
+list.
+
+- **One approval.** The cover page's "Approve the definitive drawing" (approval.py's
+  approve/withdraw, ADR-047) is retired: `POST|DELETE /api/models/<id>/approve` answer 410 and
+  name the Desk. A Desk approval now stamps `sizes.pdf` and `cutting-list.pdf` with "APPROVED
+  <name> <date> revision <n>" into `approved/`: the stamped copies are made before the Desk's
+  lock (a size drawing takes a moment) into temporary files and moved in with `os.replace`, so a
+  reader never sees half a PDF; a PDF without pages refuses the approval with 400 and leaves
+  nothing behind; a PDF that does not exist yet is skipped and the history says which were
+  stamped. `approved.stamped` keeps each stamped copy's fingerprint; `/approved/<name>` is
+  served only while that approval holds (approved or produced, the same cut file, the same
+  bytes). `approval.json` files stay readable as history (`approval.legacy`, shown on the cover
+  page). The cover page's card shows the Desk's approval, the stamped PDFs, a link to the Desk
+  card and *Send to the Desk for approval* (`/approval-request` now puts the built cover on the
+  Desk and mails the Desk's approvers with a link to its card).
+- **Who approves**: admins, users marked *may approve* (the flag that approved definitive
+  drawings) and the names in `desk.approvers`; never the workshop role. On live every user with
+  *may approve* is an admin already, so nobody gains the right.
+- **Every cover's DXF behind the Desk.** `desk.gate_scope: all` in config/defaults.yaml (a
+  company default): drawing-*, arr-*, suns-*, bbq-*, order-* and any other cover. The gate no
+  longer looks at the catalogue status (anyone with edit rights could set "checked" by hand); it
+  asks the Desk: approved or produced, for the cut file it has now. Every approval records the
+  cut file's fingerprint (ADR-120 for drawings, now for all); a later change of the cut reopens
+  the cover to waiting with a history line; earlier approvals without a fingerprint are
+  grandfathered once with the current cut, as ADR-120 did for drawings. Every `.dxf` a cover
+  serves is gated, `pattern.dxf` too (it could be cut by mistake). The admin's logged override
+  stays.
+- **Orders by a click.** A paid order (the Mollie webhook) becomes `waiting_production`, not
+  "paid and into production": the webhook only marks it, once (`AND status='awaiting_payment'`),
+  and mails the studio. A B2B order on account writes its lines as `waiting_production` and its
+  outbox rows (`b2b_dispatch`) in the same transaction as before; `auto_produce` is gone.
+  *Send to production* (Shop → Orders, Work → Workshop; editors and admins; `POST
+  /api/admin/orders/<id>/produce`) sets `released`/`released_by` once with a conditional update
+  (paid, waiting_production or on_account only), then makes the cover under one lock: a shop
+  order's own cover (`order-<n>`, calculated by a job) or the catalogue cover of a stock order,
+  sends it to the Desk as an **order** (`order` in desk.json) and sends the production mail.
+  `produce` refuses an order that was not released (409). The B2B outbox drains released lines
+  only, so a restart still finishes a line that was sent but not made, and a waiting line stays
+  in the outbox; a second click returns the same cover and dispatches nothing twice. A status
+  set by hand to `in_production` is refused before the click. The customer sees "paid" (B2C) or
+  "on account" (B2B) while the order waits.
+- **The quick approval.** An order on the Desk is first in the queue whatever the AIs said or the
+  sort, tagged ORDER #n (B2B), with an *Approve* button in the queue itself once its cutting file
+  exists; a catalogue cover whose approval holds for its current cut stays approved (ready to
+  cut at once). The approval marks the order approved.
+- **The workshop login** (role `workshop`, `cover-users add <name> --role workshop`, Settings →
+  Users & rights): starts on Work → Workshop; sees Work only (Desk read-only, its questions,
+  Workshop with the orders to make, without prices or e-mail addresses). On the Desk card it adds
+  a fit with measured sizes, comments and pictures; it never approves, rejects, marks produced,
+  undoes, corrects or starts the AI. It downloads the DXF of approved covers. Enforced in the API
+  by an allow-list (`security.WORKSHOP_READ/WRITE`: a route added later stays closed to it until
+  named), the Desk's `may_act` (note and fit only), `approver()` (never, whatever its name or
+  flag), `User.may("approve")`, the questions (only those it may answer; never an owner) and
+  auth (a workshop user cannot be *may approve*). The menus follow (`nav.ts`
+  `WORKSHOP_PAGES`, `isEditor`), and uinav.py walks the role.
+- **Migration** (dry run first; only the main session applies on live):
+  `scripts/desk_definitive.py --dry-run|--apply` turns a definitive approval that still matches
+  its cut file into a Desk approval with a history note ("grandfathered from the definitive
+  drawing approval by X on D"), keeping its stamped PDFs served; never for a drawing (gated
+  before), a rejected or an already approved cover. `scripts/desk_gate_all.py --dry-run|--apply`
+  for the newly gated covers: grandfathers those already cut or produced or in active use
+  (a valid definitive approval, catalogue status production or checked, an order in production,
+  sewn, shipped or returned), records the fingerprint of earlier Desk approvals, and sends the
+  rest to the Desk as ready for approval (ai-checked + sent), like desk_arrangements.py; a
+  rejected cover or one approved for another cut is never blessed. Both are idempotent and
+  read-only in a dry run (tested byte for byte), in `coverapi/gate_migrate.py`.
+- **Live, 13 Oct 2026 (read-only dry runs)**: 1 cover has an approval.json and it is approved on
+  the Desk too, so 0 covers have only a definitive approval. Newly locked by the gate: 208 built
+  covers that are not drawings or arrangements and have no Desk approval for their cut: 174
+  would be sent to the Desk, 23 are waiting there already (barbecues), 11 were rejected (2 more
+  are not built: nothing to cut); 0 would be grandfathered (no catalogue cover is checked or in production
+  without a Desk approval, and there are no orders). 127 approved covers get their fingerprint
+  recorded on first read. Paid orders in flight: 0 (the orders table is empty).
+- **Tests**: the gate on every cover kind and its revisions, the catalogue status never opening
+  it, the stamped PDFs (atomic, an empty PDF refused without side effects, served while the
+  approval holds), the retired routes, the order not in production before the click (webhook,
+  status by hand, B2B outbox, restart recovery, two clicks), the quick approval and the queue's
+  order, the workshop role's allowed and denied routes, its questions and its rights in auth,
+  the migrations (dry run byte for byte, apply, apply again changes nothing).
+- **Not done**: the approvers' daily digest still names arrangements only (an order's production
+  mail goes to the studio's address); whether the workshop may press *Send to production* or
+  mark a cover *Produced* is for the owner to say (now: editors and admins, approvers).

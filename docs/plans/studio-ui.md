@@ -775,3 +775,15 @@ rollback, the Excel import, the stock discount, the delivery note, the B2B terms
 | Settings | 11 tabs | 11 (of which 3 are the former Prices; 8 of the former 11) |
 | Tabs and pages in Prices + Shop + Settings | 24 | 15 |
 | A cover | 7 tabs | 7 tabs (Files inside Pieces, Price & shop new) |
+
+## 13. The owner's answers on approval and the workshop (13 Oct 2026; ADR-128)
+
+- **Q2, one approval: yes, only the Desk** (question 83 a). The model page's *Approve the definitive
+  drawing* is gone; its card shows the Desk's approval, the stamped PDFs and *Send to the Desk for
+  approval*. Step 3's approver list: admins, *may approve* and `desk.approvers` all approve at
+  the Desk; `desk.approvers` stays (it names Rens, Wouter and Wout by user name).
+- **Q4, the workshop: its own login** (question 92 a): role `workshop`, start page Work →
+  Workshop, Work only, fits, comments and pictures on a Desk card, its own questions, the DXF of
+  approved covers; never approving, prices or settings (an allow-list in the API).
+- With it: every cover's DXF behind the Desk (question 84 b) and orders into production by a
+  click in the studio (question 86 b): Work → Workshop shows the orders to make on top.

@@ -1,11 +1,16 @@
-# The Desk: approve the drawing covers
+# The Desk: approve the covers
 
 **Work → Desk** (`#/work/desk`; the start page of an approver, see
-[navigation.md](navigation.md)). The AI sorts, people decide (ADR-079). What the Desk approved
+[navigation.md](navigation.md)). The AI sorts, people decide (ADR-079, ADR-128). What the Desk approved
 or marked produced is listed for the workshop, with its files and how it fitted, on
 **Work → Workshop** ([workshop.md](workshop.md)); nothing can be approved there.
 
-- **The queue** puts first what needs a person:
+- **The queue** puts orders waiting for approval first, whatever the sort or AI scores.
+  They have an **ORDER #n** tag, with **B2B** for a business order. An approver can press
+  **Approve** in the queue once the cutting file is built. Before that it says
+  **being calculated…**. A catalogue cover keeps its approval if its current cut is unchanged.
+  Then come the other covers that need a person:
+
   1. covers where Gemini and DeepSeek disagree;
   2. covers they found poor;
   3. rejected ones;
@@ -28,9 +33,19 @@ or marked produced is listed for the workshop, with its files and how it fitted,
   **More** (top right of the card): Let the AI read it (costs about 1–5 cents), the check
   list, Edit arrangement, the cut pieces and DXF, the product list. **Open cover ↗** opens the
   cover's own page.
-- **Who decides:** Rens, Rick and Wouter (setting `desk.approvers`, shown on Settings → Desk &
-  approval) and admins. (Whether the Desk's approval and the approval of the definitive
-  drawing become one is open with the owner, #83/#84.)
+- **Who decides:** admins, users marked **may approve**, and the user names in
+  `desk.approvers` (Rens, Rick and Wouter). See Settings → Rules & defaults → Desk & approval.
+  The workshop login never approves, even if its name is in that list (ADR-128).
+- **One approval:** the Desk is the only approval. The cover page's separate
+  definitive-drawing approval is retired. Old approvals stay visible as history. A Desk
+  approval stamps the size drawing and cutting list, when available, with
+  `APPROVED <name> <date> revision <n>` on every page. Download **Approved size drawing**
+  and **Approved cutting list** from the cover's approval card above the tabs. These stamped
+  downloads disappear when a change invalidates the approval. Review it at the Desk and
+  approve again.
+- **The workshop login** can use **Comment**, with pictures, and **After sewing ▾ → Fits /
+  Does not fit / Measured…**. It cannot Approve, Reject, mark Produced, Undo, correct a cover
+  or start the AI.
 - **The actions** (the decision bar at the bottom of the card; the after-sewing ones under
   **After sewing ▾**):
   - **Approve** (key `a`): the catalogue status becomes "checked".
@@ -48,7 +63,10 @@ or marked produced is listed for the workshop, with its files and how it fitted,
     Work → Workshop.
   - **Undo** (`u`) takes back the last step. Use `j` and `k` to go to the next or previous
     cover.
-- **The cutting table's DXF** of a drawing cover downloads only once the current cut is approved.
+- **The cutting-table DXF** of every cover downloads only once the current cut is approved
+  at the Desk (ADR-128; `desk.gate_scope: all`). This includes drawings, arrangements, SUNS,
+  barbecues and shop orders. Setting the catalogue status by hand does not unlock it.
+  Every DXF waits for approval, including the flat pattern DXF.
   A rebuild that changes the cutting file puts it back to waiting with “changed after approval”
   in the history. Review it and approve again. A saved revision downloads only if its cutting
   file was approved at some point. Earlier approvals keep working: their current file is
@@ -58,6 +76,12 @@ or marked produced is listed for the workshop, with its files and how it fitted,
   keeps.
 - **The AI spend** of this month is shown at the top of the Desk to admins only (ADR-078); the
   details are on Settings → AI & spending.
+
+**For the admin:** the developer runs `scripts/desk_definitive.py` and
+`scripts/desk_gate_all.py` only on the server, with `--dry-run` first, then `--apply`
+(ADR-128). They carry matching old approvals and covers already in use into the Desk,
+record earlier approvals' cutting files, and send the other built covers for approval.
+Rejected covers and approvals for another cut stay closed.
 
 ## Correct this cover (ADR-082)
 

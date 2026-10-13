@@ -33,6 +33,15 @@ plan); a later change to either reopens it ("changed after approval", back to wa
 approved arrangement never changes silently. Its cutting-table DXF waits for the approval
 whatever `desk.gate_scope` says (`desk.gate_arrangements`).
 
+One approval, every cover (ADR-128; owner, 13 Oct 2026, questions 83 and 84): the Desk's approval
+is the only approval (the cover page's "definitive drawing" is retired; approval.py stamps the
+PDFs on a Desk approval), and the cutting-table DXF of every cover waits for it
+(`desk.gate_scope: all`): drawings, arrangements, SUNS and barbecue catalogue covers, shop orders.
+Every approval records the cut file's fingerprint; a later change of the cut reopens it. A shop
+order's cover is sent here as an *order* when someone in the studio sends the order to production
+(shop.py): first in the queue, one click approves it (`order` in desk.json). The workshop login
+(role "workshop") reads the Desk and adds fits, notes and pictures (`worker`); it never approves.
+
 No cover (Rens, 9 Oct 2026, question 12): a model marked `"no_cover": true` in its cover.json is
 kept but needs no cover, so it is not in the queue, an arrangement so marked is not announced,
 and only a note or an undo is taken for it (`refuse_no_cover`).
@@ -114,10 +123,11 @@ def state(d: Path) -> dict[str, Any]:
             doc["status"] = "ai-checked"
         if grandfather_fingerprint(d, doc):
             _write(d / "desk.json", doc)
+        ok = doc.get("approved") or {}
         if (
-            d.name.startswith("drawing-")
+            not is_arrangement(d)  # an arrangement: reopen_if_changed (its placement too)
             and doc["status"] in DONE
-            and (doc.get("approved") or {}).get("cut")
+            and (ok.get("cut") or cut_newer(d, ok))
             and _changed_since_approval(d, doc)
         ):
             from coverengine.catalogue import set_info
@@ -136,12 +146,16 @@ def state(d: Path) -> dict[str, Any]:
 
 
 def grandfather_fingerprint(d: Path, doc: dict[str, Any]) -> bool:
-    """Amend an earlier drawing approval once; caller holds _lock and saves the document."""
-    if not d.name.startswith("drawing-") or doc.get("status") not in DONE:
+    """Amend an earlier approval made without a cut fingerprint once (ADR-120; every cover since
+    ADR-128, when the gate covers them all); caller holds _lock and saves the document. An
+    arrangement's approval always recorded its cut, so it is never amended here."""
+    if is_arrangement(d) or doc.get("status") not in DONE:
         return False
     approved = doc.get("approved") or {}
     if approved.get("cut") or not (cut := cut_fingerprint(d)):
         return False
+    if cut_newer(d, approved):
+        return False  # written after that approval: not the file it was for (state reopens it)
     doc["approved"] = {**approved, "cut": cut}
     doc["approved_fingerprints"] = list(dict.fromkeys([*doc.get("approved_fingerprints", []), cut]))
     doc.setdefault("history", []).append(
@@ -154,6 +168,16 @@ def grandfather_fingerprint(d: Path, doc: dict[str, Any]) -> bool:
         }
     )
     return True
+
+
+def cut_newer(d: Path, approved: dict[str, Any]) -> bool:
+    """The cut file was written after an approval that recorded no fingerprint (ADR-128): a
+    grandfathered approval would bless a file nobody looked at."""
+    when = approved.get("time")
+    cut = d / "cut.dxf"
+    if not isinstance(when, int | float) or not cut.is_file():
+        return False
+    return cut.stat().st_mtime > float(when) + 1.0  # param-ok: a second of clock slack
 
 
 def check(d: Path) -> dict[str, Any]:
@@ -169,10 +193,15 @@ def scores(c: dict[str, Any]) -> dict[str, float | None]:
     return {"gemini": gs, "deepseek": ds, "avg": sum(vals) / len(vals) if vals else None}
 
 
-def priority(status: str, outcome: str | None, avg: float | None) -> tuple[int, float]:
-    """The queue's order: the AIs disagree, then poor, rejected and middling, then unchecked,
-    then those the AIs found right, then approved and produced."""
+def priority(
+    status: str, outcome: str | None, avg: float | None, order: bool = False
+) -> tuple[int, float]:
+    """The queue's order: a shop order waiting for its quick approval first (ADR-128), then the
+    AIs disagree, then poor, rejected and middling, then unchecked, then those the AIs found
+    right, then approved and produced."""
     a = avg if avg is not None else 0.0
+    if order and status not in (*DONE, "rejected"):
+        return -1, a
     if status == "produced":
         return 7, a
     if status == "approved":
@@ -220,6 +249,7 @@ def brief(d: Path) -> dict[str, Any]:
     _, count, vents = _pieces(d)
     cover = _read(d / "cover.json")
     last = st["history"][-1] if st["history"] else None
+    order = waiting_order(st)
     return {
         "id": d.name,
         "code": _code(d),
@@ -241,7 +271,11 @@ def brief(d: Path) -> dict[str, Any]:
         "second_round": (st.get("second_round") or {}).get("why")
         if st["status"] not in ("approved", "produced", "rejected")
         else None,
-        "priority": list(priority(st["status"], c.get("outcome"), sc["avg"])),
+        # a shop order's cover sent to production: first in the queue, approved with one
+        # click (ADR-128); `built`: its cutting file exists, so the click can approve it
+        "order": order and {k: order.get(k) for k in ("order", "b2b", "by", "time")},
+        "built": (d / "cut.dxf").is_file(),
+        "priority": list(priority(st["status"], c.get("outcome"), sc["avg"], bool(order))),
         "updated": (d / "cover.png").stat().st_mtime if (d / "cover.png").is_file() else None,
     }
 
@@ -249,12 +283,34 @@ def brief(d: Path) -> dict[str, Any]:
 # ---- permissions ----------------------------------------------------------------------------
 
 
+WORKSHOP_ROLE = "workshop"  # as coverapi.auth.WORKSHOP
+WORKER_ACTIONS = ("note", "fit")  # what the workshop login does at the Desk (ADR-128)
+
+
 def approver(user: Any, params: Any) -> bool:
+    """Approves, rejects, marks produced: an admin, a user marked *may approve*, or a name in
+    `desk.approvers`. Never the workshop login, whatever its name or flag (ADR-128)."""
+    if getattr(user, "role", None) == WORKSHOP_ROLE:
+        return False
     if user.may("admin"):
+        return True
+    if user.may("approve"):  # the one approval: the flag that approved definitive drawings
         return True
     names = {n.strip().lower() for n in str(params["desk.approvers"]).split(",") if n.strip()}
     # the user name only (ADR-123): a display name is chosen freely, so "Rens Fake" is not Rens
     return bool(user.active and user.username.lower() in names)
+
+
+def worker(user: Any, params: Any) -> bool:
+    """Adds a fit (with what was measured), a comment and pictures on a Desk card: an approver,
+    or the workshop login (ADR-128)."""
+    if approver(user, params):
+        return True
+    return bool(user.active and getattr(user, "role", None) == WORKSHOP_ROLE)
+
+
+def may_act(user: Any, params: Any, action: str) -> bool:
+    return approver(user, params) or (action in WORKER_ACTIONS and worker(user, params))
 
 
 def refuse_no_cover(d: Path, action: str) -> None:
@@ -263,26 +319,43 @@ def refuse_no_cover(d: Path, action: str) -> None:
         raise HTTPException(409, f"{d.name} needs no cover (not on the Desk): nothing to {action}")
 
 
-def dxf_allowed(d: Path, params: Any, revision: Path | None = None) -> bool:
+def gated(d: Path, params: Any) -> bool:
+    """Whether this cover's cutting-table DXF waits for a Desk approval: every cover with
+    `desk.gate_scope: all` (the default since ADR-128), else drawings, and arrangements while
+    `desk.gate_arrangements` is on (ADR-115)."""
     if not bool(params["desk.require_approval_for_dxf"]):
+        return False
+    if str(params["desk.gate_scope"]) == "all" or d.name.startswith("drawing-"):
         return True
-    if d.name.startswith("drawing-"):
-        st = state(d)
-        if revision is not None:
-            cut = cut_fingerprint(revision)
-            return cut is not None and cut in st.get("approved_fingerprints", [])
-        return st["status"] in DONE and not _changed_since_approval(d, st)
-    if is_arrangement(d) and bool(params["desk.gate_arrangements"]):
-        # an arrangement waits for its approval whatever gate_scope says, and an approval of
-        # an older cut file or placement does not count (ADR-115)
-        st = state(d)
-        return st["status"] in DONE and not _changed_since_approval(d, st)
-    if str(params["desk.gate_scope"]) != "all" and not d.name.startswith("drawing-"):
+    return is_arrangement(d) and bool(params["desk.gate_arrangements"])
+
+
+def dxf_allowed(d: Path, params: Any, revision: Path | None = None) -> bool:
+    """The cutting table's DXF: only for a cover the Desk approved for the cut file it has now
+    (its fingerprint; an arrangement's placement too), or a kept revision whose cut file was
+    approved at some time (ADR-079, 115, 120, 128). Never the catalogue status, which a person
+    can set by hand."""
+    if not gated(d, params):
         return True
     st = state(d)
-    if d.name.startswith("drawing-") or (d / "desk.json").is_file():
-        return st["status"] in ("approved", "produced")
-    return _read(d / "cover.json").get("status") in ("checked", "production")
+    if revision is not None:
+        cut = cut_fingerprint(revision)
+        return cut is not None and cut in st.get("approved_fingerprints", [])
+    return st["status"] in DONE and not _changed_since_approval(d, st)
+
+
+def stamped_ok(d: Path, name: str) -> bool:
+    """A stamped PDF (approved/<name>) is served while the Desk approval that stamped it holds:
+    approved or produced, the same cut file, and this very file (ADR-128)."""
+    st = state(d)
+    ok = st.get("approved") or {}
+    stamped = ok.get("stamped") or {}
+    path = d / "approved" / name
+    if st["status"] not in DONE or _changed_since_approval(d, st) or name not in stamped:
+        return False
+    import hashlib
+
+    return path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest()[:20] == stamped[name]
 
 
 # ---- arrangements (ADR-115) -----------------------------------------------------------------
@@ -359,6 +432,14 @@ def send_arrangement(d: Path, user: Any, learning: Path, note: str = "") -> dict
     """Its maker sends a built arrangement to the Desk: ready for approval."""
     if not is_arrangement(d):
         raise HTTPException(400, "not an arrangement")
+    return send(d, user, learning, note)
+
+
+def send(d: Path, user: Any, learning: Path, note: str = "") -> dict[str, Any]:
+    """A built cover to the Desk: ready for approval (ai-checked, `sent`), so the approvers'
+    digest names it. Already waiting: nothing changes; approved or produced: refused (a change
+    reopens it by itself). Used for arrangements (ADR-115), "Ask for approval" on a cover and
+    scripts/desk_gate_all.py (ADR-128)."""
     refuse_no_cover(d, "send")
     if not ((d / "finished.json").is_file() and (d / "cut.dxf").is_file()):
         raise HTTPException(409, "build the cover first, then send it to the Desk")
@@ -381,6 +462,43 @@ def send_arrangement(d: Path, user: Any, learning: Path, note: str = "") -> dict
         _write(d / "desk.json", st)
         _log(learning, d, entry)
     return state(d)
+
+
+def waiting_order(st: dict[str, Any]) -> dict[str, Any] | None:
+    """The shop order this cover was sent to production for, while it waits for its quick
+    approval (ADR-128); None once approved, rejected or without an order."""
+    order = st.get("order")
+    if not isinstance(order, dict) or order.get("approved") or st["status"] in (*DONE, "rejected"):
+        return None
+    return order
+
+
+def mark_order(d: Path, order: int, who: str, learning: Path, b2b: bool = False) -> dict[str, Any]:
+    """A shop order's cover sent to production by someone in the studio (shop.py): on the Desk
+    as an order, first in the queue, one click approves it. A cover the Desk already approved
+    for its current cut stays approved (a catalogue cover cut again): only the order is noted."""
+    with _lock:
+        st = state(d)
+        now = time.time()
+        before = {k: v for k, v in st.items() if k != "history"}
+        st["order"] = {"order": int(order), "b2b": bool(b2b), "by": who, "time": now}
+        entry: dict[str, Any] = {"action": "order to production", "by": who, "time": now,
+                                 "order": int(order), "before": before}  # fmt: skip
+        if st["status"] in DONE and not _changed_since_approval(d, st):
+            st["order"]["approved"] = now  # nothing to approve: its approval holds
+        elif st["status"] != WAITING or not st.get("sent"):
+            st["status"] = WAITING
+            for k in ("approved", "produced", "rejected"):
+                st.pop(k, None)
+            st["sent"] = {"by": who, "time": now, "announced": None}
+        st["history"].append(entry)
+        _write(d / "desk.json", st)
+        if st["status"] == WAITING:
+            from coverengine.catalogue import set_info
+
+            _catalogue(d, WAITING, set_info)
+        _log(learning, d, entry)
+    return st
 
 
 def arrangement_changed(
@@ -610,98 +728,144 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
         pictures = check_pictures(d, a.pictures, _settings())
     # outside the lock: the check list's points take a moment
     rows = measured_rows(d, a.measured) if a.action == "fit" and a.measured else []
-    with _lock:
-        st = state(d)
-        before = {k: v for k, v in st.items() if k != "history"}
-        now = time.time()
-        who = user.name or user.username
-        entry: dict[str, Any] = {"action": a.action, "by": who, "time": now}
-        if a.action == "approve":
-            cut = cut_fingerprint(d) if is_arrangement(d) or d.name.startswith("drawing-") else None
-            if (is_arrangement(d) or d.name.startswith("drawing-")) and cut is None:
-                raise HTTPException(
-                    400,
-                    "Build the arrangement's cutting file before approving it."
-                    if is_arrangement(d)
-                    else "Build the cover's cutting file before approving it.",
-                )
-            st["status"] = "approved"
-            st["approved"] = {"by": who, "time": now}
-            if cut is not None:
-                st["approved"]["cut"] = cut
+    who = user.name or user.username
+    prepared: dict[str, Any] | None = None
+    if a.action == "approve":
+        # every cover: the approval is for its cutting file (ADR-120, ADR-128)
+        cut_before = cut_fingerprint(d)
+        if cut_before is None:
+            raise HTTPException(
+                400,
+                "Build the arrangement's cutting file before approving it."
+                if is_arrangement(d)
+                else "Build the cover's cutting file before approving it.",
+            )
+        revs = revisions(d)
+        revision = revs[-1]["number"] if revs else None
+        from coverapi import approval
+
+        try:  # the stamped PDFs, made outside the lock (a size drawing takes a moment)
+            prepared = approval.prepare(d, who, time.time(), revision)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from None
+    try:
+        with _lock:
+            st = state(d)
+            before = {k: v for k, v in st.items() if k != "history"}
+            now = time.time()
+            entry: dict[str, Any] = {"action": a.action, "by": who, "time": now}
+            if a.action == "approve":
+                cut = cut_fingerprint(d)
+                if cut != cut_before:
+                    raise HTTPException(409, "the cutting file changed while approving: look again")
+                st["status"] = "approved"
+                st["approved"] = {"by": who, "time": now, "cut": cut, "revision": revision}
                 st["approved_fingerprints"] = list(
                     dict.fromkeys([*st.get("approved_fingerprints", []), cut])
                 )
-            if is_arrangement(d):  # what the approval is for (ADR-115)
-                st["approved"] |= {"cut": cut, "placement": _placement(d)}
-            st.pop("rejected", None)
-        elif a.action == "reject":
-            bad = [r for r in a.reasons if r not in REASONS]
-            if bad or not (a.reasons or a.text.strip()):
-                raise HTTPException(400, f"give a reason ({', '.join(REASONS)}) or a few words")
-            st["status"] = "rejected"
-            st["rejected"] = {"by": who, "time": now, "reasons": a.reasons, "text": a.text}
-            st.pop("approved", None)
-            st.pop("produced", None)
-            entry |= {"reasons": a.reasons, "text": a.text}
-        elif a.action == "note":
-            # a comment: only the history changes (ADR-096)
-            if not (a.text.strip() or pictures):
-                raise HTTPException(400, "write a few words or add a picture")
-            entry["text"] = a.text
-        elif a.action == "produced":
-            if a.done and st["status"] not in ("approved", "produced"):
-                raise HTTPException(409, "approve the cover before marking it produced")
-            if a.done:
-                st["status"] = "produced"
-                st["produced"] = {"by": who, "time": now}
-            else:
-                st["status"] = "approved"
-                st.pop("produced", None)
-            entry["done"] = a.done
-        elif a.action == "fit":
-            st["fit"] = {"fits": a.fits, "note": a.note, "by": who, "time": now}
-            entry |= {"fits": a.fits, "note": a.note}
-            if rows:  # measured against the check list: the differences are kept
-                st["fit"]["measured"] = rows
-                entry["measured"] = rows
-        elif a.action == "prefer":
-            numbers = [r["number"] for r in revisions(d)]
-            if a.n not in numbers:
-                raise HTTPException(404, f"no revision {a.n}")
-            # TODO(ADR-079): a revision keeps only its cut files, not the 3D; "prefer" marks
-            # which one the workshop cuts (its DXF), it does not restore the 3D
-            st["preferred_revision"] = a.n
-            entry["n"] = a.n
-        elif a.action == "undo":
-            # the last action not yet undone (an undo itself is not undone: undo twice goes
-            # two steps back)
-            hist = st["history"]
-            i = next((k for k in range(len(hist) - 1, -1, -1)
-                      if "before" in hist[k] and not hist[k].get("undone")), None)  # fmt: skip
-            if i is None:
-                raise HTTPException(409, "nothing to undo")
-            hist[i]["undone"] = True
-            fingerprints = st.get("approved_fingerprints", [])
-            st = {**hist[i]["before"], "history": hist}
-            if fingerprints:
-                st["approved_fingerprints"] = fingerprints
-            entry = {"action": "undo", "by": who, "time": now, "undid": hist[i].get("action")}
-            st["history"].append(entry)
-            _write(d / "desk.json", st)
-            _catalogue(d, st["status"], set_info)
-            _log(learning, d, entry)
-            return state(d)
+                if is_arrangement(d):  # what the approval is for (ADR-115)
+                    st["approved"]["placement"] = _placement(d)
+                if isinstance(st.get("order"), dict) and not st["order"].get("approved"):
+                    st["order"]["approved"] = now  # the order's quick approval (ADR-128)
+                    entry["order"] = st["order"].get("order")
+                st.pop("rejected", None)
+                assert prepared is not None
+                from coverapi import approval
+
+                st["approved"]["stamped"] = approval.commit(prepared)
+                prepared = None
+                entry["stamped"] = sorted(st["approved"]["stamped"])
+                return _finish(d, a, st, before, entry, pictures, learning, set_info)
+            return _act(d, a, st, before, entry, pictures, rows, learning, who, now)
+    finally:
+        if prepared is not None:
+            from coverapi import approval
+
+            approval.discard(prepared)
+
+
+def _act(
+    d: Path, a: Action, st: dict[str, Any], before: dict[str, Any], entry: dict[str, Any],
+    pictures: list[str], rows: list[dict[str, Any]], learning: Path, who: str, now: float,
+) -> dict[str, Any]:  # fmt: skip
+    """Every action but an approval; the caller holds _lock."""
+    from coverengine.catalogue import revisions, set_info
+
+    if a.action == "reject":
+        bad = [r for r in a.reasons if r not in REASONS]
+        if bad or not (a.reasons or a.text.strip()):
+            raise HTTPException(400, f"give a reason ({', '.join(REASONS)}) or a few words")
+        st["status"] = "rejected"
+        st["rejected"] = {"by": who, "time": now, "reasons": a.reasons, "text": a.text}
+        st.pop("approved", None)
+        st.pop("produced", None)
+        entry |= {"reasons": a.reasons, "text": a.text}
+    elif a.action == "note":
+        # a comment: only the history changes (ADR-096)
+        if not (a.text.strip() or pictures):
+            raise HTTPException(400, "write a few words or add a picture")
+        entry["text"] = a.text
+    elif a.action == "produced":
+        if a.done and st["status"] not in ("approved", "produced"):
+            raise HTTPException(409, "approve the cover before marking it produced")
+        if a.done:
+            st["status"] = "produced"
+            st["produced"] = {"by": who, "time": now}
         else:
-            raise HTTPException(400, f"unknown action {a.action!r}")
-        if pictures:
-            entry["pictures"] = pictures
-        entry["before"] = before
+            st["status"] = "approved"
+            st.pop("produced", None)
+        entry["done"] = a.done
+    elif a.action == "fit":
+        st["fit"] = {"fits": a.fits, "note": a.note, "by": who, "time": now}
+        entry |= {"fits": a.fits, "note": a.note}
+        if rows:  # measured against the check list: the differences are kept
+            st["fit"]["measured"] = rows
+            entry["measured"] = rows
+    elif a.action == "prefer":
+        numbers = [r["number"] for r in revisions(d)]
+        if a.n not in numbers:
+            raise HTTPException(404, f"no revision {a.n}")
+        # TODO(ADR-079): a revision keeps only its cut files, not the 3D; "prefer" marks
+        # which one the workshop cuts (its DXF), it does not restore the 3D
+        st["preferred_revision"] = a.n
+        entry["n"] = a.n
+    elif a.action == "undo":
+        # the last action not yet undone (an undo itself is not undone: undo twice goes
+        # two steps back)
+        hist = st["history"]
+        i = next((k for k in range(len(hist) - 1, -1, -1)
+                  if "before" in hist[k] and not hist[k].get("undone")), None)  # fmt: skip
+        if i is None:
+            raise HTTPException(409, "nothing to undo")
+        hist[i]["undone"] = True
+        fingerprints = st.get("approved_fingerprints", [])
+        st = {**hist[i]["before"], "history": hist}
+        if fingerprints:
+            st["approved_fingerprints"] = fingerprints
+        entry = {"action": "undo", "by": who, "time": now, "undid": hist[i].get("action")}
         st["history"].append(entry)
         _write(d / "desk.json", st)
-        if a.action in ("approve", "reject", "produced"):
-            _catalogue(d, st["status"], set_info)
+        _catalogue(d, st["status"], set_info)
         _log(learning, d, entry)
+        return state(d)
+    else:
+        raise HTTPException(400, f"unknown action {a.action!r}")
+    return _finish(d, a, st, before, entry, pictures, learning, set_info)
+
+
+def _finish(
+    d: Path, a: Action, st: dict[str, Any], before: dict[str, Any], entry: dict[str, Any],
+    pictures: list[str], learning: Path, set_info: Any,
+) -> dict[str, Any]:  # fmt: skip
+    """Record the action in the history, the catalogue status and learning/desk.jsonl."""
+    if pictures:
+        entry["pictures"] = pictures
+    entry["before"] = before
+    st["history"].append(entry)
+    _write(d / "desk.json", st)
+    if a.action in ("approve", "reject", "produced"):
+        _catalogue(d, st["status"], set_info)
+    _log(learning, d, entry)
     return state(d)
 
 
@@ -756,6 +920,8 @@ def workshop_item(d: Path, params: Any) -> dict[str, Any] | None:
         "since": produced.get("time") or approved.get("time"),
         "files": sorted(files - {"cut.dxf"}) + (["cut.dxf"] if "cut.dxf" in files else []),
         "dxf_ok": dxf_ok,
+        # the PDFs stamped by the Desk's approval, while it holds (ADR-128)
+        "stamped": [f for f in ("sizes.pdf", "cutting-list.pdf") if stamped_ok(d, f)],
         "revision": revision,
         "fit": fit,
         "pieces": count,
@@ -1012,7 +1178,7 @@ def install(app: FastAPI, store: Any) -> None:
         from coverengine import spend
 
         try:
-            money = spend.status(params)
+            money = spend.status(params) if user.may("edit") else None  # no money to others
         except Exception:  # noqa: BLE001
             money = None
         return {
@@ -1021,21 +1187,33 @@ def install(app: FastAPI, store: Any) -> None:
             "avg_score": round(sum(avgs) / len(avgs), 1) if avgs else None,
             "spend": money,
             "can_approve": approver(user, params),
+            # the workshop login: a fit, a comment, pictures; never approve (ADR-128)
+            "can_note": worker(user, params),
             "reasons": list(REASONS),
             "pictures_max": int(params["desk.pictures_max"]),  # type: ignore[arg-type]
         }
 
     @app.get("/api/workshop")
     def workshop_list(request: Request) -> dict[str, Any]:
-        """Work → Workshop (ADR-124): read-only, for every logged-in person (no new right: open
-        owner question 92). Changes nothing; the DXF stays behind the approval gate."""
-        current_user(request)
+        """Work → Workshop (ADR-124, ADR-128): the approved covers, and the shop's orders that
+        wait for production or are in it (without prices: the workshop login sees this page).
+        Changes nothing; the DXF stays behind the approval gate; "Send to production" is the
+        shop's route (POST /api/admin/orders/{id}/produce, editors and admins)."""
+        user = current_user(request)
         params = Registry.load(None).resolve()
         dirs = sorted(p for p in Path(store.models).iterdir()
                       if (p / "cover.json").is_file() and not no_cover(p))  # fmt: skip
         items = [w for w in (workshop_item(p, params) for p in dirs) if w is not None]
         items.sort(key=lambda w: -float(w["since"] or 0))
-        return {"items": items, "gate": bool(params["desk.require_approval_for_dxf"])}
+        orders_of = getattr(app.state, "workshop_orders", None)
+        orders = orders_of() if orders_of else []
+        for o in orders:  # the order's cover at the Desk: waiting, approved, its DXF
+            md = Path(store.models) / str(o.get("model_id") or "")
+            if o.get("model_id") and md.is_dir():
+                o["desk_status"] = state(md)["status"]
+                o["dxf_ok"] = (md / "cut.dxf").is_file() and dxf_allowed(md, params)
+        return {"items": items, "gate": bool(params["desk.require_approval_for_dxf"]),
+                "orders": orders, "can_produce": user.may("edit")}  # fmt: skip
 
     @app.get("/api/desk/{model_id}")
     def card(model_id: str, request: Request) -> dict[str, Any]:
@@ -1098,8 +1276,8 @@ def install(app: FastAPI, store: Any) -> None:
         (ADR-096). The action that follows names them."""
         user = current_user(request)
         params = Registry.load(None).resolve()
-        if not approver(user, params):
-            raise HTTPException(403, "only Rens, Rick, Wouter (desk.approvers) or an admin")
+        if not worker(user, params):
+            raise HTTPException(403, "only the approvers, the workshop or an admin")
         d = folder(model_id)
         most = int(params["desk.pictures_max"])
         if not files or len(files) > most:
@@ -1232,7 +1410,9 @@ def install(app: FastAPI, store: Any) -> None:
     def act(model_id: str, a: Action, request: Request) -> dict[str, Any]:
         user = current_user(request)
         params = Registry.load(None).resolve()
-        if not approver(user, params):
+        if not may_act(user, params, a.action):
+            if worker(user, params):  # the workshop login: a fit, a comment (ADR-128)
+                raise HTTPException(403, "the workshop adds fits and comments; an approver decides")
             raise HTTPException(403, "only Rens, Rick, Wouter (desk.approvers) or an admin")
         return apply(folder(model_id), a, user, learning)
 

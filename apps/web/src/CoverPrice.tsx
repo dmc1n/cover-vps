@@ -9,7 +9,7 @@
 // the preview's count first and a confirmation. Editors look; viewers see no prices (as before).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CoverPrices, ModelDetail, prices } from "./api";
-import { deskHref, modelHref, questionHref } from "./nav";
+import { deskHref, isEditor, modelHref, questionHref } from "./nav";
 import { useUnsaved } from "./unsaved";
 import { CostingSheet } from "./Prices";
 import type { Question } from "./Questions";
@@ -194,7 +194,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
     setC(null);
     setTyped({});
     units.current = {};
-    if (user?.role !== "viewer") load();
+    if (isEditor(user)) load();
   }, [load, user?.role]);
   // a typed price not saved in the draft yet: leaving the cover asks first (Codex)
   const fixedNow = (k: string) =>
@@ -215,7 +215,7 @@ export function CoverPrice({ id }: { id: string; model?: ModelDetail }) {
       delete next[k];
       return next;
     });
-  if (user?.role === "viewer")
+  if (!isEditor(user))
     return (
       <p className="muted">
         Prices and the shop are for editors and admins (your account looks at

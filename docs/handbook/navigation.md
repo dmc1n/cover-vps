@@ -1,6 +1,6 @@
 # Finding your way in the studio
 
-The studio has **four sections** in the dark bar at the top (ADR-122, ADR-124, ADR-126). Each has its
+The studio has **four sections** in the dark bar at the top (ADR-122, ADR-124, ADR-126, ADR-128). Each has its
 own pages in the light bar under it (the sub-menu). Every page, every tab of a cover and every
 tab of a Desk card has its own address. So a link in a mail, a bookmark or this handbook opens
 exactly that page, and the browser's Back button goes back one tab.
@@ -49,8 +49,9 @@ for you.
 
 ## Where you start
 
-- **Approvers** (Rens, Wout, and whoever may approve at the Desk or approve definitive
-  drawings) start on **Work → Desk**.
+- **The workshop login** starts on **Work → Workshop** (ADR-128).
+- **Approvers** (users marked **may approve** and the user names in `desk.approvers`) start
+  on **Work → Desk**.
 - **An admin** starts on the page he was on last (remembered in that browser); the first time
   on Work → Desk.
 - **Everyone else** starts on **Covers → All covers**.
@@ -59,23 +60,25 @@ for you.
 
 ## Who sees what
 
-| section | viewer | editor | admin |
-|---|---|---|---|
-| Work: Desk, Questions | look | look (approving: approvers only) | everything |
-| Work: Workshop | look (without the customers' fit answers) | look | look |
-| Covers: All covers, Arrangements, Learning | yes | yes | yes |
-| Covers: New cover, Product list | – | yes | yes |
-| Shop: Website (AI) | – | draft and preview | also publish |
-| Shop: Orders, Requests, B2B customers | – | – | yes |
-| A cover's Price & shop tab | – (a note) | look (no orders, no B2B) | everything; set a fixed price in the draft, publish |
-| All covers with prices | – | yes | yes |
-| Settings → Prices & costs (Costs, Price rules, Publish & versions) | – | look | change and publish; Import (Excel) |
-| Settings, every other tab (Photo test inside AI & spending) | – | – | yes |
+| section | viewer | editor | admin | workshop |
+|---|---|---|---|---|
+| Work: Desk, Questions | look | look (approving: approvers only) | everything | look; comments, pictures, fit measurements and its own questions |
+| Work: Workshop | look (without the customers' fit answers) | look; Send to production | look; Send to production | look; approved files, no prices or customers' fit answers |
+| Covers: All covers, Arrangements, Learning | yes | yes | yes | – |
+| Covers: New cover, Product list | – | yes | yes | – |
+| Shop: Website (AI) | – | draft and preview | also publish | – |
+| Shop: Orders, Requests, B2B customers | – | – | yes | – |
+| A cover's own page | yes | yes | yes | – |
+| A cover's Price & shop tab | – (a note) | look (no orders, no B2B) | everything; set a fixed price in the draft, publish | – |
+| All covers with prices | – | yes | yes | – |
+| Settings → Prices & costs (Costs, Price rules, Publish & versions) | – | look | change and publish; Import (Excel) | – |
+| Settings, every other tab (Photo test inside AI & spending) | – | – | yes | – |
 
-A page that is not for your account says so ("Not for your account"). The server checks the
-same rights on every action, whatever the menu shows. A separate login or right for the
-workshop does not exist yet (open owner question #92): today the workshop uses one of the
-roles above.
+A page that is not for your account says **Not for your account**. The workshop login sees
+**Work** only: **Desk**, **Questions**, **Workshop**. Its cover pages and every other section
+say **Not for your account**. It cannot approve, reject, mark Produced, Undo, correct covers,
+start the AI or Send to production (ADR-128). The server checks the same rights on every
+action, whatever the menu shows.
 
 ## One look
 
@@ -110,7 +113,8 @@ button per view. There are four kinds of page:
 - **Questions** (`#/work/questions`, one question `#/work/questions/<n>`): the owner's and the
   workshop's questions, answered in the studio ([desk.md](desk.md), *Vragen beantwoorden*).
 - **Workshop** (`#/work/workshop`): every cover the Desk approved or marked produced, with its
-  files, the revision to cut and how it fitted. Read only. See [workshop.md](workshop.md).
+  files, the revision to cut and how it fitted. The Orders block at the top shows orders
+  waiting for production or in production. Editors and admins can **Send to production**. See [workshop.md](workshop.md).
 
 ### Covers
 
@@ -131,14 +135,18 @@ button per view. There are four kinds of page:
 ### A cover (`#/model/<cover>/<tab>`)
 
 At the top: the picture, the name and sizes, a strip with the cover's grade, its status, its
-Desk status (a link to its card), the approval of the definitive drawing, a lock when the DXF
+Desk status (a link to its card), the Desk's approval, a lock when the DXF
 waits for the Desk's approval, and "N changes since the run before". Under it **one summary
 row**: the Desk (status, who approved, produced), the **fit** (fits / does not fit, sizes
 measured, the largest difference), the **workshop** (pieces, vents, the revision to cut, files,
 DXF lock) and the **open questions** about this cover (links). The buttons **Run again**,
-**Edit details** (category, family, status, tags, notes) and **Desk card ↗**. Under it the
-approval of the definitive drawing (Approve / Ask for approval / Withdraw, the approved PDFs),
-a running job, a rejection at the Desk and today's warnings: these stay above the tabs.
+**Edit details** (category, family, status, tags, notes) and **Desk card ↗**. Under it is the
+Desk's approval card (ADR-128), with **Approved size drawing**, **Approved cutting list** and
+**Its Desk card**. **Send to the Desk for approval** sends a built cover for review and mails
+the approvers; editors and admins see it when the cover is not already waiting there. Old
+definitive-drawing approvals remain as history. The stamped downloads disappear when a
+change invalidates the approval. A running job, a rejection at the Desk and today's warnings
+also stay above the tabs.
 
 Seven tabs; the older tabs are one click away inside them, each with its own address:
 
@@ -182,7 +190,7 @@ unsaved changes asks first.
 | group | tab | what |
 |---|---|---|
 | Business | **Company & shop** | the company, the shop (domain, languages, colours, barbecues, logo, share picture, delivery promise), support products, shipping per country (a table), *advanced:* film and story |
-| | **Selling** | matching: mode (learning / automatic), the thresholds with the value that applies, the direct-order (stock) discount; how a match is scored (read-only); the **B2B terms**: minimum order, shipping, payment days, into production at once |
+| | **Selling** | matching: mode (learning / automatic), the thresholds with the value that applies, the direct-order (stock) discount; how a match is scored (read-only); the **B2B terms**: minimum order, shipping, payment days |
 | Prices & costs | **Costs** | materials, labour and the exchange rate on one page ([prices.md](prices.md)) |
 | | **Price rules** | per channel: extra costs, markup or margin, rounding, VAT; the balloon's and frame's fixed prices; a configurator product's costing |
 | | **Publish & versions** | the draft, preview, publish, discard; the versions with roll back; Import a price list (Excel) |

@@ -9,6 +9,10 @@ Desk codes and questions, and the theme button cycles auto → light → dark an
 Since ADR-126: four sections (no Prices), the price settings in Settings → Prices & costs (editors
 see only those), a cover's seventh tab Price & shop with its parts and the summary on top, All
 covers' optional price columns, and every Prices, Shop and Settings address that moved.
+Since ADR-128: the workshop login (werkplaats) starts on Work → Workshop, sees Work only, gets
+"Not for your account" elsewhere (a cover's page too), has no Approve on a Desk card but Comment
+and After sewing, and the API refuses it prices and settings; the cover page's approval card is
+the Desk's.
 
 Every pass runs light and dark (COVER_E2E_THEMES, the browser's prefers-color-scheme), with a
 contrast check of the text on every page (WCAG: 4.5:1, 3:1 for large text).
@@ -17,7 +21,8 @@ Screenshots of every page go to $COVER_E2E_SHOTS/<width>-<theme>/ (look at them)
 Nothing is saved, approved, sent or run: the script only opens pages and tabs.
 
 Run against a running studio with a scratch data copy (never the live data) and the users rick
-(admin, approves), rens (editor, approves), eddy (editor) and vic (viewer), password below:
+(admin, approves), rens (editor, approves), eddy (editor), vic (viewer) and werkplaats
+(workshop), password below:
 
     docker run --rm --network host -v "$PWD:/repo:ro" -v "$PWD/out/uinew:/shots" \\
       -e COVER_E2E_URL=http://127.0.0.1:18250 \\
@@ -65,12 +70,16 @@ MENU = {
         "Work": ["Desk", "Questions", "Workshop"],
         "Covers": ["All covers", "Arrangements", "Learning"],
     },
+    "werkplaats": {  # the workshop login: Work only (ADR-128)
+        "Work": ["Desk", "Questions", "Workshop"],
+    },
 }  # fmt: skip
 START = {
     "rick": "#/work/desk",
     "rens": "#/work/desk",
     "eddy": "#/covers/all",
     "vic": "#/covers/all",
+    "werkplaats": "#/work/workshop",
 }
 SETTINGS = ["Company & shop", "Selling", "Costs", "Price rules", "Publish & versions",
             "Users & rights", "Rules & defaults", "Mail & notifications", "Website & API keys",
@@ -498,11 +507,45 @@ async def as_other(page: Page, user: str, width: int) -> None:
               f"{user} {width}: an editor sees the prices, no fields")  # fmt: skip
         check(await page.get_by_test_id("cover-orders").count() == 0,
               f"{user} {width}: orders on a cover are for admins")  # fmt: skip
+    if user == "werkplaats":
+        await as_workshop(page, width)
     if user == "vic":
         await page.goto(f"{URL}/#/model/{MODEL}/price")
         await expect(page.get_by_text("Prices and the shop are for editors and admins")
                      ).to_be_visible(timeout=SLOW)  # fmt: skip
         check(True, f"vic {width}: a viewer sees no prices on a cover")
+
+
+async def as_workshop(page: Page, width: int) -> None:
+    """The workshop login (ADR-128): Work only; the Desk card without Approve; the API agrees."""
+    for h in ["#/covers/all", f"#/model/{MODEL}/3d", "#/settings/costs", "#/shop/b2b"]:
+        await page.goto(f"{URL}/{h}")
+        await expect(page.get_by_text("Not for your account")).to_be_visible(timeout=SLOW)
+    check(True, f"werkplaats {width}: covers, prices, settings and the shop say so")
+    await page.goto(f"{URL}/#/work/workshop")
+    await expect(page.get_by_test_id("ws-orders")).to_be_visible(timeout=SLOW)
+    check(await page.get_by_role("button", name="Send to production").count() == 0,
+          f"werkplaats {width}: no Send to production for the workshop")  # fmt: skip
+    await shot(page, width, "workshop-Workshop")
+    await page.goto(f"{URL}/#/work/desk/{MODEL}")
+    bar = page.locator(".d-actions")
+    await expect(bar.get_by_role("button", name=re.compile("^Comment"))).to_be_visible(timeout=SLOW)
+    check(await bar.get_by_role("button", name=re.compile("Approve")).count() == 0,
+          f"werkplaats {width}: no Approve on a Desk card")  # fmt: skip
+    check(await bar.get_by_role("button", name=re.compile("Reject")).count() == 0,
+          f"werkplaats {width}: no Reject on a Desk card")  # fmt: skip
+    check(await page.get_by_role("link", name=re.compile("Open cover")).count() == 0,
+          f"werkplaats {width}: no link to the cover's page")  # fmt: skip
+    await bar.get_by_test_id("after-sewing").click()
+    await expect(bar.get_by_role("button", name="Fits", exact=True)).to_be_visible(timeout=SLOW)
+    check(await bar.locator("label.d-check").count() == 0,
+          f"werkplaats {width}: no Produced for the workshop")  # fmt: skip
+    await shot(page, width, "workshop-Desk-card")
+    codes = await page.evaluate(
+        """async () => Promise.all(['/api/prices/list', '/api/admin/orders',
+            '/api/admin/shop/settings', '/api/workshop'].map(async u => (await fetch(u)).status))"""
+    )
+    check(codes == [403, 403, 403, 200], f"werkplaats {width}: the API refuses {codes}")
 
 
 async def main() -> int:
@@ -512,7 +555,7 @@ async def main() -> int:
         )
         for theme, (w, h) in [(t, s) for t in THEMES for s in WIDTHS]:
             THEME["now"] = theme
-            for user in ["rick", "rens", "eddy", "vic"]:
+            for user in ["rick", "rens", "eddy", "vic", "werkplaats"]:
                 ctx: Any = await browser.new_context(
                     viewport={"width": w, "height": h}, color_scheme=theme
                 )

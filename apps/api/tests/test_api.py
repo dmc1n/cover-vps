@@ -55,6 +55,10 @@ def test_model_summary_and_files(chair: dict[str, Any]) -> None:
     assert m["pattern"]["summary"]["panels"] == len(m["cut"]["panels"])
     assert any(p["name"] == "vent-hood" for p in m["finished"]["pieces"])
     r = c.get(f"/api/models/{chair['id']}/files/cut.dxf")
+    assert r.status_code == 403  # every cover's DXF waits for the Desk (ADR-128)
+    assert c.get(f"/api/models/{chair['id']}/files/pattern.dxf").status_code == 403
+    assert c.post(f"/api/desk/{chair['id']}", json={"action": "approve"}).status_code == 200
+    r = c.get(f"/api/models/{chair['id']}/files/cut.dxf")
     assert r.status_code == 200 and b"LWPOLYLINE" in r.content
     assert c.get(f"/api/models/{chair['id']}/files/sizes.pdf").content.startswith(b"%PDF")
     assert c.get(f"/api/models/{chair['id']}/files/secret.txt").status_code == 404
@@ -186,6 +190,9 @@ def test_family_status_revisions_and_batch(chair: dict[str, Any]) -> None:
 
     export()  # the saved state (an earlier test may have left a trial run's files)
     n = c.get(f"/api/models/{chair['id']}").json()["revisions"][-1]["number"]
+    # a kept revision's DXF: only once its cut file was approved at the Desk (ADR-120, 128)
+    if c.get(f"/api/models/{chair['id']}/revisions/{n}/cut.dxf").status_code == 403:
+        assert c.post(f"/api/desk/{chair['id']}", json={"action": "approve"}).status_code == 200
     assert c.get(f"/api/models/{chair['id']}/revisions/{n}/cut.dxf").status_code == 200
     export()
     m2 = c.get(f"/api/models/{chair['id']}").json()
@@ -247,24 +254,34 @@ def test_reference_zip(chair: dict[str, Any], tmp_path: Path) -> None:
     assert bad.status_code == 400
 
 
-def test_approval_of_the_definitive_drawing(chair: dict[str, Any]) -> None:
+def test_the_desk_approval_is_the_only_one_and_stamps_the_pdfs(chair: dict[str, Any]) -> None:
+    """ADR-128 (owner, question 83 a): the definitive drawing's approval is retired; a Desk
+    approval stamps the size drawing and the cutting list, served while it holds."""
     c: TestClient = chair["client"]
     mid = chair["id"]
+    c.post(f"/api/desk/{mid}", json={"action": "reject", "reasons": ["other"]})
     r = c.put(f"/api/models/{mid}/info", json={"status": "production"})
-    assert r.status_code == 400  # production needs an approval first
-    r = c.post(f"/api/models/{mid}/approve", json={"note": "checked on the table"})
-    assert r.status_code == 200, r.text
-    assert r.json()["approval"]["valid"]
-    assert c.get(f"/api/models/{mid}").json()["approval"]["valid"]
-    pdf = c.get(f"/api/models/{mid}/approved/sizes.pdf")
-    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
-    # calculated again with other settings: the approval no longer matches the files
+    assert r.status_code == 400  # production needs the Desk's approval first
+    assert c.post(f"/api/models/{mid}/approve", json={"note": "x"}).status_code == 410
+    assert c.delete(f"/api/models/{mid}/approve").status_code == 410
+    assert c.get(f"/api/models/{mid}/approved/sizes.pdf").status_code == 404
+    st = c.post(f"/api/desk/{mid}", json={"action": "approve"}).json()
+    assert sorted(st["approved"]["stamped"]) == ["cutting-list.pdf", "sizes.pdf"]
+    m = c.get(f"/api/models/{mid}").json()
+    assert m["desk_approved"]["by"] and m["stamped"] == ["sizes.pdf", "cutting-list.pdf"]
+    assert m["approval"] is None  # no old approval.json: no history
+    for name in ("sizes.pdf", "cutting-list.pdf"):
+        pdf = c.get(f"/api/models/{mid}/approved/{name}")
+        assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+    assert c.put(f"/api/models/{mid}/info", json={"status": "production"}).status_code == 200
+    # calculated again with other settings: the approval no longer holds, nor do its stamps
     r = c.post(
         f"/api/models/{mid}/run", json={"steps": ["export"], "trial": {"hem.allowance_mm": 60}}
     )
     chair["app"].state.jobs.wait(r.json()["id"], RUN_TIMEOUT_S)
-    assert c.get(f"/api/models/{mid}").json()["approval"]["valid"] is False
-    assert c.delete(f"/api/models/{mid}/approve").status_code == 200
+    m = c.get(f"/api/models/{mid}").json()
+    assert m["desk_status"] == "ai-checked" and m["stamped"] == [] and m["dxf_ok"] is False
+    assert c.get(f"/api/models/{mid}/approved/sizes.pdf").status_code == 404
 
 
 def test_a_full_calculation_is_followed_by_its_drape_in_a_queue_of_its_own(

@@ -1,9 +1,10 @@
-// Work → Workshop (ADR-124): every cover the Desk approved or marked produced, what the workshop
-// cuts and sews from, and how it fitted. Read-only for every role (a workshop login of its own is
-// open owner question 92). The cutting table's DXF is offered only when the approval gate lets it
-// through (ADR-079/115/120); the server checks again on download. Approving, Produced and the
-// measured sizes stay on the Desk card (After sewing).
-import { useEffect, useMemo, useState } from "react";
+// Work → Workshop (ADR-124, ADR-128): the shop's orders that wait for production (Send to
+// production, editors and admins) or are in it, and every cover the Desk approved or marked
+// produced: what the workshop cuts and sews from, and how it fitted. The workshop login (role
+// "workshop", owner question 92) starts here. The cutting table's DXF is offered only when the
+// Desk approved the cover (every cover since ADR-128); the server checks again on download.
+// Approving and Produced stay on the Desk card; the fit and what was measured too (After sewing).
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fileUrl,
   revisionUrl,
@@ -11,9 +12,10 @@ import {
   workshop,
   type FitFeedback,
   type WorkshopItem,
+  type WorkshopOrder,
 } from "./api";
 import { FilterRow, Tpl } from "./layout";
-import { deskHref, modelHref } from "./nav";
+import { deskHref, isEditor, isWorkshop, modelHref } from "./nav";
 import { useSession } from "./Session";
 
 const FILE_LABEL: Record<string, string> = {
@@ -53,19 +55,30 @@ function useCustomerFits(enabled: boolean) {
 
 export function Workshop() {
   const { user } = useSession();
-  const editor = !!user && user.role !== "viewer";
+  const editor = isEditor(user);
   const [items, setItems] = useState<WorkshopItem[] | null>(null);
+  const [orders, setOrders] = useState<WorkshopOrder[]>([]);
+  const [canProduce, setCanProduce] = useState(false);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [fit, setFit] = useState("");
   const customers = useCustomerFits(editor);
+  const load = useCallback(
+    () =>
+      workshop
+        .list()
+        .then((r) => {
+          setItems(r.items);
+          setOrders(r.orders ?? []);
+          setCanProduce(!!r.can_produce);
+        })
+        .catch((e) => setErr(String(e).replace(/^Error: /, ""))),
+    [],
+  );
   useEffect(() => {
-    workshop
-      .list()
-      .then((r) => setItems(r.items))
-      .catch((e) => setErr(String(e).replace(/^Error: /, "")));
-  }, []);
+    load();
+  }, [load]);
   const shown = useMemo(() => {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
     return (items ?? []).filter((w) => {
@@ -90,13 +103,20 @@ export function Workshop() {
       title="Workshop"
       intro={
         <>
-          Every cover the Desk approved or marked produced: what to cut and sew
-          from, and how it fitted. Read-only: approving, <em>Produced</em> and
-          the measured sizes stay on the Desk card (<em>After sewing</em>).
+          The orders to make, and every cover the Desk approved or marked
+          produced: what to cut and sew from, and how it fitted. A paid order
+          waits until someone in the studio sends it to production; its cover
+          then goes to the Desk for a quick approval, and the DXF follows it.
+          The fit and the measured sizes go on the Desk card (
+          <em>After sewing</em>).
         </>
       }
     >
       {err && <p className="error">{err}</p>}
+      {items && (
+        <Orders orders={orders} canProduce={canProduce} onChanged={load} />
+      )}
+      <h2 className="ws-h">Approved covers</h2>
       <FilterRow
         count={
           items &&
@@ -185,6 +205,154 @@ export function Workshop() {
   );
 }
 
+const ORDER_STATUS: Record<string, string> = {
+  waiting_production: "waiting for production",
+  in_production: "in production",
+  paid: "waiting for production",
+  on_account: "waiting for production",
+};
+
+/** The shop's orders that wait for production or are in it (ADR-128): what to make, no prices.
+ * "Send to production" is the studio's click: only then the cover is made, goes to the Desk as
+ * an order (first in its queue, one click approves) and the production mail goes out. */
+function Orders({
+  orders,
+  canProduce,
+  onChanged,
+}: {
+  orders: WorkshopOrder[];
+  canProduce: boolean;
+  onChanged: () => void;
+}) {
+  const { user } = useSession();
+  const [busy, setBusy] = useState<number | null>(null);
+  const [msg, setMsg] = useState("");
+  const send = async (o: WorkshopOrder) => {
+    setBusy(o.id);
+    setMsg("");
+    try {
+      const r = await shopAdmin.produce(o.id);
+      setMsg(`Order ${o.id} sent to production: ${r.model_id} is on the Desk.`);
+      onChanged();
+    } catch (e) {
+      setMsg(String(e).replace(/^Error: /, ""));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const waiting = orders.filter((o) => o.status === "waiting_production");
+  return (
+    <section className="ws-orders" data-testid="ws-orders">
+      <h2 className="ws-h">
+        Orders{" "}
+        <span className="muted small">
+          {waiting.length} waiting for production ·{" "}
+          {orders.length - waiting.length} in production
+        </span>
+      </h2>
+      {msg && (
+        <p className="muted" role="status">
+          {msg}
+        </p>
+      )}
+      {!orders.length ? (
+        <p className="muted">No order waits for production.</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="list ws-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>What</th>
+                <th>Status</th>
+                <th>Cover and DXF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o) => (
+                <tr key={o.id} className="static" data-order={o.id}>
+                  <td className="nowrap">
+                    <strong>#{o.id}</strong>
+                    <div className="muted small">
+                      {day(o.created)}
+                      {o.company ? ` · ${o.company}` : ""}
+                      {o.customer ? ` · ${o.customer}` : ""}
+                      {o.city ? `, ${o.city}` : ""}
+                    </div>
+                  </td>
+                  <td>
+                    {o.qty > 1 && `${o.qty} × `}
+                    {o.stock ?? o.product ?? "cover"}
+                    {o.colour && ` · ${o.colour}`}
+                    {o.sizes_cm && !o.stock && (
+                      <div className="muted small">
+                        {Object.entries(o.sizes_cm)
+                          .filter(([, v]) => typeof v === "number")
+                          .map(([k, v]) => `${k} ${v}`)
+                          .join(" · ")}{" "}
+                        cm
+                      </div>
+                    )}
+                  </td>
+                  <td className="nowrap">
+                    <span
+                      className={`badge ${o.status === "waiting_production" ? "warn" : "status-checked"}`}
+                    >
+                      {ORDER_STATUS[o.status] ?? o.status}
+                    </span>
+                    {o.released_by && (
+                      <div className="muted small">
+                        sent by {o.released_by}, {day(o.released)}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    {o.status === "waiting_production" ? (
+                      canProduce && !isWorkshop(user) ? (
+                        <button
+                          className="primary"
+                          disabled={busy !== null}
+                          onClick={() => send(o)}
+                        >
+                          {busy === o.id ? "Sending…" : "Send to production"}
+                        </button>
+                      ) : (
+                        <span className="muted small">
+                          waits for the studio's Send to production
+                        </span>
+                      )
+                    ) : o.model_id ? (
+                      <>
+                        <a href={deskHref(o.model_id)}>{o.model_id}</a>{" "}
+                        <span className="muted small">
+                          Desk: {o.desk_status ?? "?"}
+                        </span>
+                        <div>
+                          {o.dxf_ok ? (
+                            <a href={fileUrl(o.model_id, "cut.dxf")} download>
+                              Cutting table (DXF)
+                            </a>
+                          ) : (
+                            <span className="dxf-locked">
+                              DXF waits for the Desk's approval
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="muted small">being made…</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Row({
   w,
   customers,
@@ -193,6 +361,8 @@ function Row({
   customers: FitFeedback[] | "loading" | "error" | null;
 }) {
   const who = w.produced ?? w.approved;
+  const { user } = useSession();
+  const cover = !isWorkshop(user); // the cover's page is not the workshop login's (ADR-128)
   return (
     <tr className="static" data-model={w.id}>
       <td>
@@ -208,9 +378,13 @@ function Row({
             <span className="ws-pic" />
           )}
           <div>
-            <a href={modelHref(w.id)}>
+            {cover ? (
+              <a href={modelHref(w.id)}>
+                <strong>{w.code}</strong>
+              </a>
+            ) : (
               <strong>{w.code}</strong>
-            </a>{" "}
+            )}{" "}
             {w.arrangement && <span className="badge">arrangement</span>}
             <div className="muted small">
               {w.pieces} pieces · {w.vents} vents
@@ -248,6 +422,19 @@ function Row({
                 {FILE_LABEL[f] ?? f}
               </a>
             ))}
+          {(w.stamped ?? []).map((f) => (
+            <a
+              key={`approved-${f}`}
+              href={`/api/models/${w.id}/approved/${f}`}
+              target="_blank"
+              rel="noreferrer"
+              title="Stamped APPROVED by the Desk's approval (ADR-128)"
+            >
+              {f === "sizes.pdf"
+                ? "Approved size drawing"
+                : "Approved cutting list"}
+            </a>
+          ))}
           {w.files.includes("cut.dxf") &&
             (w.dxf_ok ? (
               <a href={fileUrl(w.id, "cut.dxf")} download>

@@ -731,14 +731,12 @@ interface B2BSettings {
   min_order_eur: number;
   shipping_eur: number;
   payment_days: number;
-  auto_produce: boolean;
 }
 const B2B_DEFAULTS: B2BSettings = {
   online_payment: false,
   min_order_eur: 0,
   shipping_eur: 0,
   payment_days: 30,
-  auto_produce: false,
 };
 
 /** The B2B terms (was a card on Admin → B2B customers): same API, PUT /api/admin/b2b/settings. */
@@ -825,21 +823,11 @@ function B2BTerms() {
           "days",
         )}
         <Row
-          label="Into production at once"
-          keyName="b2b.auto_produce"
-          help="An order on account goes into production at once, like a paid consumer order."
-          chip={
-            <Source value={f.auto_produce} dflt={B2B_DEFAULTS.auto_produce} />
-          }
+          label="Into production"
+          keyName="b2b.production"
+          help="An order on account waits for production, like a paid consumer order, until someone in the studio presses Send to production (Shop → Orders or Work → Workshop; owner, question 86, ADR-128)."
         >
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={f.auto_produce}
-              onChange={(e) => setF({ ...f, auto_produce: e.target.checked })}
-            />
-            <span>{f.auto_produce ? "on" : "off"}</span>
-          </label>
+          <span className="ro">by Send to production</span>
         </Row>
         <Row
           label="Online payment"
@@ -948,7 +936,7 @@ function Recipients({ specs }: { specs: ParamSpec[] | null }) {
       <Row
         label="Approval requests"
         keyName="users.may_approve"
-        help="“Ask for approval” on a cover mails the users who may approve and have an e-mail address (Users & rights)."
+        help="“Send to the Desk for approval” on a cover puts it on the Desk and mails the Desk's approvers (may approve, desk.approvers, admins) who have an e-mail address, with a link to its Desk card."
       >
         <span className="ro">the approvers</span>
       </Row>
@@ -1073,7 +1061,7 @@ const TAB_INTRO: Record<string, string> = {
   selling:
     "How we sell existing covers and to business customers: matching, the direct-order discount, the B2B terms.",
   users:
-    "Who may log in, with which role, and who may approve the definitive drawing.",
+    "Who may log in, with which role (the workshop has its own), and who approves at the Desk.",
   defaults: "",
   mail: "The mail server, the login code and every address that receives mail.",
   website: "How the website and webshops reach the studio.",
@@ -1184,12 +1172,12 @@ function AdminTab({ tab }: { tab: string }) {
           intro={
             <Intro>
               How the Desk works: which covers need an approval before the
-              cutting-table DXF, who approves, when a repeated correction
-              becomes a rule, how often the question mails go out. Today two
-              lists decide who approves: <b>may approve</b> on a user (Users
-              &amp; rights; the definitive drawing) and{" "}
-              <code>desk.approvers</code> below (the Desk; admins always may).
-              Making that one list is an open question for the owner.
+              cutting-table DXF (every cover since ADR-128), who approves, when
+              a repeated correction becomes a rule, how often the question mails
+              go out. The Desk's approval is the only approval. Who approves:
+              admins, users marked <b>may approve</b> (Users &amp; rights) and
+              the names in <code>desk.approvers</code> below; the workshop role
+              never.
             </Intro>
           }
         />

@@ -1,6 +1,7 @@
 """The cover webshop (ADR-062): pages for people and machines, the configurator's proposal with
 the rain check, an order without payment set up, the AI CMS's draft and publish, the settings."""
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -190,10 +191,58 @@ def test_auto_mode_answers_at_once_and_an_existing_cover_is_ordered(app: Any) ->
     order = {"quote_id": q["id"], "name": "Anna", "email": "anna@example.com",
              "street": "Dorpsstraat 1", "postcode": "1234 AB", "city": "Utrecht",
              "country": "NL", "terms": True}  # fmt: skip
-    oid = c.post("/api/shop/order", json=order).json()["order"]
+    placed = c.post("/api/shop/order", json=order).json()
+    oid = placed["order"]
+    # not paid: no production, whoever clicks (ADR-128)
+    assert admin.post(f"/api/admin/orders/{oid}/produce").status_code == 409
+    _paid_by_mollie(app, oid, placed["total_eur"])
+    rows = admin.get("/api/admin/orders").json()["orders"]
+    assert next(r for r in rows if r["id"] == oid)["status"] == "waiting_production"
+    token = placed["status_url"].rsplit("/", 1)[1]
+    assert c.get(f"/api/shop/order/{token}").json()["status"] == "paid"  # to the customer
+    # paid: still not in production, and no status change by hand puts it there
+    hand = admin.put(f"/api/admin/orders/{oid}", json={"status": "in_production"})
+    assert hand.status_code == 400
+    d = app.state.store.models / "suns-dining-table-a-240"
+    assert not (d / "desk.json").exists()
     assert admin.post(f"/api/admin/orders/{oid}/produce").json()["model_id"] == (
         "suns-dining-table-a-240"  # cut from its own pattern, no new model
     )
+    st = json.loads((d / "desk.json").read_text())
+    assert st["order"]["order"] == oid and st["status"] == "ai-checked"  # the quick approval
+    q = admin.get("/api/desk").json()["items"]
+    assert q[0]["id"] == "suns-dining-table-a-240" and q[0]["order"]["order"] == oid
+    rows = admin.get("/api/admin/orders").json()["orders"]
+    row = next(r for r in rows if r["id"] == oid)
+    assert row["status"] == "in_production" and row["released_by"] == "Rick"
+    # a second click and a repeated webhook change nothing
+    assert admin.post(f"/api/admin/orders/{oid}/produce").json()["model_id"] == row["model_id"]
+    _paid_by_mollie(app, oid, placed["total_eur"])
+    rows = admin.get("/api/admin/orders").json()["orders"]
+    assert next(r for r in rows if r["id"] == oid)["status"] == "in_production"
+
+
+def _paid_by_mollie(app: Any, oid: int, total: float) -> None:
+    """Mollie calls the webhook; the shop asks Mollie, which says: paid (no network)."""
+    import io
+    import sqlite3
+    from unittest import mock
+
+    with sqlite3.connect(app.state.auth.path) as db:
+        db.execute("UPDATE orders SET mollie_id=? WHERE id=?", (f"tr_test{oid}", oid))
+    pay = {"status": "paid", "amount": {"value": f"{total:.2f}", "currency": "EUR"},
+           "metadata": {"order": oid}, "mode": "none"}  # fmt: skip
+
+    class Answer(io.BytesIO):
+        def __enter__(self) -> "Answer":
+            return self
+
+        def __exit__(self, *a: object) -> None:
+            return None
+
+    with mock.patch("urllib.request.urlopen", lambda *a, **k: Answer(json.dumps(pay).encode())):
+        r = TestClient(app).post("/api/shop/mollie", data={"id": f"tr_test{oid}"})
+    assert r.status_code == 200, r.text
 
 
 def test_the_shop_speaks_every_language_and_the_ai_fills_them_in(

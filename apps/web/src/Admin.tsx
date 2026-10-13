@@ -11,7 +11,7 @@ import {
   User,
   WebshopSettings,
 } from "./api";
-import { modelHref } from "./nav";
+import { deskHref, modelHref } from "./nav";
 
 const when = (t: number | null) =>
   t ? new Date(t * 1000).toLocaleString() : "—";
@@ -204,12 +204,19 @@ export function Users() {
                   <option value="admin">admin</option>
                   <option value="editor">editor</option>
                   <option value="viewer">viewer</option>
+                  <option value="workshop">workshop</option>
                 </select>
               </td>
               <td>
                 <input
                   type="checkbox"
                   checked={u.can_approve}
+                  disabled={u.role === "workshop"}
+                  title={
+                    u.role === "workshop"
+                      ? "The workshop role never approves"
+                      : "Approves at the Desk"
+                  }
                   onChange={(e) => change(u, { can_approve: e.target.checked })}
                 />
               </td>
@@ -283,6 +290,7 @@ export function Users() {
               ...u,
               email: u.email || null,
               role: u.role as User["role"],
+              can_approve: u.can_approve && u.role !== "workshop",
               send_invite: send,
               note,
             });
@@ -325,11 +333,13 @@ export function Users() {
             <option value="viewer">viewer</option>
             <option value="editor">editor</option>
             <option value="admin">admin</option>
+            <option value="workshop">workshop</option>
           </select>
           <label>
             <input
               type="checkbox"
-              checked={form.can_approve}
+              disabled={form.role === "workshop"}
+              checked={form.can_approve && form.role !== "workshop"}
               onChange={(e) =>
                 setForm({ ...form, can_approve: e.target.checked })
               }
@@ -350,8 +360,12 @@ export function Users() {
         </div>
         <p className="muted">
           Viewer: looks and downloads. Editor: also uploads, calculates and
-          changes settings. Admin: also this page. “May approve”: may approve
-          the definitive drawing of a cover.
+          changes settings. Admin: also this page. Workshop: the workshop's own
+          login: Work → Workshop and the Desk read-only, fits, comments and
+          pictures on a Desk card, its own questions and the DXF of approved
+          covers; it never approves and sees no prices or settings. “May
+          approve”: approves at the Desk (the only approval), as the names in
+          desk.approvers do.
         </p>
       </form>
     </>
@@ -868,11 +882,22 @@ export function EmbedAndKeys() {
 
 // ---- the cover webshop (ADR-062) ----------------------------------------------------------------
 
+// An order's statuses in words; "waiting for production": paid (or on account), waiting for
+// someone in the studio to send it (owner, 13 Oct 2026, question 86 b; ADR-128).
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  awaiting_payment: "awaiting payment",
+  waiting_production: "waiting for production",
+  in_production: "in production",
+  on_account: "on account",
+};
+const RELEASABLE = ["paid", "waiting_production", "on_account"];
+
 /** Shop → Orders; `focus`: an order opened from the search (#/shop/orders/<n>), shown and marked. */
 export function Orders({ focus = null }: { focus?: number | null }) {
   const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState<number | null>(null);
   const load = () =>
     shopAdmin
       .orders()
@@ -964,32 +989,61 @@ export function Orders({ focus = null }: { focus?: number | null }) {
                   <td>
                     <select
                       value={o.status}
+                      aria-label={`Status of order ${o.id}`}
                       onChange={async (e) => {
-                        await shopAdmin.setStatus(o.id, e.target.value);
+                        setMsg("");
+                        try {
+                          await shopAdmin.setStatus(o.id, e.target.value);
+                        } catch (err) {
+                          setMsg(String(err).replace(/^Error: /, ""));
+                        }
                         load();
                       }}
                     >
                       {statuses.map((s) => (
-                        <option key={s}>{s}</option>
+                        <option key={s} value={s}>
+                          {ORDER_STATUS_LABEL[s] ?? s}
+                        </option>
                       ))}
                     </select>
+                    {o.released_by && (
+                      <div className="muted small">
+                        sent by {o.released_by}
+                        {o.released ? `, ${when(o.released)}` : ""}
+                      </div>
+                    )}
                   </td>
                   <td>
                     {o.model_id ? (
-                      <a href={modelHref(o.model_id)}>{o.model_id}</a>
-                    ) : (
+                      <>
+                        <a href={modelHref(o.model_id)}>{o.model_id}</a>
+                        <br />
+                        <a className="small" href={deskHref(o.model_id)}>
+                          Desk card
+                        </a>
+                      </>
+                    ) : RELEASABLE.includes(o.status) ? (
                       <button
+                        className="primary"
+                        disabled={busy !== null}
+                        title="Someone in the studio decides: the cover is made and goes to the Desk for a quick approval; the DXF follows (ADR-128)"
                         onClick={async () => {
+                          setBusy(o.id);
+                          setMsg("");
                           try {
                             await shopAdmin.produce(o.id);
                             load();
                           } catch (e) {
-                            setMsg(String(e));
+                            setMsg(String(e).replace(/^Error: /, ""));
+                          } finally {
+                            setBusy(null);
                           }
                         }}
                       >
-                        Into production
+                        {busy === o.id ? "Sending…" : "Send to production"}
                       </button>
+                    ) : (
+                      <span className="muted small">not paid yet</span>
                     )}
                   </td>
                 </tr>
