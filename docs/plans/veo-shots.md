@@ -60,6 +60,31 @@ are cut-outs ("Free") without a scene.
 | `marbella-golden-v2` | used: the whole canopy in one box, hem just above the paving, two vents; in the backlight the sand reads khaki-grey |
 | `basta-end-v1` | used: wedge covers on the loungers, box covers on the bar table and chairs, all sand, the pool and its reflections unchanged |
 
-## The clips and how good they are
+## The clips and how good they are (13 Oct, one Fast take each, a second only after a clear flaw)
 
-See ADR-127 and the comparison page (`/media/veo-compare.html`); each `<n>.json` has the prompt.
+Encoded with `hero_encode.py` (AV1 1920 × 1080 + H.264 1280 × 720, ~3.6 MB each, poster, no
+sound, 7.6 s with the end dissolving into the start) as `veo-<scene>-<n>` in the media folder,
+beside start/end stills `veo-<scene>-<n>-start.jpg` / `-end.jpg`; the page
+`veo-compare.html` puts them next to the clip on the preview now. All 16:9: the story's cards are
+4:5, so a card would crop the sides (the villa is 16:9 already).
+
+| Media name | Shot (out/veo/…) | Judgement |
+|---|---|---|
+| veo-fit-1 | fit-portofino #1 | clean and calm, no hands, ends exactly on our cover; but it floats down from the sky |
+| veo-fit-2 | fit-portofino-back #1 | "pulled from behind": the cloth first stands up like a sail, lies bunched, snaps into shape in the last second; weakest |
+| veo-fit-3 | fit-portofino-mid #1 (mid frame → end) | the most believable: hanging over the back, it slides forward over the seat, the skirt drops; starts half on |
+| veo-fit-4 | fit-kota-back #1 | lively, close, our Kota cover; the throw at 1 s is fast and a bit magical |
+| veo-rain-1 | rain-portofino #1 | rain, streams down the front skirt, splashes on wet paving; the beads on top are faint at phone size |
+| veo-rain-2 | rain-kota #1 | the most convincing water (streams pour off the slope, splashes, puddles); the camera moves a lot |
+| veo-villa-1 | villa-blocchi-b #1 | warm low sun, calm, loops well; the covers are puffier than our faceted Blocchi cover; no sea |
+| veo-villa-2 | villa-marbella #1 | real Spanish villa and pool; a growing sun flare, and the covered canopy is a plain khaki box |
+| veo-range-1 | range-basta #1 | five sharp sand covers by the pool; the camera drifts until the loungers leave the frame |
+| veo-range-2 | range-basta-b #1 | the retake: near-still, everything stays in frame, loops cleanly; a "living photo" |
+| (not encoded) | villa-blocchi #1 | rejected: the camera swings to an invented sunset and an empty terrace; lumpy covers (frame v2) |
+
+Spent this round: €14.28 on the ledger (11 clips × €1.14 estimate, 11 frames at their billed
+€0.15–0.16), $15.03 at list-or-above prices; the cap was €30.
+
+**Open:** `/media/` serves only `.mp4/.webm/.jpg/.png/.webp` (shop.py `media_file`), so
+`/media/veo-compare.html` gives 404 until the main session either lets that one page through or
+serves it elsewhere; the clips and stills themselves are reachable under `/media/`.
