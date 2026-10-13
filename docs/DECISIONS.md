@@ -4679,3 +4679,118 @@ desk.py, approval.py, order-to-production and roles; nothing here touches those.
 Better, later: a durable job queue that resumes instead of interrupting; per-model locks for
 all writers; an outbox for the approval and invitation mails' audit trail in one place; a
 transactional promotion for drawing rebuilds instead of refusing them.
+
+## ADR-130 — Studio 2.0: "A · iOS light", our own icons, the (i) instead of loose text
+
+The owner chose direction **A · iOS light** of the Studio 2.0 proposal (13 Oct 2026,
+docs/plans/studio-v2.md), "with icons etc.", and later the same day asked for **icons of our
+own** ("maak zelf unieke icons voor de backend"). Built on v1.42.0 (after ADR-128 and ADR-129),
+from the proposal's tokens, audit and icon map; its mock-up patch was a reference only.
+Decided with the choice, not asked again: iOS blue as the one accent, a light header and
+sub-menu, the system font with Inter as the web fallback, 14 px cards and grouped inset lists,
+Settings with coloured icon tiles, the status colours below, field borders of at least 3:1,
+icons on every menu item, tab, toolbar action and status chip, and the text reduction.
+
+1. **Tokens** (`apps/web/src/studio.css`, first block; same names as before plus `--wait`,
+   `--made`, `--count`, `--tile-*`, `--radius-lg`, `--radius-sm`, `--icon-stroke`). Light: a
+   grouped grey ground `#f2f2f7`, white cards, ink `#1c1c1e`, muted `#636366`; dark: true black,
+   grey cards `#1c1c1e`. One accent, iOS blue (links `#0062cc`/`#5eb0ff`, buttons
+   `#0068d6`/`#0a6cdb`, white text 5.3 / 5.0:1). States: **approved green** (`--ok`),
+   **waiting blue** (`--wait`), **rejected red** (`--bad`), **a warning orange** (`--warn`),
+   **produced purple** (`--made`), each on its own tint. A field's border (`--line-strong`)
+   `#848489` light, `#757579` dark: at least 3:1 against the surface, the ground, the sunken
+   and the stone tone (WCAG 1.4.11; was 1.7:1). `apps/api/tests/test_web_tokens.py` keeps every
+   text pair at 4.5:1, borders, counts and the Settings tiles at 3:1, in light and both dark
+   blocks. Type: `-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter Variable", Inter,
+   system-ui`: SF on a Mac and an iPad, Inter self-hosted (`@fontsource-variable/inter`,
+   preloaded by the Vite plugin for index.html) elsewhere. Shape: 10 px controls, 14 px cards,
+   34 px controls (40 on a touch screen), pills for chips and the sub-menu.
+2. **The shell.** The header is light and translucent (no black bar), 56 px: the mark, the four
+   sections as pills with their icon (the current one tinted blue), the search with its glass,
+   Guide, the theme and Log out as icons (named "Guide", "Log out"), the name with a person
+   icon. The sub-menu: pills with icons, the current page a solid blue pill. Settings: iOS
+   Settings, a coloured tile with a white glyph before each tab, and each setting a row of name
+   (its help behind an (i), its key in the name's tooltip), value and source chip.
+3. **Our own icons** (`apps/web/src/icons/glyphs.tsx`): 69 glyphs drawn for the studio on a
+   24-px grid, one stroke with round caps and joins, no fills, `currentColor`: the four
+   sections, Search and Guide; Desk (a tray with a tick), Questions, Workshop (scissors at the
+   cutting line); All covers, Arrangements (an L-shaped set from above), New cover, Learning,
+   Product list; a cover's tabs (3D, pattern pieces, a stitched seam, sliders, compare,
+   history, euro); the 3D toolbar (the vent hood, dimensions, the tape, the size drawing,
+   design, rain on a cover, fabric draping from a bar, unfold, simulate, the check list); the
+   actions (approve, reject, comment, needle and thread for After sewing, the cutting table
+   with an arrow for Send to production, run again, DXF, cutting list); the statuses (each its
+   own shape so they read without colour: a tick, a clock, a cross, a triangle, the cover with
+   a tick for produced, a pause for interrupted); the Settings tiles; the shop (a receipt, a
+   request, a building). The cover's silhouette (a lounge chair under its cover, the hem
+   flaring) is shared by Covers, New cover, Produced and the requests. Optical sizes: the stroke
+   is about 1.5 px at 16, 1.65 px at 20 and 1.75 px at 24 (`strokeFor`). Lucide (`lucide-react`
+   1.56.0, ISC/MIT, imported icon by icon) only for generic glyphs: chevrons, close, the (i),
+   copy, an external link, more, undo, delete, theme, table/cards. The sheet:
+   `node apps/web/e2e/iconsheet.mjs OUT.html` (16/20/24 px, light and dark), looked at, eight
+   glyphs redrawn after the first look (covers, all covers, new cover, arrangements, simulate,
+   send to production, sewing, requests: the drape read as a hut, the L-set as a book); `~/cover-data/media/studio2-own-icons.jpg`.
+4. **The (i) and the components** (`apps/web/src/icons/index.tsx`): `Info` is a button (named
+   "About …", `aria-expanded`, `aria-controls`) whose text sits right after it in the page, so
+   Tab reaches a link inside it; Enter, Space, a click or a tap opens it, Escape (focus back on
+   the button), a tap elsewhere or the button closes it, a mouse also opens it by pointing. In
+   the browser's top layer (popover API) so no table or scrolling box clips it; without the API
+   a fixed card. The card is in the page only while open (a closed (i) adds no text, so a word
+   is found once), never taller than the screen (it scrolls inside) and placed below, else
+   above, else as low as the screen allows (Codex's review). Never inside a heading, label or button: `Heading` puts it beside the title.
+   `StatusChip` maps a state to its colour and icon; `IconButton`/`IconLink` show an action as
+   an icon with its words as tooltip and accessible name. `PageHead`'s intro, the Settings
+   rows' help, the tab intros and group intros are (i)s by construction.
+5. **Loose text** (the proposal's audit, `out/studio2-work/textaudit.py` re-run on the code):
+   of the 525 audited items, 458 still stood as visible text on v1.42.0; after: 79, of which 25
+   are empty states and "loading" lines kept on purpose, and the rest errors, live status ("The
+   AI is reading…", "Comparing…"), role notes shown instead of a control ("An admin changes
+   prices"), states that change a number's meaning ("over the low skirt", "not used") and short
+   action labels. The rules for new pages (§3 of the plan): a page explains itself in an (i);
+   a field's help is its (i); a repeated label is the column head; a toolbar action is an icon
+   with its words as name; empty states, errors, live status and numbers stay visible.
+   Explanations already behind a click ("Terms explained", "What the lines mean") stay plain.
+6. **Pages**: Desk and its card (KPI tiles with icons, the pipeline and pills in the status
+   colours, counts as icon + number, Open cover and More as icons, Approve / Reject / Comment /
+   After sewing with icons, Undo as an icon, the keys in the title's (i)), Workshop (files as
+   tinted icon buttons with their word under them on a touch screen and a tick on an approved
+   copy, the DXF a blue button, states as chips, Orders with Send to production),
+   Questions, All covers (Table/Cards as icons, counts as chips), New cover, a cover's head (the
+   strip as chips, Run, Edit details and Desk card as icons, the rejection as a red banner) and
+   its seven tabs, Shop (Orders, Requests, B2B customers with the shop's link and its (i),
+   Website), every Settings tab, the login and invitation pages (a white card on the light
+   ground; the backdrop's story drawn in greys and blue). The public shop and the B2B shop keep
+   their own design; the customers' configurator keeps the first studio's colours, Work Sans
+   and shape (`.theme-light`).
+7. **Codex** did, reviewed here: the conversion of the price, admin and cover-tab files from the
+   audit lists (Prices, PriceImport, CoverPrice, Admin, B2BCustomers, PhotoTest, Settings,
+   MailOutbox, Viewer, Measure, Catalogue, Reference, SeamEditor, AiAdvice, Learning,
+   DeskCorrect, DeskPictures, DeskMeasured, DeskProducts, Unfold, DrawingUpload, Arrangements,
+   Questions) and the LICENSES rows. Corrected in review: definitions inside a disclosure kept
+   plain; units ("cm above the hem") and states kept visible; the main actions (Save, Save
+   draft, Preview, Add …, Approve, Apply, Accept) keep their words beside the icon; one icon
+   per meaning (not one generic gear on every heading); an (i) that stood alone under a block
+   moved into its heading.
+8. **Checks** (scratch copies of the data, never live: mail, public URL, shop domain, Mollie
+   and the link key cleared, `cover-users two-factor off`, test users; Playwright in Docker
+   with `--user $(id -u):$(id -g)`): `uinav.py` all good (2,328 checks: every role including
+   the workshop login, light and dark, 1440, 1024 as a touch screen and 820, strict contrast,
+   field borders, the (i)s, named icon controls); `desk_pictures.py` in Chromium, WebKit,
+   Firefox and Edge with the office policies; `questions.py` (the three and Edge);
+   `measure.py`, `prices.py`, `priceimport.py`, `arrangements_desk.py`, `stock_order.py`,
+   `b2b.py`, `memory3d.py` and `make e2e`; `make test` (pytest, ruff, mypy, the stylesheet
+   test, the new token test), `tsc`, prettier. Found and fixed on the way: WebKit dropped a
+   picture pasted right after the marker closed (the paste listener now reads the marker from
+   a ref; main has the same race, rarely); a closed (i)'s text matched a test's search for a
+   visible word, so the card is now rendered only while open; tests that named a button by its
+   old words (✓ Approve, ✕ Reject, Pieces & revisions, the 3D file input) by the new ones.
+   Codex's adversarial review ("nothing lost when text moved to popovers; contrast;
+   keyboard/touch access; roles unchanged") found two points, both fixed: a long (i) could run
+   off a small or zoomed screen; the Workshop's file icons said what they were only in a
+   tooltip, which a tablet does not show (now a short word beside each, and a tick on an
+   approved copy). Roles: no condition, route or API call changed; the workshop login's checks
+   in uinav pass unchanged.
+
+Better, later: the Desk card's tabs as a segmented control on a phone; the glyphs as an SVG
+sprite if their number grows; a design-token export for the website (ADR-105) so both share
+the status colours.
