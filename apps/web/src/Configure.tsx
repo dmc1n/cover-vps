@@ -1,6 +1,7 @@
 // The customer's configurator (#/configure, ADR-061): no login, made to sit in an iframe on a
 // webshop. The customer picks what to cover, gives rough sizes and options, and sees at once a
 // 3D proposal, the pieces, the fabric and the price; then can send it as a request.
+import { disposeObject, trackRenderer } from "./dispose3d";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -83,6 +84,7 @@ function Preview({ url }: { url: string | null }) {
       100,
     );
     const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const untrack = trackRenderer(renderer);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(el.clientWidth, el.clientHeight);
     el.appendChild(renderer.domElement);
@@ -96,7 +98,10 @@ function Preview({ url }: { url: string | null }) {
     controls.enableDamping = true;
     let alive = true;
     new GLTFLoader().load(url, (gltf) => {
-      if (!alive) return;
+      if (!alive) {
+        disposeObject(gltf.scene);
+        return;
+      }
       gltf.scene.traverse((o) => {
         const m = o as THREE.Mesh;
         if (m.isMesh)
@@ -126,7 +131,12 @@ function Preview({ url }: { url: string | null }) {
       alive = false;
       window.removeEventListener("resize", onResize);
       renderer.setAnimationLoop(null);
+      controls.dispose();
+      disposeObject(scene);
+      scene.clear();
       renderer.dispose();
+      renderer.forceContextLoss();
+      untrack();
       el.removeChild(renderer.domElement);
     };
   }, [url]);
