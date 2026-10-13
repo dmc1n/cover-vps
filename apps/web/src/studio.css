@@ -6397,7 +6397,7 @@ td .infotip {
   background: var(--ok-soft);
   color: var(--ok);
 }
-/* a Workshop file: an icon; on a touch screen with its short word; an approved copy a tick */
+/* a Workshop file: an icon and its short word (no hover on a tablet); an approved copy a tick */
 a.icon-btn.ws-file {
   position: relative;
   width: auto;
@@ -6406,7 +6406,6 @@ a.icon-btn.ws-file {
   gap: 4px;
 }
 .ws-file-label {
-  display: none;
   font-size: 12px;
   font-weight: 600;
 }
@@ -6418,11 +6417,7 @@ a.icon-btn.ws-file {
   background: var(--surface);
   color: var(--ok);
 }
-@media (pointer: coarse) {
-  .ws-file-label {
-    display: inline;
-  }
-}
+
 .file-bar {
   gap: 8px;
 }

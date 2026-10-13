@@ -33,8 +33,8 @@ const FILE_LABEL: Record<string, string> = {
   "cut.svg": "Cut pieces (SVG)",
   "cut.dxf": "Cutting table (DXF)",
 };
-// the files as icons, the words in their tooltips and, on a touch screen, a short word under
-// each (Studio 2.0, ADR-130); an approved copy also carries a tick, not only a colour
+// the files as icons with a short word beside each (a tablet has no tooltips) and the full words
+// as their name (Studio 2.0, ADR-130); an approved copy also carries a tick, not only a colour
 const FILE_SHORT: Record<string, string> = {
   "cutting-list.pdf": "List",
   "sizes.pdf": "Sizes",

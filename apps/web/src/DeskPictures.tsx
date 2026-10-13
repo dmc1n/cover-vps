@@ -135,6 +135,10 @@ export function PictureTray({
     setNote(`${what}${e === undefined ? "" : `: ${why(e)}`}. ${OTHER_BROWSER}`);
   const pendingRef = useRef(pending);
   pendingRef.current = pending;
+  // read at the paste itself, not from the render that registered the listener: a picture
+  // pasted right after the marker closed is not lost (ADR-130, seen in WebKit)
+  const markingRef = useRef(marking);
+  markingRef.current = marking;
   const full = pending.length >= max;
 
   const fromFile = useCallback(
@@ -168,7 +172,7 @@ export function PictureTray({
   useEffect(() => {
     if (!paste) return;
     const onPaste = (e: ClipboardEvent) => {
-      if (marking) return;
+      if (markingRef.current) return;
       const item = [...(e.clipboardData?.items ?? [])].find((i) =>
         i.type.startsWith("image/"),
       );
@@ -179,7 +183,7 @@ export function PictureTray({
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [fromFile, marking, paste]);
+  }, [fromFile, paste]);
 
   const done = (blob: Blob, source: string) => {
     const url = URL.createObjectURL(blob);

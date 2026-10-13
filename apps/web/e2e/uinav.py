@@ -558,15 +558,14 @@ async def covers_and_workshop(page: Page, width: int, n: list[int]) -> None:
       return {links: links.length, bad: links.filter(m => !ok.has(m)), items: w.items.length};
     }""")
     check(not gate["bad"], f"rick {width}: Workshop offers the DXF only past the gate {gate}")
-    if width in TOUCH:  # no hover on a tablet: every file says what it is under its icon
-        bare = await page.evaluate(
-            "() => [...document.querySelectorAll('.ws-file')].filter(a =>"
-            " !a.querySelector('.ws-file-label')?.checkVisibility()).length"
-        )
-        check(bare == 0, f"rick {width}: every Workshop file has its word on a touch screen")
-    other = page.locator(
-        "main button:not(.info-btn)"
-    )  # an (i) only shows text.filter(has_not_text="Send to production")
+    # no hover on a tablet: every file says what it is beside its icon
+    bare = await page.evaluate(
+        "() => [...document.querySelectorAll('.ws-file')].filter(a =>"
+        " !a.querySelector('.ws-file-label')?.checkVisibility()).length"
+    )
+    check(bare == 0, f"rick {width}: every Workshop file has its word beside its icon")
+    # an (i) only shows text: not an action
+    other = page.locator("main button:not(.info-btn)").filter(has_not_text="Send to production")
     check(await other.count() == 0,
           f"rick {width}: the Workshop has no buttons but Send to production")  # fmt: skip
 

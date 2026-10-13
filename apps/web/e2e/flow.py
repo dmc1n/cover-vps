@@ -27,7 +27,7 @@ async def main() -> int:
         await expect(page.get_by_role("button", name="Log out")).to_be_visible()
         await page.goto(URL + "#/covers/new")  # Covers → New cover: three uploads (ADR-124)
         await expect(page.get_by_role("heading", name="From a 3D file")).to_be_visible()
-        await page.get_by_label("3D file").set_input_files(CHAIR)
+        await page.get_by_label("3D file", exact=True).set_input_files(CHAIR)
         await page.get_by_role("button", name="Upload and run").click()
         await expect(page.get_by_text("Check: what is this file?")).to_be_visible(timeout=RUN_MS)
         await page.get_by_role("button", name="Yes, the complete product (furniture)").click()
