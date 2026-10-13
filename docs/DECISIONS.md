@@ -4541,11 +4541,15 @@ desk.py, approval.py, order-to-production and roles; nothing here touches those.
    it); a key used for another e-mail or proposal is 409. A page without a key (an old cached
    page) is protected by the same proposal, e-mail and street, unpaid, within 15 minutes.
    Everything after the order row is safe to run again (`finish_order`, Codex's review): the
-   payment is made by the request that claims the order (a claim older than 40 s is taken
-   over), with Mollie's `Idempotency-Key` per order, and the "new order" mail has a fixed
-   outbox reference; so the retry of a checkout whose first request stopped after the order
-   row finishes it, and a payment still being made elsewhere answers 409 "try again" (the
-   page keeps its key) instead of an order without a payment link.
+   payment is made by the request that claims the order with a token (a claim older than
+   40 s is taken over; a result is written only while the claim is still that token's),
+   with Mollie's `Idempotency-Key` per order, and the "new order" mail has a fixed outbox
+   reference. So the retry of a checkout whose first request stopped after the order row
+   finishes it; a payment still being made elsewhere answers 409 "try again" (the page
+   keeps its key); and a Mollie error or timeout lets the claim go and answers 502 "try
+   again" (mailed to us once), where it used to end the checkout without a payment link:
+   the next try asks Mollie again with the same key, so it stays one payment (Codex's two
+   reviews). Send again in the outbox moves a mail only from failed, in one step.
 6. **The step cache.** A step's stamp now lists every file the run created or changed in the
    model folder (`outputs`: cut.svg, cutting-list.pdf, pattern.svg, ...), not only the main
    ones. A step is skipped only while all of them exist and are not empty; a stamp from before

@@ -199,3 +199,22 @@ def test_a_backlog_never_sends_a_mail_twice_when_another_worker_takes_over(app: 
     assert sorted(FakeSMTP.accepted) == ["r0@example.com", "r1@example.com", "r2@example.com"]
     rows = _rows(app, "SELECT status, claim FROM mail_outbox")
     assert all(r["status"] == "sent" and r["claim"] is None for r in rows)
+
+
+def test_send_again_moves_only_a_failed_mail_once(app: Any) -> None:
+    """Codex's second review: two clicks on Send again never reset a mail a worker holds."""
+    auth = app.state.auth
+    FakeSMTP.plan = ["down"]
+    oid = mailer.queue(auth, "a@example.com", "s", "t", "shop")
+    assert oid
+    db = sqlite3.connect(auth.path)
+    db.execute("UPDATE mail_outbox SET status='failed' WHERE id=?", (oid,))
+    db.commit()
+    assert mailer.retry(auth, oid)["status"] == "pending"
+    db.execute("UPDATE mail_outbox SET claim='worker' WHERE id=?", (oid,))  # a worker holds it
+    db.commit()
+    with pytest.raises(ValueError):
+        mailer.retry(auth, oid)  # the second click
+    (row,) = _rows(app, "SELECT status, claim FROM mail_outbox")
+    assert row["status"] == "pending" and row["claim"] == "worker"
+    db.close()

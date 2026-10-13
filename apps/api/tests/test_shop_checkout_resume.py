@@ -102,8 +102,43 @@ def test_a_payment_still_being_made_elsewhere_is_said_not_skipped(
     monkeypatch.setattr(shop_module, "ORDER_WAIT_S", 1)
     oid = half_made_order(shop, "chk-busy-0001")
     with sqlite3.connect(shop["app"].state.auth.path) as db:  # another request holds it
-        db.execute("UPDATE orders SET data=json_set(data, '$.payment_claim', ?) WHERE id=?",
-                   (time.time(), oid))  # fmt: skip
+        db.execute("UPDATE orders SET data=json_set(data, '$.payment_claim', 'other', "
+                   "'$.payment_claim_at', ?) WHERE id=?", (time.time(), oid))  # fmt: skip
     body = {**shop["order"], "idempotency_key": "chk-busy-0001"}
     r = shop["c"].post("/api/shop/order", json=body)
     assert r.status_code == 409 and "try again" in r.json()["detail"]
+
+
+def test_a_mollie_outage_stays_resumable_and_a_stale_claim_is_taken_over(
+    shop: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Codex's second review: a failed or timed-out Mollie call must not end the checkout
+    without a payment link; the next try asks Mollie again with the same idempotency key.
+    A claim whose request stopped long ago is taken over."""
+    fake = FakeMollie()
+    down = {"n": 1}
+
+    def flaky(req: Any, timeout: float = 0) -> Any:
+        if down["n"]:
+            down["n"] -= 1
+            fake.calls.append(req.get_header("Idempotency-key"))
+            raise TimeoutError("Mollie did not answer")
+        return fake(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "urlopen", flaky)
+    body = {**shop["order"], "idempotency_key": "chk-flaky-001"}
+    first = shop["c"].post("/api/shop/order", json=body)
+    assert first.status_code == 502 and "try again" in first.json()["detail"]
+    again = shop["c"].post("/api/shop/order", json=body)
+    assert again.status_code == 200 and again.json()["checkout_url"].startswith("https://pay.")
+    assert len(fake.calls) == 2 and fake.calls[0] == fake.calls[1]  # the same payment key
+    assert sum(m.startswith("Order ") and "Mollie refused" in m for m in shop["mails"]) == 1
+    # a claim of a request that stopped 10 minutes ago does not block a new checkout's retry
+    oid = half_made_order(shop, "chk-stale-001")
+    with sqlite3.connect(shop["app"].state.auth.path) as db:
+        db.execute("UPDATE orders SET data=json_set(data, '$.payment_claim', 'gone', "
+                   "'$.payment_claim_at', ?) WHERE id=?", (time.time() - 600, oid))  # fmt: skip
+    r = shop["c"].post(
+        "/api/shop/order", json={**shop["order"], "idempotency_key": "chk-stale-001"}
+    )
+    assert r.status_code == 200 and r.json()["order"] == oid and r.json()["checkout_url"]

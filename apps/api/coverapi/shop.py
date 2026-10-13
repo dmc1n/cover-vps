@@ -1139,22 +1139,26 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             row = db.execute("SELECT * FROM orders WHERE id=?", (oid,)).fetchone()
         return row, json.loads(row["data"])
 
-    def _prepare_payment(oid: int, request: Request) -> None:
-        """The order's Mollie payment, made once: this request claims the order (a claim older
-        than PAYMENT_CLAIM_S is taken over: its request stopped), Mollie gets an idempotency key
-        per order, and the link is stored (`checkout_url`, "" when Mollie refused or there is no
-        key: the order waits for payment by bank)."""
-        now = time.time()
+    def _prepare_payment(oid: int, request: Request) -> str | None:
+        """The order's Mollie payment, made once. This request claims the order with a token
+        (a claim older than PAYMENT_CLAIM_S is taken over: its request stopped); Mollie gets an
+        idempotency key per order, so a payment made by a request that stopped is the one it
+        answers; the result is written only while the claim is still this token's. The link is
+        stored in `checkout_url` ("" without a Mollie key: the order waits for payment by bank).
+        A Mollie error releases the claim and keeps the order resumable: the error is returned
+        (and mailed once), the next try of the checkout asks Mollie again."""
+        now, token = time.time(), secrets.token_hex(8)
         with sqlite3.connect(auth.path) as db:
             claimed = db.execute(
-                "UPDATE orders SET data=json_set(data, '$.payment_claim', ?) WHERE id=? AND "
-                "json_extract(data, '$.checkout_url') IS NULL AND (json_extract(data, "
-                "'$.payment_claim') IS NULL OR json_extract(data, '$.payment_claim') < ?)",
-                (now, oid, now - PAYMENT_CLAIM_S)).rowcount  # fmt: skip
+                "UPDATE orders SET data=json_set(data, '$.payment_claim', ?, "
+                "'$.payment_claim_at', ?) WHERE id=? AND json_extract(data, '$.checkout_url') IS "
+                "NULL AND (json_extract(data, '$.payment_claim_at') IS NULL OR "
+                "json_extract(data, '$.payment_claim_at') < ?)",
+                (token, now, oid, now - PAYMENT_CLAIM_S)).rowcount  # fmt: skip
         if not claimed:
-            return
+            return None
         row, d = _order_data(oid)
-        checkout, mid = "", None
+        checkout, mid, problem = "", None, None
         if settings()["payment"].get("mollie_key"):
             status_url = f"{shop_root(auth, request)}order/{row['token']}"
             hook = shop_root(auth, request).removesuffix("shop/") + "api/shop/mollie"
@@ -1167,24 +1171,38 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
                     "metadata": {"order": oid},
                 }, idempotency=f"cover-order-{oid}-{row['token'][:8]}")  # fmt: skip
                 checkout, mid = pay["_links"]["checkout"]["href"], pay["id"]
-            except Exception as exc:  # noqa: BLE001 - the order stays; payment can follow
-                notify(f"Order {oid}: Mollie refused the payment", str(exc),
-                       ref=f"order-payment-refused:{oid}")  # fmt: skip
-        with sqlite3.connect(auth.path) as db:  # what every repeat of this checkout answers
-            db.execute("UPDATE orders SET mollie_id=COALESCE(?, mollie_id), data=json_set(data, "
-                       "'$.checkout_url', ?) WHERE id=?", (mid, checkout, oid))  # fmt: skip
+            except Exception as exc:  # noqa: BLE001 - the order stays; the next try resumes
+                problem = str(exc)[:300]
+        with sqlite3.connect(auth.path) as db:
+            if problem is None:  # what every repeat of this checkout answers
+                db.execute(
+                    "UPDATE orders SET mollie_id=COALESCE(?, mollie_id), data=json_remove("
+                    "json_set(data, '$.checkout_url', ?), '$.payment_claim', '$.payment_claim_at')"
+                    " WHERE id=? AND json_extract(data, '$.payment_claim')=?",
+                    (mid, checkout, oid, token))  # fmt: skip
+            else:  # released: the next try of the checkout asks Mollie again
+                db.execute(
+                    "UPDATE orders SET data=json_remove(json_set(data, '$.payment_error', ?), "
+                    "'$.payment_claim', '$.payment_claim_at') WHERE id=? AND "
+                    "json_extract(data, '$.payment_claim')=?", (problem, oid, token))  # fmt: skip
+        if problem is not None:  # mailed after the claim is let go, once per order
+            notify(f"Order {oid}: Mollie refused the payment", problem,
+                   ref=f"order-payment-refused:{oid}")  # fmt: skip
+        return problem
 
     def finish_order(oid: int, request: Request, repeat: bool) -> dict[str, Any]:
         """Everything after the order row, safe to run again (ADR-129): the payment link (or
         the wait for the request that is making it) and the one "new order" mail. A repeat of
         a checkout whose first request stopped half-way finishes it here."""
-        _prepare_payment(oid, request)
+        problem = _prepare_payment(oid, request)
         end = time.time() + ORDER_WAIT_S
         row, d = _order_data(oid)
-        while "checkout_url" not in d and time.time() < end:
+        while problem is None and "checkout_url" not in d and time.time() < end:
             time.sleep(0.25)  # another request is still asking Mollie for the link
-            _prepare_payment(oid, request)  # it stopped: take over
+            problem = _prepare_payment(oid, request)  # it stopped: take over
             row, d = _order_data(oid)
+        if problem is not None:
+            raise HTTPException(502, "the payment could not be started; please try again")
         if "checkout_url" not in d:
             raise HTTPException(409, "the payment is still being prepared; try again in a moment")
         stock = d.get("stock")

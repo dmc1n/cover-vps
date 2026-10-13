@@ -80,6 +80,9 @@ Settings → **Website & API keys** → Payment → Mollie key (shown masked; *R
 new one):
 
 - empty: orders are placed and wait for payment (bank transfer; **Into production** by hand);
+- when Mollie does not answer or refuses, the customer sees "the payment could not be
+  started; please try again" and we get one mail; the next try finishes the same order with
+  the same payment (ADR-129);
 - `test_…`: Mollie's test mode; the checkout says "Testbetalingen: er wordt geen geld
   afgeschreven";
 - `live_…`: real payments.

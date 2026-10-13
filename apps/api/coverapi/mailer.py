@@ -307,16 +307,17 @@ def deliver_due(auth: Auth, now: float | None = None) -> dict[str, int]:
 def retry(auth: Auth, outbox_id: int) -> dict[str, Any]:
     """Send again (Settings → System & logs): a failed mail goes back in the outbox."""
     with contextlib.closing(_db(auth)) as db:
-        r = db.execute("SELECT * FROM mail_outbox WHERE id=?", (outbox_id,)).fetchone()
-        if r is None:
-            raise KeyError(outbox_id)
-        if r["status"] != "failed" or r["body"] is None:
-            raise ValueError("only a failed mail whose text is still kept can be sent again")
-        db.execute(
+        # one step: only a failed mail with its text goes back, so two clicks never reset a
+        # mail a worker already holds or sent (Codex's review)
+        moved = db.execute(
             "UPDATE mail_outbox SET status='pending', attempts=0, next_try=?, claim=NULL "
-            "WHERE id=?",
+            "WHERE id=? AND status='failed' AND body IS NOT NULL",
             (time.time(), outbox_id),
-        )
+        ).rowcount
+        if not moved:
+            if db.execute("SELECT 1 FROM mail_outbox WHERE id=?", (outbox_id,)).fetchone() is None:
+                raise KeyError(outbox_id)
+            raise ValueError("only a failed mail whose text is still kept can be sent again")
     _register(auth)
     _wake.set()
     return {"id": outbox_id, "status": "pending"}
