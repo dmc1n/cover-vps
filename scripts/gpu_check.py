@@ -21,6 +21,7 @@ from typing import Any
 
 from coverengine import audit, drape, drape_gpu
 from coverengine.params import Registry
+from coverengine.staging import guard_staging_output
 
 
 def main() -> int:
@@ -35,6 +36,12 @@ def main() -> int:
     dirs = list(a.models) or sorted(
         d for d in a.models_dir.glob(f"{a.prefix}*") if (d / "panels.npz").is_file()
     )
+    guard_staging_output(a.out)
+    if not a.models:
+        guard_staging_output(a.models_dir)
+    for d in dirs:
+        guard_staging_output(d.parent)
+        guard_staging_output(d)
     params = Registry.load(None).resolve()
     a.out.mkdir(parents=True, exist_ok=True)
     rows: list[dict[str, Any]] = []

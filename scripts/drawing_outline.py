@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from coverengine.staging import guard_staging_output
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coverengine import crosscheck  # noqa: E402
 from coverengine.drawing_vectors import outline_shape  # noqa: E402
@@ -36,6 +38,7 @@ def main() -> int:
     a = ap.parse_args()
     pdfs = {re.sub(r"^cover \d+ - ", "", p.stem): p for p in sorted(a.pdfs.glob("*.pdf"))}
     codes = a.only.split(",") if a.only else list(pdfs)
+    guard_staging_output(a.out)
     a.out.mkdir(parents=True, exist_ok=True)
     results = []
     for code in codes:

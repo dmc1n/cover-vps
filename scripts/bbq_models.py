@@ -546,6 +546,7 @@ def _run(args: list[str], log: Path) -> int:
 
 
 def one(spec: dict[str, Any], out: Path, steps: set[str]) -> dict[str, Any]:
+    guard_staging_output(out)
     mid = spec["id"]
     dst = out / "models" / mid
     guard_staging_output(dst)

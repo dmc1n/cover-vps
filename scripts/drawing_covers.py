@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from coverengine.staging import guard_staging_output
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coverengine.ai import ask_parts  # noqa: E402
@@ -103,6 +104,8 @@ def top_view(model: Path) -> Path:
     ax.set_aspect("equal")
     ax.axis("off")
     ax.set_title(f"TOP VIEW (front at the bottom): {w / 10:.1f} x {d / 10:.1f} cm")
+    guard_staging_output(model.parent)
+    guard_staging_output(model)
     out = model / "top.png"
     fig.savefig(out, dpi=100)
     return out
@@ -165,6 +168,7 @@ def written(value: float, sizes: list[float]) -> str:
 
 
 def one(row: dict[str, Any], pictures: Path, params: Any, models: Path) -> dict[str, Any]:
+    guard_staging_output(models)
     code = row["code"]
     out: dict[str, Any] = {"code": code, "file": row["file"]}
     picture = pictures / (Path(row["file"]).stem + ".png")
@@ -233,6 +237,8 @@ def one(row: dict[str, Any], pictures: Path, params: Any, models: Path) -> dict[
 
 def recompare(folder: Path) -> None:
     """Only the comparison again, for the covers already built (covers.json is updated)."""
+    guard_staging_output(folder)
+    guard_staging_output(Path("models"))
     rows = {r["code"]: r for r in json.loads((folder / "drawings.json").read_text())}
     results = json.loads((folder / "covers.json").read_text())
     params = Registry.load(None).resolve()
@@ -264,6 +270,8 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--compare-only", action="store_true", help="only compare again")
     args = ap.parse_args()
+    guard_staging_output(args.folder)
+    guard_staging_output(Path("models"))
     if args.compare_only:
         recompare(args.folder)
         return 0
@@ -287,6 +295,7 @@ def main() -> int:
 
 
 def write_results(folder: Path, results: list[dict[str, Any]]) -> None:
+    guard_staging_output(folder)
     (folder / "covers.json").write_text(json.dumps(results, indent=1) + "\n")
     keys = ["code", "status", "shape", "pieces", "max_stretch_pct", "detail", "notes", "model_id",
             "sizes", "file"]  # fmt: skip

@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from coverengine.staging import guard_staging_output
 from PIL import Image, ImageDraw
 from scipy import ndimage, optimize
 
@@ -173,6 +174,9 @@ def strokes(red: np.ndarray) -> list[np.ndarray]:
 
 def main() -> None:
     model_dir, pic, prefix = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+    guard_staging_output(prefix.parent)
+    guard_staging_output(prefix.with_suffix(".json"))
+    guard_staging_output(prefix.with_suffix(".png"))
     data = np.load(model_dir / "panels.npz")
     names = [p["name"] for p in json.loads((model_dir / "panels.json").read_text())["panels"]]
     verts, faces, labels = data["vertices"], data["faces"], data["labels"]

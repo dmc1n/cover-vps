@@ -24,6 +24,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+from coverengine.staging import guard_staging_output
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coverengine.drawing_ai import (  # noqa: E402
     read,
@@ -33,6 +35,7 @@ from coverengine.params import Registry  # noqa: E402
 
 def calculate(code: str, shape: dict[str, Any], timeout: int) -> dict[str, Any]:
     """The cover built and calculated (drawing_cover.py) in a process of its own, with a limit."""
+    guard_staging_output(Path("models"))
     import subprocess
 
     cmd = [sys.executable, str(Path(__file__).with_name("drawing_cover.py")), code, "swept",
@@ -60,6 +63,9 @@ def main() -> int:
     ap.add_argument("--timeout", type=int, default=1500, help="seconds for one cover's calculation")
     ap.add_argument("--force", action="store_true", help="also the drawings already built")
     a = ap.parse_args()
+    guard_staging_output(a.out)
+    if not a.no_build:
+        raise SystemExit("Build in staging with fewer_build.py / given_build.py instead")
     base = Registry.load(None).resolve()
     params = Registry.load(None).resolve(trial={
         "ai.provider": str(base["ai.vision_provider"]), "ai.model": str(base["ai.vision_model"]),

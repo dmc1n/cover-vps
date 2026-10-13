@@ -34,6 +34,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+from coverengine.staging import guard_staging_output
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coverengine import crosscheck  # noqa: E402
 from coverengine.drawing_solid import best_solid, iso_fit, model_surface, pieces  # noqa: E402
@@ -73,6 +75,8 @@ def better(new: dict[str, Any], old: dict[str, Any]) -> bool:
 
 def replace_live(live: Path, src_glb: Path, params: dict[str, Any], note: str) -> str:
     """The new surface into the live cover's own folder, calculated as a new revision."""
+    guard_staging_output(live.parent)
+    guard_staging_output(live)
     rc, last = cover("import", str(src_glb), "--out", str(live), "--units", "mm", "--up", "z")
     if rc:
         return f"import failed: {last}"
@@ -103,10 +107,15 @@ def main() -> int:
     ap.add_argument("--one", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--timeout", type=int, default=2400, help="seconds per drawing")
     a = ap.parse_args()
+    guard_staging_output(a.out)
+    guard_staging_output(a.old_checks)
+    if not a.dry_run:
+        raise SystemExit("Build in staging with fewer_build.py / given_build.py instead")
     found = pdfs(a.pdfs)
     codes = a.only.split(",") if a.only else list(found)
     a.out.mkdir(parents=True, exist_ok=True)
     staging = a.out / "staging" / "models"
+    guard_staging_output(staging)
     staging.mkdir(parents=True, exist_ok=True)
     roll = roll_mm()
 

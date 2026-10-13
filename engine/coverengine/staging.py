@@ -21,7 +21,8 @@ def guard_staging_output(dst: Path, src: Path | None = None) -> None:
         for root in roots:
             if path.is_relative_to(root) or root.is_relative_to(path):
                 raise ValueError(
-                    f"Unsafe staging output {dst}: {path} overlaps protected tree {root}"
+                    f"Unsafe staging output {dst}: {path} overlaps protected tree {root}. "
+                    "Build in staging with fewer_build.py / given_build.py instead."
                 )
 
     check(target)

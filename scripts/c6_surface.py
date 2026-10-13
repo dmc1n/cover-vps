@@ -11,9 +11,11 @@ corner. Open at the bottom. Written in mm, Z up, the outside corner at the origi
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import numpy as np
 import trimesh
+from coverengine.staging import guard_staging_output
 
 X, Y = 2900.0, 3800.0  # outside sizes (drawing: 289.99 and 379.98 cm)
 ARM = 1100.0  # depth of both arms (109.98 cm)
@@ -64,6 +66,8 @@ def mesh() -> trimesh.Trimesh:
 
 
 if __name__ == "__main__":
+    guard_staging_output(Path(sys.argv[1]).parent)
+    guard_staging_output(Path(sys.argv[1]))
     m = mesh()
     m.export(sys.argv[1])
     print(f"{sys.argv[1]}: {m.bounds[1] - m.bounds[0]} mm, area {m.area / 1e6:.2f} m2")

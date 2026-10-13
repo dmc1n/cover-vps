@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import trimesh
+from coverengine.staging import guard_staging_output
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coverengine.drawn_merge import merge, model_parts  # noqa: E402
@@ -35,6 +36,9 @@ def merged_scene(parts: list[tuple[str, trimesh.Trimesh]]) -> trimesh.Scene:
 
 
 def one(model: Path, dry: bool) -> dict[str, Any]:
+    if not dry:
+        guard_staging_output(model.parent)
+        guard_staging_output(model)
     params = Registry.load(None).resolve()
     parts = model_parts(model / "model.glb")
     out = merge(parts, roll_mm(), float(params["drawn.merge_fold_deg"]),  # type: ignore[arg-type]
@@ -48,6 +52,8 @@ def one(model: Path, dry: bool) -> dict[str, Any]:
         res["status"] = "would join (dry run)"
         return res
     src = Path("out/drawn") / f"{model.name}-merged.glb"
+    guard_staging_output(src.parent)
+    guard_staging_output(src)
     src.parent.mkdir(parents=True, exist_ok=True)
     merged_scene(out).export(src)
     from drawing_rebuild import replace_live
@@ -71,6 +77,9 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--one", help=argparse.SUPPRESS)
     a = ap.parse_args()
+    guard_staging_output(Path("out/drawings"))
+    if not a.dry_run:
+        raise SystemExit("Build in staging with fewer_build.py / given_build.py instead")
     if a.one:  # a child process: one cover (the geometry libraries are not thread safe)
         print(json.dumps(one(Path("models") / a.one, a.dry_run)), flush=True)
         return 0

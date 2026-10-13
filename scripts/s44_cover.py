@@ -12,10 +12,12 @@ between. Piecewise flat pieces lie flat exactly. Walls stand under the outline.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import numpy as np
 import pymupdf
 import shapely
+from coverengine.staging import guard_staging_output
 
 sys.path.insert(0, "engine")
 from coverengine.drawn import Piece, scene  # noqa: E402
@@ -55,6 +57,8 @@ def strokes(
 
 
 def main(pdf: str, out_glb: str) -> None:
+    guard_staging_output(Path(out_glb).parent)
+    guard_staging_output(Path(out_glb))
     st, x0, y0, scale = strokes(pdf)
 
     def mm(p: tuple[float, float]) -> tuple[float, float]:

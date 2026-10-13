@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from coverengine.drawing_vectors import features
+from coverengine.staging import guard_staging_output
 
 
 def slug(code: str) -> str:
@@ -36,6 +37,8 @@ def pdfs(folder: Path) -> dict[str, Path]:
 def apply(model: Path, pdf: Path) -> dict[str, Any]:
     """The drawing's features on the cover: drawing_features.json, and the written vent count
     as `features.vents_total` in cover.json (removed again when the drawing gives none)."""
+    guard_staging_output(model.parent)
+    guard_staging_output(model)
     found = features(pdf)
     (model / "drawing_features.json").write_text(json.dumps(found, indent=1) + "\n")
     path = model / "cover.json"
@@ -69,6 +72,8 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--no-export", action="store_true")
     a = ap.parse_args()
+    guard_staging_output(a.models)
+    guard_staging_output(Path("out/drawings"))
     found = pdfs(a.pdfs)
     codes = a.only.split(",") if a.only else list(found)
 

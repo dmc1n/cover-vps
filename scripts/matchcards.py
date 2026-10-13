@@ -23,6 +23,7 @@ from typing import Any
 from coverapi.match_list import listing as read_listing
 from coverengine import match_drawings as md
 from coverengine.params import Registry
+from coverengine.staging import guard_staging_output
 
 
 def main() -> None:
@@ -33,6 +34,7 @@ def main() -> None:
     ap.add_argument("--prices", default=str(data / "prices" / "imports"))
     a = ap.parse_args()
     models, out = Path(a.models), Path(a.out)
+    guard_staging_output(out)
     out.mkdir(parents=True, exist_ok=True)
     p = Registry.load(None).resolve()
     lst = read_listing(Path(a.prices))

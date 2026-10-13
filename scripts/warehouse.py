@@ -20,6 +20,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from coverengine.staging import guard_staging_output
+
 API = "https://3dwarehouse.sketchup.com/warehouse/v1.0"
 PAGE = 100
 ID = re.compile(r"3D Warehouse ([0-9a-f-]{36})")
@@ -48,9 +50,11 @@ def list_creator(creator: str) -> dict[str, str]:
 
 
 def fetch(catalogue: Path, out: Path) -> None:
+    guard_staging_output(out)
     out.mkdir(parents=True, exist_ok=True)
     for entity, title in json.loads(catalogue.read_text()).items():
         dest = out / f"{entity}.glb"
+        guard_staging_output(dest)
         if dest.is_file() and dest.stat().st_size:
             continue
         try:
@@ -60,8 +64,10 @@ def fetch(catalogue: Path, out: Path) -> None:
 
 
 def photos(models: Path, tag: str | None) -> None:
+    guard_staging_output(models)
     n = 0
     for d in sorted(models.iterdir()):
+        guard_staging_output(d)
         cover = d / "cover.json"
         if not cover.is_file():
             continue

@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 from coverengine.catalogue import grade
+from coverengine.staging import guard_staging_output
 
 THUMB_PX = 240  # longest side of the embedded pictures
 QUALITY = 72
@@ -195,6 +196,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--limit", type=float, default=2.0, help="stretch limit (%)")
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args(argv)
+    guard_staging_output(a.out.parent)
+    guard_staging_output(a.out)
     data = rows(a.models, a.tag, a.prefix)
     page = (
         PAGE.replace("__TITLE__", html.escape(a.title))
