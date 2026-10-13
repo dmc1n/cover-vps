@@ -1,0 +1,124 @@
+{
+  "about": "Veo clips for the website from real SUNS photos with our cover put on by gemini-3-pro-image (ADR-127, docs/plans/veo-shots.md). Paths are relative to out/veo/frames (veo.py --frames). Shapes: the cover.png of each model in models/, copied to frames/refs/.",
+  "defaults": {
+    "model": "veo-3.1-fast-generate-preview",
+    "image_model": "gemini-3-pro-image",
+    "image_size": "2K",
+    "duration": 8,
+    "resolution": "1080p",
+    "aspect": "16:9",
+    "negative": "hands, arms, fingers, people, text, letters, numbers, logos, labels, watermark, zips, buttons, straps, extra seams, warping or bending furniture, morphing shapes, melting fabric, colour change, flicker, camera shake, fast motion, cuts"
+  },
+  "frames": {
+    "portofino-end": {
+      "photo": "portofino-start.png",
+      "refs": [
+        "refs/portofino-daybed-cover.png",
+        "refs/fabric-kota-render.png"
+      ],
+      "prompt": "Edit the first photo only. Put one fitted, tailored protective cover over the whole outdoor daybed (the cushions, the back cushions and the teak platform base). Its shape is the cover in the second image (the colours there only mark the cut pieces; the real cover is one uniform colour): a wedge with a straight vertical skirt along the front that covers the teak base and the front of the seat cushions, a top that slopes in one straight taut plane from the front edge of the seat up to the top edge of the back cushions so rain runs off, both ends slanting inward like a hipped roof, and a vertical back. The cover is as tall as the furniture: its highest edge, at the back, is exactly at the height of the top of the back cushions in the photo, nothing is squashed, and the cover is exactly as wide as the daybed. The fabric is the one in the third image: sand-coloured (beige) 100% acrylic outdoor canvas, matte woven texture, neat double-stitched seams along every edge, slight natural tension wrinkles. The hem runs straight and level all round, about 5 cm above the paving, so a thin strip of shadow shows under it. Two small vent hoods low on the front skirt, each a rectangular flap of the same sand canvas about 25 cm wide and 22 cm high. Everything under the cover is hidden, including the small tray table. Keep everything else in the photo exactly the same: same camera, lens and framing, the same sunlight direction and shadows, the paving, the tree, the plant pot, the glass building behind. Photorealistic, the same photographic quality as the original. No text, no logos, no labels, no people."
+    },
+    "portofino-mid": {
+      "photo": "portofino-start.png",
+      "refs": [
+        "portofino-end-v2.png"
+      ],
+      "prompt": "Edit the first photo only. Show the moment halfway through putting on the cover from the second image: the same sand-coloured canvas cover has been pulled over the daybed from behind and now hangs over the top of the back cushions, its back half lying on the back cushions and its front half hanging loosely down over the front of the back cushions onto the seat, with soft folds; the front of the seat cushions and the front of the teak base are still uncovered. Nobody is visible. Keep everything else in the photo exactly the same: same camera, framing, light and shadows, paving, tree, plant pot and building. Photorealistic. No text, no logos, no people, no hands."
+    },
+    "portofino-rain": {
+      "photo": "portofino-end-v2.png",
+      "prompt": "Edit this photo only: make it the same scene on a rainy day. Soft grey overcast daylight with no direct sun and no hard shadows, the paving dark and wet with a faint sheen and a few shallow puddles reflecting the sky, the plants and the tree wet. The sand-coloured cover keeps exactly its shape, its seams, its vent hoods and its colour (only slightly darker where wet); fine raindrops bead on its sloped top and a few thin trickles run down its slope. Same camera and framing, everything else in its place. Photorealistic. No text, no logos, no people."
+    },
+    "kota-rain": {
+      "photo": "kota-end.png",
+      "prompt": "Edit this photo only: make it the same scene on a rainy day. Soft grey overcast daylight with no direct sun and no hard shadows, the paving dark and wet with a faint sheen and a few shallow puddles reflecting the sky, the grass, hedge and flowers wet. The sand-coloured cover keeps exactly its shape, its seams and its colour (only slightly darker where wet); fine raindrops bead on its sloped top and a few thin trickles run down its slope. Same camera and framing, everything else in its place. Photorealistic. No text, no logos, no people."
+    },
+    "basta-end": {
+      "photo": "basta-start.png",
+      "refs": [
+        "refs/basta-lounger-cover.png",
+        "refs/basta-bartable-cover.png",
+        "refs/fiave-barchair-cover.png",
+        "refs/fabric-kota-render.png"
+      ],
+      "prompt": "Edit the first photo only. Give each piece of furniture its own fitted, tailored protective cover: the two sun loungers on the wooden deck, and in the background the bar table and each of its bar chairs. The shapes are the covers in the second image (a sun lounger: a wedge whose top slopes from the raised back down to the foot end), the third image (the bar table: a long box with a slightly sloped top) and the fourth image (a bar chair: a tall box with a sloped top); the colours in those three images only mark the cut pieces, each real cover is one uniform colour. The fabric is the one in the fifth image: sand-coloured (beige) 100% acrylic outdoor canvas, matte woven texture, neat double-stitched seams along the edges, slight natural tension wrinkles. Each cover has a straight vertical skirt whose hem runs level about 5 cm above the deck, and one small vent hood (a rectangular flap of the same canvas, about 25 cm wide) low on each long side. The towels, cushions and pillows are under the covers and not visible. Keep everything else exactly the same: same camera, lens and framing, the same sunlight and shadows, the pool and its reflections, the deck, the low wall, the side table, the steps, the trees and hedges and sky. Photorealistic, the same photographic quality as the original. No text, no logos, no labels, no people."
+    },
+    "blocchi-golden": {
+      "photo": "blocchi-start.png",
+      "refs": [
+        "refs/blocchi-moon-cover.png",
+        "refs/fabric-kota-render.png"
+      ],
+      "prompt": "Edit the first photo only. Cover each of the two curved white sofas, made exactly like the cover in the third image covers its sofa (crisp, taut, flat panels, straight seams), with its own fitted, tailored protective cover. The shape is the cover in the second image (the colours there only mark the cut pieces; the real cover is one uniform colour): it follows the sofa's curved outline in plan with a straight vertical skirt all round, and its top is made of a few flat, taut, crisp panels that rise from the front edge of the seat to a straight ridge at the height of the top of the back pillows, so rain runs off; the loose back pillows are inside it. The fabric is pulled tight and tailored, with clean straight seams between the panels: no bulges, no lumps, no loose bag shape. The fabric is the one in the third image: sand-coloured (beige) 100% acrylic outdoor canvas, matte woven texture, neat double-stitched seams along the edges, slight natural tension wrinkles. The hem runs level about 5 cm above the terrace floor; two small vent hoods (rectangular flaps of the same canvas, about 25 cm wide) low on the front skirt of each cover. The two small teak tables, the bottle, glass and vase stay where they are, uncovered. Also change the light to golden hour: a low warm sun from the left, long soft shadows across the terrace, a warm glow on the mountains and the sky slightly peach towards the horizon. Keep everything else exactly the same: same camera, lens and framing, the olive tree in its pot, the glass balustrade, the trees, the mountains and the valley. Photorealistic, like a real photograph. No text, no logos, no labels, no people."
+    },
+    "marbella-golden": {
+      "photo": "marbella-start.png",
+      "refs": [
+        "refs/portofino-roof-cover.png",
+        "refs/fabric-kota-render.png"
+      ],
+      "prompt": "Edit the first photo only. Put one fitted, tailored protective cover over the whole teak daybed with its canopy frame: the cover reaches from the top of the canopy down to just above the poolside paving and hides the frame, the roof, the curtains, the cushions and the pillows. Its shape is the cover in the second image (the colours there only mark the cut pieces; the real cover is one uniform colour): a tall box with four flat vertical walls following the canopy's posts and a top that slopes gently in one plane from front to back so rain runs off. The fabric is the one in the third image: sand-coloured (beige) 100% acrylic outdoor canvas, matte woven texture, neat double-stitched seams along every vertical and top edge, slight natural tension wrinkles where the fabric spans between the posts. The walls run all the way down past the teak platform base, which is hidden too: the hem runs straight and level about 5 cm above the paving, no wood visible below the cover. Two small vent hoods (rectangular flaps of the same canvas, about 25 cm wide and 22 cm high) low on the front wall. The two small teak lanterns stay beside it, uncovered. Also change the light to golden hour: a low warm sun from the left, long soft shadows, warm light on the palms, the roof tiles and the chimneys, the sky slightly peach. Keep everything else exactly the same: same camera, lens and framing, the pool, the palms and plants, the villa's roof. Photorealistic, like a real photograph. No text, no logos, no labels, no people."
+    }
+  },
+  "shots": {
+    "fit-portofino": {
+      "media_key": "fit",
+      "first": "portofino-start.png",
+      "last": "portofino-end-v2.png",
+      "prompt": "A tailored sand-coloured canvas protective cover floats gently down from above and settles over the outdoor daybed on a sunny paved terrace: the fabric drapes over the back cushions and the seat, the sloped top, the ends and the short skirt drop straight into place and the hem comes to rest just above the paving. Camera completely still. Bright natural daylight, real shadows. Realistic heavy canvas cloth physics, calm, no people. The tree, the plant pot and the glass building behind stay exactly the same."
+    },
+    "fit-portofino-back": {
+      "media_key": "fit",
+      "first": "portofino-start.png",
+      "last": "portofino-end-v2.png",
+      "prompt": "A sand-coloured canvas protective cover is drawn over the outdoor daybed from behind, as if pulled from out of frame: it first appears over the top of the back cushions, slides forward over the back cushions and the seat in one smooth, slow movement, then the front skirt and the sloped ends drop into place and the hem settles just above the paving. Nobody is visible. Camera completely still. Bright natural daylight, real shadows. Realistic heavy canvas cloth physics, calm. The tree, the plant pot and the glass building behind stay exactly the same."
+    },
+    "fit-portofino-mid": {
+      "media_key": "fit",
+      "first": "portofino-mid-v1.png",
+      "last": "portofino-end-v2.png",
+      "prompt": "The sand-coloured canvas cover that hangs over the back of the outdoor daybed slides forward over the seat in one slow smooth movement, as if pulled from the front out of frame; the front skirt and the sloped ends drop into place and the hem settles just above the paving, the fabric relaxing into its final shape. Nobody is visible. Camera completely still. Bright natural daylight, real shadows. Realistic heavy canvas cloth physics, calm."
+    },
+    "fit-kota-back": {
+      "media_key": "fit",
+      "first": "kota-start.png",
+      "last": "kota-end.png",
+      "prompt": "A sand-coloured canvas protective cover is drawn over the light-grey outdoor sofa from behind, as if pulled from out of frame: it appears over the top of the backrest, slides forward over the back and the cushions in one smooth, slow movement, then the side panels and the skirt drop into place and the hem settles just above the floor tiles. Nobody is visible. Camera completely still. Bright natural summer sunlight, real shadows. Realistic heavy canvas cloth physics, calm. The coffee table, vase, flowers, grass and hedge stay exactly the same."
+    },
+    "rain-portofino": {
+      "media_key": "runoff",
+      "first": "portofino-rain-v1.png",
+      "prompt": "Steady rain falls on a terrace on a grey day. A sand-coloured canvas cover over an outdoor daybed: raindrops bead on its coated fabric and run down its sloped top in thin streams, gather at the hem and drip onto the wet paving, where small splashes and ripples form in the puddles. Grey overcast light. Very slow push-in, camera otherwise still. The cover keeps its shape and colour. Calm and realistic."
+    },
+    "rain-kota": {
+      "media_key": "runoff",
+      "first": "kota-rain-v1.png",
+      "prompt": "Steady rain falls on a garden terrace on a grey day. A sand-coloured canvas cover over an outdoor sofa: raindrops bead on its coated fabric and run down its sloped top in thin streams, gather at the hem and drip onto the wet tiles, where small splashes form. Grey overcast light. Very slow push-in, camera otherwise still. The cover keeps its shape and colour. Calm and realistic."
+    },
+    "villa-blocchi": {
+      "media_key": "villa",
+      "first": "blocchi-golden-v2.png",
+      "prompt": "Golden hour on a terrace high above a green valley with mountains. Two curved outdoor sofas stand under fitted sand-coloured canvas covers. The camera dollies slowly sideways to the right. A light evening breeze moves the leaves of the olive tree and the trees and barely stirs the fabric; the low warm sun throws long soft shadows across the terrace. Calm, realistic, no people."
+    },
+    "range-basta": {
+      "media_key": "range",
+      "first": "basta-end-v1.png",
+      "prompt": "A sunny poolside terrace: two sun loungers on the wooden deck and a bar table with bar chairs behind them, each under its own fitted sand-coloured canvas cover. The camera pushes in slowly and drifts a little to the right. A light breeze moves the leaves of the trees and makes small ripples on the pool, sunlight glitters on the water; the covers keep their shape. Calm, realistic, no people."
+    },
+    "villa-marbella": {
+      "media_key": "villa",
+      "first": "marbella-golden-v2.png",
+      "prompt": "Golden hour by a villa pool in southern Spain. A tall teak daybed with a canopy stands under a fitted sand-coloured canvas cover beside the pool. The camera dollies very slowly sideways to the right, staying on the covered daybed. A light warm breeze moves the palm fronds and the leaves; the pool water ripples softly and glitters in the low sun; long soft shadows. The cover keeps its shape and colour. Calm, realistic, no people."
+    },
+    "villa-blocchi-b": {
+      "media_key": "villa",
+      "first": "blocchi-golden-v3.png",
+      "prompt": "Golden hour on a terrace high above a green valley with mountains. Two curved outdoor sofas stand under fitted sand-coloured canvas covers. The camera dollies very slowly to the right by about one metre; the two covered sofas stay in the middle of the frame the whole time. A light evening breeze moves the leaves of the olive tree and barely stirs the fabric. The light and the sky stay as they are. Calm, realistic, no people."
+    },
+    "range-basta-b": {
+      "media_key": "range",
+      "first": "basta-end-v1.png",
+      "prompt": "A sunny poolside terrace: two sun loungers on the wooden deck and a bar table with bar chairs behind them, each under its own fitted sand-coloured canvas cover. The camera stays almost still, only a very slow, slight push-in; everything stays in frame. A light breeze moves the leaves of the trees and makes small ripples on the pool; sunlight glitters on the water. The covers keep their shape and colour. Calm, realistic, no people."
+    }
+  }
+}

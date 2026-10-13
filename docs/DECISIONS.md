@@ -4427,3 +4427,53 @@ docs/plans/studio-ui.md §12; handbook: prices.md, navigation.md.
   approval gate (ADR-079/115/120), server-only settings (ADR-123).
 - **Better later:** inline editing in All covers' price columns (now: one click to the cover);
   a per-cover price history (who set its fixed price when) from the versions.
+
+## ADR-127 — The website's clips from real SUNS photos: Gemini puts our cover on, Veo moves it
+
+The owner (13 October 2026), after one test on the Kota photo: "dit is stukken beter", then
+"alleen even de beste foto zoeken voor alle settings, mag ook een ander model zijn maar dan
+moeten we het aanpassen". Kling (ADR-125) has no API credit; Google's Gemini API does, through
+the key we already have (`GEMINI_API_KEY`). This keeps ADR-125's rule that the cover is ours, but
+the scene is now a real photograph instead of our Blender stills, which never looked filmed.
+
+- **The recipe.** (1) The start frame is a real SUNS product or mood photo from hello-suns.com
+  (the brand whose covers we make, the owner's partner), cropped to 16:9 1920 × 1080. (2) The end
+  frame is that photo with our cover on the furniture, made by `gemini-3-pro-image`
+  (generateContent, image out, 16:9 at 2K, then fitted to 1920 × 1080) from the photo plus the
+  model's own `cover.png` as the shape reference (its colours only mark the pieces) and our
+  Kota canvas render as the fabric reference; the prompt names the sloped top, the level skirt
+  with its hem ~5 cm above the ground and the vent hoods, and asks to keep everything else.
+  (3) `veo-3.1-fast-generate-preview` (predictLongRunning, 8 s, 1080p, 16:9, a negative prompt)
+  animates from the first frame, with a last frame for a transition (fit). Every frame is looked
+  at before it is used; a frame that invents logos, text, a wrong shape or a changed background
+  is made again (`-v2`, `-v3`, the first kept).
+- **The photo per scene** (from 1,000 SUNS photos: all product pages and all project pages,
+  contact sheets in `out/veo/suns-photos/`; only models we have a cover for in `models/`):
+  fit = the Portofino daybed on the paved terrace (front-on, one piece, room above it);
+  rain = the same daybed, the Kota sofa as second; villa = the Blocchi sofas on the mountain
+  terrace at golden hour, the Portofino daybed with roof at the Marbella villa pool as second
+  (SUNS has one sea photo, Villa Maxima in Puglia, but its sofa is the Pesaro, which we have no
+  cover for); range = the two Basta loungers by the pool with the Basta bar set behind.
+  Sources (file names, URLs) in `out/veo/frames/sources.json`. Plan, prompts and judgements:
+  docs/plans/veo-shots.md.
+- **The client** (`scripts/film/veo.py`, shots and frames in `scripts/film/veo_shots.json`):
+  `photo`, `frame`, `submit`, `run`, `fetch`, `cost`; `--dry-run` prints the request with the key
+  as `***` and sends nothing. The key goes only into the `x-goog-api-key` header (also for the
+  download), never into a URL, a log or a record.
+- **Money.** Every paid call is written to `out/veo/ledger.jsonl` and the studio's AI ledger
+  (spend.py) before it is sent; a call whose estimate would pass `--budget-eur` (default 30) is
+  refused before anything goes out; a Gemini image answer's token count replaces its estimate.
+  Prices (ai.google.dev/gemini-api/docs/pricing, read 13 Oct 2026): Veo 3.1 Fast $0.10/s 720p,
+  $0.12/s 1080p, $0.30/s 4K; Gemini 3 Pro Image $0.134 an image (1K/2K). The ledger uses
+  $0.15/s (the brief's figure, above list) and $1 = €0.95: a clip ~€1.14, a frame ~€0.13 to
+  €0.16. Veo bills no usage in its answer, so its estimate stays.
+- **Tests** (`engine/tests/test_veo.py`): a fake HTTP layer only; the request shapes of both
+  calls, the polling to the download with the key header, a failed operation, the budget
+  refusal before any call, frames and clips counted together, no key in any output, the crop.
+- **To the site**: `hero_encode.py` (AV1 1920 × 1080 + H.264 1280 × 720, poster, no sound,
+  the end dissolving into the start) under new names `veo-<scene>-<n>` in the media folder,
+  next to the current clips on `/media/veo-compare.html`; the owner picks there, then the
+  preview's `story_media` and a release (not done by this round).
+- **Rejected**: Veo 3.1 (non-Fast, $0.40/s) before Fast has shown a flaw that it would fix;
+  Gemini's image model for motion; making covers for models without one (the Puglia sea photo
+  waits for a Pesaro cover).

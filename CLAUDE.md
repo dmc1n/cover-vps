@@ -248,6 +248,10 @@ scripts/film/blender.sh -P scripts/film/kling_frames.py -- --shot fit|rain|villa
 uv run python scripts/film/kling.py submit SHOT | run --shots a,b | status | fetch | cost [--dry-run] [--budget-eur 50]
                                              the website's clips by Kling from those stills; ledger, cap (ADR-125,
                                              docs/plans/kling-shots.md; key KLING_API_KEY or KLING_ACCESS/SECRET_KEY)
+uv run python scripts/film/veo.py photo URL --name N | frame NAME | submit SHOT | run --shots a,b | fetch | cost
+                                             [--dry-run] [--budget-eur 30]   the website's clips from real SUNS photos: Gemini
+                                             puts our cover on (end frame), Veo 3.1 Fast moves it; ledger, cap, sources.json
+                                             (ADR-127, scripts/film/veo_shots.json, docs/plans/veo-shots.md; key GEMINI_API_KEY)
 uv run python scripts/film/story_frames.py OUT --name storyN --chapters DIR | --base SET --replace DIR   the story's WEBP sets (ADR-121)
 make e2e        the web app flow in a real browser (Playwright in Docker)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
