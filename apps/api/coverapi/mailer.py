@@ -27,6 +27,7 @@ import sqlite3
 import ssl
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from email.message import EmailMessage
 from pathlib import Path
@@ -41,7 +42,9 @@ MAIL_KEY = "mail"
 SECURITIES = ("starttls", "ssl", "none")
 TIMEOUT_S = 20
 TICK_S = 30  # the outbox looks for due mails this often
-CLAIM_S = TIMEOUT_S * 3  # a mail being tried is not picked up again for this long
+# a mail being tried is not picked up again for this long (its lease): well over one SMTP
+# conversation (connect, TLS, login, send: each may take TIMEOUT_S)
+CLAIM_S = TIMEOUT_S * 10
 HOUR_S = 3600
 ERROR_CHARS = 300  # of an error kept in the log
 SUBJECT_CHARS = 200  # of a subject kept in the log
@@ -51,7 +54,8 @@ CREATE TABLE IF NOT EXISTS mail_outbox (
   id INTEGER PRIMARY KEY, created REAL NOT NULL, kind TEXT NOT NULL, ref TEXT UNIQUE,
   recipient TEXT NOT NULL, subject TEXT NOT NULL, body TEXT,
   status TEXT NOT NULL DEFAULT 'pending',  -- pending | sent | failed
-  attempts INTEGER NOT NULL DEFAULT 0, next_try REAL NOT NULL, last_error TEXT, sent REAL
+  attempts INTEGER NOT NULL DEFAULT 0, next_try REAL NOT NULL, last_error TEXT, sent REAL,
+  claim TEXT  -- the try that holds the mail now (its lease ends at next_try)
 );
 CREATE INDEX IF NOT EXISTS mail_outbox_due ON mail_outbox(status, next_try);
 CREATE TABLE IF NOT EXISTS mail_log (
@@ -94,6 +98,8 @@ def _db(auth: Auth) -> sqlite3.Connection:
     db = sqlite3.connect(auth.path, timeout=10, isolation_level=None)
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMA)
+    if "claim" not in {r[1] for r in db.execute("PRAGMA table_info(mail_outbox)")}:
+        db.execute("ALTER TABLE mail_outbox ADD COLUMN claim TEXT")
     return db
 
 
@@ -211,13 +217,13 @@ def queue(auth: Auth, to: str, subject: str, text: str, kind: str,
     """Put a mail in the outbox and try it at once; a failed try is repeated later until the
     server accepts it. With `ref`, a mail is queued once only (None: it was there already).
     Returns the outbox row; `is_sent` says whether the first try went."""
-    now = time.time()
+    now, claim = time.time(), uuid.uuid4().hex
     with contextlib.closing(_db(auth)) as db:
         try:
             cur = db.execute(
-                "INSERT INTO mail_outbox (created, kind, ref, recipient, subject, body, next_try)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (now, kind, ref, to, subject, text, now + CLAIM_S),  # claimed by this try
+                "INSERT INTO mail_outbox (created, kind, ref, recipient, subject, body, next_try,"
+                " claim) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (now, kind, ref, to, subject, text, now + CLAIM_S, claim),  # held by this try
             )
         except sqlite3.IntegrityError:
             return None
@@ -238,27 +244,29 @@ def is_sent(auth: Auth, outbox_id: int | None) -> bool:
 
 def _attempt(auth: Auth, db: sqlite3.Connection, r: sqlite3.Row, now: float,
              lim: dict[str, float]) -> str:  # fmt: skip
-    """One try of one outbox mail: sent (its text removed), again later (a doubling wait) or,
-    at the last try, failed."""
-    attempts = int(r["attempts"]) + 1
+    """One try of one outbox mail that this try holds (`claim`): sent (its text removed), again
+    later (a doubling wait) or, at the last try, failed. Every result is written only while the
+    claim is still this try's, so a try whose lease ran out never overwrites a newer one."""
+    attempts, mine = int(r["attempts"]) + 1, (r["id"], r["claim"])
     _current.value = (r["kind"], int(r["id"]))
     try:
         send(auth, r["recipient"], r["subject"], r["body"] or "")
     except Exception as exc:  # noqa: BLE001 - logged by send(); tried again later
         err = _clean_error(exc, auth)
         if attempts >= lim["attempts"]:
-            db.execute("UPDATE mail_outbox SET status='failed', attempts=?, last_error=? "
-                       "WHERE id=?", (attempts, err, r["id"]))  # fmt: skip
+            db.execute("UPDATE mail_outbox SET status='failed', attempts=?, last_error=?, "
+                       "claim=NULL WHERE id=? AND claim=?", (attempts, err, *mine))  # fmt: skip
             log.warning("mail %s to %s failed for good: %s", r["id"], r["recipient"], err)
             return "failed"
         wait = min(lim["retry_first_s"] * 2 ** (attempts - 1), lim["retry_max_s"])
-        db.execute("UPDATE mail_outbox SET attempts=?, last_error=?, next_try=? WHERE id=?",
-                   (attempts, err, now + wait, r["id"]))  # fmt: skip
+        db.execute("UPDATE mail_outbox SET attempts=?, last_error=?, next_try=?, claim=NULL "
+                   "WHERE id=? AND claim=?", (attempts, err, now + wait, *mine))  # fmt: skip
         return "retry"
     finally:
         _current.value = (None, None)
     db.execute("UPDATE mail_outbox SET status='sent', sent=?, attempts=?, body=NULL, "
-               "last_error=NULL WHERE id=?", (time.time(), attempts, r["id"]))  # fmt: skip
+               "last_error=NULL, claim=NULL WHERE id=? AND claim=?",
+               (time.time(), attempts, *mine))  # fmt: skip
     hook = ON_SENT.get(r["kind"])
     if hook and r["ref"]:
         try:
@@ -275,16 +283,19 @@ def deliver_due(auth: Auth, now: float | None = None) -> dict[str, int]:
     lim = _limits()
     out = {"sent": 0, "retry": 0, "failed": 0}
     with contextlib.closing(_db(auth)) as db:
-        # claim the due mails: their next try moves ahead, so no other worker sends them twice
-        db.execute("BEGIN IMMEDIATE")
-        rows = db.execute(
-            "SELECT * FROM mail_outbox WHERE status='pending' AND next_try<=? ORDER BY id",
-            (now,),
-        ).fetchall()
-        db.executemany("UPDATE mail_outbox SET next_try=? WHERE id=?",
-                       [(now + CLAIM_S, r["id"]) for r in rows])  # fmt: skip
-        db.execute("COMMIT")
-        for r in rows:
+        due = [r["id"] for r in db.execute(
+            "SELECT id FROM mail_outbox WHERE status='pending' AND next_try<=? ORDER BY id",
+            (now,))]  # fmt: skip
+        for oid in due:
+            # each mail is claimed just before its try (a lease of CLAIM_S from now), so a long
+            # backlog never sends a mail whose claim another worker took meanwhile
+            claim = uuid.uuid4().hex
+            if not db.execute(
+                "UPDATE mail_outbox SET claim=?, next_try=? WHERE id=? AND status='pending' "
+                "AND next_try<=?", (claim, max(now, time.time()) + CLAIM_S, oid, now)
+            ).rowcount:  # fmt: skip
+                continue
+            r = db.execute("SELECT * FROM mail_outbox WHERE id=?", (oid,)).fetchone()
             out[_attempt(auth, db, r, now, lim)] += 1
         old = now - lim["keep_hours"] * HOUR_S
         db.execute("UPDATE mail_outbox SET body=NULL WHERE status='failed' AND created<?", (old,))
@@ -302,7 +313,8 @@ def retry(auth: Auth, outbox_id: int) -> dict[str, Any]:
         if r["status"] != "failed" or r["body"] is None:
             raise ValueError("only a failed mail whose text is still kept can be sent again")
         db.execute(
-            "UPDATE mail_outbox SET status='pending', attempts=0, next_try=? WHERE id=?",
+            "UPDATE mail_outbox SET status='pending', attempts=0, next_try=?, claim=NULL "
+            "WHERE id=?",
             (time.time(), outbox_id),
         )
     _register(auth)

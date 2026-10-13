@@ -169,3 +169,33 @@ def test_the_fit_question_counts_as_sent_only_once_accepted(app: Any) -> None:
     mailer.deliver_due(app.state.auth, now=time.time() + 120)
     assert _rows(app, "SELECT feedback_sent FROM orders")[0]["feedback_sent"] is not None
     assert FakeSMTP.accepted == ["anna@example.com"]
+
+
+def test_a_backlog_never_sends_a_mail_twice_when_another_worker_takes_over(app: Any) -> None:
+    """Codex's review: each mail is claimed just before its own try, so while the first mail of
+    a backlog takes long, another worker sends the rest and this one skips them."""
+    auth = app.state.auth
+    FakeSMTP.plan = ["down"] * 3
+    t0 = time.time()
+    for n in range(3):
+        mailer.queue(auth, f"r{n}@example.com", f"Order {n}", "text", "shop")
+    nested: list[dict[str, int]] = []
+    busy: list[bool] = []
+    original = FakeSMTP.send_message
+
+    def slow_first(self: FakeSMTP, msg: Any) -> dict[str, Any]:
+        if not busy:  # meanwhile another worker runs through the outbox
+            busy.append(True)
+            nested.append(mailer.deliver_due(auth, now=t0 + 100))
+        return original(self, msg)
+
+    FakeSMTP.send_message = slow_first  # type: ignore[method-assign]
+    try:
+        out = mailer.deliver_due(auth, now=t0 + 100)
+    finally:
+        FakeSMTP.send_message = original  # type: ignore[method-assign]
+    assert nested == [{"sent": 2, "retry": 0, "failed": 0}]
+    assert out == {"sent": 1, "retry": 0, "failed": 0}
+    assert sorted(FakeSMTP.accepted) == ["r0@example.com", "r1@example.com", "r2@example.com"]
+    rows = _rows(app, "SELECT status, claim FROM mail_outbox")
+    assert all(r["status"] == "sent" and r["claim"] is None for r in rows)

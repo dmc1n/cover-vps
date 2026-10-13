@@ -71,7 +71,8 @@ price is on its way the old one is not shown and cannot be ordered, and an older
 arrives late is dropped. One checkout makes one order: the order button is locked while the
 order is on its way, and the page sends a key with it, so a double click or a retry gets the
 order that was already made (a page without a key: the same proposal, e-mail and street, still
-unpaid, within 15 minutes is the same order).
+unpaid, within 15 minutes is the same order). When the payment link is still being made the
+page says to try again in a moment; the retry finishes the same order.
 
 ## Payments (Mollie)
 

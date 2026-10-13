@@ -500,7 +500,9 @@ class OrderIn(BaseModel):
 
 
 ORDER_REPLAY_S = 900  # without a key: the same proposal and address within this long is one order
-ORDER_WAIT_S = 15  # a repeat waits at most this long for the first request's payment link
+ORDER_WAIT_S = 25  # a repeat waits at most this long for the first request's payment link
+PAYMENT_CLAIM_S = 40  # one request prepares an order's payment; after this long another may
+# (Mollie answers within 20 s; its idempotency key keeps it one payment)
 
 ORDERS_TABLE = """
 CREATE TABLE IF NOT EXISTS orders (
@@ -1096,11 +1098,15 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         return model_response(request, (quotes / f"{qid}.glb").read_bytes(),
                               "model/gltf-binary", "public, max-age=86400")  # fmt: skip
 
-    def mollie(method: str, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def mollie(method: str, path: str, body: dict[str, Any] | None = None,
+               idempotency: str | None = None) -> dict[str, Any]:  # fmt: skip
         key = settings()["payment"].get("mollie_key") or ""
         data = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(f"{MOLLIE_API}{path}", data=data, method=method, headers={
-            "Authorization": f"Bearer {key}", "Content-Type": "application/json"})  # fmt: skip
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        if idempotency:  # Mollie answers a repeated create with the payment it made
+            headers["Idempotency-Key"] = idempotency
+        req = urllib.request.Request(f"{MOLLIE_API}{path}", data=data, method=method,
+                                     headers=headers)  # fmt: skip
         with urllib.request.urlopen(req, timeout=20) as r:  # noqa: S310 - Mollie's https API
             doc: dict[str, Any] = json.loads(r.read())
             return doc
@@ -1127,21 +1133,77 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             ).fetchone()  # fmt: skip
             return row  # type: ignore[no-any-return]
 
-    def replay(row: sqlite3.Row, request: Request) -> dict[str, Any]:
-        """The answer the first request gave (its payment link once it is there)."""
+    def _order_data(oid: int) -> tuple[sqlite3.Row, dict[str, Any]]:
+        with sqlite3.connect(auth.path) as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute("SELECT * FROM orders WHERE id=?", (oid,)).fetchone()
+        return row, json.loads(row["data"])
+
+    def _prepare_payment(oid: int, request: Request) -> None:
+        """The order's Mollie payment, made once: this request claims the order (a claim older
+        than PAYMENT_CLAIM_S is taken over: its request stopped), Mollie gets an idempotency key
+        per order, and the link is stored (`checkout_url`, "" when Mollie refused or there is no
+        key: the order waits for payment by bank)."""
+        now = time.time()
+        with sqlite3.connect(auth.path) as db:
+            claimed = db.execute(
+                "UPDATE orders SET data=json_set(data, '$.payment_claim', ?) WHERE id=? AND "
+                "json_extract(data, '$.checkout_url') IS NULL AND (json_extract(data, "
+                "'$.payment_claim') IS NULL OR json_extract(data, '$.payment_claim') < ?)",
+                (now, oid, now - PAYMENT_CLAIM_S)).rowcount  # fmt: skip
+        if not claimed:
+            return
+        row, d = _order_data(oid)
+        checkout, mid = "", None
+        if settings()["payment"].get("mollie_key"):
+            status_url = f"{shop_root(auth, request)}order/{row['token']}"
+            hook = shop_root(auth, request).removesuffix("shop/") + "api/shop/mollie"
+            try:
+                pay = mollie("POST", "/payments", {
+                    "amount": {"currency": "EUR", "value": f"{float(row['total_eur']):.2f}"},
+                    "description": f"Cover order {oid}",
+                    "redirectUrl": status_url,
+                    "webhookUrl": hook,
+                    "metadata": {"order": oid},
+                }, idempotency=f"cover-order-{oid}-{row['token'][:8]}")  # fmt: skip
+                checkout, mid = pay["_links"]["checkout"]["href"], pay["id"]
+            except Exception as exc:  # noqa: BLE001 - the order stays; payment can follow
+                notify(f"Order {oid}: Mollie refused the payment", str(exc),
+                       ref=f"order-payment-refused:{oid}")  # fmt: skip
+        with sqlite3.connect(auth.path) as db:  # what every repeat of this checkout answers
+            db.execute("UPDATE orders SET mollie_id=COALESCE(?, mollie_id), data=json_set(data, "
+                       "'$.checkout_url', ?) WHERE id=?", (mid, checkout, oid))  # fmt: skip
+
+    def finish_order(oid: int, request: Request, repeat: bool) -> dict[str, Any]:
+        """Everything after the order row, safe to run again (ADR-129): the payment link (or
+        the wait for the request that is making it) and the one "new order" mail. A repeat of
+        a checkout whose first request stopped half-way finishes it here."""
+        _prepare_payment(oid, request)
         end = time.time() + ORDER_WAIT_S
-        d = json.loads(row["data"])
+        row, d = _order_data(oid)
         while "checkout_url" not in d and time.time() < end:
-            time.sleep(0.25)  # the first request is still asking Mollie for the link
-            with sqlite3.connect(auth.path) as db:
-                (raw,) = db.execute("SELECT data FROM orders WHERE id=?", (row["id"],)).fetchone()
-            d = json.loads(raw)
+            time.sleep(0.25)  # another request is still asking Mollie for the link
+            _prepare_payment(oid, request)  # it stopped: take over
+            row, d = _order_data(oid)
+        if "checkout_url" not in d:
+            raise HTTPException(409, "the payment is still being prepared; try again in a moment")
         stock = d.get("stock")
-        return {"order": row["id"], "status_url": f"{shop_root(auth, request)}order/{row['token']}",
-                "checkout_url": d.get("checkout_url") or None, "total_eur": row["total_eur"],
-                "status": row["status"], "repeat": True,
-                "stock": {"model_id": stock["model_id"], "name": stock["name"]}
-                if stock else None}  # fmt: skip
+        status_url = f"{shop_root(auth, request)}order/{row['token']}"
+        what = (f"EXISTING COVER {stock['name']} ({stock['model_id']}), "
+                f"EUR {d['quote']['quote']['price']['sale_eur']}" if stock
+                else json.dumps(d["quote"]["quote"]["sizes_cm"]))  # fmt: skip
+        c = d["customer"]
+        notify(f"New order {oid}: EUR {row['total_eur']}" + (" (existing cover)" if stock else ""),
+               f"{c['name']} <{c['email']}>\n{status_url}\n{what}\n(admin page, Orders)",
+               ref=f"order-new:{oid}")  # fmt: skip
+        out = {"order": oid, "status_url": status_url,
+               "checkout_url": d.get("checkout_url") or None, "total_eur": row["total_eur"],
+               "status": row["status"],
+               "stock": {"model_id": stock["model_id"], "name": stock["name"]}
+               if stock else None}  # fmt: skip
+        if repeat:
+            out["repeat"] = True
+        return out
 
     @app.post("/api/shop/order")
     def shop_order(req: OrderIn, request: Request) -> dict[str, Any]:
@@ -1170,7 +1232,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         # one checkout, one order (ADR-129): a repeat gets the order the first request made
         earlier = repeated_order(req)
         if earlier is not None:
-            return replay(earlier, request)
+            return finish_order(int(earlier["id"]), request, repeat=True)
         try:
             with sqlite3.connect(auth.path) as db:
                 cur = db.execute(
@@ -1184,36 +1246,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             earlier = repeated_order(req)
             if earlier is None:
                 raise
-            return replay(earlier, request)
-        status_url = f"{shop_root(auth, request)}order/{token}"
-        hook = shop_root(auth, request).removesuffix("shop/") + "api/shop/mollie"
-        checkout = None
-        if settings()["payment"].get("mollie_key"):
-            try:
-                pay = mollie("POST", "/payments", {
-                    "amount": {"currency": "EUR", "value": f"{total:.2f}"},
-                    "description": f"Cover order {oid}",
-                    "redirectUrl": status_url,
-                    "webhookUrl": hook,
-                    "metadata": {"order": oid},
-                })  # fmt: skip
-                checkout = pay["_links"]["checkout"]["href"]
-                with sqlite3.connect(auth.path) as db:
-                    db.execute("UPDATE orders SET mollie_id=? WHERE id=?", (pay["id"], oid))
-            except Exception as exc:  # noqa: BLE001 - the order stays; payment can follow
-                notify(f"Order {oid}: Mollie refused the payment", str(exc))
-        with sqlite3.connect(auth.path) as db:  # what a repeat of this checkout answers
-            db.execute("UPDATE orders SET data=json_set(data, '$.checkout_url', ?) WHERE id=?",
-                       (checkout or "", oid))  # fmt: skip
-        what = (f"EXISTING COVER {stock['name']} ({stock['model_id']}), "
-                f"EUR {record['quote']['price']['sale_eur']}" if stock
-                else json.dumps(record["quote"]["sizes_cm"]))  # fmt: skip
-        notify(f"New order {oid}: EUR {total}" + (" (existing cover)" if stock else ""),
-               f"{req.name} <{req.email}>\n{status_url}\n{what}\n(admin page, Orders)")  # fmt: skip
-        return {"order": oid, "status_url": status_url, "checkout_url": checkout,
-                "total_eur": total, "status": "awaiting_payment",
-                "stock": {"model_id": stock["model_id"], "name": stock["name"]}
-                if stock else None}  # fmt: skip
+            return finish_order(int(earlier["id"]), request, repeat=True)
+        return finish_order(int(oid or 0), request, repeat=False)
 
     @app.get("/api/shop/order/{token}")
     def shop_order_status(token: str) -> dict[str, Any]:

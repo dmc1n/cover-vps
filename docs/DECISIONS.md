@@ -4517,7 +4517,9 @@ desk.py, approval.py, order-to-production and roles; nothing here touches those.
    digests) keeps the text in `mail_outbox` until accepted, tries at once and then after
    1, 2, 4 ... minutes (at most 6 h apart) up to 8 times (`limits.mail_*`), then `failed`. The
    text goes when sent, a failed one's after 14 days. One worker thread per process walks the
-   outbox. Settings → System & logs → Mail lists waiting and failed mails and has **Send again**
+   outbox; each mail is claimed (a token and a 200 s lease) just before its own try and its
+   result is written only while the claim is still that try's, so a long backlog never sends
+   a mail another worker took over (Codex's review). Settings → System & logs → Mail lists waiting and failed mails and has **Send again**
    (`/api/admin/mail/outbox`). Mails with a secret (login code, password and invitation links)
    are never queued: sent once, logged without text. The fit question's `feedback_sent` is set
    only when its mail was accepted (`mailer.ON_SENT`), and a queued one is not queued again.
@@ -4538,6 +4540,12 @@ desk.py, approval.py, order-to-production and roles; nothing here touches those.
    moment get the order the first one made (`repeat: true`, its payment link once Mollie gave
    it); a key used for another e-mail or proposal is 409. A page without a key (an old cached
    page) is protected by the same proposal, e-mail and street, unpaid, within 15 minutes.
+   Everything after the order row is safe to run again (`finish_order`, Codex's review): the
+   payment is made by the request that claims the order (a claim older than 40 s is taken
+   over), with Mollie's `Idempotency-Key` per order, and the "new order" mail has a fixed
+   outbox reference; so the retry of a checkout whose first request stopped after the order
+   row finishes it, and a payment still being made elsewhere answers 409 "try again" (the
+   page keeps its key) instead of an order without a payment link.
 6. **The step cache.** A step's stamp now lists every file the run created or changed in the
    model folder (`outputs`: cut.svg, cutting-list.pdf, pattern.svg, ...), not only the main
    ones. A step is skipped only while all of them exist and are not empty; a stamp from before
