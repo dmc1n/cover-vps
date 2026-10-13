@@ -121,7 +121,7 @@ def test_the_log_holds_no_password_and_no_text(app: Any) -> None:
     auth = app.state.auth
     FakeSMTP.plan = ["auth"]
     with pytest.raises(smtplib.SMTPAuthenticationError):
-        mailer.send(auth, "x@example.com", "Your login code", "code 123456")  # direct, a secret
+        mailer.send(auth, "x@example.com", "Cover Studio login code: 123456", "code 123456")
     (row,) = _rows(app, "SELECT * FROM mail_log")
     assert row["result"] == "error" and row["kind"] == "direct"
     assert PASSWORD not in row["error"] and "SMTPAuthenticationError" in row["error"]

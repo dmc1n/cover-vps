@@ -44,6 +44,7 @@ TICK_S = 30  # the outbox looks for due mails this often
 CLAIM_S = TIMEOUT_S * 3  # a mail being tried is not picked up again for this long
 HOUR_S = 3600
 ERROR_CHARS = 300  # of an error kept in the log
+SUBJECT_CHARS = 200  # of a subject kept in the log
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS mail_outbox (
@@ -107,13 +108,20 @@ def _clean_error(exc: BaseException, auth: Auth) -> str:
     return text[:ERROR_CHARS]
 
 
+def _safe_subject(subject: str) -> str:
+    """The subject for the log: a login code in it (six digits or more) is masked."""
+    from coverapi.auth import CODE_DIGITS
+
+    return re.sub(rf"\d{{{CODE_DIGITS},}}", "******", subject)[:SUBJECT_CHARS]
+
+
 def _log(auth: Auth, kind: str, to: str, subject: str, result: str, error: str | None = None,
          outbox_id: int | None = None) -> None:  # fmt: skip
     with contextlib.closing(_db(auth)) as db:
         db.execute(
             "INSERT INTO mail_log (time, outbox_id, kind, recipient, subject, result, error) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (time.time(), outbox_id, kind, to, subject[:200], result, error),
+            (time.time(), outbox_id, kind, to, _safe_subject(subject), result, error),
         )
 
 
