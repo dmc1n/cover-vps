@@ -31,6 +31,7 @@ Note column.
 | fastapi | 0.141.1 | MIT | API (M6) |  |
 | uvicorn | 0.54.0 | BSD-3-Clause | API server (M6) |  |
 | pytest | 9.1.1 | MIT | tests (dev) |  |
+| pytest-xdist | 3.8.0 | MIT | parallel tests in make test (dev, ADR-129) |  |
 | ruff | 0.16.9 | MIT | lint and format (dev) |  |
 | mypy | 2.3.1 | MIT | type checks (dev) |  |
 | pre-commit | 4.6.2 | MIT | commit hooks (dev) |  |

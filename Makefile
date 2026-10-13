@@ -1,5 +1,5 @@
 # Cover pattern engine — see CLAUDE.md "Commands".
-.PHONY: setup test lint shapes testsheets golden demo api-dev web-dev web-build e2e deploy backup
+.PHONY: setup test test-parallel test-serial test-fast lint shapes testsheets golden demo api-dev web-dev web-build e2e deploy backup
 
 UV ?= uv
 RUN := $(UV) run
@@ -9,8 +9,24 @@ setup:
 	@if [ -f apps/web/package.json ]; then cd apps/web && npm install; else echo "apps/web: nothing to install yet (M6)"; fi
 	$(RUN) pre-commit install
 
-test: lint
+# the whole suite, for every commit and release (ADR-129): the lint and the tests side by side,
+# the tests in PYTEST_WORKERS processes (pytest-xdist, one test file per process at a time, so a
+# file's shared fixtures are built once), then the tests that time themselves on their own
+PYTEST_WORKERS ?= 6
+test:
+	@$(MAKE) --no-print-directory -j2 lint test-parallel
+	$(RUN) pytest -q -m timing
+
+test-parallel:
+	$(RUN) pytest -q -n $(PYTEST_WORKERS) --dist loadfile -m "not timing"
+
+# the same tests in one process, as before ADR-129 (to compare, or when a parallel run misbehaves)
+test-serial: lint
 	$(RUN) pytest -q
+
+# while developing: without the slow tests (15 s or more each, conftest.py); never for a release
+test-fast:
+	$(RUN) pytest -q -n $(PYTEST_WORKERS) --dist loadfile -m "not slow and not timing"
 
 lint:
 	$(RUN) ruff check .

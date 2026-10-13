@@ -38,6 +38,7 @@ USED_FOR = {
     "pymupdf": "reading the owner's PDF drawings (learning)",
     "pillow": "pictures attached at the Desk, checked and re-encoded (ADR-096)",
     "pytest": "tests (dev)",
+    "pytest-xdist": "parallel tests in make test (dev, ADR-129)",
     "ruff": "lint and format (dev)",
     "mypy": "type checks (dev)",
     "pre-commit": "commit hooks (dev)",

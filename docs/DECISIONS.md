@@ -4477,3 +4477,94 @@ the scene is now a real photograph instead of our Blender stills, which never lo
 - **Rejected**: Veo 3.1 (non-Fast, $0.40/s) before Fast has shown a flaw that it would fix;
   Gemini's image model for motion; making covers for models without one (the Puglia sea photo
   waits for a Pesaro cover).
+
+## ADR-129 — Stability round: live folders, interrupted jobs, mail, releases, shop, cache, backup, 3D memory, test time
+
+The owner answered question #90 ("Waar gaat de komende week het werk heen?") with b): a
+stability round first. The open findings of the Codex analysis of 11 October
+(`~/cover-data/reports/codex-analysis-2026-10-11.md`) were checked against ADR-120 to ADR-127
+first. Already fixed there and not done again: the drawing approval tied to its cut fingerprint
+(ADR-120), the step time and memory limits (`coverapi.limited`, ADR-123), the staging guard on
+given_build, fewer_build, innerwalls_sweep, answers_stage and bbq_models, and dropping an
+aborted quote answer when the stock cover changes (ADR-118). ADR-128 is the parallel round on
+desk.py, approval.py, order-to-production and roles; nothing here touches those.
+
+1. **Live model folders** (Codex did this, reviewed). Every script in scripts/ that writes model
+   folders calls `coverengine.staging.guard_staging_output` on its output root and each model
+   destination before anything is written: drawing_cover(s), drawing_features,
+   drawing_crosscheck, drawing_outline, drawing_axes_check `--fix`, c6_surface, s44_cover,
+   catalogue_page, desk_marks, fewer_check, matchcards, film/hero_data, warehouse `fetch`/`photos`,
+   gpu_check, learned_check `--recalc`. The in-place rebuilders refuse a live run:
+   drawing_rebuild and drawing_merge only with `--dry-run`, drawing_swept only with
+   `--no-build`; the message points to the staging builders (fewer_build, given_build). Left as
+   they are, on purpose: the live-metadata tools that are dry-run first (desk_fingerprints,
+   desk_arrangements, desk_import, questions, prices_import, quotes_clean).
+   `engine/tests/test_scripts_staging.py` runs each script against a synthetic live tree and a
+   symlink alias of it and proves nothing was written; it also keeps the list complete.
+2. **Interrupted jobs.** A job names its server process (`owner`: pid and a per-process id) and
+   each running step its process group. On start-up `Jobs.recover()` marks the jobs of a server
+   that is gone, queued or running, as `interrupted` with the reason ("the server stopped while
+   the step cut ran (a restart or a crash); run it again"), and ends a step's process group that
+   outlived its server (only when its command line is our `coverapi.limited`). `POST
+   /api/jobs/<id>/rerun` (and **Run again** on the cover's job bar) starts the same steps and
+   trial again, for an interrupted or failed job. The job carries `timeout_s`
+   (`limits.job_timeout_s`); the bar shows it while the job runs. The pages that follow a job
+   stop following at `interrupted` too.
+3. **Mail.** `mailer.send` logs every attempt in app.db (`mail_log`: time, kind, recipient,
+   subject with a login code masked, sent or the error without the password; never the text).
+   A mail is sent only when the SMTP server accepted it: refused recipients are a failure.
+   `mailer.queue` (order notices, the fit question, requests, B2B order mails, the Desk's
+   digests) keeps the text in `mail_outbox` until accepted, tries at once and then after
+   1, 2, 4 ... minutes (at most 6 h apart) up to 8 times (`limits.mail_*`), then `failed`. The
+   text goes when sent, a failed one's after 14 days. One worker thread per process walks the
+   outbox. Settings → System & logs → Mail lists waiting and failed mails and has **Send again**
+   (`/api/admin/mail/outbox`). Mails with a secret (login code, password and invitation links)
+   are never queued: sent once, logged without text. The fit question's `feedback_sent` is set
+   only when its mail was accepted (`mailer.ON_SENT`), and a queued one is not queued again.
+   Background loops (fit mails, question mails, the outbox) log their errors to the journal.
+4. **Releases.** `release.sh --switch` (and so `rollback.sh`): when `sudo -n systemctl restart
+   cover-web` fails, or `/api/health` does not answer as the expected release within a minute,
+   it switches `~/releases/current` back, restarts, checks that one, and says "switched back to
+   vX automatically" (or that the one before does not answer either), also in history.log. Only
+   that sudo command is used. When the service does not run from `~/releases/current` yet (the
+   first install, which needs `sudo cp` and `daemon-reload`), it changes nothing and prints the
+   commands for a person (exit 2). Tested with stand-in sudo, systemctl and curl
+   (`engine/tests/test_release_script.py`).
+5. **The consumer shop.** The configurator's quote request has a number and the quote
+   remembers the choices it was made for; only the newest answer is shown, and a price is shown
+   and orderable only while it belongs to exactly the choices on screen. The checkout is locked
+   while its request runs and sends an `idempotency_key` (a random key per order content);
+   `orders.idempotency_key` is unique, so a double click, a retry or two requests at the same
+   moment get the order the first one made (`repeat: true`, its payment link once Mollie gave
+   it); a key used for another e-mail or proposal is 409. A page without a key (an old cached
+   page) is protected by the same proposal, e-mail and street, unpaid, within 15 minutes.
+6. **The step cache.** A step's stamp now lists every file the run created or changed in the
+   model folder (`outputs`: cut.svg, cutting-list.pdf, pattern.svg, ...), not only the main
+   ones. A step is skipped only while all of them exist and are not empty; a stamp from before
+   (no `outputs`) is calculated once more.
+7. **Backup** (Codex did this, reviewed). With `COVER_BACKUP_REMOTE` set, a missing rclone, an
+   unknown remote or a failed copy keeps the local archive but writes FAILED and the reason to
+   last_backup.txt (the watchdog mails it) and exits non-zero; unset says "off-server copy: not
+   set"; a good copy says so. R2 itself is owner question #89.
+8. **3D memory** (Codex did this, reviewed). `apps/web/src/dispose3d.ts` disposes every
+   geometry, material and texture of a tree; the cover's 3D view (also on the Desk card), the
+   configurator, Unfold and the shop's scenes dispose their scene, controls and renderer on
+   unmount and the objects they replace. `window.__three` counts live renderers and their
+   geometries and textures; `apps/web/e2e/memory3d.py` opens 20 covers in a row and fails when a
+   renderer stays or the heap grows.
+9. **Test time.** Measured on the server on 13 October (8 cores, other agents' work running
+   too, so both numbers are on a busy machine): before, `make test` took 26 min 31 s (lint
+   55 s, then pytest 25 min 29 s, 800 tests); after, 7 min 39 s (lint and 6 pytest processes
+   side by side 6 min 2 s for 875 tests, then the 3 timing tests alone 1 min 35 s), 878 tests in
+   all (the 800 and this round's new ones). The longest file (test_hull.py, 4 to 5 min alone)
+   now sets the floor. `make test` runs the lint next to pytest, pytest
+   in 6 processes (pytest-xdist, `--dist loadfile`: one file per process, so a module's
+   fixtures are built once), then the three tests that assert a duration on their own
+   (`-m timing`). Nothing is left out: the same tests run. `make test-serial` is the old way,
+   `make test-fast` leaves out the 30 tests of 15 s or more (`-m slow`) while developing, never
+   for a release. The marks live in the root `conftest.py`, which fails when a listed test is
+   gone.
+
+Better, later: a durable job queue that resumes instead of interrupting; per-model locks for
+all writers; an outbox for the approval and invitation mails' audit trail in one place; a
+transactional promotion for drawing rebuilds instead of refusing them.

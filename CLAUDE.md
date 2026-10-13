@@ -218,9 +218,10 @@ cover drape models/<id>/ [--verbose]         the sewn pieces dropped over the fu
 uv run python scripts/warehouse.py list|fetch|photos   products from 3D Warehouse (GLB, photos)
 uv run python scripts/drawing_outline.py OUT --pdfs DIR [--only S45]   free plan shapes read from the PDF's own lines (ADR-072)
 uv run python scripts/drawing_crosscheck.py OUT --pdfs DIR   Gemini and DeepSeek check drawing covers and each other (ADR-072)
-uv run python scripts/drawing_features.py --pdfs DIR   vent count and features from each drawing's text onto its cover (ADR-075)
-uv run python scripts/drawing_rebuild.py OUT --pdfs DIR [--dry-run]   drawing covers rebuilt from their own views; better ones replace (ADR-075)
-uv run python scripts/drawing_merge.py [--only ...] [--dry-run]   free-form drawing covers in fewer pieces (ADR-076)
+uv run python scripts/drawing_features.py --models STAGING --pdfs DIR   vent count and features from each drawing's text onto its cover (ADR-075)
+uv run python scripts/drawing_rebuild.py OUT --pdfs DIR --dry-run   drawing covers rebuilt from their own views, compared only;
+                                             replacing live covers is refused: build in staging (fewer_build/given_build, ADR-129)
+uv run python scripts/drawing_merge.py [--only ...] --dry-run   free-form drawing covers in fewer pieces, compared only (ADR-076, 129)
 uv run python scripts/fewer_build.py OUT --codes C27,... | --merge all   drawing covers rebuilt in staging, slivers joined (ADR-097)
 uv run python scripts/fewer_check.py DIR ...   re-measure a built cover from its cut.dxf and patterns (ADR-097)
 uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT   the Desk picture's red marks mapped onto the cover's panels and 3D (camera fitted, ADR-100)
@@ -235,7 +236,8 @@ uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--o
 COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py [--out out/matchcards]   approved drawing covers as existing covers:
                                              kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114)
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
-COVER_DATA_DIR=~/cover-data uv run python scripts/learned_check.py [--recalc]   do the Desk's corrections still hold? (ADR-082)
+COVER_DATA_DIR=~/cover-data uv run python scripts/learned_check.py [--recalc --models STAGING]   do the Desk's corrections still hold?
+                                             (ADR-082; --recalc on live models is refused, ADR-129)
 uv run python scripts/film/hero_data.py MODEL_DIR OUT   the home film's data: cover.npz, seams.png, pieces.json (ADR-108)
 blender -b -P scripts/film/render_hero.py -- --data OUT --assets DIR --out FRAMES   the home film's frames (and hero_fall.py, hero_assets.py)
 uv run python scripts/film/hero_encode.py FRAMES DIR --name hero-kotaN   AV1 + H.264 under 4 MB, poster, strip (ADR-108)
@@ -254,6 +256,7 @@ uv run python scripts/film/veo.py photo URL --name N | frame NAME | submit SHOT 
                                              (ADR-127, scripts/film/veo_shots.json, docs/plans/veo-shots.md; key GEMINI_API_KEY)
 uv run python scripts/film/story_frames.py OUT --name storyN --chapters DIR | --base SET --replace DIR   the story's WEBP sets (ADR-121)
 make e2e        the web app flow in a real browser (Playwright in Docker)
+apps/web/e2e/memory3d.py URL                20 covers' 3D views in a row: every WebGL renderer let go, the heap flat (ADR-129)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
 apps/web/e2e/prices.py                      prices in a real browser: Settings → Prices & costs, a cover's Price & shop,
                                              a stale page refused (ADR-098, ADR-126; usage in its docstring)
@@ -313,10 +316,15 @@ COVER_DATA_DIR=~/cover-data uv run python scripts/quotes_clean.py [--dry-run]   
                                              limits.quotes_keep_days that no order names (housekeeping.sh daily, ADR-123)
 caddy validate --config deploy/Caddyfile --adapter caddyfile   check the Caddyfile (request size walls, log redaction; ADR-123)
 cover-site "<what should change>" | --publish | --discard | --history | --translate   the shop's website with the AI CMS, all languages (ADR-062, 064)
-scripts/release.sh v1.2.3 "what is new"     test, tag, build ~/releases/v1.2.3 and switch the app to it (ADR-053)
+scripts/release.sh v1.2.3 "what is new"     test, tag, build ~/releases/v1.2.3 and switch the app to it (ADR-053); a failed
+                                             restart or health check switches back by itself and says so; the first service
+                                             install (daemon-reload) is printed for a person (ADR-129)
 scripts/rollback.sh [v1.2.3 | --list]       back to the release before (or a chosen one) in seconds
 sudo systemctl restart cover-web            the app as a service (runs ~/releases/current); Caddy serves https://covers.suns.nu
-make backup     the data directory to ~/backups (5 kept, room checked first; R2 when set); scripts/housekeeping.sh daily (safety copies > 14 days, releases beyond 8)
+make backup     the data directory to ~/backups (5 kept, room checked first; R2 when COVER_BACKUP_REMOTE is set, a failed copy
+                is FAILED in last_backup.txt, ADR-129); scripts/housekeeping.sh daily (safety copies > 14 days, releases beyond 8)
+Settings → System & logs → Mail             the mail outbox: waiting and failed mails, Send again; every send attempt logged (ADR-129)
+POST /api/jobs/<id>/rerun                   "Run again" for a job a restart interrupted (or a failed one; ADR-129)
 cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build
 cd apps/site && npm test | npm run check     the Worker's tests (security headers, no studio routes) and typecheck (ADR-103)
 ```
@@ -327,6 +335,15 @@ are set only there: no model, preset, learned rule, `--set` or UI override (ADR-
 Staging scripts validate output roots and model destinations with
 `coverengine.staging.guard_staging_output` before writes. Live `models/` and
 `~/cover-data/models` (including symlink aliases and ancestors) must never be staging outputs.
+Every script in scripts/ that writes model folders does this (ADR-129, `engine/tests/test_scripts_staging.py`
+keeps the list); only the deliberate live-metadata tools (desk_fingerprints, desk_arrangements,
+desk_import, questions, prices_import, quotes_clean) write live data, each dry-run first.
+
+Stability rules (ADR-129): jobs a stopped server left are "interrupted" on start-up; a mail is
+"sent" only when the SMTP server accepted it, through `coverapi.mailer.queue` (outbox, retries)
+unless it holds a secret (login code, password link: `mailer.send` once); the shop's checkout
+carries an idempotency key; a cached step is skipped only while every file it wrote exists.
+`make test` runs pytest in parallel (pytest-xdist); `make test-serial` runs it in one process.
 
 ## How to work in this repo (instructions for Claude Code)
 

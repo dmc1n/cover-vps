@@ -66,6 +66,13 @@ Delivery per country (Settings → Company & shop → Shipping per country) is a
 checkout and shown before the order. The *indicative* switch is on
 Settings → Costs, under Exchange rate.
 
+The price shown is always the one for the sizes and options on screen (ADR-129): while a new
+price is on its way the old one is not shown and cannot be ordered, and an older answer that
+arrives late is dropped. One checkout makes one order: the order button is locked while the
+order is on its way, and the page sends a key with it, so a double click or a retry gets the
+order that was already made (a page without a key: the same proposal, e-mail and street, still
+unpaid, within 15 minutes is the same order).
+
 ## Payments (Mollie)
 
 Settings → **Website & API keys** → Payment → Mollie key (shown masked; *Replace* to give a

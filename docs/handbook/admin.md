@@ -134,9 +134,11 @@ versions** ([prices.md](prices.md)). One cover's cost and prices are on its Pric
 **Server**
 
 - **System & logs**: version, engine, disk, last backup, the releases, mail and AI state, open
-  problems and the last alerts (the alert address itself is under Mail & notifications); who is
-  logged in, since when and from where; every login, failed login, change and approval, with
-  who and when.
+  problems and the last alerts (the alert address itself is under Mail & notifications);
+  **Mail**: the outbox (mails waiting for another try and failed ones, with the last error and
+  **Send again**) and the last send attempts, without their texts (ADR-129, [server.md](server.md));
+  who is logged in, since when and from where; every login, failed login, change and approval,
+  with who and when.
 
 ## The Shop pages
 

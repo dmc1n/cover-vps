@@ -70,7 +70,9 @@ Open a cover from All covers, the search, or a Desk card (`#/model/<id>/<tab>`).
 Desk status, the approval of the definitive drawing, a lock when the DXF waits for the Desk,
 and "N changes since the run before". The buttons **Run again**, **Edit details** (category,
 family, status, tags, notes; see [catalogue.md](catalogue.md)) and **Desk card ↗**. Above the
-tabs stay the approval of the definitive drawing ([admin.md](admin.md)), a running job, a
+tabs stay the approval of the definitive drawing ([admin.md](admin.md)), a running job (with the
+time one step may take at most; a job the server left behind at a restart says **Interrupted**
+and has **Run again**, ADR-129), a
 rejection at the Desk and today's warnings. Under the head one summary row: the Desk, the fit,
 the workshop (revision to cut, files) and the open questions about this cover (ADR-126).
 
