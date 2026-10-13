@@ -49,10 +49,12 @@ for the money and the shop).
   (**Cmd+K** on a Mac) jumps to it; the arrow keys and **Enter** open a hit; **Escape** closes
   the list.
 - **Guide** opens this page.
-- **The round theme button** left of your name switches between As the computer (◐), Light (☀)
+- **The theme button** left of your name switches between As the computer (half sun, half moon), Light (sun)
   and Dark (☾). It is remembered in that browser only. Drawings, flat patterns and pictures
   stay on white, and the 3D view keeps its light stage.
-- **Your name** opens *My account* (your password); then **Log out**.
+- **Your name** opens *My account* (your password); the arrow beside it is **Log out**.
+- **The (i)** beside a title or a setting holds its explanation: click or tap it, or Tab to it
+  and press Enter (ADR-130).
 
 ## Where you start
 
@@ -147,7 +149,7 @@ it better. It then becomes a new revision of the same cover, so nothing is lost.
 
 ## Only what changed is calculated
 
-When you save a setting or press **Run again**, every step checks whether anything it depends
+When you save a setting or press **Run** (run again), every step checks whether anything it depends
 on changed. A step with no changes skips itself, so a vent setting recalculates only the
 export, in seconds. The size drawing and the air vents in 3D are made when you open them.
 

@@ -21,6 +21,7 @@ Pictures go to $COVER_E2E_SHOTS (default /shots), which must hold upload-sample.
 import asyncio
 import json
 import os
+import re
 import sys
 from typing import Any
 
@@ -138,7 +139,7 @@ async def one(browser: Browser, name: str, width: int, model: str) -> list[str]:
     await page.wait_for_timeout(5000)  # the 3D files load
 
     # the reject dialog, and its Pictures row in sight without scrolling
-    await actions.get_by_role("button", name="✕ Reject").click()
+    await actions.get_by_role("button", name=re.compile("^Reject")).click()
     await page.wait_for_timeout(1200)  # the dialog scrolls itself into view
     await page.screenshot(path=f"{SHOTS}/{tag}-1-reject.png")
     assert await in_sight(page, ".d-reject .d-pics-bar"), f"{tag}: Pictures row off the screen"
@@ -226,7 +227,7 @@ async def blocked(browser: Browser, model: str) -> None:
         page.locator(".d-card .d-3d canvas, .d-card .d-3d .gl-error").first
     ).to_be_visible()
     await page.wait_for_timeout(3000)
-    await page.locator(".d-actions").get_by_role("button", name="✕ Reject").click()
+    await page.locator(".d-actions").get_by_role("button", name=re.compile("^Reject")).click()
     reject = page.locator(".d-reject")
     await expect(reject.locator(".d-pics-note").first).to_contain_text("Pictures need Chrome")
     await reject.get_by_role("button", name="Snapshot 3D").click()

@@ -1,7 +1,8 @@
 # Finding your way in the studio
 
-The studio has **four sections** in the dark bar at the top (ADR-122, ADR-124, ADR-126, ADR-128). Each has its
-own pages in the light bar under it (the sub-menu). Every page, every tab of a cover and every
+The studio has **four sections** in the bar at the top (ADR-122, ADR-124, ADR-126, ADR-128),
+each with its icon. Each has its own pages in the bar under it (the sub-menu), as pills with
+their icon; the page you are on is the blue pill. Every page, every tab of a cover and every
 tab of a Desk card has its own address. So a link in a mail, a bookmark or this handbook opens
 exactly that page, and the browser's Back button goes back one tab.
 
@@ -14,7 +15,7 @@ Work        Desk · Questions · Workshop
 Covers      All covers · Arrangements · New cover | Learning · Product list
 Shop        Orders · Requests · B2B customers | Website (AI)
 Settings    one page with vertical tabs (admins; editors: the three Prices & costs tabs)
-Right side  Search (everything) · Guide · theme button · your name (My account) · Log out
+Right side  Search (everything) · Guide (book) · theme button · your name (My account) · Log out (arrow)
 ```
 
 **One cover, one page** (ADR-126): everything about one cover — its cost, prices, fixed price,
@@ -36,16 +37,17 @@ for you.
 
   **Ctrl+K** (**Cmd+K** on a Mac) puts the cursor in the search box. The arrow keys and
   **Enter** open a hit; **Escape** closes the list.
-- **Guide**: the short tour of the studio ([how-it-works.md](how-it-works.md), `#/guide`, also
+- **Guide** (the open book): the short tour of the studio ([how-it-works.md](how-it-works.md), `#/guide`, also
   readable without logging in).
-- **The theme button** (the round button left of your name): the studio has a light and a dark
-  theme. By default it follows your computer's setting. Each click goes one step further:
-  **As the computer** (◐) → **Light** (☀) → **Dark** (☾). The choice is remembered in that
+- **The theme button** (left of your name): the studio has a light and a dark theme. By
+  default it follows your computer's setting. Each click goes one step further: **As the
+  computer** (half sun, half moon) → **Light** (sun) → **Dark** (moon). The choice is remembered in that
   browser only. Drawings, flat patterns and pictures stay on a white ground in both themes, and
   the 3D view keeps its light stage. The customers' configurator (`#/configure`) is always
   light.
 - **Your name** opens **My account** (change your password).
-- **Log out**.
+- **Log out**: the arrow out of the door, right of your name (its name shows when you point
+  at it).
 
 ## Where you start
 
@@ -80,10 +82,34 @@ say **Not for your account**. It cannot approve, reject, mark Produced, Undo, co
 start the AI or Send to production (ADR-128). The server checks the same rights on every
 action, whatever the menu shows.
 
-## One look
+## One look (Studio 2.0, ADR-130)
 
-The whole studio uses one font (Work Sans), rectangular buttons and at most one main (dark)
-button per view. There are four kinds of page:
+The studio looks like an iPad's Settings: a light grey ground with white cards with round
+corners, one blue for everything you can press or that is chosen, and the device's own font
+(SF on a Mac and an iPad, Inter elsewhere). Light and dark: dark is true black with grey cards.
+
+- **Icons.** Every section, page, tab and most actions have an icon of the studio's own (the
+  covers, the vent hood, the cutting table, needle and thread). An action shown only as an icon
+  says its name when you point at it, and a screen reader reads that name.
+- **The (i).** A page, a group or a setting explains itself behind a small (i) beside its title
+  or label, not in a line of text under it. Click or tap the (i) (or Tab to it and press
+  Enter) to read; Escape, a tap elsewhere or the (i) again closes it. With a mouse it also
+  opens when you point at it.
+- **States as coloured chips with an icon:** approved / ready green (a tick), waiting blue (a
+  clock), rejected / failed red (a cross), a warning or "to check" orange (a triangle or an
+  exclamation mark), produced purple (the cover with a tick), interrupted (a pause).
+- **Settings** has coloured tiles beside its tabs and its settings as rows: the name with its
+  (i), the value, where the value comes from. The setting's key shows when you point at its
+  name.
+- **What stays visible as text:** empty lists, errors, what is running now, numbers, and a note
+  where your role shows something instead of a button.
+
+How it looks, every page light and dark:
+https://preview.s2dio.living/media/studio2-built-light.jpg and
+https://preview.s2dio.living/media/studio2-built-dark.jpg; the icons:
+https://preview.s2dio.living/media/studio2-own-icons.jpg.
+
+There are four kinds of page:
 
 - **a list with a filter row** (All covers, Workshop, Orders, …);
 - **a queue with the detail beside it** (Desk, Questions);
@@ -98,15 +124,16 @@ button per view. There are four kinds of page:
   the right in four tabs, each with its own address:
   - **Check** (`…/<cover>`): the latest rejection and what happened since, the drawing beside
     our cover in 3D, the products, what the program read and what the AIs say;
-  - **Pieces & revisions** (`…/<cover>/pieces`): the pieces and the revisions ("cut this");
-  - **Correct this cover** (`…/<cover>/correct`): seams, vents, sizes, shape, with pictures;
+  - **Pieces** (`…/<cover>/pieces`): the pieces and the revisions ("cut this");
+  - **Correct** (`…/<cover>/correct`): seams, vents, sizes, shape, with pictures;
     the drawing and the 3D stay above it;
   - **History** (`…/<cover>/history`): everything that happened, with the pictures.
 
   The decision bar stays at the bottom of the screen: **Approve**, **Reject**, **Comment**,
-  **After sewing ▾** (Produced, a note, Measured…, Fits, Does not fit) and **Undo**. The keys:
-  `j` `k` move, `a` approve, `r` reject, `c` comment, `p` produced, `u` undo. **More** (top
-  right of the card): Let the AI read it (costs about 1–5 cents), the check list, Edit
+  **After sewing ▾** (Produced, a note, Measured…, Fits, Does not fit) and **Undo** (the
+  curved arrow). The keys are in the (i) beside the title **Desk**: `j` `k` move, `a` approve,
+  `r` reject, `c` comment, `p` produced, `u` undo. Top right of the card: **Open cover** (the
+  arrow out of a box) and **More** (the three dots): Let the AI read it (costs about 1–5 cents), the check list, Edit
   arrangement, the cut pieces and DXF, the product list. The AI spend tile is shown to admins
   only (Settings → AI & spending has the details). Everything about the Desk:
   [desk.md](desk.md).
@@ -139,10 +166,11 @@ Desk status (a link to its card), the Desk's approval, a lock when the DXF
 waits for the Desk's approval, and "N changes since the run before". Under it **one summary
 row**: the Desk (status, who approved, produced), the **fit** (fits / does not fit, sizes
 measured, the largest difference), the **workshop** (pieces, vents, the revision to cut, files,
-DXF lock) and the **open questions** about this cover (links). The buttons **Run again**,
-**Edit details** (category, family, status, tags, notes) and **Desk card ↗**. Under it is the
+DXF lock) and the **open questions** about this cover (links). The buttons **Run** (run
+again), **Edit details** (the pencil: category, family, status, tags, notes) and **Desk card**
+(the tray). Under it is the
 Desk's approval card (ADR-128), with **Approved size drawing**, **Approved cutting list** and
-**Its Desk card**. **Send to the Desk for approval** sends a built cover for review and mails
+**Desk card**. **Send to Desk** (send to the Desk for approval) sends a built cover for review and mails
 the approvers; editors and admins see it when the cover is not already waiting there. Old
 definitive-drawing approvals remain as history. The stamped downloads disappear when a
 change invalidates the approval. A running job, a rejection at the Desk and today's warnings

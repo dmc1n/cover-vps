@@ -329,7 +329,7 @@ export function Info({
   return (
     <span
       ref={wrap}
-      className={`info ${className}`.trim()}
+      className={`infotip ${className}`.trim()}
       onPointerEnter={hoverIn}
       onPointerLeave={hoverOut}
       onBlur={(e) => {

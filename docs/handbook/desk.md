@@ -31,7 +31,7 @@ or marked produced is listed for the workshop, with its files and how it fitted,
   - **History**: everything that happened, with the pictures.
 
   **More** (top right of the card): Let the AI read it (costs about 1–5 cents), the check
-  list, Edit arrangement, the cut pieces and DXF, the product list. **Open cover ↗** opens the
+  list, Edit arrangement, the cut pieces and DXF, the product list. **Open cover** (the arrow out of a box) opens the
   cover's own page.
 - **Who decides:** admins, users marked **may approve**, and the user names in
   `desk.approvers` (Rens, Rick and Wouter). See Settings → Rules & defaults → Desk & approval.

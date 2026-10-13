@@ -21,7 +21,7 @@ page and the server. The map itself, with every address and who sees what:
 3. **Find anything** with the search box at the top right (**Ctrl+K**, **Cmd+K** on a Mac):
    covers, Desk codes, questions and, for admins, orders
    ([navigation.md — The right side of the bar](navigation.md#the-right-side-of-the-bar)).
-4. **Light or dark:** the round button left of your name: As the computer (◐), Light (☀),
+4. **Light or dark:** the button left of your name: As the computer (half sun, half moon), Light (sun),
    Dark (☾).
 
 The studio's buttons stay English (owner question #91, ADR-128).

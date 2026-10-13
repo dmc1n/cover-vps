@@ -72,7 +72,7 @@ numbers asks first.
 
 - **Prices**: per channel the live price (B2C incl. VAT, B2B ex VAT, the other one small
   under it), *fixed price* or *calculated* (with the rule), the margin, and, when there is a
-  draft, its price in the draft. An admin types a fixed price and clicks **Save in draft**, or
+  draft, its price in the draft. An admin types a fixed price and clicks **Save** (save in draft), or
   **Remove** (the calculated price applies again). It goes into the same draft as everything
   else, never live by itself.
 - **The draft bar** on top says how many changes the draft holds (also those from elsewhere)

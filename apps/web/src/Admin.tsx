@@ -321,9 +321,13 @@ export function Users() {
           }
         }}
       >
-        <h3>
-          <Icon name="users" /> New user
-        </h3>
+        <Heading
+          icon="users"
+          infoLabel="About the roles"
+          info="Viewer: looks and downloads. Editor: also uploads, calculates and changes settings. Admin: also this page. Workshop: the workshop's own login: Work → Workshop and the Desk read-only, fits, comments and pictures on a Desk card, its own questions and the DXF of approved covers; it never approves and sees no prices or settings. “May approve”: approves at the Desk (the only approval), as the names in desk.approvers do."
+        >
+          New user
+        </Heading>
         <div className="row">
           <input
             placeholder="user name"
@@ -372,15 +376,6 @@ export function Users() {
             <Icon name="add" /> Add
           </button>
         </div>
-        <Info label="About user rights">
-          Viewer: looks and downloads. Editor: also uploads, calculates and
-          changes settings. Admin: also this page. Workshop: the workshop's own
-          login: Work → Workshop and the Desk read-only, fits, comments and
-          pictures on a Desk card, its own questions and the DXF of approved
-          covers; it never approves and sees no prices or settings. “May
-          approve”: approves at the Desk (the only approval), as the names in
-          desk.approvers do.
-        </Info>
       </form>
     </>
   );
@@ -754,11 +749,23 @@ export function Requests() {
         <Heading
           id="req-quotes"
           icon="requests"
-          infoLabel="About from the configurator"
+          infoLabel="About the quotes"
           info={
             <>
-              From the configurator (<a href="#/configure">#/configure</a>, also
-              in a webshop). The cost price is only shown here.
+              <p>
+                From the configurator (<a href="#/configure">#/configure</a>,
+                also in a webshop). The cost price is only shown here.
+              </p>
+              <p>
+                * indicative: the prices in the cost model (quote.*) are still
+                placeholders.
+              </p>
+              <p>
+                Who gets a request by mail: Settings →{" "}
+                <a href="#/settings/mail">Mail &amp; notifications</a>. The
+                configurator in a webshop and the API keys: Settings →{" "}
+                <a href="#/settings/website">Website &amp; API keys</a>.
+              </p>
             </>
           }
         >
@@ -819,17 +826,7 @@ export function Requests() {
             ))}
           </tbody>
         </table>
-        <Info label="About indicative prices">
-          * indicative: the prices in the cost model (quote.*) are still
-          placeholders.
-        </Info>
       </section>
-      <Info label="About request settings">
-        Who gets a request by mail: Settings →{" "}
-        <a href="#/settings/mail">Mail &amp; notifications</a>. The configurator
-        in a webshop and the API keys: Settings →{" "}
-        <a href="#/settings/website">Website &amp; API keys</a>.
-      </Info>
     </>
   );
 }

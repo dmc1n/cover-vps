@@ -2038,6 +2038,21 @@ function CostingView({
   return (
     <>
       <Intro>
+        <Info label="About this part">
+          <p>
+            <b>
+              What a configurator product costs and sells for, line by line,
+            </b>{" "}
+            at the sizes you give. A cover's own costing (catalogue, drawing,
+            arrangement, order) is on the cover's page, tab{" "}
+            <i>Price &amp; shop</i>.
+          </p>
+          <p>
+            <b>Prices:</b> “live” = what the shop uses now; “saved draft” = your
+            saved, unpublished numbers; “this page” = the numbers on this page,
+            also before saving. <b>CSV</b> opens in Excel, <b>PDF</b> to print.
+          </p>
+        </Info>
         <Explain title="What the lines mean">
           <dl className="terms">
             <dt>Cost price</dt>
@@ -2074,21 +2089,6 @@ function CostingView({
             </dd>
           </dl>
         </Explain>
-        <Info label="About this part">
-          <p>
-            <b>
-              What a configurator product costs and sells for, line by line,
-            </b>{" "}
-            at the sizes you give. A cover's own costing (catalogue, drawing,
-            arrangement, order) is on the cover's page, tab{" "}
-            <i>Price &amp; shop</i>.
-          </p>
-          <p>
-            <b>Prices:</b> “live” = what the shop uses now; “saved draft” = your
-            saved, unpublished numbers; “this page” = the numbers on this page,
-            also before saving. <b>CSV</b> opens in Excel, <b>PDF</b> to print.
-          </p>
-        </Info>
       </Intro>
       <section className="card">
         <div className="row">

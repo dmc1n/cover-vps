@@ -81,7 +81,10 @@ Python engine, server side, one VPS.
   editing with geodesic preview, patch colours and stretch heatmap; SVG 2D pattern view;
   parameter panel generated from JSON schema; export downloads. The studio's map is
   `src/nav.ts`, its one stylesheet `src/studio.css` (tokens, light and dark), its page
-  templates `src/layout.tsx` (ADR-122, ADR-124). One cover, one page: what belongs to one cover
+  templates `src/layout.tsx` (ADR-122, ADR-124). Studio 2.0 "A · iOS light" (ADR-130): our own
+  icons in `src/icons/` (glyphs.tsx; Lucide only for generic glyphs), and a page explains itself
+  behind an (i) (`Info`, `Heading` in `src/icons/index.tsx`), never in a line of loose text;
+  long buttons short with the full words as their name, states as `StatusChip`s. One cover, one page: what belongs to one cover
   (its cost, prices, shop place, orders) lives only on its page; general settings in Settings (ADR-126); the handbook's index is docs/handbook/README.md.
 - Deployment: Docker Compose on the Hetzner VPS (api, web, cloudflared). Reachable only through
   a Cloudflare Tunnel protected by Cloudflare Access; the firewall allows SSH alone. Nightly
@@ -300,15 +303,20 @@ apps/web/e2e/bbq.py                         the configurator's barbecue option i
 3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
 apps/web/e2e/uinav.py                       the studio's map (ADR-122, 124, 126): every menu item per role, every old address, a
                                              cover's and a Desk card's tabs, a cover's Price & shop, All covers' prices, All covers' filters, the search, the theme,
-                                             1440/820 px, light and dark with a contrast check, screenshots; docs/handbook/navigation.md
+                                             1440/1024 (touch)/820 px, light and dark with a strict contrast check, field borders 3:1,
+                                             the (i)s (placement, Enter/Escape/tap) and named icon controls (ADR-130), screenshots;
+                                             docs/handbook/navigation.md
 Work → Workshop (#/work/workshop)           the orders to make (Send to production, editors and admins), approved covers: files
                                              (DXF behind the gate), fits, customers' answers (ADR-124, ADR-128); the workshop login's start page
 Shop → Orders → Send to production          a paid order (or one on account) waits until someone in the studio sends it: then its cover is
                                              made, goes to the Desk as an ORDER (first, one-click approval) and the DXF follows (ADR-128)
 Covers → All covers (#/covers/all[?view=cards])   Models + Catalogue: one filter row, Table / Cards, batch selection (ADR-124)
 Covers → New cover (#/covers/new)           a 3D file, a drawing (PDF), reference pairs (zip) on one page (ADR-124)
-header: Search (Ctrl+K) · ◐/☀/☾ theme       covers, Desk codes, questions, orders (admins); light/dark per browser (ADR-124)
-apps/web/src/studio.css                     the one stylesheet: tokens light and dark, the four page templates (ADR-124)
+header: Search (Ctrl+K) · theme (sun/moon)   covers, Desk codes, questions, orders (admins); light/dark per browser (ADR-124)
+apps/web/src/studio.css                     the one stylesheet: tokens light and dark (A · iOS light, ADR-130), the four page
+                                             templates (ADR-124); apps/api/tests/test_web_tokens.py keeps every text 4.5:1, borders 3:1
+apps/web/src/icons/                         Cover Studio's own icons (glyphs.tsx), Icon, Info (the (i)), StatusChip, Heading (ADR-130)
+cd apps/web && node e2e/iconsheet.mjs OUT.html   every icon at 16/20/24 px, light and dark, to look at (ADR-130)
 apps/web/e2e/uiaudit.py | uiaudit_proto.py   every studio page at 1440/820 px with control counts; the proposed layout's
                                              prototype (out/uiaudit/prototype/index.html, static) — docs/plans/studio-ui.md
 cover info <mesh | model dir>               size, triangles, area; analytic check for test shapes

@@ -14,6 +14,13 @@ Since ADR-128: the workshop login (werkplaats) starts on Work → Workshop, sees
 and After sewing, and the API refuses it prices and settings; the cover page's approval card is
 the Desk's.
 
+Since ADR-130 (Studio 2.0): an iPad width (1024, a touch screen) besides 1440 and 820; the
+contrast check is strict (every text 4.5:1, 3:1 for large text; a field's border 3:1 against
+what is around it); on every page the (i) buttons stand beside their heading or label (never
+inside a heading, a label or a button) and say what they explain, every icon-only control has
+a name, every icon is hidden from screen readers; an (i) opens with the keyboard (Enter) and
+closes with Escape, back on its button, and opens with a tap on the touch screen.
+
 Every pass runs light and dark (COVER_E2E_THEMES, the browser's prefers-color-scheme), with a
 contrast check of the text on every page (WCAG: 4.5:1, 3:1 for large text).
 
@@ -30,7 +37,7 @@ Run against a running studio with a scratch data copy (never the live data) and 
       bash -c "pip install -q playwright==1.63.0 && python /repo/apps/web/e2e/uinav.py"
 
 COVER_E2E_MODEL (a drawing cover), COVER_E2E_MODEL2 (another cover) and COVER_E2E_ARR (an
-arrangement) choose the examples; COVER_E2E_SIZES the widths (default 1440x900,820x1180).
+arrangement) choose the examples; COVER_E2E_SIZES the widths (default 1440x900,1024x1366,820x1180).
 """
 
 import asyncio
@@ -47,7 +54,8 @@ SHOTS = os.environ.get("COVER_E2E_SHOTS", "/shots")
 MODEL = os.environ.get("COVER_E2E_MODEL", "drawing-s45")
 MODEL2 = os.environ.get("COVER_E2E_MODEL2", "suns-2-seater-kota")
 ARR = os.environ.get("COVER_E2E_ARR", "arr-portofino-2-c")
-SIZES = os.environ.get("COVER_E2E_SIZES", "1440x900,820x1180")
+SIZES = os.environ.get("COVER_E2E_SIZES", "1440x900,1024x1366,820x1180")
+TOUCH = {1024}  # the iPad width runs as a touch screen (taps, no hover)
 THEMES = os.environ.get("COVER_E2E_THEMES", "light,dark").split(",")
 WIDTHS = [(int(w), int(h)) for w, h in (x.split("x") for x in SIZES.split(","))]
 SLOW = 30_000
@@ -172,6 +180,54 @@ CONTRAST_JS = """() => {
   }
   return out;
 }"""
+# a field's border against what is around it (WCAG 1.4.11: 3:1), and the (i)s and icons
+CONTROLS_JS = """() => {
+  const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const rgb = s => (s.match(/[\\d.]+/g) || []).map(Number);
+  const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  const ratio = (a, b) => {
+    const x = lum(a), y = lum(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+  const bgOf = el => {
+    for (let e = el; e; e = e.parentElement) {
+      const c = rgb(getComputedStyle(e).backgroundColor);
+      if (c.length === 3 || (c.length === 4 && c[3] > 0.9)) return c.slice(0, 3);
+    }
+    return [255, 255, 255];
+  };
+  const out = {borders: [], placed: [], unnamed: [], icons: 0};
+  const fields = ['input:not([type=checkbox]):not([type=radio]):not([type=range])',
+    ':not([type=file]):not([type=hidden]):not([type=color]), select, textarea'].join('');
+  for (const f of document.querySelectorAll(fields)) {
+    if (!f.checkVisibility() || f.closest('.theme-light, [disabled]') || f.disabled) continue;
+    const cs = getComputedStyle(f);
+    if (parseFloat(cs.borderTopWidth) < 0.5) continue;
+    const r = ratio(rgb(cs.borderTopColor).slice(0, 3), bgOf(f.parentElement));
+    const what = f.getAttribute('aria-label') || f.placeholder || f.name || f.tagName;
+    if (r < 3) out.borders.push(what + ' ' + r.toFixed(2));
+  }
+  for (const i of document.querySelectorAll('.infotip')) {
+    if (i.parentElement.closest('h1, h2, h3, h4, h5, h6, label, button, summary, option, a'))
+      out.placed.push((i.querySelector('.info-btn')?.getAttribute('aria-label') || '?'));
+    const b = i.querySelector('.info-btn');
+    const named = b && b.getAttribute('aria-label') && b.hasAttribute('aria-expanded');
+    if (!named || !b.getAttribute('aria-controls'))
+      out.unnamed.push('an (i) without its name or state');
+  }
+  for (const c of document.querySelectorAll('button, a, summary')) {
+    if (!c.checkVisibility()) continue;
+    const words = (c.textContent || '').trim();
+    const pic = c.querySelector('img[alt]:not([alt=""])');
+    if (!words && !c.getAttribute('aria-label') && !c.getAttribute('title') && !pic)
+      out.unnamed.push(c.tagName + '.' + c.className);
+  }
+  for (const svg of document.querySelectorAll('svg.ico')) {
+    out.icons += 1;
+    if (svg.getAttribute('aria-hidden') !== 'true') out.unnamed.push('an icon read aloud');
+  }
+  return out;
+}"""
 COUNTS_JS = """() => ({ buttons: document.querySelectorAll('main button').length,
   height: document.documentElement.scrollHeight })"""
 problems: list[str] = []
@@ -215,10 +271,59 @@ async def contrast(page: Page, where: str) -> None:
         return
     if bad:
         low_contrast[f"{THEME['now']} {where}"] = bad[:6]
-    worst = [b for b in bad if b["ratio"] < b["need"] - 1]
+    worst = [b for b in bad if b["ratio"] < b["need"]]  # strict since ADR-130
     check(not worst, f"{THEME['now']} {where}: text contrast ({len(bad)} under the line, "
                      f"worst {min((b['ratio'] for b in bad), default='-')}: "
                      f"{[b['text'] for b in worst[:3]]})")  # fmt: skip
+
+
+async def controls(page: Page, where: str) -> None:
+    """Fields' borders 3:1; the (i)s beside what they explain, named; icon-only controls named."""
+    try:
+        c = await page.evaluate(CONTROLS_JS)
+    except Exception:  # noqa: BLE001 - a page in the middle of loading
+        return
+    t = f"{THEME['now']} {where}"
+    check(not c["borders"], f"{t}: field borders 3:1 ({c['borders'][:3]})")
+    check(not c["placed"], f"{t}: no (i) inside a heading, label or button ({c['placed'][:3]})")
+    check(not c["unnamed"], f"{t}: every icon-only control named ({c['unnamed'][:3]})")
+
+
+async def info_popover(page: Page, width: int) -> None:
+    """An (i): Enter opens it, Escape closes it and gives the focus back; a tap on a touch
+    screen opens it; its text is readable (contrast) while it is open."""
+    await page.goto(f"{URL}/#/settings/company")
+    btn = page.locator(".set-name .info-btn").first
+    await expect(btn).to_be_visible(timeout=SLOW)
+    pop = page.locator(f'[id="{await btn.get_attribute("aria-controls")}"]')
+    if width in TOUCH:
+        await btn.tap()
+    else:
+        await btn.focus()
+        await page.keyboard.press("Enter")
+    await expect(pop).to_be_visible()
+    check(await btn.get_attribute("aria-expanded") == "true", f"rick {width}: the (i) says open")
+    await contrast(page, f"{width} (i) open")
+    await page.keyboard.press("Escape")
+    await expect(pop).to_be_hidden()
+    check(
+        await btn.evaluate("b => document.activeElement === b"),
+        f"rick {width}: Escape closes the (i) and the focus is back on it",
+    )
+    # Tab from the (i) reaches a link inside an open one (a Settings tab intro has none; the
+    # cover's Prices (i) has two)
+    await page.goto(f"{URL}/#/model/{MODEL}/price")
+    box = page.get_by_test_id("cover-prices")
+    ib = box.locator(".info-btn").first
+    await expect(ib).to_be_visible(timeout=SLOW)
+    await ib.focus()
+    await page.keyboard.press("Enter")
+    await page.keyboard.press("Tab")
+    inside = await page.evaluate(
+        "() => !!document.activeElement?.closest('.info-pop') && document.activeElement.tagName"
+    )
+    check(inside == "A", f"rick {width}: Tab reaches a link inside an open (i) ({inside})")
+    await page.keyboard.press("Escape")
 
 
 async def shot(page: Page, width: int, name: str) -> None:
@@ -226,6 +331,7 @@ async def shot(page: Page, width: int, name: str) -> None:
     os.makedirs(folder, exist_ok=True)
     await page.wait_for_timeout(600)
     await contrast(page, f"{width} {name}")
+    await controls(page, f"{width} {name}")
     try:
         await page.screenshot(path=f"{folder}/{name}.png", full_page=True, timeout=120_000)
     except Exception:  # noqa: BLE001 - a long page with software WebGL: the screen only
@@ -367,6 +473,7 @@ async def as_rick(page: Page, width: int) -> None:
     n[0] += 1
     await shot(page, width, f"{n[0]:02d}-desk-card-arrangement")
     await covers_and_workshop(page, width, n)
+    await info_popover(page, width)
     await search_and_theme(page, width, n)
 
 
@@ -445,7 +552,9 @@ async def covers_and_workshop(page: Page, width: int, n: list[int]) -> None:
       return {links: links.length, bad: links.filter(m => !ok.has(m)), items: w.items.length};
     }""")
     check(not gate["bad"], f"rick {width}: Workshop offers the DXF only past the gate {gate}")
-    other = page.locator("main button").filter(has_not_text="Send to production")
+    other = page.locator(
+        "main button:not(.info-btn)"
+    )  # an (i) only shows text.filter(has_not_text="Send to production")
     check(await other.count() == 0,
           f"rick {width}: the Workshop has no buttons but Send to production")  # fmt: skip
 
@@ -558,7 +667,9 @@ async def main() -> int:
             THEME["now"] = theme
             for user in ["rick", "rens", "eddy", "vic", "werkplaats"]:
                 ctx: Any = await browser.new_context(
-                    viewport={"width": w, "height": h}, color_scheme=theme
+                    viewport={"width": w, "height": h},
+                    color_scheme=theme,
+                    has_touch=w in TOUCH,
                 )
                 page = await ctx.new_page()
                 page.on(

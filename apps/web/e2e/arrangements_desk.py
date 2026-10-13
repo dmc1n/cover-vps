@@ -25,6 +25,7 @@ Screenshots go to $COVER_E2E_SHOTS (default /shots).
 
 import asyncio
 import os
+import re
 from typing import Any
 
 from playwright.async_api import Page, async_playwright, expect
@@ -109,14 +110,14 @@ async def main() -> None:
         await expect(card.locator(".viewer canvas[data-loaded]")).to_be_visible(timeout=SLOW)
         await expect(card.get_by_role("link", name="Check list (PDF)").first).to_be_visible()
         tabs = card.get_by_role("navigation", name="Card")
-        await tabs.get_by_role("link", name="Pieces & revisions").click()
+        await tabs.get_by_role("link", name="Pieces", exact=True).click()
         await expect(card.get_by_role("heading", name="Pieces", exact=True)).to_be_visible()
         await tabs.get_by_role("link", name="Check", exact=True).click()
         await page.wait_for_timeout(2500)
         await shot(page, "03-desk-arr-list-and-card")
         await shot(page, "04-desk-arr-card-full", full=True)
         assert await dxf(page, ARR) == 403
-        await card.get_by_role("button", name="✓ Approve").click()
+        await card.locator(".d-actions").get_by_role("button", name=re.compile("^Approve")).click()
         # an approval moves on to the next card; back to this one
         await expect(page).not_to_have_url(f"{URL}/#/work/desk/{ARR}", timeout=SLOW)
         await page.goto(f"{URL}/#/work/desk/{ARR}")

@@ -129,8 +129,7 @@ export function Settings({
       {Object.entries(groups).map(([group, list]) => (
         <section key={group} className="group">
           <h3 onClick={() => setOpen({ ...open, [group]: !open[group] })}>
-            <Icon name="adjust" /> {open[group] || filter ? "▾" : "▸"}{" "}
-            {GROUP_LABEL[group] ?? group}
+            {open[group] || filter ? "▾" : "▸"} {GROUP_LABEL[group] ?? group}
             <span className="muted"> ({list.length})</span>
           </h3>
           {(open[group] || filter) &&

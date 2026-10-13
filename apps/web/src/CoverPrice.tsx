@@ -1,4 +1,4 @@
-import { Heading, Icon, IconButton, IconLink, Info } from "./icons";
+import { Heading, Icon, IconButton, Info } from "./icons";
 // A cover's own commerce on its own page (ADR-126, docs/plans/studio-ui.md §12): the tab
 // "Price & shop" (#/model/<id>/price) and the summary at the top of every cover's page.
 //
@@ -583,10 +583,17 @@ function ShopPart({ c, id }: { c: CoverPrices; id: string }) {
   const notes = Object.entries(d.delivery_note);
   return (
     <section className="card" data-testid="cover-shop">
-      <h3>
-        <Icon name="shop" />
+      <Heading
+        icon="shop"
+        infoLabel="About the shop"
+        info={
+          !s.offered && id.startsWith("drawing-")
+            ? "A drawing cover is offered once the Desk approved it and its kind is sure (ADR-114)."
+            : undefined
+        }
+      >
         Shop
-      </h3>
+      </Heading>
       <p>
         {s.offered ? (
           <span className="badge ok">offered as an existing cover</span>
@@ -687,12 +694,6 @@ function ShopPart({ c, id }: { c: CoverPrices; id: string }) {
           <a href="#/settings/company">Company &amp; shop</a>.
         </Info>
       </p>
-      {!s.offered && id.startsWith("drawing-") && (
-        <Info label="About this section">
-          A drawing cover is offered once the Desk approved it and its kind is
-          sure (ADR-114).
-        </Info>
-      )}
     </section>
   );
 }
@@ -807,8 +808,14 @@ function OrdersPart({ c }: { c: CoverPrices }) {
           </table>
         </>
       )}
-      <IconLink icon="orders" label="Orders" href="#/shop/orders" />{" "}
-      <IconLink icon="requests" label="Requests" href="#/shop/requests" />
+      <div className="row">
+        <a className="btn sm" href="#/shop/orders">
+          <Icon name="orders" /> All orders
+        </a>
+        <a className="btn sm" href="#/shop/requests">
+          <Icon name="requests" /> All requests
+        </a>
+      </div>
     </section>
   );
 }

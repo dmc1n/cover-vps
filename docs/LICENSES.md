@@ -46,7 +46,10 @@ Note column.
 | Component | Licence | Used for |
 |-----------|---------|----------|
 | React, Vite, Three.js | MIT | web app (M6) |
-| Work Sans (`@fontsource-variable/work-sans`) | OFL-1.1 | the website's typeface, self-hosted (ADR-105) |
+| Work Sans (`@fontsource-variable/work-sans`) | OFL-1.1 | the website's typeface and, in the studio, only the customers' configurator, self-hosted (ADR-105, ADR-130) |
+| Lucide (`lucide-react` 1.56.0) | ISC; MIT for the Feather-derived icons | generic utility glyphs in the studio (chevrons, close, the (i), copy, external link, more, undo, delete, theme); keep the copyright and permission notices of the package's LICENSE (Copyright (c) 2026 Lucide Icons and Contributors; Copyright (c) 2013-present Cole Bemis) (Studio 2.0, ADR-130) |
+| Inter (`@fontsource-variable/inter`) | OFL-1.1 | the studio's typeface where the device has no SF (system font first), self-hosted (ADR-130) |
+| Cover Studio's own icons (`apps/web/src/icons/glyphs.tsx`) | ours | every section, page, tab, toolbar action, status and Settings tile icon of the studio, drawn for it (owner, 13 Oct 2026; ADR-130); no third-party licence |
 | cloudflared | Apache-2.0 | Cloudflare Tunnel (M6) |
 | Single-stroke pen font (`coverengine/export/strokefont.py`) | ours | pen text |
 | Blender 4.2 LTS | GPL-3.0-or-later | renders the website's films offline (ADR-065, ADR-071, ADR-108); not shipped |

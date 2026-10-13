@@ -237,16 +237,16 @@ export function SeamEditor({
           <Icon name="seams" /> Suggest seams
         </button>
         <span className="muted">{MODE_HELP[mode]}</span>
+        <Info label="About the colours of the plan">
+          Grey: the seams of the last run. Blue: your seams (
+          {plan.manual ? "from seams.json" : "starting from the automatic ones"}
+          ); orange dashed: a seam the program proposes where a piece stretches
+          too much (click it to add it); squares: vertical skirt seams
+          {skirtAuto ? " (automatic until you move one)" : ""}. The contour
+          lines (equal height) show where the top folds.
+        </Info>
       </div>
       {error && <p className="error">{error}</p>}
-      <Info label="About seams">
-        Grey: the seams of the last run. Blue: your seams (
-        {plan.manual ? "from seams.json" : "starting from the automatic ones"});
-        orange dashed: a seam the program proposes where a piece stretches too
-        much (click it to add it); squares: vertical skirt seams
-        {skirtAuto ? " (automatic until you move one)" : ""}. The contour lines
-        (equal height) show where the top folds.
-      </Info>
       <svg
         ref={svg}
         className="plan"

@@ -1791,8 +1791,8 @@ main:has(.desk) {
   letter-spacing: 0.06em;
   padding: 0 6px;
   border-radius: 4px;
-  background: var(--sand);
-  color: #26241f;
+  background: var(--primary);
+  color: var(--on-primary);
 }
 .d-pill.arr.s-ai-checked {
   background: var(--warn-soft);
@@ -2771,23 +2771,28 @@ svg.plan .proposal text {
   justify-content: center;
   padding: 24px 16px;
   box-sizing: border-box;
-  background: radial-gradient(circle at 20% 10%, #31372c 0%, #1d1f1b 60%);
+  background: radial-gradient(
+    circle at 20% 10%,
+    var(--surface) 0%,
+    var(--bg) 60%
+  );
 }
 .login-card {
   width: min(380px, 100%);
-  background: var(--bg);
-  border-radius: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
   padding: 28px 28px 22px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-  border-top: 4px solid var(--sand);
+  box-shadow: var(--shadow-pop);
+  border: 1px solid var(--line);
 }
 .login-card h1 {
   margin: 4px 0 0;
-  font-size: 28px;
-  font-style: italic;
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .login-card label {
   display: flex;
@@ -2798,13 +2803,8 @@ svg.plan .proposal text {
 }
 .login-card input {
   padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--surface);
-}
-.login-card input:focus {
-  outline: 2px solid var(--sand-soft);
-  border-color: var(--sand);
 }
 .login-card button {
   margin-top: 4px;
@@ -2959,12 +2959,31 @@ label.check {
   height: 100%;
   z-index: 0;
   pointer-events: none;
-  --pb-cream: #f9f6e8;
-  --pb-sage: #85886f;
-  --pb-sage-soft: #a9ac9c;
-  --pb-sand: #a38e6e;
-  --pb-olive: #31372c;
-  --pb-deep: #272c23;
+  /* Studio 2.0: the story drawn in greys and the studio's blue on the light ground */
+  --pb-cream: #8e8e93;
+  --pb-sage: #aeaeb2;
+  --pb-sage-soft: #8e8e93;
+  --pb-sand: #0a84ff;
+  --pb-olive: #636366;
+  --pb-deep: #3a3a3c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .process-backdrop {
+    --pb-cream: #e5e5ea;
+    --pb-sage: #8e8e93;
+    --pb-sage-soft: #aeaeb2;
+    --pb-sand: #5eb0ff;
+    --pb-olive: #2c2c2e;
+    --pb-deep: #1c1c1e;
+  }
+}
+:root[data-theme="dark"] .process-backdrop {
+  --pb-cream: #e5e5ea;
+  --pb-sage: #8e8e93;
+  --pb-sage-soft: #aeaeb2;
+  --pb-sand: #5eb0ff;
+  --pb-olive: #2c2c2e;
+  --pb-deep: #1c1c1e;
 }
 .process-backdrop .pb-thread {
   fill: none;
@@ -3417,14 +3436,14 @@ fieldset.card legend {
   padding: 8px 10px;
 }
 .cms-line .prompt {
-  color: var(--sand);
+  color: #5eb0ff; /* on the dark code ground in both themes: 6:1 */
   font-family: monospace;
   font-size: 20px;
 }
-.cms-line input {
+.card .cms-line input:not([type="checkbox"]) {
   flex: 1;
-  background: transparent;
-  border: 0;
+  background: transparent !important; /* the dark line is the field */
+  border: 0 !important;
   color: var(--code-ink);
   font-family: ui-monospace, Menlo, monospace;
   font-size: 15px;
@@ -3849,17 +3868,18 @@ fieldset.card legend {
   line-height: 1.45;
 }
 /* an intro that is only its (i): on the line of the heading above it (Studio 2.0) */
-.prices .prices-intro:has(> .info:only-child) {
+.prices .prices-intro:has(> .infotip:only-child) {
   display: inline-flex;
   margin: 0 0 0 6px;
   vertical-align: middle;
 }
-.prices :is(h2, h3):has(+ .prices-intro > .info:only-child) {
+.prices :is(h2, h3):has(+ .prices-intro > .infotip:only-child) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
-.prices-bar > .info {
+.prices-bar > .infotip,
+.prices .prices-intro > .infotip:first-child:not(:only-child) {
   float: right;
 }
 .approval-state strong {
@@ -5370,8 +5390,9 @@ table.list tr.focus td {
 /* object: a cover (.cv-head, .cv-strip, nav.tabs) */
 nav.tabs .count {
   margin-left: 6px;
-  background: var(--warn);
-  color: var(--on-primary);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-weight: 650;
   border-radius: 8px;
   padding: 0 6px;
   font-size: 11px;
@@ -5629,7 +5650,7 @@ h2 {
 h3 {
   font-size: var(--fs-h3);
 }
-:is(h2, h3, h4):has(> .ico, > .info) {
+:is(h2, h3, h4):has(> .ico, > .infotip) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -6146,7 +6167,7 @@ nav.tabs a.active,
 }
 
 /* ---- the (i): a button, and the explanation in a small card ---- */
-.info {
+.infotip {
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
@@ -6319,21 +6340,37 @@ button.info-btn[aria-expanded="true"] {
 .set-group > .head-row > h3 {
   margin: 10px 0 6px;
 }
+/* a field without a rule of its own still gets room inside its border */
+:where(
+  input:not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="file"],
+    [type="color"],
+    [type="hidden"]
+  ),
+  select
+) {
+  padding: 5px 10px;
+  min-height: 30px;
+  box-sizing: border-box;
+}
 /* a heading followed by its (i): the (i) stays on the heading's line */
-:is(h2, h3, h4, h5, strong, b):has(+ .info) {
+:is(h2, h3, h4, h5, strong, b):has(+ .infotip) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   margin-right: 2px;
   vertical-align: middle;
 }
-:is(h2, h3, h4, h5):has(+ .info) + .info {
+:is(h2, h3, h4, h5):has(+ .infotip) + .infotip {
   margin-bottom: 4px;
 }
-.field-label .info,
-.set-name .info,
-th .info,
-td .info {
+.field-label .infotip,
+.set-name .infotip,
+th .infotip,
+td .infotip {
   margin-left: 2px;
 }
 .chip-s {
