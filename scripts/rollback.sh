@@ -5,6 +5,9 @@
 #   scripts/rollback.sh             the release that was live before this one
 #   scripts/rollback.sh v1.0.0      a chosen release
 #   scripts/rollback.sh --list      the releases on this server, the live one marked
+#
+# If the chosen release does not restart or answer, the app goes back to the one that was live,
+# by itself, and the script says so (release.sh --switch, ADR-129).
 set -euo pipefail
 
 RELEASES=${COVER_RELEASES:-$HOME/releases}
