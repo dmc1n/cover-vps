@@ -168,7 +168,13 @@ export function Story({
     return () => ctx.revert();
   }, [story.chapters.length]);
 
-  const clip = (name: string) => media[name] || "";
+  // A media value may hold several takes separated by "|" (ADR-127): one is chosen per visit, the
+  // same position for a clip's video, AV1 and poster, so the three always belong together.
+  const take = useMemo(() => Math.floor(Math.random() * 1_000_000), []);
+  const clip = (name: string) => {
+    const takes = (media[name] || "").split("|").filter(Boolean);
+    return takes.length ? takes[take % takes.length] : "";
+  };
   return (
     <div className="st" ref={root}>
       <section className="st-hero">
