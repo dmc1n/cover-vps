@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from coverengine.staging import guard_staging_output
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coverengine.drawing_views import dimensions  # noqa: E402
@@ -81,6 +82,8 @@ def main() -> int:
     ap.add_argument("--pdfs", type=Path, required=True)
     ap.add_argument("--fix", action="store_true")
     a = ap.parse_args()
+    if a.fix:
+        guard_staging_output(Path("out/drawings/axes"))
     found = pdfs(a.pdfs)
     swapped = []
     for code, pdf in found.items():

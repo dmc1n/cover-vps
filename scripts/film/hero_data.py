@@ -34,6 +34,7 @@ import ezdxf
 import numpy as np
 from coverengine import drape as dr
 from coverengine.params import Registry
+from coverengine.staging import guard_staging_output
 from PIL import Image, ImageDraw
 from scipy import ndimage
 
@@ -175,6 +176,7 @@ def bake(uv, faces, lap, hem) -> tuple[Image.Image, tuple[float, float]]:
 
 
 def build(model: Path, out: Path) -> None:
+    guard_staging_output(out, model)
     params = Registry.load(None).resolve()
     c = dr.cloth(model, params)
     assert c.flat is not None

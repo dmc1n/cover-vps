@@ -645,6 +645,13 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   const [vents, setVents] = useState(true);
   const [support, setSupport] = useState("none");
   const [quote, setQuote] = useState<Quote | null>(null);
+  // the choices the quote on screen was made for (ADR-129): a price for other choices, or an
+  // older answer arriving late, is never shown or ordered
+  const [quoteFor, setQuoteFor] = useState("");
+  const latestQuote = useRef(0);
+  const [ordering, setOrdering] = useState(false);
+  const orderLock = useRef(false);
+  const orderKey = useRef<{ for: string; key: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [step, setStep] = useState<"design" | "checkout">("design");
@@ -689,11 +696,25 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
     setSizes(d);
     setSupport("none");
   }, [product, products, start]);
+  const choices = useMemo(
+    () =>
+      JSON.stringify({
+        product,
+        sizes,
+        colour,
+        vents: stock ? true : vents, // an existing cover comes as it is made
+        support,
+        stock_model: stock,
+        match_token: stock ? matchToken : null,
+      }),
+    [product, sizes, colour, vents, support, stock, matchToken],
+  );
   useEffect(() => {
     if (!Object.keys(sizes).length) return;
-    // only the newest answer counts: a custom quote still on its way must never overwrite the
-    // existing cover's (ADR-118)
+    // only the newest answer counts (ADR-118, ADR-129): each request has its number, and an
+    // answer that is not the newest request's is dropped even when it arrives last
     const ctl = new AbortController();
+    const id = ++latestQuote.current;
     const t = setTimeout(async () => {
       setBusy(true);
       setError("");
@@ -702,32 +723,28 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: ctl.signal,
-          body: JSON.stringify({
-            product,
-            sizes,
-            colour,
-            vents: stock ? true : vents, // an existing cover comes as it is made
-            support,
-            stock_model: stock,
-            match_token: stock ? matchToken : null,
-          }),
+          body: choices,
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail ?? r.status);
-        if (!ctl.signal.aborted) setQuote(data);
+        if (!ctl.signal.aborted && id === latestQuote.current) {
+          setQuote(data);
+          setQuoteFor(choices);
+        }
       } catch (e) {
-        if (!ctl.signal.aborted) setError(String(e).replace(/^Error: /, ""));
+        if (!ctl.signal.aborted && id === latestQuote.current)
+          setError(String(e).replace(/^Error: /, ""));
       } finally {
-        if (!ctl.signal.aborted) setBusy(false);
+        if (!ctl.signal.aborted && id === latestQuote.current) setBusy(false);
       }
     }, 400);
     return () => {
       clearTimeout(t);
       ctl.abort();
     };
-  }, [product, sizes, colour, vents, support, stock, matchToken]);
-  // the quote on screen belongs to what is chosen now: an existing cover or a custom one
-  const fresh = (quote?.stock?.model_id ?? null) === stock;
+  }, [choices, sizes]);
+  // the quote on screen belongs to exactly what is chosen now (ADR-129)
+  const fresh = !!quote && quoteFor === choices;
   const stockQuote = stock && fresh ? quote : null;
   const note = deliveryNote(info, lang);
 
@@ -1002,20 +1019,39 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
             className="s-checkout"
             onSubmit={async (e) => {
               e.preventDefault();
+              // one checkout, one order (ADR-129): a second click while the first is on its
+              // way does nothing, and a retry of the same order sends the same key
+              if (orderLock.current || !fresh) return;
+              orderLock.current = true;
+              setOrdering(true);
               setError("");
-              const r = await fetch("/api/shop/order", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  quote_id: quote.id,
-                  ...form,
-                  lang,
-                  source_url: source?.url ?? null,
-                  source_summary: source?.summary || null,
-                }),
-              });
-              const data = await r.json();
-              if (!r.ok) return setError(data.detail ?? "error");
+              const body = {
+                quote_id: quote.id,
+                ...form,
+                lang,
+                source_url: source?.url ?? null,
+                source_summary: source?.summary || null,
+              };
+              const what = JSON.stringify(body);
+              if (orderKey.current?.for !== what)
+                orderKey.current = { for: what, key: newKey() };
+              let data;
+              try {
+                const r = await fetch("/api/shop/order", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    ...body,
+                    idempotency_key: orderKey.current.key,
+                  }),
+                });
+                data = await r.json();
+                if (!r.ok) throw new Error(data.detail ?? "error");
+              } catch (err) {
+                orderLock.current = false;
+                setOrdering(false);
+                return setError(String(err).replace(/^Error: /, ""));
+              }
               if (source?.photos.length) {
                 // the photos the customer started from, kept with the order for the workshop
                 const token = String(data.status_url ?? "")
@@ -1029,7 +1065,11 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
                 }).catch(() => undefined);
               }
               if (data.checkout_url) window.location.href = data.checkout_url;
-              else setDone(data);
+              else {
+                setDone(data);
+                orderLock.current = false;
+                setOrdering(false);
+              }
             }}
           >
             <button
@@ -1107,7 +1147,11 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
             {info.settings.payment_mode === "test" && (
               <p className="s-note">{w("test_payments")}</p>
             )}
-            <button className="s-btn wide" disabled={!form.terms}>
+            <button
+              className="s-btn wide"
+              disabled={!form.terms || ordering || !fresh}
+              aria-busy={ordering}
+            >
               {info.settings.payment ? w("order_pay") : w("place_order")} →
             </button>
             {error && <p className="s-error">{error}</p>}
@@ -1141,6 +1185,14 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
       </aside>
     </section>
   );
+}
+
+/** A checkout's idempotency key (ADR-129): random, letters, digits and dashes. */
+function newKey(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 }
 
 // While a page's data loads: its shape, softly; when the link leads nowhere: say so (ADR-105).

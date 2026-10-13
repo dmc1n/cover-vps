@@ -979,10 +979,11 @@ def _cached(step: str, handler: Handler, args: argparse.Namespace) -> int:
     if not args.force and stepcache.unchanged(step, model, params):
         print(f"{step}: unchanged, skipped (--force to calculate again)")
         return 0
+    before = stepcache.snapshot(model)
     with stepcache.reading() as read:
         code = handler(args)
     if code == 0:
-        stepcache.write(step, model, params, read)
+        stepcache.write(step, model, params, read, stepcache.written(before, model))
     return code
 
 

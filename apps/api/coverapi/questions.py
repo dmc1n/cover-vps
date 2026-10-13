@@ -27,6 +27,7 @@ and process the answers."
 from __future__ import annotations
 
 import json
+import logging
 import re
 import sqlite3
 import threading
@@ -846,7 +847,7 @@ def install(app: FastAPI, auth: Any, root: Path, models_dir: Path) -> None:
             auth,
             params(),
             base,
-            lambda to, subject, text: mailer.send(auth, to, subject, text),
+            lambda to, subject, text: mailer.queue(auth, to, subject, text, "digest"),
             models_dir,
         )
 
@@ -855,8 +856,8 @@ def install(app: FastAPI, auth: Any, root: Path, models_dir: Path) -> None:
         while True:
             try:
                 due()
-            except Exception:  # noqa: BLE001 - try again in an hour
-                pass
+            except Exception:  # noqa: BLE001 - said in the journal; again in an hour
+                logging.getLogger("coverapi.questions").exception("question mails")
             time.sleep(HOUR_S)
 
     app.state.question_mails = due

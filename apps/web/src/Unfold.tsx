@@ -1,6 +1,7 @@
 // "Unfold" (ADR-085): the cover's pieces pulled apart and laid flat on a table, with their net
 // and cut outlines, the allowance bands (seams, hem), the vent openings and hoods, a label per
 // piece and a list of where the fabric goes. The data: /api/models/{id}/unfold.json and .bin.
+import { disposeObject } from "./dispose3d";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -346,8 +347,12 @@ export function UnfoldView({
         const h = (mesh as THREE.Mesh & { _hook?: FrameHook })._hook;
         frameHooks.current = frameHooks.current.filter((x) => x !== h);
         scene.remove(mesh);
+        disposeObject(mesh);
       }
-      if (table) scene.remove(table);
+      if (table) {
+        scene.remove(table);
+        disposeObject(table);
+      }
       hideLayers(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

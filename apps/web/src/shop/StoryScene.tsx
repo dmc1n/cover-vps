@@ -2,6 +2,7 @@
 // points (the designed cover in its pieces, every piece flat on the roll, the cover as it falls
 // over the furniture), morphed by how far the visitor has scrolled. `progress` runs 0..1 over six
 // chapters: the furniture, the cover, its pieces, flat on the roll, sewn and fitted, the rain.
+import { disposeObject, trackRenderer } from "../dispose3d";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -51,6 +52,7 @@ export function StoryScene({
     scene.fog = new THREE.Fog(BG, 14, 34);
     const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 80);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const untrack = trackRenderer(renderer);
     // a phone draws at most 1.5 pixels per CSS pixel (ADR-106)
     const phone =
       window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 820;
@@ -195,7 +197,10 @@ export function StoryScene({
       rain.visible = false;
       scene.add(rain);
       new GLTFLoader().load(`/api/shop/story/${model}-furniture.glb`, (g) => {
-        if (!alive) return;
+        if (!alive) {
+          disposeObject(g.scene);
+          return;
+        }
         furniture = g.scene;
         furniture.traverse((o) => {
           const mesh = o as THREE.Mesh;
@@ -303,7 +308,11 @@ export function StoryScene({
     return () => {
       alive = false;
       window.removeEventListener("resize", resize);
+      disposeObject(scene);
+      scene.clear();
       renderer.dispose();
+      renderer.forceContextLoss();
+      untrack();
       el.removeChild(renderer.domElement);
     };
   }, [model, progress]);

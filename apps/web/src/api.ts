@@ -150,7 +150,7 @@ export interface Kind {
 
 export interface JobStep {
   name: Step;
-  status: "waiting" | "running" | "done" | "failed";
+  status: "waiting" | "running" | "done" | "failed" | "interrupted";
   log: string;
   started?: number;
   finished?: number;
@@ -159,12 +159,46 @@ export interface JobStep {
 export interface Job {
   id: string;
   model_id: string;
-  status: "queued" | "running" | "done" | "failed";
+  status: "queued" | "running" | "done" | "failed" | "interrupted";
   steps: JobStep[];
   error?: string;
   trial: Record<string, unknown>;
   created: number;
+  /** limits.job_timeout_s: a step that runs longer is stopped (ADR-123, ADR-129) */
+  timeout_s?: number;
+  rerun_of?: string;
 }
+
+/** The mail outbox (ADR-129): waiting and failed mails, and the send attempts (no texts). */
+export interface MailOutbox {
+  configured: boolean;
+  pending: number;
+  failed: number;
+  outbox: {
+    id: number;
+    created: number;
+    kind: string;
+    recipient: string;
+    subject: string;
+    status: "pending" | "failed";
+    attempts: number;
+    next_try: number;
+    last_error: string | null;
+    can_retry: number;
+  }[];
+  log: {
+    time: number;
+    kind: string;
+    recipient: string;
+    subject: string;
+    result: string;
+    error: string | null;
+  }[];
+}
+
+/** A job that will not change any more (done, failed, or interrupted by a restart). */
+export const jobFinished = (j: Pick<Job, "status">) =>
+  j.status === "done" || j.status === "failed" || j.status === "interrupted";
 
 /** What the program read from a drawing (drawing_read.json, ADR-081). */
 export interface DrawingRead {
@@ -284,6 +318,11 @@ export const api = {
   model: (id: string) =>
     fetch(`/api/models/${id}`).then((r) => json<ModelDetail>(r)),
   job: (id: string) => fetch(`/api/jobs/${id}`).then((r) => json<Job>(r)),
+  /** Run again: an interrupted or failed job, the same steps (ADR-129). */
+  rerunJob: (id: string) =>
+    fetch(`/api/jobs/${id}/rerun`, { method: "POST" }).then((r) =>
+      json<Job>(r),
+    ),
   specs: () => fetch("/api/parameters").then((r) => json<ParamSpec[]>(r)),
   params: (id: string) =>
     fetch(`/api/models/${id}/parameters`).then((r) => json<ModelParams>(r)),
@@ -894,6 +933,13 @@ export const admin = {
     ),
   system: () =>
     fetch("/api/admin/system").then((r) => json<Record<string, unknown>>(r)),
+  /** The mail outbox and the last send attempts (ADR-129). */
+  mailOutbox: () =>
+    fetch("/api/admin/mail/outbox").then((r) => json<MailOutbox>(r)),
+  mailRetry: (id: number) =>
+    send("POST", `/api/admin/mail/outbox/${id}/retry`).then((r) =>
+      json<{ id: number; status: string }>(r),
+    ),
   alertEmail: (to: string) =>
     send("PUT", "/api/admin/alert-email", { to }).then((r) =>
       json<{ alert_email: string }>(r),

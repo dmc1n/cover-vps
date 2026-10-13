@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Nightly backup of the data (make backup; cron at 02:30). Keeps BACKUP_KEEP (5) archives in
-# BACKUP_DIR (~/backups). If an rclone remote named in COVER_BACKUP_REMOTE exists (for example
-# "r2:cover-backups", set up with `rclone config` once the Cloudflare account is there), the
-# archive is copied there too. Everything the app needs to restore is in the archive: the model
+# BACKUP_DIR (~/backups). With COVER_BACKUP_REMOTE set (for example "r2:cover-backups", set up
+# with `rclone config` once the Cloudflare account is there), the archive is copied there too;
+# when that copy cannot be made (no rclone, an unknown remote, a failed copy) the local archive
+# stays, last_backup.txt says FAILED and why (the watchdog mails it) and the script fails
+# (ADR-129). Unset: last_backup.txt says "off-server copy: not set". Everything the app needs to restore is in the archive: the model
 # folders (with cover.json and seams.json), uploads and job files. The original 3D files of the
 # manufacturer stay on this server.
 # Not in the archive: the local safety copies made before a change (cover-data/backup-*; the
@@ -25,7 +27,7 @@ chmod 700 "$DEST"
 STAMP=$(date +%Y%m%d-%H%M)
 ARCHIVE="$DEST/cover-data-$STAMP.tar.gz"
 PARTIAL="$ARCHIVE.partial"
-SNAP=$(mktemp -d)
+SNAP=$(mktemp -d "$DEST/.snapshot.XXXXXX")
 trap 'rm -rf "$SNAP" "$PARTIAL"' EXIT
 fail() {
   echo "$(date '+%Y-%m-%d %H:%M') FAILED: $1" > "$DATA/last_backup.txt"
@@ -45,16 +47,23 @@ if [ -f "$DATA/app.db" ]; then
   python3 -c "import sqlite3,sys; s=sqlite3.connect(sys.argv[1]); d=sqlite3.connect(sys.argv[2]); s.backup(d); d.close()" \
     "$DATA/app.db" "$SNAP/app.db"
 fi
+snapshot_args=()
+[ ! -f "$SNAP/app.db" ] || snapshot_args=(-C "$SNAP" app.db)
 # follow the models link (the web app's models are the repository's models/ folder)
 tar -czhf "$PARTIAL" -C "$DATA" --exclude='*.tmp' --exclude='./app.db' --exclude='./app.db-*' \
   --exclude='./backup-*' --exclude='*.log' . \
-  -C "$SNAP" $( [ -f "$SNAP/app.db" ] && echo app.db ) || fail "tar stopped (disk full?)"
+  "${snapshot_args[@]}" || fail "tar stopped (disk full?)"
 gzip -t "$PARTIAL" || fail "the archive does not test"
 chmod 600 "$PARTIAL"
 mv "$PARTIAL" "$ARCHIVE"
 archives | tail -n +$((KEEP + 1)) | xargs -r rm --
-if [ -n "${COVER_BACKUP_REMOTE:-}" ] && rclone listremotes | grep -q "^${COVER_BACKUP_REMOTE%%:*}:"; then
-  rclone copy "$ARCHIVE" "$COVER_BACKUP_REMOTE"
+off_server="off-server copy: not set"
+if [ -n "${COVER_BACKUP_REMOTE:-}" ]; then
+  command -v rclone >/dev/null 2>&1 || fail "off-server copy: rclone missing; the local archive $(basename "$ARCHIVE") is kept"
+  remotes=$(rclone listremotes 2>/dev/null) || fail "off-server copy: cannot list remotes; the local archive $(basename "$ARCHIVE") is kept"
+  printf '%s\n' "$remotes" | grep -Fxq -- "${COVER_BACKUP_REMOTE%%:*}:" || fail "off-server copy: unknown remote; the local archive $(basename "$ARCHIVE") is kept"
+  rclone copy "$ARCHIVE" "$COVER_BACKUP_REMOTE" >/dev/null 2>&1 || fail "off-server copy: rclone copy failed; the local archive $(basename "$ARCHIVE") is kept"
+  off_server="off-server copy: succeeded"
 fi
-echo "$(date '+%Y-%m-%d %H:%M') $(basename "$ARCHIVE") $(du -h "$ARCHIVE" | cut -f1)" > "$DATA/last_backup.txt"
+echo "$(date '+%Y-%m-%d %H:%M') $(basename "$ARCHIVE") $(du -h "$ARCHIVE" | cut -f1); $off_server" > "$DATA/last_backup.txt"
 echo "backup -> $ARCHIVE ($(du -h "$ARCHIVE" | cut -f1))"

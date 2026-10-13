@@ -27,7 +27,11 @@ sudo fail2ban-client status sshd         # banned addresses
 Every night at 02:30 `scripts/backup.sh` writes `~/backups/cover-data-<date>.tar.gz`: all
 models, uploads, jobs, the users and the settings (14 kept, readable only by user dev). The
 time of the last good backup is in `~/cover-data/last_backup.txt` and on Settings → System. Still
-missing: a copy outside this server (see QUESTIONS.md).
+missing: a copy outside this server (see QUESTIONS.md, #89). Once `COVER_BACKUP_REMOTE` is set
+(for example `r2:cover-backups`), every night's archive is copied there too. When that copy
+cannot be made (rclone missing, an unknown remote, a failed copy), the local archive stays,
+`last_backup.txt` starts with **FAILED** and says why, and the watchdog mails it (ADR-129).
+Unset, `last_backup.txt` ends with "off-server copy: not set".
 
 Restore one model: `tar -xzf ~/backups/cover-data-<date>.tar.gz ./models/<id>` in a temporary
 folder, then copy it back. Restore everything: stop cover-web, move ~/cover-data aside, unpack
@@ -79,12 +83,40 @@ De app draait vanuit `~/releases/current`, een verwijzing naar de live versie (b
 bij elke wissel dezelfde.
 
 - Nieuwe versie live zetten: `scripts/release.sh v1.1.0 "wat er nieuw is"` (test eerst alles,
-  zet een versienummer in git, bouwt de versie in een eigen map en schakelt over). Antwoordt
-  de app daarna niet binnen een minuut, dan gaat hij vanzelf terug naar de vorige versie.
+  zet een versienummer in git, bouwt de versie in een eigen map en schakelt over). Mislukt de
+  herstart, of antwoordt de app niet binnen een minuut als die nieuwe versie, dan gaat hij
+  vanzelf terug naar de vorige versie, start die opnieuw en zegt dat ("switched back to ...
+  automatically"; ook in `~/releases/history.log`). Hetzelfde geldt voor `rollback.sh` (ADR-129).
+- Alleen `sudo systemctl restart cover-web` mag zonder wachtwoord. Draait de dienst nog niet
+  vanuit `~/releases/current` (de eerste installatie), dan verandert het script niets en print
+  het de commando's (`sudo cp ...`, `sudo systemctl daemon-reload`, ...) voor een persoon.
 - Terug naar de vorige versie: `scripts/rollback.sh` (ongeveer 10 seconden).
 - Terug naar een bepaalde versie: `scripts/rollback.sh v1.0.0`; welke er zijn:
   `scripts/rollback.sh --list`.
 - Welke versie live is: Settings → System ("Release (live)"), met de laatste wissels.
+
+## Jobs after a restart (ADR-129)
+
+A calculation runs as a job in the app. When the app stops while a job runs (a release, a
+restart, a crash), the job cannot go on. At the next start the app marks every job it left
+queued or running as **interrupted**, with the reason ("the server stopped while the step cut
+ran"), and ends a calculation that was still running on its own. On the cover's page the job
+bar says so and has **Run again** (the same steps, the same trial values). While a job runs, the
+bar shows how long one step may take at most (`limits.job_timeout_s`, 4 h); a longer step is
+stopped and the job fails with that reason.
+
+## Mail (ADR-129)
+
+Every mail the studio and the shop send is logged in app.db: when, what kind, to whom, the
+subject, and "sent" or the error. The text is never logged, nor a password. A mail counts as sent
+only when the mail server accepted it. Order notices, the fit question after delivery, requests
+and the Desk's digests go through an **outbox**: tried at once, and when that fails again after
+1, 2, 4, ... minutes (at most 6 h apart, `limits.mail_*`), 8 tries in all; then the mail is
+**failed**. Settings → System & logs → **Mail** lists what waits and what failed, with the last
+error, and has **Send again**. The text of a sent mail is removed at once; a failed one's after
+14 days. Login codes and password links are never kept: they are sent once, and the person asks
+again if one did not arrive. The fit question counts as sent (and is not asked again) only once
+the server took it.
 
 ## Limits that protect the server (ADR-123)
 

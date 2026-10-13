@@ -20,6 +20,7 @@ import time
 from pathlib import Path
 
 from coverengine import learned
+from coverengine.staging import guard_staging_output
 
 
 def main() -> int:
@@ -32,7 +33,12 @@ def main() -> int:
     if base is None:
         print("set COVER_DATA_DIR to the data folder", file=sys.stderr)
         return 2
+    out = base / "learning" / "check.json"
+    guard_staging_output(out.parent)
+    guard_staging_output(out)
     models = a.models or base / "models"
+    if a.recalc:
+        guard_staging_output(models)
     cases_dir = learned.cases_dir(base)
     cases = sorted(cases_dir.glob("*.json")) if cases_dir and cases_dir.is_dir() else []
     only = set(a.only.split(",")) if a.only else None
@@ -53,6 +59,7 @@ def main() -> int:
             rows.append({"case": path.name, "model": name, "result": "cover gone"})
             continue
         if a.recalc and name not in recalced:
+            guard_staging_output(d)
             for step in ("cut", "flatten", "export"):
                 subprocess.run([sys.executable, "-m", "coverengine.cli", step, str(d)],
                                capture_output=True, check=False)  # fmt: skip
@@ -67,7 +74,6 @@ def main() -> int:
     held = sum(1 for r in rows if r["result"] == "holds")
     failed = sum(1 for r in rows if r["result"] == "FAILS")
     print(f"{held} hold, {failed} fail, {len(rows) - held - failed} other, of {len(rows)} cases")
-    out = base / "learning" / "check.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"time": time.time(), "rows": rows}, indent=1) + "\n", "utf-8")
     return 1 if failed else 0

@@ -1,3 +1,4 @@
+import { disposeObject, trackRenderer } from "./dispose3d";
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { UnfoldView, type FrameHook } from "./Unfold";
 import { MeasureTool, VentSizes } from "./Measure";
@@ -308,6 +309,7 @@ export function Viewer({
         if (snapshot) snapshot.current = null;
       };
     }
+    const untrack = trackRenderer(renderer);
     setGlError("");
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(el.clientWidth || 1, el.clientHeight || 1);
@@ -343,7 +345,10 @@ export function Viewer({
     let alive = true;
     for (const layer of available) {
       loader.load(`${fileUrl(id, layer.file)}?v=${stamp}`, (gltf) => {
-        if (!alive) return;
+        if (!alive) {
+          disposeObject(gltf.scene);
+          return;
+        }
         const root = gltf.scene;
         root.traverse((o) => {
           const mesh = o as THREE.Mesh;
@@ -463,9 +468,19 @@ export function Viewer({
       window.removeEventListener("resize", onResize);
       sized?.disconnect();
       renderer.setAnimationLoop(null);
+      if (drapeAnim.current) drapeAnim.current.frames.length = 0;
+      drapeAnim.current = null;
+      cameraRef.current = null;
+      controlsRef.current = null;
+      controls.dispose();
+      disposeObject(scene);
+      scene.clear();
       renderer.dispose();
+      renderer.forceContextLoss();
+      untrack();
       el.removeChild(renderer.domElement);
       groups.current = {};
+      frameHooks.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, stamp, files.join(",")]);
@@ -475,6 +490,7 @@ export function Viewer({
     const scene = sceneRef.current;
     if (!scene) return;
     const group = new THREE.Group();
+    let alive = true;
     if (raining && rain) {
       const paths = rain.drops
         .slice(0, DROPS_SHOWN)
@@ -501,8 +517,12 @@ export function Viewer({
         t: paths.map(() => -Math.random() * 60),
       };
       if (files.includes("rain.glb")) {
-        new GLTFLoader().load(`${fileUrl(id, "rain.glb")}?v=${stamp}`, (gltf) =>
-          group.add(gltf.scene),
+        new GLTFLoader().load(
+          `${fileUrl(id, "rain.glb")}?v=${stamp}`,
+          (gltf) => {
+            if (alive) group.add(gltf.scene);
+            else disposeObject(gltf.scene);
+          },
         );
       }
     } else {
@@ -510,7 +530,9 @@ export function Viewer({
     }
     scene.add(group);
     return () => {
+      alive = false;
       scene.remove(group);
+      disposeObject(group);
       rainAnim.current = null;
     };
   }, [raining, rain, id, stamp, files]);
@@ -580,7 +602,10 @@ export function Viewer({
           new GLTFLoader().load(
             `${fileUrl(id, "drape_rain.glb")}?v=${stamp}`,
             (gltf) => {
-              if (!alive || !sceneRef.current) return;
+              if (!alive || !sceneRef.current) {
+                disposeObject(gltf.scene);
+                return;
+              }
               gltf.scene.traverse((o) => {
                 const m = o as THREE.Mesh;
                 if (m.isMesh)
@@ -596,7 +621,10 @@ export function Viewer({
         new GLTFLoader().load(
           `${fileUrl(id, "drape.glb")}?v=${stamp}`,
           (gltf) => {
-            if (!alive || !sceneRef.current) return;
+            if (!alive || !sceneRef.current) {
+              disposeObject(gltf.scene);
+              return;
+            }
             gltf.scene.traverse((o) => {
               const m = o as THREE.Mesh;
               if (m.isMesh)
@@ -616,8 +644,13 @@ export function Viewer({
       if (groups.current[f]) groups.current[f].visible = false;
     return () => {
       alive = false;
+      if (drapeAnim.current) drapeAnim.current.frames.length = 0;
       drapeAnim.current = null;
-      for (const o of added) sceneRef.current?.remove(o);
+      for (const o of added) {
+        o.removeFromParent();
+        disposeObject(o);
+      }
+      added.length = 0;
       for (const [file, obj] of Object.entries(groups.current))
         obj.visible = !!shownRef.current[file];
     };
@@ -647,7 +680,10 @@ export function Viewer({
       .catch(() => undefined);
     return () => {
       alive = false;
-      if (group) scene.remove(group);
+      if (group) {
+        scene.remove(group);
+        disposeObject(group);
+      }
     };
   }, [showVents, id, stamp, files]);
 
@@ -674,7 +710,10 @@ export function Viewer({
     }, 250);
     return () => {
       clearInterval(timer);
-      if (group) scene.remove(group);
+      if (group) {
+        scene.remove(group);
+        disposeObject(group);
+      }
     };
   }, [showDims, id, stamp, files]);
 

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from coverengine import crosscheck
+from coverengine.staging import guard_staging_output
 
 
 def slug(code: str) -> str:
@@ -33,6 +34,8 @@ def main() -> int:
     ap.add_argument("--only")
     ap.add_argument("--workers", type=int, default=3)
     a = ap.parse_args()
+    guard_staging_output(a.out)
+    guard_staging_output(Path("models"))
     pdfs = {re.sub(r"^cover \d+ - ", "", p.stem): p for p in sorted(a.pdfs.glob("*.pdf"))}
     codes = a.only.split(",") if a.only else list(pdfs)
     jobs = [(c, pdfs[c], Path("models") / slug(c)) for c in codes if c in pdfs]
@@ -43,6 +46,7 @@ def main() -> int:
 
     def one(job: tuple[str, Path, Path]) -> dict[str, Any]:
         code, pdf, model = job
+        guard_staging_output(model)
         try:
             res = {"code": code, **crosscheck.run(pdf, model)}
         except Exception as exc:  # noqa: BLE001 - one drawing must not stop the others

@@ -794,14 +794,22 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
     def link(request: Request, page: str) -> str:
         return f"{shop_root(auth, request)}b2b/{page}"
 
-    def mail(to: str, subject: str, text: str) -> bool:
-        if not mailer.configured(auth):
-            return False
+    def mail(to: str, subject: str, text: str, secret: bool = False) -> bool:
+        """True when the mail server accepted it now. Orders and notices go through the
+        outbox (tried again later, failures in Settings → System & logs; ADR-129); a mail with
+        a password link (`secret`) is sent once, never kept: the person asks again."""
+        if secret:
+            if not mailer.configured(auth):
+                return False
+            try:
+                mailer.send(auth, to, subject, text)  # logged, without its text
+            except Exception:  # noqa: BLE001 - a mail never stops a login link
+                return False
+            return True
         try:
-            mailer.send(auth, to, subject, text)
-        except Exception:  # noqa: BLE001 - a mail never stops an order or a login link
+            return mailer.is_sent(auth, mailer.queue(auth, to, subject, text, "b2b"))
+        except Exception:  # noqa: BLE001 - a mail never stops an order
             return False
-        return True
 
     def studio_mail(subject: str, text: str) -> None:
         mail(str(auth.setting("alert_email", "rick@s2dio.industries")), subject, text)
@@ -920,7 +928,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
                 token = db.token(int(user["id"]), "reset")
                 url = link(request, f"reset/{token}")
                 mail(user["email"], w.get("mail_reset_subject") or "A new password",
-                     f"{w.get('mail_reset_text', '')}\n\n{url}\n")  # fmt: skip
+                     f"{w.get('mail_reset_text', '')}\n\n{url}\n", secret=True)  # fmt: skip
                 auth.log(who(user), "b2b password reset asked", address(request))
         return {"ok": True}
 
@@ -1323,6 +1331,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
             user["email"],
             w.get("mail_invite_subject") or "Your business account",
             f"{w.get('mail_invite_text', '')}\n\n{company['name']}\n{url}\n",
+            secret=True,
         )
         auth.log(admin, "b2b invite", {"company": company["name"], "email": user["email"],
                                        "mailed": mailed})  # fmt: skip

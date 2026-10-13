@@ -66,6 +66,7 @@ def _pieces(d: Path) -> list[dict[str, Any]]:
 
 
 def stage(spec: dict[str, Any], out: Path, models: Path) -> dict[str, Any]:
+    guard_staging_output(out, models)
     model = spec["model"]
     src, dst = models / model, out / model
     guard_staging_output(dst, src)

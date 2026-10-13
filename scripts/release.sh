@@ -8,55 +8,100 @@
 #   scripts/release.sh --switch v1.0.0      only switch the app to a release built before
 #   scripts/rollback.sh                     back to the release before (see there)
 #
-# If the app does not answer after the switch, it is switched back at once.
+# If the restart fails, or the app does not answer as that release within a minute, it is switched
+# back to the release before at once, restarted, and the script says so (ADR-053, ADR-129).
+#
+# sudo: only `sudo systemctl restart cover-web` is allowed without a password on the server.
+# The first install of the service file (cp + daemon-reload) needs a person: the script sees
+# that before it changes anything and prints the commands instead of failing half-way.
 set -euo pipefail
 
 REPO=${COVER_REPO:-$HOME/cover-pattern-engine}
 RELEASES=${COVER_RELEASES:-$HOME/releases}
-HEALTH=http://127.0.0.1:8080/api/health
+HEALTH=${COVER_HEALTH_URL:-http://127.0.0.1:8080/api/health}
+HEALTH_TRIES=${COVER_HEALTH_TRIES:-60}  # seconds to wait for the app to answer
+UNIT=/etc/systemd/system/cover-web.service
 
 die() { echo "release: $*" >&2; exit 1; }
 
-healthy() {  # the app answers within 60 s
-  for _ in $(seq 60); do
-    if curl -fsS -m 2 "$HEALTH" >/dev/null 2>&1; then return 0; fi
+healthy() {  # the app answers as release $1 within HEALTH_TRIES seconds
+  local body
+  for _ in $(seq "$HEALTH_TRIES"); do
+    if body=$(curl -fsS -m 2 "$HEALTH" 2>/dev/null) &&
+      { [ -z "${1:-}" ] || grep -q "\"release\": *\"$1\"" <<<"$body"; }; then
+      return 0
+    fi
     sleep 1
   done
   return 1
 }
 
+restart() {  # the one password-free sudo command; its failure is reported, not fatal here
+  sudo -n systemctl restart cover-web
+}
+
+point() {  # ~/releases/current -> $1, atomically
+  ln -sfn "$1" "$RELEASES/current.new"
+  mv -T "$RELEASES/current.new" "$RELEASES/current"
+}
+
+needs_person() {  # the service does not run from ~/releases/current yet: print what a person runs
+  local target=$1
+  if [ "$(systemctl show -p WorkingDirectory --value cover-web)" != "$RELEASES/current" ]; then
+    # the first release: the service must run from ~/releases/current. Installing the service
+    # file needs sudo with a password: a person does it, nothing is changed here
+    cat >&2 <<EOF
+release: the service cover-web does not run from $RELEASES/current yet. Installing its
+service file needs a person (sudo with a password). ${target##*/} is built; nothing was switched. Run:
+
+  cp $UNIT $RELEASES/cover-web.service.before
+  ln -sfn $target $RELEASES/current
+  sudo cp $target/deploy/cover-web.service $UNIT
+  sudo systemctl daemon-reload
+  sudo systemctl restart cover-web
+  curl -fsS $HEALTH
+
+and, if it does not answer: sudo cp $RELEASES/cover-web.service.before $UNIT &&
+sudo systemctl daemon-reload && sudo systemctl restart cover-web
+EOF
+    exit 2
+  fi
+}
+
 switch() {  # point ~/releases/current at $1 and restart the app; back to the one before if it fails
-  local target=$RELEASES/$1 before
+  local target=$RELEASES/$1 before prev
   [ -d "$target/.venv" ] || die "$1 is not built in $RELEASES"
   before=$(readlink "$RELEASES/current" 2>/dev/null || true)
-  ln -sfn "$target" "$RELEASES/current.new"
-  mv -T "$RELEASES/current.new" "$RELEASES/current"
-  if [ "$(systemctl show -p WorkingDirectory --value cover-web)" != "$RELEASES/current" ]; then
-    # the first release: the service runs from ~/releases/current from now on (the old
-    # service file is kept, to go back to if this release does not answer)
-    cp /etc/systemd/system/cover-web.service "$RELEASES/cover-web.service.before"
-    sudo cp "$target/deploy/cover-web.service" /etc/systemd/system/cover-web.service
-    sudo systemctl daemon-reload
+  prev=${before##*/}
+  needs_person "$target"
+  point "$target"
+  local why=""
+  if ! restart; then
+    why="the restart failed"
+  elif ! healthy "$1"; then
+    why="it does not answer as $1 within ${HEALTH_TRIES} s"
   fi
-  sudo systemctl restart cover-web
-  if healthy; then
-    echo "$(date '+%F %T') $1 live (before: ${before##*/})" >> "$RELEASES/history.log"
+  if [ -z "$why" ]; then
+    echo "$(date '+%F %T') $1 live (before: $prev)" >> "$RELEASES/history.log"
     echo "release: $1 is live"
     return 0
   fi
-  echo "release: $1 does not answer; back to ${before##*/}" >&2
-  if [ -n "$before" ]; then
-    ln -sfn "$before" "$RELEASES/current.new"
-    mv -T "$RELEASES/current.new" "$RELEASES/current"
-    sudo systemctl restart cover-web
-    healthy || echo "release: ${before##*/} does not answer either: check 'journalctl -u cover-web'" >&2
-  elif [ -f "$RELEASES/cover-web.service.before" ]; then  # the first release: the old service
-    sudo cp "$RELEASES/cover-web.service.before" /etc/systemd/system/cover-web.service
-    sudo systemctl daemon-reload
-    sudo systemctl restart cover-web
-    rm -f "$RELEASES/current"
+  echo "release: $1 FAILED: $why" >&2
+  if [ -z "$before" ] || [ "$before" = "$target" ]; then
+    echo "release: no release before $1 to go back to; check 'journalctl -u cover-web'" >&2
+    echo "$(date '+%F %T') $1 FAILED ($why), nothing to go back to" >> "$RELEASES/history.log"
+    exit 1
   fi
-  echo "$(date '+%F %T') $1 FAILED, back to ${before##*/}" >> "$RELEASES/history.log"
+  point "$before"
+  if restart && healthy "$prev"; then
+    echo "release: switched back to $prev automatically; $prev is live again" >&2
+    echo "$(date '+%F %T') $1 FAILED ($why), switched back to $prev" >> "$RELEASES/history.log"
+  else
+    echo "release: switched back to $prev, but $prev does not answer either: check" \
+      "'journalctl -u cover-web' (sudo systemctl restart cover-web)" >&2
+    echo "$(date '+%F %T') $1 FAILED ($why), back to $prev which does not answer" \
+      >> "$RELEASES/history.log"
+  fi
   exit 1
 }
 

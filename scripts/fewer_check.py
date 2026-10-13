@@ -29,6 +29,7 @@ from typing import Any
 
 import numpy as np
 from coverengine.params import Registry
+from coverengine.staging import guard_staging_output
 
 AREA_TOL = 0.02  # flat area within 2 % of the 3D area
 SEAM_3D_TOL = 0.01  # a flat seam within 1 % (or 3 mm) of its 3D length
@@ -258,6 +259,9 @@ def main() -> int:
     ap.add_argument("--vents", type=int)
     ap.add_argument("--json", type=Path)
     a = ap.parse_args()
+    if a.json:
+        guard_staging_output(a.json.parent)
+        guard_staging_output(a.json)
     rows = []
     for m in a.models:
         want = a.vents

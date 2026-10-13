@@ -18,6 +18,7 @@ from coverengine.cli import main as cover
 from coverengine.drawn import build
 from coverengine.io.kind import confirm
 from coverengine.params import Registry
+from coverengine.staging import guard_staging_output
 
 STEPS = ("hull", "cut", "flatten", "export", "preview")
 
@@ -40,10 +41,14 @@ def make(
 ) -> Path:
     """`pieces`: already made (the drawing's own views, ADR-075) instead of built from `sizes`.
     `parameters`: merged into the cover's parameters before it is calculated."""
+    guard_staging_output(models)
     if pieces is None:
         pieces = build(shape, sizes, roll_mm())
     model = models / ("drawing-" + re.sub(r"[^a-z0-9]+", "-", code.lower()).strip("-"))
     src = models.parent / "out" / "drawn" / f"{model.name}.glb"
+    guard_staging_output(model)
+    guard_staging_output(src.parent)
+    guard_staging_output(src)
     src.parent.mkdir(parents=True, exist_ok=True)
     from coverengine.drawing_route import surface
 

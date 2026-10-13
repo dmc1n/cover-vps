@@ -108,13 +108,16 @@ def create_app(
         drape_after_export=_auto_drape(),
         drape_workers=int(os.environ.get("COVER_DRAPE_WORKERS", "4")),
     )
+    jobs.recover()  # what a stopped server left running is "interrupted" (ADR-129)
     app = FastAPI(
         title="Cover Studio", version=__version__, docs_url=None, redoc_url=None, openapi_url=None
     )
     app.state.store, app.state.jobs = store, jobs
     auth = Auth(store.root / "app.db")
     install(app, auth, login_required)
-    from coverapi import webshop
+    from coverapi import mailer, webshop
+
+    mailer.install(app, auth)  # the outbox and the send log (ADR-129)
 
     webshop.install(app, auth, store.root / "quotes", store.models)
     from coverapi import own_reference
@@ -527,6 +530,16 @@ def create_app(
             return jobs.get(job_id)
         except KeyError:
             raise HTTPException(404, f"no job {job_id!r}") from None
+
+    @app.post("/api/jobs/{job_id}/rerun")
+    def job_rerun(job_id: str) -> dict[str, Any]:
+        """Run again: an interrupted (or failed) job, the same steps and trial (ADR-129)."""
+        try:
+            return jobs.rerun(job_id)
+        except KeyError:
+            raise HTTPException(404, f"no job {job_id!r}") from None
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
 
     if web_dir is not None and (web_dir / "b2b.html").is_file():
         b2b.install_pages(app, web_dir)  # /shop/b2b/..., before the shop's own pages

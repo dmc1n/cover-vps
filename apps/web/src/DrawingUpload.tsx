@@ -1,7 +1,7 @@
 // Route A (ADR-081): upload a drawing (PDF); the program reads it itself and builds the cover,
 // or says why it could not ("needs a person"). Nothing is guessed.
 import { useEffect, useState } from "react";
-import { api, type DrawingRead, type Job } from "./api";
+import { api, jobFinished, type DrawingRead, type Job } from "./api";
 import { deskHref, modelHref } from "./nav";
 
 export function DrawingUpload() {
@@ -13,12 +13,12 @@ export function DrawingUpload() {
   const [read, setRead] = useState<DrawingRead | null>(null);
 
   useEffect(() => {
-    if (!job || job.status === "done" || job.status === "failed") return;
+    if (!job || jobFinished(job)) return;
     const t = setTimeout(async () => {
       try {
         const j = await api.job(job.id);
         setJob(j);
-        if ((j.status === "done" || j.status === "failed") && model)
+        if (jobFinished(j) && model)
           setRead(await api.drawingRead(model).catch(() => null));
       } catch (e) {
         setError(String(e));
@@ -74,7 +74,7 @@ export function DrawingUpload() {
         </button>
       </div>
       {error && <p className="error">{error}</p>}
-      {job?.status === "failed" && (
+      {(job?.status === "failed" || job?.status === "interrupted") && (
         <p className="error">
           The build failed: {job.error ?? "see the model's job log"}
         </p>

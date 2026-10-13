@@ -69,8 +69,25 @@ async def run(width: int, height: int, name: str) -> dict[str, object]:
             )
         await page.locator(".s-checkout input[type=checkbox]").first.check()
         await page.screenshot(path=f"{SHOTS}/stock-{name}-checkout.png", full_page=True)
-        await page.click(".s-checkout button.s-btn.wide")
+        # one checkout, one order (ADR-129): the order's answer is slow, the customer clicks
+        # three times; one request goes out, with an idempotency key
+        posts: list[dict[str, object]] = []
+
+        async def slow_order(route):  # type: ignore[no-untyped-def]
+            if route.request.method == "POST":
+                posts.append(json.loads(route.request.post_data or "{}"))
+                await asyncio.sleep(1.5)
+            await route.continue_()
+
+        await page.route("**/api/shop/order", slow_order)
+        submit = page.locator(".s-checkout button.s-btn.wide")
+        await submit.click()
+        for _ in range(2):
+            await submit.click(force=True, no_wait_after=True, timeout=2000)
         await page.wait_for_selector(".s-done", timeout=30000)
+        assert len(posts) == 1, f"{len(posts)} order requests for one checkout"
+        assert len(str(posts[0].get("idempotency_key") or "")) >= 8, posts[0]
+        out["order_requests"] = len(posts)
         out["thanks"] = await page.inner_text(".s-done")
         await page.screenshot(path=f"{SHOTS}/stock-{name}-thanks.png")
         await browser.close()

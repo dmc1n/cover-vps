@@ -5,6 +5,7 @@
 // configurator swaps models on every size), so a new quote never flashes an empty box; a frame is
 // drawn only when something moved; nothing is drawn while the view is off screen; a phone draws
 // at most 1.5 pixels per CSS pixel. The canvas fades in once the first model is there.
+import { disposeObject, trackRenderer } from "../dispose3d";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -29,15 +30,7 @@ const setSolid = (mat: THREE.MeshStandardMaterial, o: number) => {
   mat.needsUpdate = true;
 };
 
-function dispose(o: THREE.Object3D) {
-  o.traverse((x) => {
-    const m = x as THREE.Mesh;
-    if (!m.isMesh) return;
-    m.geometry.dispose();
-    for (const mat of ([] as THREE.Material[]).concat(m.material))
-      mat.dispose();
-  });
-}
+const dispose = disposeObject;
 
 export function Scene({
   url,
@@ -78,6 +71,7 @@ export function Scene({
       100,
     );
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: dark });
+    const untrack = trackRenderer(renderer);
     const phone =
       window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 820;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, phone ? 1.5 : 2));
@@ -167,7 +161,11 @@ export function Scene({
       renderer.setAnimationLoop(null);
       if (v.model) dispose(v.model);
       controls.dispose();
+      disposeObject(scene);
+      scene.clear();
       renderer.dispose();
+      renderer.forceContextLoss();
+      untrack();
       el.removeChild(canvas);
       view.current = null;
     };
@@ -181,7 +179,10 @@ export function Scene({
     let alive = true;
     const added: THREE.Object3D[] = [];
     v.loader.load(url, (gltf) => {
-      if (!alive) return;
+      if (!alive) {
+        disposeObject(gltf.scene);
+        return;
+      }
       const named = (o: THREE.Object3D, n: string) =>
         o.name.includes(n) || !!o.parent?.name.includes(n);
       // balloons under the cover: show the cover see-through so they can be seen
@@ -242,7 +243,10 @@ export function Scene({
       dirty.current = true;
       for (const o of overlays)
         v.loader.load(o, (w) => {
-          if (!alive) return;
+          if (!alive) {
+            disposeObject(w.scene);
+            return;
+          }
           w.scene.traverse((x) => {
             const m = x as THREE.Mesh;
             if (m.isMesh) {

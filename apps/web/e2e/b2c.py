@@ -49,6 +49,49 @@ async def visit(page: Page, path: str, name: str) -> dict[str, object]:
             "title": await page.title(), "images": imgs}  # fmt: skip
 
 
+async def late_price(ctx) -> dict[str, object]:  # type: ignore[no-untyped-def]
+    """ADR-129: a slow price answer never shows an older price. The answer for one size is held
+    back 4 s; the size changes again meanwhile; the shown price is the newest one's, also after
+    the old answer has come in."""
+    page = await ctx.new_page()
+    await page.goto(f"{URL}/configure", wait_until="load")
+    await page.locator(".s-price strong").first.wait_for(timeout=30000)
+    answers: list[float] = []
+    hold = {"next": True}
+
+    async def quote(route):  # type: ignore[no-untyped-def]
+        slow, hold["next"] = hold["next"], False
+        resp = await route.fetch()
+        answers.append(float((await resp.json())["price"]["total_eur"]))
+        if slow:
+            await asyncio.sleep(4)
+        try:
+            await route.fulfill(response=resp)
+        except Exception:  # noqa: BLE001, S110 - the page dropped the old request: fine
+            pass
+
+    await page.route("**/api/shop/quote", quote)
+    size = page.locator(".s-range input[type=range]").first
+    await size.focus()
+    for _ in range(30):
+        await size.press("ArrowRight")  # one size: its answer is the slow one
+    await page.wait_for_timeout(900)
+    for _ in range(30):
+        await size.press("ArrowRight")  # another size: its answer comes at once
+    await page.wait_for_timeout(6000)  # the slow one has arrived (or was dropped) by now
+    assert len(answers) >= 2 and answers[0] != answers[-1], answers
+    lang = await page.evaluate("document.documentElement.lang || 'nl'")
+    newest = await page.evaluate(
+        "([n, l]) => new Intl.NumberFormat(l, {style: 'currency', currency: 'EUR'}).format(n)",
+        [answers[-1], lang],
+    )
+    shown = await page.locator(".s-price strong").first.inner_text()
+    assert shown == newest, f"shown {shown}, newest answer {newest}, answers {answers}"
+    await page.screenshot(path=f"{SHOTS}/desktop-late-price.png", full_page=True)
+    await page.close()
+    return {"answers": answers, "shown": shown}
+
+
 async def main() -> None:
     report = []
     async with async_playwright() as p:
@@ -74,6 +117,8 @@ async def main() -> None:
             await page.screenshot(path=f"{SHOTS}/{label}-checkout.png", full_page=True)
             total = await page.locator("form.s-checkout .s-price").inner_text()
             report.append({"view": label, "checkout": total.replace("\n", " | ")})
+            if label == "desktop":
+                report.append({"view": label, "late_price": await late_price(ctx)})
             await ctx.close()
         await b.close()
     print(json.dumps(report, indent=1, ensure_ascii=False))

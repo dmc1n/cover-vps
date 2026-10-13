@@ -38,6 +38,18 @@ REBOOT_DAYS_MAX = 7
 REMIND_HOURS = 6
 
 
+def backup_status(data: Path) -> dict[str, str]:
+    """Report both stale backups and failed off-server copies without side effects."""
+    bad: dict[str, str] = {}
+    last = data / "last_backup.txt"
+    age = (time.time() - last.stat().st_mtime) / 3600 if last.is_file() else 1e9
+    if age > BACKUP_HOURS_MAX:
+        bad["backup"] = f"the last backup is {age:.0f} hours old"
+    elif "FAILED" in last.read_text(encoding="utf-8", errors="replace"):
+        bad["backup"] = "the last backup failed: " + last.read_text(encoding="utf-8").strip()
+    return bad
+
+
 def _get(url: str) -> int:
     try:
         with urllib.request.urlopen(url, timeout=15) as r:  # noqa: S310 - fixed addresses
@@ -102,12 +114,7 @@ def checks() -> dict[str, str]:
             bad["certificate"] = f"the https certificate ends in {days} days"
     except Exception as exc:  # noqa: BLE001
         bad["certificate"] = f"the https certificate cannot be read: {exc}"
-    last = DATA / "last_backup.txt"
-    age = (time.time() - last.stat().st_mtime) / 3600 if last.is_file() else 1e9
-    if age > BACKUP_HOURS_MAX:
-        bad["backup"] = f"the last backup is {age:.0f} hours old"
-    elif "FAILED" in last.read_text(encoding="utf-8", errors="replace"):
-        bad["backup"] = "the last backup failed: " + last.read_text(encoding="utf-8").strip()
+    bad.update(backup_status(DATA))
     failed = subprocess.run(
         ["systemctl", "--failed", "--no-legend", "--plain"], capture_output=True, text=True
     ).stdout.split()
