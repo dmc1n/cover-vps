@@ -202,3 +202,56 @@ def test_route_a_builds_a_corner_sofa_from_its_top_view_and_3d_picture(tmp_path:
     assert got["score"] > got["views_shape_score"]  # better than the block straight up
     names = {p.name.split("-")[0] for p in res["pieces"]}
     assert {"strip", "slope", "hip", "back", "front", "end"} <= names
+
+
+def _edges(plan: shapely.Polygon) -> list[float]:
+    p = fi._corners(plan)
+    return sorted(round(float(x), 2) for x in np.linalg.norm(np.roll(p, -1, axis=0) - p, axis=1))
+
+
+def _true(plan: shapely.Polygon, sizes: list[float]) -> tuple[shapely.Polygon, list[str]]:
+    return fi.true_sizes(plan, sizes, float(P["drawing.isofit_size_tol"]),  # type: ignore[arg-type]
+                         float(P["drawing.isofit_square_deg"]),  # type: ignore[arg-type]
+                         float(P["drawing.isofit_same_cm"]))  # type: ignore[arg-type]  # fmt: skip
+
+
+def test_the_traced_top_view_is_made_true_to_the_written_sizes() -> None:
+    """Rens, 9 Oct 2026 (C10, C4): "the main size must be 357 x 357 cm", "343.6 becomes 344",
+    "skirt right and skirt front are not the same, both 92 cm wide". A traced L a few mm off and
+    a hair out of square comes back with exactly the written sizes, square, its arms equal."""
+    traced = shapely.Polygon([(0, 0), (356.5, 0.2), (356.4, -91.6), (92.1, -92.0),
+                              (91.9, -356.2), (0.1, -356.0)])  # fmt: skip
+    plan, done = _true(traced, [30.0, 40.0, 44.0, 84.0, 92.0, 357.0])
+    assert _edges(plan) == [92.0, 92.0, 265.0, 265.0, 357.0, 357.0]
+    assert done and "mirror" in done[-1]
+
+
+def test_mirror_edges_written_a_hair_apart_are_one_size_written_far_apart_stay() -> None:
+    """S33 writes its two backs 244.1 and 243.8 cm on a symmetric V: one size, the larger. C29
+    writes 247.7 and 243.3: the drawing means them apart, they stay as written."""
+
+    def v_plan(lb: float, rb: float, end: float = 109.5) -> shapely.Polygon:
+        a = np.radians(22.5)
+        left = lb * np.array([-np.cos(a), -np.sin(a)])
+        right = rb * np.array([np.cos(a), -np.sin(a)])
+        n_l = np.array([np.sin(a), -np.cos(a)])  # into the V, square to the left arm
+        n_r = np.array([-np.sin(a), -np.cos(a)])
+        ln = shapely.LineString(
+            [left + n_l * end, left + n_l * end + 1e3 * np.array([np.cos(a), np.sin(a)])]
+        )
+        rn = shapely.LineString(
+            [right + n_r * end, right + n_r * end - 1e3 * np.array([np.cos(a), -np.sin(a)])]
+        )
+        inner = np.asarray(ln.intersection(rn).coords[0])
+        return shapely.Polygon([(0, 0), right, right + n_r * end, inner, left + n_l * end, left])
+
+    plan, _ = _true(v_plan(244.4, 243.2), [109.7, 243.8, 244.1])
+    assert _edges(plan)[-2:] == [244.1, 244.1]
+    plan, _ = _true(v_plan(246.0, 242.0), [109.7, 241.9, 246.1])
+    assert _edges(plan)[-2:] == [241.9, 246.1]
+
+
+def test_a_curved_top_view_is_left_as_traced() -> None:
+    round_ = shapely.Point(0, 0).buffer(100.0, quad_segs=32)
+    plan, done = _true(round_, [200.0])
+    assert plan.equals(round_) and not done

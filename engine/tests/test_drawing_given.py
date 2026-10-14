@@ -196,6 +196,24 @@ def test_the_audit_flags_a_rebuild_that_lost_a_decided_vent_count(tmp_path: Path
     assert {c["check"]: c for c in drawing_checks(model)}["decided vents"]["ok"]
 
 
+def test_the_audit_flags_a_top_view_off_its_written_sizes(tmp_path: Path) -> None:
+    """C4 (Rens, 9 Oct 2026): "the main size 343.6 cm becomes 344 cm". A fitted cover whose
+    back runs 344.4 and 343.6 cm where the drawing writes 344 fails; the depth is not a written
+    edge (C29's reaches past its 109.3 cm ends) and is left out."""
+    from coverengine.audit import drawing_checks
+
+    model = tmp_path / "drawing-c4"
+    model.mkdir()
+    lengths = {"lengths_cm": [344.4, 343.6, 85.3], "written_cm": [344.0, 344.0, 85.0]}
+    read = {"reader": "isofit", "isofit": {"lengths": lengths}}
+    (model / "drawing_read.json").write_text(json.dumps(read))
+    check = {c["check"]: c for c in drawing_checks(model)}["written sizes"]
+    assert not check["ok"] and "343.6 cm where the drawing writes 344" in check["detail"]
+    lengths.update(lengths_cm=[344.0, 344.0, 87.0])
+    (model / "drawing_read.json").write_text(json.dumps(read))
+    assert {c["check"]: c for c in drawing_checks(model)}["written sizes"]["ok"]
+
+
 def test_heights_are_read_from_upright_sizes_when_the_drawing_does_not_name_them(
     tmp_path: Path,
 ) -> None:

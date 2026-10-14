@@ -106,18 +106,25 @@ def _iso_share(outline: np.ndarray) -> float:
     return float(length[near].sum() / max(length.sum(), 1e-9))
 
 
+SAME_AS_CM = 0.5  # param-ok: an inch value this close to a written cm value is that value rounded
+
+
 def written_cm(pdf: Path) -> list[float]:
     """Every size written on the drawing, in cm: values with cm, inch values converted when no
     cm value is written beside them (the drawings write "[45.0cm] 17.7in" or only inches)."""
     import pymupdf
 
     out: list[float] = []
+    conv: list[float] = []  # converted from inches: the drawing's own cm value wins when written
     for page in pymupdf.open(pdf).pages():
         k = _bare_factor(page.get_text())
         for b in page.get_text("blocks"):
             text = b[4]
             if re.search(
-                r"order number|product number|fabric type|air\s*pocket|air\s*vent", text, re.I
+                r"order number|product number|fabric type|air\s*pocket|air\s*vent"
+                r"|\bcover[\s-]*\d+\b",  # the order's own number ("cover 86"), no size
+                text,
+                re.I,
             ):
                 continue
             vals = [(float(v.replace(",", ".")), (u or "").lower()) for v, u in CM.findall(text)]
@@ -127,9 +134,12 @@ def written_cm(pdf: Path) -> list[float]:
             if cms:
                 out += cms
             elif inch:
-                out += inch
+                conv += inch
             else:
-                out += [v * k for v in bare if v >= 5]  # param-ok: a bare number is a size
+                bare = [v * k for v in bare if v >= 5]  # param-ok: a bare number is a size
+                (conv if k != 1 else out).extend(bare)
+    # "111.00" (inches, 281.94 cm) beside "282 cm": the size is the drawing's 282 (Rens, 9 Oct 2026)
+    out += [v for v in conv if not any(abs(v - c) <= SAME_AS_CM for c in out)]
     return sorted({round(v, 1) for v in out if v > 0})
 
 
