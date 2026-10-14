@@ -21,6 +21,10 @@ inside a heading, a label or a button) and say what they explain, every icon-onl
 a name, every icon is hidden from screen readers; an (i) opens with the keyboard (Enter) and
 closes with Escape, back on its button, and opens with a tap on the touch screen.
 
+Since ADR-132: Covers → Links in every role's menu but the workshop's; editors and admins see
+Confirm / Not a pair / Choose another on a row (the picker opens), a viewer the rows only, No
+partner lists drawings; the workshop login gets "Not for your account" and a 403 from /api/links.
+
 Every pass runs light and dark (COVER_E2E_THEMES, the browser's prefers-color-scheme), with a
 contrast check of the text on every page (WCAG: 4.5:1, 3:1 for large text).
 
@@ -64,19 +68,21 @@ SLOW = 30_000
 MENU = {
     "rick": {
         "Work": ["Desk", "Questions", "Workshop"],
-        "Covers": ["All covers", "Arrangements", "New cover", "Learning", "Product list"],
+        "Covers": ["All covers", "Arrangements", "New cover", "Learning", "Links",
+                   "Product list"],
         "Shop": ["Orders", "Requests", "B2B customers", "Website (AI)"],
         "Settings": [],
     },
     "eddy": {
         "Work": ["Desk", "Questions", "Workshop"],
-        "Covers": ["All covers", "Arrangements", "New cover", "Learning", "Product list"],
+        "Covers": ["All covers", "Arrangements", "New cover", "Learning", "Links",
+                   "Product list"],
         "Shop": ["Website (AI)"],
         "Settings": [],
     },
     "vic": {
         "Work": ["Desk", "Questions", "Workshop"],
-        "Covers": ["All covers", "Arrangements", "Learning"],
+        "Covers": ["All covers", "Arrangements", "Learning", "Links"],
     },
     "werkplaats": {  # the workshop login: Work only (ADR-128)
         "Work": ["Desk", "Questions", "Workshop"],
@@ -479,6 +485,7 @@ async def as_rick(page: Page, width: int) -> None:
     n[0] += 1
     await shot(page, width, f"{n[0]:02d}-desk-card-arrangement")
     await covers_and_workshop(page, width, n)
+    await links_page(page, "rick", width, n)
     await info_popover(page, width)
     await search_and_theme(page, width, n)
 
@@ -570,6 +577,37 @@ async def covers_and_workshop(page: Page, width: int, n: list[int]) -> None:
           f"rick {width}: the Workshop has no buttons but Send to production")  # fmt: skip
 
 
+async def links_page(page: Page, user: str, width: int, n: list[int]) -> None:
+    """Covers → Links (ADR-132): the queue, both covers side by side; editors and admins see
+    Confirm / Not a pair / Choose another, a viewer sees the same rows without them. Nothing is
+    clicked that decides anything; the picker opens and closes."""
+    await page.goto(f"{URL}/#/covers/links")
+    await expect(page.locator("h1.page-title")).to_have_text("Links", timeout=SLOW)
+    rows = page.get_by_test_id("link-row")
+    await expect(rows.first).to_be_visible(timeout=SLOW)  # the list loads after a short pause
+    count = await rows.count()
+    check(count > 0, f"{user} {width}: Links shows proposals ({count})")
+    n[0] += 1
+    await shot(page, width, f"{n[0]:02d}-links-{user}")
+    first = rows.first
+    editor = user in ("rick", "rens", "eddy")
+    for name in ("Confirm", "Not a pair", "Choose another"):
+        got = await first.get_by_role("button", name=name, exact=True).count()
+        check(got == (1 if editor else 0),
+              f"{user} {width}: Links row {'has' if editor else 'has no'} {name}")  # fmt: skip
+    if editor:
+        await first.get_by_role("button", name="Choose another", exact=True).click()
+        await expect(first.get_by_role("dialog", name="Choose another")).to_be_visible(timeout=SLOW)
+        n[0] += 1
+        await shot(page, width, f"{n[0]:02d}-links-picker")
+        await first.get_by_role("button", name="Choose another", exact=True).click()
+    await page.get_by_role("button", name=re.compile("^No partner")).click()
+    await expect(page.get_by_test_id("nopartner-row").first).to_be_visible(timeout=SLOW)
+    n[0] += 1
+    await shot(page, width, f"{n[0]:02d}-links-nopartner-{user}")
+    await contrast(page, f"{user} {width} links")
+
+
 async def search_and_theme(page: Page, width: int, n: list[int]) -> None:
     box = page.get_by_role("searchbox", name=re.compile("Search covers, Desk codes"))
     await page.keyboard.press("Control+k")
@@ -631,6 +669,7 @@ async def as_other(page: Page, user: str, width: int) -> None:
     if user == "werkplaats":
         await as_workshop(page, width)
     if user == "vic":
+        await links_page(page, "vic", width, [50])
         await page.goto(f"{URL}/#/model/{MODEL}/price")
         await expect(page.get_by_text("Prices and the shop are for editors and admins")
                      ).to_be_visible(timeout=SLOW)  # fmt: skip
@@ -639,7 +678,8 @@ async def as_other(page: Page, user: str, width: int) -> None:
 
 async def as_workshop(page: Page, width: int) -> None:
     """The workshop login (ADR-128): Work only; the Desk card without Approve; the API agrees."""
-    for h in ["#/covers/all", f"#/model/{MODEL}/3d", "#/settings/costs", "#/shop/b2b"]:
+    for h in ["#/covers/all", "#/covers/links", f"#/model/{MODEL}/3d", "#/settings/costs",
+              "#/shop/b2b"]:  # fmt: skip
         await page.goto(f"{URL}/{h}")
         await expect(page.get_by_text("Not for your account")).to_be_visible(timeout=SLOW)
     check(True, f"werkplaats {width}: covers, prices, settings and the shop say so")
@@ -664,9 +704,10 @@ async def as_workshop(page: Page, width: int) -> None:
     await shot(page, width, "workshop-Desk-card")
     codes = await page.evaluate(
         """async () => Promise.all(['/api/prices/list', '/api/admin/orders',
-            '/api/admin/shop/settings', '/api/workshop'].map(async u => (await fetch(u)).status))"""
+            '/api/admin/shop/settings', '/api/links', '/api/workshop']
+            .map(async u => (await fetch(u)).status))"""
     )
-    check(codes == [403, 403, 403, 200], f"werkplaats {width}: the API refuses {codes}")
+    check(codes == [403, 403, 403, 403, 200], f"werkplaats {width}: the API refuses {codes}")
 
 
 async def main() -> int:

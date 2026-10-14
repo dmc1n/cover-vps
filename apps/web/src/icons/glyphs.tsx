@@ -108,6 +108,17 @@ export const GLYPHS = {
       <path d="M21.5 9v5" />
     </>
   ),
+  // a drawing (a sheet with its folded corner) and a 3D model (a block) joined by a seam:
+  // Covers → Links, a drawing cover and a 3D-model cover of the same product (ADR-132)
+  links: (
+    <>
+      <path d="M3 3.5h5.5L11 6v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" />
+      <path d="M8.5 3.5V6H11M5.5 8.5h3" />
+      <path d="M17 11 21 13.2v4.6L17 20l-4-2.2v-4.6Z" />
+      <path d="m13 13.2 4 2.2 4-2.2M17 15.4V20" />
+      <path d="M7 13v1.5a2 2 0 0 0 2 2h4" />
+    </>
+  ),
   "product-list": (
     <>
       <rect x="3.5" y="4" width="17" height="16" rx="2" />
