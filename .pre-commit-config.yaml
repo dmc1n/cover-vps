@@ -2,6 +2,12 @@
 repos:
   - repo: local
     hooks:
+      - id: no-merge-markers
+        name: no merge conflict markers
+        entry: bash -c 'if grep -nE "^(<<<<<<<|>>>>>>>) |^=======$" "$@"; then echo "merge conflict markers left"; exit 1; fi' --
+        language: system
+        types: [text]
+        exclude: '\.(svg|dxf)$'
       - id: ruff
         name: ruff check
         entry: uv run ruff check --fix
