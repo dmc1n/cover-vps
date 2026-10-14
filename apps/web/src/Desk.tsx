@@ -436,9 +436,13 @@ export function Desk({
 
   // what was just done on the card before, shown on the next one (an approval or a rejection
   // moves on by itself; its message must not vanish with the card)
-  const [flash, setFlash] = useState("");
+  // kept with the card it is meant for: the card may mount before or after it is set
+  const [flash, setFlash] = useState<{ id: string; text: string }>({
+    id: "",
+    text: "",
+  });
   const open = (id: string, done = "") => {
-    setFlash(done);
+    setFlash({ id, text: done });
     window.location.hash = deskHref(id);
   };
   // an order's quick approval from the queue: one click (ADR-128)
@@ -801,7 +805,7 @@ export function Desk({
               reasons={q.reasons}
               picturesMax={q.pictures_max ?? 8}
               onChanged={load}
-              flash={flash}
+              flash={flash.id === selected ? flash.text : ""}
               rev={cardRev}
               notify={notify}
               nextAfter={nextAfter}
@@ -939,6 +943,9 @@ function CardView({
   const [sewing, setSewing] = useState(false); // the "After sewing" row of the action bar
   const [measured, setMeasured] = useState<Record<string, number>>({});
   const [msg, setMsg] = useState(flash);
+  useEffect(() => {
+    if (flash) setMsg(flash);
+  }, [flash]);
   const [allDiffs, setAllDiffs] = useState(false);
   const [allRevs, setAllRevs] = useState(false);
   // "let the AI read it": its job followed here, the outcome shown beside the button
@@ -1046,10 +1053,13 @@ function CardView({
       setDialog("");
       setMsg(done);
       notify(`${done}: ${code}`, "ok");
-      await Promise.all([load(), onChanged()]);
+      // the list and its counts follow (the Desk's own state: it outlives this card), and
+      // the next card opens at once, chosen before the list changed
+      const refresh = Promise.all([next ? null : load(), onChanged()]);
+      if (next) onNext(`${done}: ${code}`, id, following);
+      await refresh;
       busyRef.current = false;
       setBusy("");
-      if (next) onNext(`${done}: ${code}`, id, following);
       return true;
     },
     [id, code, load, onChanged, onNext, nextAfter, notify],

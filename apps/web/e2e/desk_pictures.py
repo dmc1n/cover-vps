@@ -167,6 +167,13 @@ async def one(browser: Browser, name: str, width: int, model: str) -> list[str]:
     await page.screenshot(path=f"{SHOTS}/{tag}-3-ready.png")
     await reject.get_by_role("button", name="Reject", exact=True).click()
     await expect(page.locator(".d-msg")).to_contain_text("Rejected")
+    # the Desk moves on to the next card and refreshes its list (ADR-135): let that finish
+    # before the page reloads (WebKit reports a fetch cut off by a reload as an error)
+    await expect(page.locator("[data-testid=desk-toast].t-ok")).to_contain_text("Rejected")
+    try:
+        await page.wait_for_load_state("networkidle", timeout=15_000)
+    except Exception:  # noqa: BLE001 - a slow 3D load: the reload below still works
+        pass
     uploads = [p for p in posts if p[0].endswith("/pictures")]
     assert uploads, f"{tag}: no POST .../pictures"
     act = [b for u, b in posts if u == model and b and b.get("action") == "reject"][-1]

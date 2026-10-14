@@ -5018,10 +5018,12 @@ Chromium, WebKit, Firefox, 1440 and 1024).
 Decision:
 - One action at a time per card (`busyRef`): the clicked button says **Approving…** (a
   spinner), every other action and key waits; when the answer comes a message at the top
-  right (**Approved: <cover>**, kept while the next card opens), the queue and the card are
-  refreshed and awaited, then the next card opens. The next card is chosen **before** the
-  action (the list changes after it) and opened only while the person is still on that card;
-  after the last card the message says so.
+  right (**Approved: <cover>**, kept while the next card opens), the next card opens at once
+  and the queue (the Desk's own state, which outlives the card) refreshes its list and counts;
+  a Comment reloads its card. The next card is chosen **before** the action (the list changes
+  after it) and opened only while the person is still on that card; after the last card the
+  message says so. `desk_pictures.py` now waits for that move before it reloads the page
+  (WebKit reports a fetch cut off by a reload as an error).
 - A refusal (409, 400, 403) shows the server's reason in red, as a message at the top right
   (`role=alert`) and beside the buttons ("Approve D2 refused: already approved by Wout …"),
   and the card and the queue are reloaded (someone else may have acted).
