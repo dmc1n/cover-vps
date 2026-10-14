@@ -18,6 +18,13 @@ SERVER_KEYS = (
     "spend.hard_stop",
     "suggest.visitor_eur_day",
     "suggest.per_hour",
+    # the agent API's limits (ADR-135)
+    "limits.agent_per_hour",
+    "limits.agent_anon_per_day",
+    "limits.agent_key_per_day",
+    "limits.agent_key_photos_per_day",
+    "limits.agent_key_eur_day",
+    "limits.agent_link_hours",
 )
 
 

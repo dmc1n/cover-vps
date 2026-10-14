@@ -641,9 +641,17 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   } | null>(null);
   const [stock, setStock] = useState<string | null>(start.get("stock"));
   const [matchToken, setMatchToken] = useState<string | null>(start.get("mt"));
-  const [colour, setColour] = useState(info.settings.colours[0] ?? "");
-  const [vents, setVents] = useState(true);
+  // a link from the agent API (ADR-135) may also carry the colour, the vents, the support and
+  // checkout=1 (straight to the checkout once its price is on screen)
+  const [colour, setColour] = useState(() => {
+    const c = start.get("colour");
+    return c && info.settings.colours.includes(c)
+      ? c
+      : (info.settings.colours[0] ?? "");
+  });
+  const [vents, setVents] = useState(start.get("vents") !== "0");
   const [support, setSupport] = useState("none");
+  const toCheckout = useRef(start.get("checkout") === "1");
   const [quote, setQuote] = useState<Quote | null>(null);
   // the choices the quote on screen was made for (ADR-129): a price for other choices, or an
   // older answer arriving late, is never shown or ordered
@@ -679,6 +687,7 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   useEffect(() => {
     const d: Record<string, number | boolean> = {};
     for (const f of products[product].fields) d[f.key] = f.default;
+    let support0 = "none";
     if (first.current) {
       first.current = false;
       try {
@@ -686,6 +695,7 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
       } catch {
         /* no sizes given */
       }
+      if (start.get("support") === "balloons") support0 = "balloons";
     } else {
       setStock(null);
     }
@@ -694,7 +704,7 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
       pendingSizes.current = null;
     }
     setSizes(d);
-    setSupport("none");
+    setSupport(support0);
   }, [product, products, start]);
   const choices = useMemo(
     () =>
@@ -746,6 +756,13 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   // the quote on screen belongs to exactly what is chosen now (ADR-129)
   const fresh = !!quote && quoteFor === choices;
   const stockQuote = stock && fresh ? quote : null;
+  useEffect(() => {
+    // an order link (ADR-135): to the checkout once, when the price for its choices is here
+    if (fresh && toCheckout.current) {
+      toCheckout.current = false;
+      setStep("checkout");
+    }
+  }, [fresh]);
   const note = deliveryNote(info, lang);
 
   // how solid the cover is drawn (the owner, 6 Oct 2026: "too dark, a slider for the

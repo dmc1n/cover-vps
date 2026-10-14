@@ -1,0 +1,217 @@
+{
+ "_about": "The kinds of furniture the agent API (/api/v2, ADR-135) and the measuring guide (/measure) know, each mapped to a configurator product (config/quote_products.json, whose ranges and defaults apply). Per size: the API name, the configurator field it fills, whether it must be given, other names an agent may use, what it means and how to measure it. A size with \"requires\" is asked only when that yes/no is true. Draft texts from what the configurator asks today: the owner checks and edits them here (English; other languages later through the CMS).",
+ "general": {
+  "units": "Sizes are in centimetres (cm). Send \"unit\": \"mm\" to give them in millimetres instead.",
+  "how": "Measure the furniture itself, not the cover you want: we add the room a cover needs. Measure at the widest point, outside to outside, with cushions in place, to the nearest centimetre. Width is left to right as you face the furniture, depth front to back, height from the ground up.",
+  "tips": [
+   "Use a tape measure held straight and level; do not follow curves.",
+   "Measure arms, back and legs where they stick out the furthest.",
+   "If your furniture stands on a slope, measure the height at the highest leg.",
+   "Rough sizes to the centimetre are enough: the cover has a few centimetres of room."
+  ]
+ },
+ "kinds": {
+  "sofa": {
+   "product": "sofa",
+   "label": "Sofa or lounge bench (straight)",
+   "aliases": ["sofa_bench", "lounge_sofa", "couch", "bench", "2_seater", "3_seater"],
+   "how": "A straight sofa: the cover runs from the ground at the front over the seat and the back to the ground behind.",
+   "sizes": [
+    {"name": "width", "field": "length_cm", "required": true, "aliases": ["length"],
+     "means": "Outside width, arm to arm, at the widest point.",
+     "how": "Stand in front of the sofa and measure from the outside of the left arm to the outside of the right arm."},
+    {"name": "depth", "field": "depth_cm", "required": true,
+     "means": "Outside depth, front to back.",
+     "how": "From the front of the seat (or the front of the arms, if they stick out further) to the back of the backrest."},
+    {"name": "height", "field": "back_height_cm", "required": true, "aliases": ["back_height"],
+     "means": "Height of the back.",
+     "how": "From the ground to the highest point of the backrest, cushions in place."},
+    {"name": "front_height", "field": "front_height_cm", "required": false, "aliases": ["arm_height"],
+     "means": "Height at the front: the arms, or the seat when there are no arms.",
+     "how": "From the ground to the top of the arms at the front; without arms, to the top of the seat cushion."}
+   ]
+  },
+  "corner_sofa": {
+   "product": "corner_sofa",
+   "label": "Corner sofa (L-shape)",
+   "aliases": ["l_sofa", "l_shape", "corner_set", "sectional", "lounge_corner"],
+   "how": "An L-shaped set measured as one piece: both legs of the L from the outside corner.",
+   "sizes": [
+    {"name": "long_side", "field": "long_side_cm", "required": true, "aliases": ["width", "long_leg"],
+     "means": "The longer leg of the L, outside to outside.",
+     "how": "Along the back of the longer leg, from the outside of the corner to the far end (arm included)."},
+    {"name": "short_side", "field": "short_side_cm", "required": true, "aliases": ["short_leg"],
+     "means": "The shorter leg of the L, outside to outside.",
+     "how": "Along the back of the shorter leg, from the outside of the corner to the far end (arm included)."},
+    {"name": "depth", "field": "depth_cm", "required": true,
+     "means": "Depth of a leg, front to back.",
+     "how": "From the front of the seat to the back of the backrest, on one leg (both legs are usually the same)."},
+    {"name": "height", "field": "back_height_cm", "required": true, "aliases": ["back_height"],
+     "means": "Height of the back.",
+     "how": "From the ground to the highest point of the backrest, cushions in place."},
+    {"name": "front_height", "field": "front_height_cm", "required": false, "aliases": ["arm_height"],
+     "means": "Height at the front: the arms, or the seat when there are no arms.",
+     "how": "From the ground to the top of the arms at the front; without arms, to the top of the seat cushion."}
+   ],
+   "left_right": "Which hand the L is, as the furniture maker names it (for example \"corner set left\"). If you are not sure, leave it out: covers of both hands are then shown and the answer says so."
+  },
+  "chair": {
+   "product": "item",
+   "label": "Chair or lounge chair",
+   "aliases": ["armchair", "lounge_chair", "dining_chair", "club_chair"],
+   "how": "One chair under its own box-shaped cover.",
+   "sizes": [
+    {"name": "width", "field": "length_cm", "required": true,
+     "means": "Outside width, left to right, arms included.", "how": "At the widest point, usually across the arms."},
+    {"name": "depth", "field": "width_cm", "required": true,
+     "means": "Outside depth, front to back.", "how": "From the front of the seat or arms to the back of the backrest or the back legs, whichever sticks out further."},
+    {"name": "height", "field": "height_cm", "required": true,
+     "means": "Height to the highest point.", "how": "From the ground to the top of the backrest."}
+   ]
+  },
+  "side_table": {
+   "product": "item",
+   "label": "Side table, coffee table or fire table without a burner cover",
+   "aliases": ["coffee_table", "lounge_table", "low_table"],
+   "how": "A small table under its own box-shaped cover.",
+   "sizes": [
+    {"name": "width", "field": "length_cm", "required": true, "aliases": ["length"],
+     "means": "The longer side of the table top.", "how": "Across the top; for a round table, the diameter."},
+    {"name": "depth", "field": "width_cm", "required": true,
+     "means": "The shorter side of the table top.", "how": "Across the top at right angles to the width; for a round table, the diameter again."},
+    {"name": "height", "field": "height_cm", "required": true,
+     "means": "Table height.", "how": "From the ground to the top of the table."}
+   ]
+  },
+  "footstool": {
+   "product": "item",
+   "label": "Footstool, hocker or pouf",
+   "aliases": ["hocker", "ottoman", "pouf", "stool"],
+   "how": "A footstool under its own box-shaped cover.",
+   "sizes": [
+    {"name": "width", "field": "length_cm", "required": true, "means": "Outside width.", "how": "Left to right at the widest point."},
+    {"name": "depth", "field": "width_cm", "required": true, "means": "Outside depth.", "how": "Front to back at the widest point."},
+    {"name": "height", "field": "height_cm", "required": true, "means": "Height.", "how": "From the ground to the top of the cushion."}
+   ]
+  },
+  "lounger": {
+   "product": "lounger",
+   "label": "Sun lounger",
+   "aliases": ["sun_lounger", "sunbed", "sunlounger", "chaise_longue"],
+   "how": "Measure the lounger lying flat. If its back cannot fold flat, say so with headrest and measure the raised back too.",
+   "sizes": [
+    {"name": "length", "field": "length_cm", "required": true, "means": "Outside length, head to foot.", "how": "From the far end of the head to the far end of the foot, wheels and handles included."},
+    {"name": "width", "field": "width_cm", "required": true, "means": "Outside width.", "how": "Left to right at the widest point, armrests included."},
+    {"name": "height", "field": "height_cm", "required": true, "means": "Height lying flat.", "how": "From the ground to the top of the mattress or the frame, whichever is higher, with the back down."},
+    {"name": "headrest", "field": "headrest", "required": false, "type": "boolean",
+     "means": "true when the back stays raised (it cannot fold flat).", "how": "Leave it out or false for a lounger that lies flat."},
+    {"name": "headrest_height", "field": "headrest_height_cm", "required": true, "requires": "headrest",
+     "means": "Height of the raised back.", "how": "From the ground to the top of the raised back."},
+    {"name": "headrest_length", "field": "headrest_length_cm", "required": true, "requires": "headrest",
+     "means": "How far the raised back reaches along the lounger.", "how": "Seen from the side: from the head end to where the raised back meets the flat part."}
+   ]
+  },
+  "daybed": {
+   "product": "lounger",
+   "label": "Daybed",
+   "aliases": ["day_bed"],
+   "how": "A daybed is covered like a flat sun lounger. A daybed with a canopy or wider than 120 cm: ask us (made to measure by hand).",
+   "sizes": [
+    {"name": "length", "field": "length_cm", "required": true, "means": "Outside length, the long side.", "how": "Along the long side at the widest point."},
+    {"name": "width", "field": "width_cm", "required": true, "means": "Outside width, the short side.", "how": "Across the short side at the widest point."},
+    {"name": "height", "field": "height_cm", "required": true, "means": "Height to the highest point.", "how": "From the ground to the top of the mattress or the back, whichever is higher."}
+   ]
+  },
+  "dining_set": {
+   "product": "dining_set",
+   "label": "Dining set: a rectangular table with its chairs",
+   "aliases": ["table", "dining_table", "garden_table", "patio_set"],
+   "how": "Measure the table. With chairs (the default) the cover goes over the table and the chairs pushed in; we add the room the chairs need.",
+   "sizes": [
+    {"name": "width", "field": "table_length_cm", "required": true, "aliases": ["length", "table_length"], "means": "Table length, the long side of the top.", "how": "Along the table top, end to end."},
+    {"name": "depth", "field": "table_width_cm", "required": true, "aliases": ["table_width"], "means": "Table width, the short side of the top.", "how": "Across the table top."},
+    {"name": "height", "field": "table_height_cm", "required": true, "aliases": ["table_height"], "means": "Table height.", "how": "From the ground to the top of the table."},
+    {"name": "chairs", "field": "chairs", "required": false, "type": "boolean", "means": "true (default): the cover goes over the table and the chairs pushed in; false: over the table alone.", "how": "Decide whether the chairs stay at the table under the cover."}
+   ]
+  },
+  "round_dining_set": {
+   "product": "round_set",
+   "label": "Round dining set: a round table with its chairs",
+   "aliases": ["round_table", "round_set", "round_dining_table"],
+   "how": "Measure the table. With chairs (the default) the cover goes over the table and the chairs pushed in.",
+   "sizes": [
+    {"name": "diameter", "field": "table_diameter_cm", "required": true, "aliases": ["width", "table_diameter"], "means": "Diameter of the table top.", "how": "Across the middle of the top, edge to edge."},
+    {"name": "height", "field": "table_height_cm", "required": true, "aliases": ["table_height"], "means": "Table height.", "how": "From the ground to the top of the table."},
+    {"name": "chairs", "field": "chairs", "required": false, "type": "boolean", "means": "true (default): over the table and the chairs; false: over the table alone.", "how": "Decide whether the chairs stay at the table under the cover."}
+   ]
+  },
+  "bbq_kamado": {
+   "product": "bbq_kamado",
+   "label": "Kamado (egg) barbecue in a nest",
+   "aliases": ["kamado", "egg", "big_green_egg"],
+   "barbecue": true,
+   "how": "Measure the barbecue cold, lid closed. Our barbecue covers go on a cold barbecue only.",
+   "sizes": [
+    {"name": "egg_diameter", "field": "egg_diameter_cm", "required": true, "means": "Diameter of the egg.", "how": "Across the widest part of the ceramic egg."},
+    {"name": "closed_height", "field": "closed_height_cm", "required": true, "aliases": ["height"], "means": "Height with the lid closed.", "how": "From the ground to the top of the chimney cap, lid closed."},
+    {"name": "handle_depth", "field": "handle_depth_cm", "required": true, "aliases": ["depth"], "means": "Depth from the handle to the hinge.", "how": "From the front of the handle to the back of the hinge."},
+    {"name": "side_tables", "field": "side_tables", "required": false, "type": "boolean", "means": "true when it has side tables (shelves) that stay up.", "how": "Leave it out or false without side tables."},
+    {"name": "tables_width", "field": "tables_width_cm", "required": true, "requires": "side_tables", "means": "Width over the side tables.", "how": "From the outside of one side table to the outside of the other."}
+   ]
+  },
+  "bbq_kamado_table": {
+   "product": "bbq_kamado_table",
+   "label": "Kamado barbecue in a table",
+   "aliases": ["kamado_table"],
+   "barbecue": true,
+   "how": "Measure the table and the egg in it, cold, lid closed.",
+   "sizes": [
+    {"name": "table_length", "field": "table_length_cm", "required": true, "aliases": ["width"], "means": "Length of the table.", "how": "Along the table top, end to end."},
+    {"name": "table_width", "field": "table_width_cm", "required": true, "aliases": ["depth"], "means": "Width of the table.", "how": "Across the table top."},
+    {"name": "table_height", "field": "table_height_cm", "required": true, "means": "Table height.", "how": "From the ground to the table top."},
+    {"name": "egg_diameter", "field": "egg_diameter_cm", "required": true, "means": "Diameter of the egg.", "how": "Across the widest part of the egg."},
+    {"name": "closed_height", "field": "closed_height_cm", "required": true, "aliases": ["height"], "means": "Height with the lid closed.", "how": "From the ground to the top of the chimney cap."}
+   ]
+  },
+  "bbq_gas": {
+   "product": "bbq_gas",
+   "label": "Gas barbecue with side shelves",
+   "aliases": ["gas_grill", "gas_bbq"],
+   "barbecue": true,
+   "how": "Measure cold, lid closed, side shelves up.",
+   "sizes": [
+    {"name": "width", "field": "width_cm", "required": true, "means": "Width over the side shelves.", "how": "From the outside of one shelf to the outside of the other."},
+    {"name": "depth", "field": "depth_cm", "required": true, "means": "Depth, front to back.", "how": "From the front of the handle to the back of the hood or cart."},
+    {"name": "closed_height", "field": "closed_height_cm", "required": true, "aliases": ["height"], "means": "Height with the lid closed.", "how": "From the ground to the top of the hood."},
+    {"name": "shelf_height", "field": "shelf_height_cm", "required": true, "means": "Height of the side shelves.", "how": "From the ground to the top of a side shelf."},
+    {"name": "hood_width", "field": "hood_width_cm", "required": true, "means": "Width of the hood.", "how": "Across the hood (the lid) alone."}
+   ]
+  },
+  "bbq_pellet": {
+   "product": "bbq_pellet",
+   "label": "Pellet grill",
+   "aliases": ["pellet_grill", "smoker"],
+   "barbecue": true,
+   "how": "Measure cold, lid closed.",
+   "sizes": [
+    {"name": "width", "field": "width_cm", "required": true, "means": "Width, hopper and shelves included.", "how": "At the widest point, left to right."},
+    {"name": "depth", "field": "depth_cm", "required": true, "means": "Depth, front to back.", "how": "From the front of the handle to the back."},
+    {"name": "closed_height", "field": "closed_height_cm", "required": true, "aliases": ["height"], "means": "Height with the lid closed.", "how": "From the ground to the top of the lid or chimney."},
+    {"name": "lid_length", "field": "lid_length_cm", "required": true, "means": "Length of the lid.", "how": "Across the lid, left to right."}
+   ]
+  },
+  "bbq_fire_table": {
+   "product": "bbq_fire_table",
+   "label": "Fire table or plancha",
+   "aliases": ["fire_table", "plancha", "fire_pit_table"],
+   "barbecue": true,
+   "how": "Measure cold.",
+   "sizes": [
+    {"name": "fire_width", "field": "fire_width_cm", "required": true, "aliases": ["width", "diameter"], "means": "Diameter (round) or width (square).", "how": "Across the top at the widest point."},
+    {"name": "height", "field": "height_cm", "required": true, "means": "Height.", "how": "From the ground to the top."},
+    {"name": "square", "field": "square", "required": false, "type": "boolean", "means": "true for a square or rectangular one; false (default) for a round one.", "how": "Look at it from above."},
+    {"name": "depth", "field": "depth_cm", "required": true, "requires": "square", "means": "Depth of a square one.", "how": "Front to back across the top."}
+   ]
+  }
+ }
+}

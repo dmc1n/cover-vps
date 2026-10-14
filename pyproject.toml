@@ -39,7 +39,7 @@ check_untyped_defs = false
 files = ["engine/coverengine", "apps/api/coverapi"]
 
 [tool.pytest.ini_options]
-testpaths = ["engine/tests", "apps/api/tests"]
+testpaths = ["engine/tests", "apps/api/tests", "clients/cli"]
 filterwarnings = [
   # scikit-image's marching cubes on numpy 2.5; harmless, fixed upstream
   "ignore:Setting the shape on a NumPy array has been deprecated:DeprecationWarning",
