@@ -202,6 +202,15 @@ features:                        # per-cover defaults, overridden per model
                                  # "piece@fraction" along its bottom edge, comma separated
                                  # ("skirt-back@0.5, top-2@0.25"); empty = the rule. Wins over
                                  # vents_total and the per-metre rule (ADR-101)
+  vent_on_corners: false         # Rens, 9 Oct 2026 (Casto daybed): "geen vents op afgeronde hoeken";
+                                 # a vent on a rounded corner moves along its piece to the nearest
+                                 # straight stretch (a round cover keeps its vents; ADR-131).
+                                 # vent_positions set by a person are kept as they are
+  vent_corner_max_deg: 25        # a vent's bottom edge with vent_seam_clearance_mm either side (a
+                                 # corner is kept clear like a seam: 45 cm) turning more than this
+                                 # in plan (its turns added up) stands on a rounded corner: a
+                                 # curve tighter than about 1 m radius; a gently curved back wall
+                                 # is no corner (to confirm)
   vent_seam_clearance_mm: 100    # to confirm; a vent keeps this far from a vertical seam; a short
                                  # side gets its vent centred, closer (owner: it must have one)
   vent_hood_depth_mm: 80         # to confirm; the hood piece is this much deeper than the vent

@@ -165,10 +165,13 @@ def side_of(panel: str) -> str:
 @dataclass(frozen=True)
 class Walls:
     """What the 3D cover tells about each piece, for the vents (`vent_walls`): the pieces on an
-    inner wall, and the way each piece faces (a unit vector in plan, out of the cover)."""
+    inner wall, and the way each piece faces (a unit vector in plan, out of the cover); per
+    piece its bottom edge in plan (points in order) with the pieces at its start and its end
+    ("" for none), to keep vents off rounded corners."""
 
     inner: frozenset[str] = frozenset()
     facing: dict[str, tuple[float, float]] = field(default_factory=dict)
+    hems: dict[str, tuple[Array, str, str]] = field(default_factory=dict)
 
 
 PROBE_MM = 50.0  # param-ok: a point this far beside a wall tells out from in (as vents3d)
@@ -225,7 +228,191 @@ def vent_walls(model_dir: Any, params: EffectiveParams) -> Walls:
         if footprint.contains(shapely.Point(float(probe[0]), float(probe[1]))):
             d = -d  # cover beyond it: that was the inside
         facing[name] = (float(d[0]), float(d[1]))
-    return Walls(frozenset(inner), facing)
+    original = data["original_vertex"] if "original_vertex" in data else np.arange(len(v))
+    hems = {}
+    for i, name in enumerate(names):
+        hem = _bottom_path(v, f[labels == i], near)
+        if hem is None:
+            continue
+        ends = []
+        for k in (hem[0], hem[-1]):
+            # the piece at this end: another piece holding the same (original) vertex
+            others = labels[np.isin(f, np.flatnonzero(original == original[k])).any(axis=1)]
+            mates = sorted({names[j] for j in others if j != i and j < len(names)})
+            skirts = [m for m in mates if m.startswith("skirt")]
+            ends.append((skirts or mates or [""])[0] if hem[0] != hem[-1] else "")
+        hems[name] = (np.asarray(v[hem, :2], dtype=np.float64), ends[0], ends[1])
+    return Walls(frozenset(inner), facing, hems)
+
+
+def _bottom_path(v: Array, faces: NDArray[np.int64], near: float) -> list[int] | None:
+    """A piece's bottom edge as vertex indices in order: its longest chain of boundary edges
+    lying within `near` of its lowest point."""
+    if not len(faces):
+        return None
+    z0 = float(v[faces, 2].min())
+    e = np.sort(np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]]), axis=1)
+    uniq, count = np.unique(e, axis=0, return_counts=True)
+    low = uniq[(count == 1) & (v[uniq[:, 0], 2] <= z0 + near) & (v[uniq[:, 1], 2] <= z0 + near)]
+    nbr: dict[int, list[int]] = {}
+    for a, b in low.tolist():
+        nbr.setdefault(a, []).append(b)
+        nbr.setdefault(b, []).append(a)
+    best: list[int] = []
+    seen: set[int] = set()
+    starts = [k for k, n in nbr.items() if len(n) == 1] + list(nbr)
+    for s in starts:
+        if s in seen:
+            continue
+        path, prev = [s], -1
+        seen.add(s)
+        while True:
+            nxt = [n for n in nbr[path[-1]] if n != prev and n not in seen]
+            if not nxt:
+                if len(path) > 2 and path[0] in nbr[path[-1]]:
+                    path.append(path[0])  # a closed ring: one piece all round
+                break
+            prev = path[-1]
+            path.append(nxt[0])
+            seen.add(nxt[0])
+        length = float(np.linalg.norm(np.diff(v[path, :2], axis=0), axis=1).sum())
+        if len(path) > 1 and length > float(
+            np.linalg.norm(np.diff(v[best, :2], axis=0), axis=1).sum() if len(best) > 1 else 0.0
+        ):
+            best = path
+    return best if len(best) > 1 else None
+
+
+def _ends(run: HemRun, panel: dict[str, Any]) -> tuple[str, str]:
+    """What lies at the start and at the end of a run: the mate of the edge before and after
+    it ("" when that is a free edge or a hem)."""
+    outline = np.asarray(panel["outline_mm"], dtype=np.float64)
+    n = len(outline)
+    edges = panel["edges"]
+    for k, e in enumerate(edges):
+        pts = outline[edge_indices(n, e["range"])]
+        if len(pts) == len(run.points) and np.allclose(pts, run.points):
+            before, after = edges[k - 1], edges[(k + 1) % len(edges)]
+            return (
+                str(before.get("mate") or "") if before["kind"] == "seam" else "",
+                str(after.get("mate") or "") if after["kind"] == "seam" else "",
+            )
+    return "", ""
+
+
+def _along(pts: Array, s: Any) -> Array:
+    seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+    acc = np.concatenate([[0.0], np.cumsum(seg)])
+    return np.stack([np.interp(s, acc, pts[:, 0]), np.interp(s, acc, pts[:, 1])], axis=-1)
+
+
+def bend_deg(pts: Array, t: float, half: float) -> float:
+    """How much a line on the cover turns in plan between `t - half` and `t + half` (mm along
+    it): the sum of its turns, resampled every `BEND_STEP_MM` (0 on a straight wall; a
+    stretch of length L round a corner of radius R turns L / R)."""
+    length = float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum())
+    lo, hi = max(t - half, 0.0), min(t + half, length)
+    n = max(int(math.ceil((hi - lo) / BEND_STEP_MM)), 2)
+    q = _along(pts, np.linspace(lo, hi, n + 1))
+    d = np.diff(q, axis=0)
+    d = d[np.linalg.norm(d, axis=1) > 0]
+    if len(d) < 2:  # noqa: PLR2004 - a turn needs two directions
+        return 0.0
+    ang = np.arctan2(d[:, 1], d[:, 0])
+    turn = (np.diff(ang) + math.pi) % (2 * math.pi) - math.pi
+    return math.degrees(float(np.abs(turn).sum()))
+
+
+def arc_position(pts: Array, p: Array) -> float:
+    """Where a point lies along a line in plan (mm from its start), by the nearest point."""
+    seg = np.diff(pts, axis=0)
+    ln = np.linalg.norm(seg, axis=1)
+    acc = np.concatenate([[0.0], np.cumsum(ln)])
+    rel = np.asarray(p[:2]) - pts[:-1]
+    u = np.clip((rel * seg).sum(axis=1) / np.maximum(ln**2, 1e-12), 0.0, 1.0)  # param-ok
+    near = pts[:-1] + seg * u[:, None]
+    i = int(np.argmin(np.linalg.norm(near - np.asarray(p[:2]), axis=1)))
+    return float(acc[i] + u[i] * ln[i])
+
+
+def has_straight(pts: Array, half: float, limit: float) -> bool:
+    """Whether a bottom edge in plan has a stretch of 2 x `half` turning no more than `limit`
+    degrees (a round cover's piece has none)."""
+    length = float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum())
+    stations = np.arange(half, length - half + CORNER_STEP_MM / 2, CORNER_STEP_MM)
+    return any(bend_deg(pts, float(t), half) <= limit for t in stations)
+
+
+BEND_STEP_MM = 25.0  # param-ok: resampling of a bottom edge to measure its turns
+CORNER_STEP_MM = 10.0  # param-ok: search step along a bottom edge for a straight stretch
+SAME_LENGTH = 0.05  # param-ok: a 3D bottom edge this close in length to the flat one is the same
+
+
+def _off_corners(
+    places: list[tuple[str, float]],
+    room: dict[str, list[HemRun]],
+    by_name: dict[str, dict[str, Any]],
+    walls: Walls,
+    params: EffectiveParams,
+) -> tuple[list[tuple[str, float]], list[str]]:
+    """No vent on a rounded corner (Rens, 9 Oct 2026, the Casto daybed: "geen vents op afgeronde
+    hoeken"): a vent whose bottom edge (its width and `features.vent_seam_clearance_mm` either
+    side, as from a seam) turns more than `features.vent_corner_max_deg` in plan moves along its
+    piece to the nearest
+    straight stretch, clear of the piece's other vents. A piece with no straight stretch (a
+    round cover) keeps it where it was."""
+    w = _p(params, "features.vent_width_mm")
+    allowance = _p(params, "stitching.allowance_mm")
+    clear = _p(params, "features.vent_seam_clearance_mm")
+    limit = _p(params, "features.vent_corner_max_deg")
+    half = w / 2 + clear
+    out: list[tuple[str, float]] = []
+    warnings: list[str] = []
+    for k, (name, s_at) in enumerate(places):
+        runs = room.get(name, [])
+        hem = walls.hems.get(name)
+        if len(runs) != 1 or runs[0].kind != "hem" or hem is None:
+            out.append((name, s_at))
+            continue
+        r = runs[0]
+        pts, a, b = hem
+        length = float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum())
+        if abs(length - r.length) > SAME_LENGTH * r.length:
+            out.append((name, s_at))
+            continue
+        start, end = _ends(r, by_name[name])
+        if a != b and (start, end) == (a, b):
+            ways = [False]
+        elif a != b and (start, end) == (b, a):
+            ways = [True]
+        else:  # not known which way round: both must be straight
+            ways = [False, True]
+
+        def turn(s: float, pts: Array = pts, length: float = length, ways: list[bool] = ways,
+                 scale: float = length / r.length) -> float:  # fmt: skip
+            t = s * scale
+            return max(bend_deg(pts, length - t if flip else t, half) for flip in ways)
+
+        gap = clear if r.length >= w + 2 * clear else (r.length - w) / 2
+        lo, hi = w / 2 + gap, r.length - w / 2 - gap
+        s = float(np.clip(s_at, lo, hi)) if hi >= lo else s_at
+        if hi < lo or turn(s) <= limit:
+            out.append((name, s))
+            continue
+        others = [x for n, x in out if n == name] + [x for n, x in places[k + 1 :] if n == name]
+        stations = np.arange(lo, hi + CORNER_STEP_MM / 2, CORNER_STEP_MM)
+        cands = sorted(stations, key=lambda c: abs(c - s))
+        best = next((float(c) for c in cands
+                     if all(abs(c - o) >= w + 2 * allowance for o in others)
+                     and turn(float(c)) <= limit), None)  # fmt: skip
+        if best is None:
+            if has_straight(pts, half, limit):  # straight room, but the other vents hold it
+                warnings.append(f"air vent {k + 1} on {name} stands on a rounded corner: "
+                                "no free straight stretch on that piece")  # fmt: skip
+            out.append((name, s))  # a piece round all along (a round cover) keeps it
+        else:
+            out.append((name, best))
+    return out, warnings
 
 
 def inner_skirts(model_dir: Any, params: EffectiveParams) -> frozenset[str]:
@@ -502,6 +689,9 @@ def place_vents(
             k = counts[name]
             places += [(name, (j + 0.5) * lengths[name] / k) for j in range(k)]  # param-ok: middles
     by_name = {p["name"]: p for p in panels}
+    if places and not text and not params["features.vent_on_corners"]:
+        places, more = _off_corners(places, room, by_name, walls, params)
+        warnings += more
     out: dict[str, list[Array]] = {}
     for k, (name, s_at) in enumerate(places, start=1):
         acc = 0.0

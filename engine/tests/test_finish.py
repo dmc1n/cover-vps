@@ -344,3 +344,72 @@ def test_vent_walls_face_out_of_the_cover(tmp_path: Path) -> None:
     for name, d in want.items():
         assert walls.facing[name] == pytest.approx(d, abs=1e-6), name
     assert {"skirt-front-2", "skirt-right-2"} <= walls.inner
+
+
+def _corner_wall(tmp_path: Path, radius: float = 200.0) -> tuple[Any, Any]:
+    """One skirt piece, 0.4 m high, round a rounded corner: 600 mm straight, a quarter circle,
+    600 mm straight; its middle lies on the corner."""
+    import json
+    import math
+
+    from coverengine.finish.finish import vent_walls
+
+    arc = [(600 + radius * math.sin(a), radius - radius * math.cos(a))
+           for a in np.linspace(0, math.pi / 2, 24)]  # fmt: skip
+    path = [(0.0, 0.0), *arc, (600 + radius, radius + 600)]
+    verts, faces = [], []
+    for x, y in path:
+        verts += [(x, y, 0.0), (x, y, 400.0)]
+    for k in range(len(path) - 1):
+        a = 2 * k
+        faces += [(a, a + 2, a + 3), (a, a + 3, a + 1)]
+    np.savez(tmp_path / "panels.npz", vertices=np.array(verts), faces=np.array(faces),
+             labels=np.zeros(len(faces), dtype=int))  # fmt: skip
+    (tmp_path / "panels.json").write_text(json.dumps({"panels": [{"name": "skirt-front"}]}))
+    length = float(np.linalg.norm(np.diff(np.array(path), axis=0), axis=1).sum())
+    d = doc(square("skirt-front", 400, ["hem", "seam", "seam", "seam"], [False] * 4))
+    d["panels"][0]["outline_mm"] = [[0, 0], [length, 0], [length, 400], [0, 400]]
+    return d, vent_walls(tmp_path, params())
+
+
+def test_no_vent_on_a_rounded_corner(tmp_path: Path) -> None:
+    """Rens, 9 Oct 2026 (Casto daybed): "geen vents op afgeronde hoeken". A vent whose middle
+    falls on a rounded corner moves along its piece to a straight stretch (ADR-131); with
+    `features.vent_on_corners` it stays in the middle."""
+    import math
+
+    from coverengine.finish.finish import bend_deg
+
+    d, walls = _corner_wall(tmp_path)
+    hem = walls.hems["skirt-front"][0]
+    corner = (600.0, 600.0 + math.pi * 100)  # where the quarter circle lies along the wall
+    assert Registry.load().resolve()["features.vent_on_corners"] is False  # the default
+    one = {"features.vents_total": 1}
+    vents, warnings = place_vents(d["panels"], params(**one), walls)
+    (rect,) = vents["skirt-front"]
+    at = float(np.asarray(rect)[:2, 0].mean())
+    assert at + 125 < corner[0] or at - 125 > corner[1]  # the opening off the corner
+    assert bend_deg(hem, at, 225) <= 25 and not warnings
+    vents, _ = place_vents(d["panels"], params(**one, **{"features.vent_on_corners": True}), walls)
+    (rect,) = vents["skirt-front"]
+    middle = float(np.asarray(rect)[:2, 0].mean())
+    assert corner[0] < middle < corner[1]  # on the corner, as before
+    assert bend_deg(hem, middle, 225) > 25
+    # a person's place is kept (Rens's circles on C27's rounded arm ends)
+    by_hand = {**one, "features.vent_positions": "skirt-front@0.5"}
+    vents, _ = place_vents(d["panels"], params(**by_hand), walls)
+    assert corner[0] < float(np.asarray(vents["skirt-front"][0])[:2, 0].mean()) < corner[1]
+
+
+def test_a_round_wall_keeps_its_vents() -> None:
+    """A piece that is round all along (a round cover's strip) has no straight stretch: its
+    vents stay where the rule put them."""
+    import math
+
+    from coverengine.finish.finish import bend_deg, has_straight
+
+    circle = np.array([(500 * math.cos(a), 500 * math.sin(a)) for a in np.linspace(0, 2, 60)])
+    assert not has_straight(circle, 225, 30)
+    assert bend_deg(circle, 400, 225) == pytest.approx(math.degrees(450 / 500), abs=3)
+    straight = np.array([(0.0, 0.0), (1000.0, 0.0)])
+    assert bend_deg(straight, 500, 225) == pytest.approx(0, abs=1e-6)

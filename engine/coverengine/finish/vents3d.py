@@ -39,7 +39,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial import cKDTree
 
-from coverengine.finish.finish import HemRun, edge_indices, place_vents, vent_bases, vent_walls
+from coverengine.finish.finish import HemRun, _ends, place_vents, vent_bases, vent_walls
 from coverengine.flatten.pattern import _panel_mesh, compensation
 from coverengine.flatten.solve import flatten
 from coverengine.params import EffectiveParams
@@ -173,23 +173,6 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
 
 def _r(p: Array) -> list[float]:
     return [round(float(x), 1) for x in p]
-
-
-def _ends(run: HemRun, panel: dict[str, Any]) -> tuple[str, str]:
-    """What lies at the start and at the end of a run: the mate of the edge before and after
-    it ("" when that is a free edge or a hem)."""
-    outline = np.asarray(panel["outline_mm"], dtype=np.float64)
-    n = len(outline)
-    edges = panel["edges"]
-    for k, e in enumerate(edges):
-        pts = outline[edge_indices(n, e["range"])]
-        if len(pts) == len(run.points) and np.allclose(pts, run.points):
-            before, after = edges[k - 1], edges[(k + 1) % len(edges)]
-            return (
-                str(before.get("mate") or "") if before["kind"] == "seam" else "",
-                str(after.get("mate") or "") if after["kind"] == "seam" else "",
-            )
-    return "", ""
 
 
 def corners_along(pts3: Array) -> list[float]:
