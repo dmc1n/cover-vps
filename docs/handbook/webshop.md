@@ -118,3 +118,14 @@ The preview (preview.s2dio.living) is never indexed.
 `apps/web/e2e/b2c.py` opens every consumer page on a desktop and a phone (390 px), checks the
 price note and the checkout, and saves screenshots (usage in its docstring). The Worker's own
 tests: `cd apps/site && npm test`.
+
+### Bot protection (Turnstile)
+
+Create a widget in the Cloudflare dashboard → Turnstile, with hostnames
+`shop.s2dio.living` and `preview.s2dio.living`. Put its public site key in
+`deploy/.env` as `TURNSTILE_SITE_KEY` and its secret as `TURNSTILE_SECRET_KEY`,
+then restart the app (with Docker Compose, recreate the app container so it receives
+the new environment). Most visitors see nothing; Turnstile shows a check only when
+interaction is needed. The checkout, the "ask us" form beside the matching covers and the photo/link suggestion send the verification
+token to the server. The honeypot and rate limits remain active; without keys the
+forms work as before.

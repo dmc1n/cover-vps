@@ -37,6 +37,7 @@ interface Company {
   addresses: Addr[];
   price_list: string;
   fixed: Record<string, number>;
+  vies: { valid?: boolean | null; checked?: number; name?: string; error?: string | null; manual_override?: boolean } | null;
   reverse_charge: boolean;
   status: string;
   note: string | null;
@@ -267,6 +268,7 @@ export function B2BCustomers() {
                   <br />
                   <span className="muted">
                     VAT {c.vat_number || "—"} · {c.city} {c.country}
+                    <ViesResult c={c} />
                   </span>
                 </td>
                 <td>
@@ -375,6 +377,20 @@ export function B2BCustomers() {
   );
 }
 
+function ViesResult({ c }: { c: Company }) {
+  const v = c.vies;
+  if (!v) return null;
+  return (
+    <span title={v.error || undefined}>
+      {" "}
+      <StatusChip status={v.valid === true ? "approved" : v.valid === false ? "rejected" : "warning"}>
+        {v.valid === true ? "VIES valid" : v.valid === false ? "VIES invalid" : v.checked ? "VIES not reachable" : "VIES not checked"}
+      </StatusChip> · {when(v.checked ?? null)} {v.name}
+      {v.manual_override !== undefined && " · Manual override"}
+    </span>
+  );
+}
+
 function CompanyCard({
   c,
   s,
@@ -400,6 +416,12 @@ function CompanyCard({
     reverse_charge: c.reverse_charge,
     note: c.note ?? "",
   });
+  const [override, setOverride] = useState(false);
+  const [checking, setChecking] = useState(false);
+  useEffect(() => {
+    setF((previous) => ({ ...previous, reverse_charge: c.reverse_charge }));
+    setOverride(false);
+  }, [c.reverse_charge, c.vies]);
   const [fixed, setFixed] = useState(
     Object.entries(c.fixed)
       .map(([k, v]) => `${k} = ${v}`)
@@ -452,8 +474,9 @@ function CompanyCard({
         className="fields b2b-fields"
         onSubmit={(e) => {
           e.preventDefault();
+          const { reverse_charge, ...fields } = f;
           run(() =>
-            call("PUT", `companies/${c.id}`, { ...f, fixed: parsed() }),
+            call("PUT", `companies/${c.id}`, { ...fields, fixed: parsed(), ...(override ? { reverse_charge } : {}) }),
           );
         }}
       >
@@ -478,6 +501,20 @@ function CompanyCard({
             />
           </label>
         ))}
+        <div>
+          VAT {c.vat_number || "—"}<ViesResult c={c} />{" "}
+          <button
+            type="button"
+            disabled={checking}
+            onClick={async () => {
+              setChecking(true);
+              await run(() => call("POST", `companies/${c.id}/vies`));
+              setChecking(false);
+            }}
+          >
+            Check VIES
+          </button>
+        </div>
         <label className="field">
           <span>Price list</span>
           <select
@@ -495,10 +532,12 @@ function CompanyCard({
           <input
             type="checkbox"
             checked={f.reverse_charge}
-            onChange={(e) => setF({ ...f, reverse_charge: e.target.checked })}
+            onChange={(e) => {
+              setOverride(true);
+              setF({ ...f, reverse_charge: e.target.checked });
+            }}
           />{" "}
-          VAT reverse-charged (no VAT on the order: an EU company outside NL
-          with a valid VAT number; check with the accountant)
+          VAT reverse-charged (manual override for this save)
         </label>
         <label className="field">
           <span>

@@ -40,7 +40,8 @@ test("every answer carries the security headers", async () => {
   for (const path of ["/", "/configure", "/robots.txt", "/api/admin/users"]) {
     const res = await get(path);
     for (const k of Object.keys(SECURITY_HEADERS)) assert.ok(res.headers.get(k), `${path}: ${k}`);
-    assert.match(res.headers.get("content-security-policy")!, /script-src 'self'/);
+    assert.match(res.headers.get("content-security-policy")!, /frame-src https:\/\/challenges\.cloudflare\.com/);
+    assert.match(res.headers.get("content-security-policy")!, /script-src 'self' https:\/\/challenges\.cloudflare\.com/);
     assert.equal(res.headers.get("set-cookie"), null); // never the studio's session
   }
 });

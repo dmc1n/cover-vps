@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 import { Suggest, type Suggestion } from "./Suggest";
+import { Turnstile } from "./Turnstile";
 import { createRoot } from "react-dom/client";
 import "./shop.css";
 import { Icon } from "./Icons";
@@ -72,6 +73,8 @@ interface Info {
     company: Record<string, string>;
     shipping: { country: string; name: string; eur: number }[];
     payment: boolean;
+    /** Cloudflare Turnstile's public site key; empty: no widget (QUESTIONS 32, ADR-136) */
+    turnstile_site_key?: string;
     /** Mollie's mode from the key's prefix (ADR-103): test payments move no money */
     payment_mode?: "test" | "live" | "none";
     film_url: string;
@@ -531,6 +534,8 @@ function MatchCard({
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [trap, setTrap] = useState("");
+  const [turnstile, setTurnstile] = useState("");
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     setSent(false);
     if (!auto || !Object.keys(sizes).length) return;
@@ -567,9 +572,11 @@ function MatchCard({
                   name,
                   lang: tx.lang,
                   website: trap,
+                  turnstile,
                 }),
               });
               const d = await r.json();
+              setAttempt((n) => n + 1);
               if (!r.ok) return setError(d.detail ?? "error");
               setSent(true);
             }}
@@ -588,7 +595,8 @@ function MatchCard({
               onChange={(e) => setEmail(e.target.value)}
             />
             <Trap value={trap} set={setTrap} />
-            <button className="s-btn small">{tx.w("match_ask")} →</button>
+            <Turnstile siteKey={info.settings.turnstile_site_key} onToken={setTurnstile} refresh={attempt} />
+            <button className="s-btn small" disabled={!!info.settings.turnstile_site_key && !turnstile}>{tx.w("match_ask")} →</button>
             {error && <p className="s-error">{error}</p>}
           </form>
         )}
@@ -657,6 +665,8 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   // older answer arriving late, is never shown or ordered
   const [quoteFor, setQuoteFor] = useState("");
   const latestQuote = useRef(0);
+  const [turnstile, setTurnstile] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const [ordering, setOrdering] = useState(false);
   const orderLock = useRef(false);
   const orderKey = useRef<{ for: string; key: string } | null>(null);
@@ -840,6 +850,7 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
           <>
             <h1>{w("configure")}</h1>
             <Suggest
+              siteKey={info.settings.turnstile_site_key}
               w={w}
               lang={lang}
               productName={tx.product}
@@ -1059,12 +1070,14 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     ...body,
+                    turnstile,
                     idempotency_key: orderKey.current.key,
                   }),
                 });
                 data = await r.json();
                 if (!r.ok) throw new Error(data.detail ?? "error");
               } catch (err) {
+                setAttempt((n) => n + 1);
                 orderLock.current = false;
                 setOrdering(false);
                 return setError(String(err).replace(/^Error: /, ""));
@@ -1084,6 +1097,7 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
               if (data.checkout_url) window.location.href = data.checkout_url;
               else {
                 setDone(data);
+                setAttempt((n) => n + 1);
                 orderLock.current = false;
                 setOrdering(false);
               }
@@ -1161,12 +1175,13 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
               <strong>{euro(quote.price.total_eur + shipping, lang)}</strong>
               {quote.price.indicative && <Indicative tx={tx} />}
             </div>
+            <Turnstile siteKey={info.settings.turnstile_site_key} onToken={setTurnstile} refresh={attempt} />
             {info.settings.payment_mode === "test" && (
               <p className="s-note">{w("test_payments")}</p>
             )}
             <button
               className="s-btn wide"
-              disabled={!form.terms || ordering || !fresh}
+              disabled={!form.terms || ordering || !fresh || (!!info.settings.turnstile_site_key && !turnstile)}
               aria-busy={ordering}
             >
               {info.settings.payment ? w("order_pay") : w("place_order")} →

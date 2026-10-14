@@ -148,5 +148,19 @@
     "check": "The audit's vents check ('on a rounded corner') and engine/tests/test_finish.py::test_no_vent_on_a_rounded_corner.",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792008000,
+    "model_id": "suns-lounge-pico-bended-2-seater",
+    "complaint": "Back less tight, may be one continuous curve, smoother (Rens, 9 Oct 2026, both Pico covers); answered 14 Oct (QUESTIONS 101): the back wall plus the two back corners as one roomy arc from above, a few cm looser round the cushions, no kink at the corners.",
+    "cause": "A follow plan keeps the furniture's outline plus the clearance; where a back cushion stands out near a back corner the outline has a 1-2 cm dent and a tight corner.",
+    "rule": "On request per model (hull.plan_back_arc): behind the plan's widest points the outline is filled out to its convex hull, grown by hull.plan_back_ease_mm and its corners rounded (hull.plan_back_round_mm); the side walls lean out over hull.plan_back_taper_mm. When a reviewer asks for a smoother or looser back on a sofa with a curved back, propose this."
+  },
+  {
+    "time": 1792008001,
+    "model_id": "bbq-kamado-joe-classic-iii-cart",
+    "complaint": "On 4 BBQ covers with side tables one vent does not fit where the rule wants it (owner, 12 Oct 2026, QUESTIONS 81: one vent fewer on that side, the rest by the rule).",
+    "cause": "A kamado's handle stands in front of the side tables; the box's plan gets a 24-25 cm strip beside the front, shorter than a vent and its seam allowances.",
+    "rule": "features.vent_short_piece_ok (on in presets/bbq): a piece too short for a vent simply has none and it is no warning; elsewhere it stays a warning."
   }
 ]

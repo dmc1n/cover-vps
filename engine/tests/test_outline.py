@@ -136,3 +136,21 @@ def test_an_organic_outline_is_followed_bays_and_all(tmp_path: Path) -> None:
     pattern = json.loads((d / "pattern.json").read_text())
     usable = float(params["roll.usable_width_mm"])  # type: ignore[arg-type]
     assert all(p["flat_width_mm"] <= usable for p in pattern["panels"])
+
+
+def test_the_back_is_one_roomy_arc_on_request() -> None:
+    """Rens, 14 Oct 2026 (QUESTIONS 101, the Pico sofas): the back wall and the two back corners
+    as one arc from above, a few cm looser, no kink where a cushion stands out at a corner."""
+    # a fan-shaped sofa (-y front): a back arc, then a dent just inside each back corner
+    back = [(x, 560 - 0.00035 * x * x) for x in range(-800, 801, 50)]
+    plan = shapely.Polygon([(-1070, 190), (-950, 230), *back, (950, 230), (1070, 190),
+                            (500, -570), (-500, -570)])  # fmt: skip
+    out = outline.back_arc(plan, 30.0, 150.0, 400.0)
+    assert out.buffer(0.5).contains(plan)  # never closer to the furniture
+    behind = out.intersection(shapely.box(-3000, 190, 3000, 3000))
+    assert behind.area / behind.convex_hull.area > 0.999  # one arc: no dent left
+    assert plan.area < out.area < 1.15 * plan.area  # a few cm looser, not a new shape
+    front = shapely.box(-3000, -3000, 3000, -300)
+    assert abs(out.intersection(front).area - plan.intersection(front).area) < 1.0
+    assert out.distance(shapely.Point(0, 560 + 25)) == 0  # the back grew by about the ease
+    assert Registry.load(None).resolve()["hull.plan_back_arc"] is False

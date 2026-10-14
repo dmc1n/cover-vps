@@ -29,6 +29,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from coverapi import shipping as delivery
 from coverapi import shop_legal
 from coverapi.match_list import STOCK_MODEL
 
@@ -38,6 +39,28 @@ PREVIEW_SETTING = "shop_preview_token"
 MOLLIE_API = "https://api.mollie.com/v2"
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 SITEMAP_PAGES = ("", "configure", "terms", "privacy", "returns", "cookies", "contact", "warranty")
+
+
+def turnstile_ok(token: str | None, ip: str) -> bool:
+    """Cloudflare Turnstile (QUESTIONS 32, ADR-136): verified only when the secret is set
+    (deploy/.env); then a missing token, a refusal or no answer is False. The secret and
+    Cloudflare's error codes are never shown or logged."""
+    from coverapi.security import env_value
+
+    secret = env_value("TURNSTILE_SECRET_KEY")
+    if not secret:
+        return True
+    if not token:
+        return False
+    body = urllib.parse.urlencode({"secret": secret, "response": token, "remoteip": ip}).encode()
+    req = urllib.request.Request(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify", data=body, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:  # noqa: S310 - Cloudflare HTTPS API
+            return json.load(response).get("success") is True
+    except (OSError, ValueError, AttributeError):
+        return False
 
 
 GZIP_FROM_BYTES = 1024  # smaller files are not worth packing
@@ -471,6 +494,7 @@ class MatchIn(BaseModel):
     email: str | None = Field(default=None, max_length=254)
     name: str | None = Field(default=None, max_length=120)
     lang: str = Field(default="nl", pattern=r"^[a-z]{2}$")
+    turnstile: str | None = Field(default=None, max_length=2048)
     website: str | None = Field(default=None, max_length=200)  # the honeypot (ADR-103)
 
 
@@ -499,6 +523,7 @@ class OrderIn(BaseModel):
     # started from a photo or a link (ADR-086): kept with the order for the workshop
     source_url: str | None = Field(default=None, max_length=2000)
     source_summary: str | None = Field(default=None, max_length=600)
+    turnstile: str | None = Field(default=None, max_length=2048)
     website: str | None = Field(default=None, max_length=200)  # the honeypot (ADR-103)
     # one checkout, one order (ADR-129, as B2B's ADR-104): the page sends the same key again on
     # a double click or a retry and gets the order it already made
@@ -815,7 +840,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     from coverengine.errors import CoverError
 
     from coverapi import mailer, match_list, prices
-    from coverapi.security import _address, require
+    from coverapi.security import _address, env_value, require
 
     site = Site(data / "site")
     quotes = data / "shop_quotes"
@@ -852,6 +877,11 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         if len(recent) > 5000:  # noqa: PLR2004 - a public shop: forget the idle visitors
             for k in [k for k, v in recent.items() if now - v[-1] >= 60]:  # noqa: PLR2004
                 del recent[k]
+
+    def client_ip(request: Request) -> str:
+        """The visitor's address: through the website its own (the Worker's x-client-ip)."""
+        a = _address(request)
+        return (request.headers.get("x-client-ip") or a) if link_ok(auth, request) else a
 
     def no_bots(trap: str | None) -> None:
         """The honeypot (ADR-103): a field people never see; a bot that fills it is refused."""
@@ -1007,6 +1037,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             or [{"country": x["country"], "name": x["name"], "eur": 0} for x in s["shipping"]],
             "payment": bool(s["payment"].get("mollie_key")),
             "payment_mode": payment_mode(s),
+            "turnstile_site_key": env_value("TURNSTILE_SITE_KEY"),
             "film_url": s["film_url"],
             "film_av1": s["film_av1"],
             "film_poster": s["film_poster"],
@@ -1254,6 +1285,10 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
     def shop_order(req: OrderIn, request: Request) -> dict[str, Any]:
         limit(request, per_minute=10)
         no_bots(req.website)
+        # Turnstile (QUESTIONS 32): a token works once, so a retry of the same checkout (its
+        # idempotency key, ADR-129) is not asked again: it gets the order the first one made
+        if repeated_order(req) is None and not turnstile_ok(req.turnstile, client_ip(request)):
+            raise HTTPException(400, "please try again")
         if not req.terms:
             raise HTTPException(400, "please accept the terms")
         if not EMAIL.match(req.email.strip()):
@@ -1262,18 +1297,25 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         if not path.is_file():
             raise HTTPException(404, "the proposal has expired; please make it again")
         record = json.loads(path.read_text(encoding="utf-8"))
-        ship = next(
-            (x for x in settings()["shipping"] if x["country"] == req.country.upper()), None
-        )
-        if ship is None:
+        # delivery: the carrier's rate by weight and box once it is set up, else the country's
+        # fixed amount (QUESTIONS 28/29, coverapi/shipping.py)
+        rate = delivery.quote(settings()["shipping"], req.country, req.postcode,
+                              record["quote"].get("fabric_m2"), shop_params(auth))  # fmt: skip
+        if rate is None:
             raise HTTPException(400, "we do not deliver to this country yet")
-        shipping = float(ship.get("eur") or 0)
+        shipping = rate.eur
         total = round(record["quote"]["price"]["sale_eur"] + record["support_eur"] + shipping, 2)
         token = secrets.token_urlsafe(18)
         # an existing cover (ADR-118): the order names the model and the price it was sold at
         stock = record.get("stock")
-        data = {"customer": req.model_dump(exclude={"idempotency_key"}), "quote": record,
-                "shipping_eur": shipping, "lang": req.lang, "stock": stock}  # fmt: skip
+        data = {
+            "customer": req.model_dump(exclude={"idempotency_key", "turnstile"}),
+            "quote": record,
+            "shipping_eur": shipping,
+            "shipping_source": rate.source,
+            "lang": req.lang,
+            "stock": stock,
+        }
         # one checkout, one order (ADR-129): a repeat gets the order the first request made
         earlier = repeated_order(req)
         if earlier is not None:
@@ -1363,6 +1405,10 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
 
         limit(request)
         no_bots(req.website)
+        # Turnstile guards the form that mails us (an e-mail given); the configurator's own
+        # automatic look-up while sizes change stays free, limited per minute as before
+        if req.email and not turnstile_ok(req.turnstile, client_ip(request)):
+            raise HTTPException(400, "please try again")
         bbq_refused(req.product, auth, request)
         p = shop_params(auth)
         mode = str(p["match.mode"])

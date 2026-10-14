@@ -87,6 +87,12 @@ CSP = (
     "img-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; object-src 'none'; "
     "base-uri 'none'; frame-ancestors 'self'; form-action 'self'"
 )
+# the shop's pages (and the website, which keeps this header) load Cloudflare Turnstile's
+# script and frame (QUESTIONS 32, ADR-136)
+TURNSTILE_ORIGIN = "https://challenges.cloudflare.com"
+SHOP_CSP = CSP.replace("script-src 'self'", f"script-src 'self' {TURNSTILE_ORIGIN}").replace(
+    "frame-src 'self'", f"frame-src 'self' {TURNSTILE_ORIGIN}"
+)
 
 
 class LoginRequest(BaseModel):
@@ -223,14 +229,15 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
         # the configurator may be shown in an iframe on the webshop addresses set on the admin
         # page (ADR-061); everything else only on our own pages
         shops = [o for o in (auth.setting("embed_origins", []) or []) if o]
+        csp = SHOP_CSP if request.url.path.startswith("/shop") else CSP
         if shops:
             response.headers.setdefault(
                 "Content-Security-Policy",
-                CSP.replace("frame-ancestors 'self'", "frame-ancestors 'self' " + " ".join(shops)),
+                csp.replace("frame-ancestors 'self'", "frame-ancestors 'self' " + " ".join(shops)),
             )
         else:
             response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-            response.headers.setdefault("Content-Security-Policy", CSP)
+            response.headers.setdefault("Content-Security-Policy", csp)
         response.headers.setdefault("Referrer-Policy", "same-origin")
         response.headers.setdefault(
             "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
@@ -571,6 +578,22 @@ def _problems(path: Any) -> list[str]:
     if not path.is_file():
         return []
     return [v.get("text", k) for k, v in json.loads(path.read_text() or "{}").items()]
+
+
+def env_value(name: str) -> str:
+    """A key from the environment, else from deploy/.env (as the AI's keys): the app runs as a
+    service that does not load that file itself. Never logged."""
+    import os
+
+    from coverengine.params.registry import repo_root
+
+    value = os.environ.get(name, "")
+    env = repo_root() / "deploy" / ".env"
+    if not value and env.is_file():
+        for line in env.read_text(encoding="utf-8").splitlines():
+            if line.startswith(f"{name}="):
+                value = line.split("=", 1)[1].strip().strip("'\"")
+    return value
 
 
 def _env_has(name: str) -> bool:
