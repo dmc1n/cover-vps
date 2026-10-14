@@ -337,7 +337,13 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     up a wall (a vent hung from a free top edge, upside down, C24)."""
     import math
 
-    from coverengine.finish.finish import vent_bases, vent_walls
+    from coverengine.finish.finish import (
+        arc_position,
+        bend_deg,
+        has_straight,
+        vent_bases,
+        vent_walls,
+    )
     from coverengine.finish.vents3d import ensure_vents
 
     path = ensure_vents(model_dir) if (model_dir / "panels.npz").is_file() else None
@@ -381,6 +387,23 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
         high = [x["piece"] for x in vents if min(c[2] for c in x["corners_mm"]) - low > reach]
         if high:
             problems.append("high up a wall (upside down?): " + ", ".join(high))
+    if vents and not places and not params["features.vent_on_corners"]:
+        # Rens, 9 Oct 2026: no vents on rounded corners (ADR-134); a piece that is round all
+        # along (a round cover) has no straight stretch to give them
+        limit = float(params["features.vent_corner_max_deg"])  # type: ignore[arg-type]
+        w = float(params["features.vent_width_mm"])  # type: ignore[arg-type]
+        clear = float(params["features.vent_seam_clearance_mm"])  # type: ignore[arg-type]
+        corner = []
+        for x in vents:
+            hem = walls.hems.get(x["piece"])
+            if hem is None or "height_line_mm" not in x:
+                continue
+            at = arc_position(hem[0], np.array(x["height_line_mm"][1]))
+            bend = bend_deg(hem[0], at, w / 2 + clear)
+            if bend > limit and has_straight(hem[0], w / 2 + clear, limit):
+                corner.append(f"{x['piece']} ({bend:.0f}°)")
+        if corner:
+            problems.append("on a rounded corner: " + ", ".join(corner))
     detail = "; ".join(problems) or (
         f"{len(vents)} vents on {sum(1 for k in per if k)} of {len(sides)} sides, at the "
         + str(params["features.vent_align"])

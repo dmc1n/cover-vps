@@ -162,7 +162,10 @@ def _turn(ours: trimesh.Trimesh, theirs: trimesh.Trimesh) -> int:
     return best_deg
 
 
-def _fit(ours: trimesh.Trimesh, theirs: trimesh.Trimesh, rounds: int = 25) -> float:
+ICP_ROUNDS = 25  # param-ok: iterations of the fit
+
+
+def _fit(ours: trimesh.Trimesh, theirs: trimesh.Trimesh, rounds: int = ICP_ROUNDS) -> float:
     """ICP: the reference moved and turned (no scaling, no mirroring) onto the program's cover;
     only a small correction is kept (the placement on the ground is right already)."""
     import igl

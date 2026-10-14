@@ -4943,3 +4943,48 @@ audit and `scripts/fewer_check.py` (seam pairs 0.4 / 0.0 mm) and go live; C4, C8
 written sizes but fail the pieces check on the hip ends (as the live covers do, by more): to the
 owner. The rule changes the other isofit covers when rebuilt: C3, C9, C30, C31 (all approved; not
 swept live).
+
+## ADR-134 — No air vents on rounded corners; Rens's second-round remarks of 9 Oct on vents and smoothing
+
+Rens at the Desk, 9 October 2026 (round 2, processed 14 Oct; staging `out/rejections2/vents/`):
+on the Casto daybed "geen vents op afgeronde hoeken, verder prima hoes!"; on C27 "vents
+verdelen zoals eerder aangegeven op tekening"; on C26 "vents herpositioneren zoals aangegeven op
+de afbeelding"; on the Vado dining chair "deze hoes specifiek volgt de outline wel heel precies,
+mag meer gesmooth worden"; on the Pico bended 2-seater and the Pico corner "achterzijde iets
+minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
+
+- **The rule (ADR-055), for every cover:** `features.vent_on_corners: false`. The vents are placed
+  as before (ADR-101), then a vent whose bottom edge with `features.vent_seam_clearance_mm`
+  either side (a corner is kept clear like a seam) turns more than
+  `features.vent_corner_max_deg` (25: a curve tighter than about 1 m radius) in plan, its turns
+  added up, moves along its piece to the nearest straight stretch, clear of the piece's other
+  vents (`finish._off_corners`). The plan of each piece's bottom edge and the pieces at its two
+  ends come from panels.npz (`Walls.hems`); the flat bottom edge is matched to it by its end
+  seams (both ways round when they cannot tell). A piece that is round all along (a round
+  cover's strip, a chair's curved back) keeps its vents; places a person set
+  (`features.vent_positions`) are kept. The audit's vents check fails "on a rounded corner"
+  with the same measure (only where the piece has a straight stretch); test_finish.py
+  `test_no_vent_on_a_rounded_corner`, `test_a_round_wall_keeps_its_vents`; an AI lesson.
+- **C27:** the drawing draws its "10 Air Pocket" with ten arrows; Rens's marks of 8 Oct (circles
+  on four front walls and the left arm's end, crosses on the back) agree with them. Placed by
+  hand (`vent_positions`): two on the long left arm's outer wall (its side and its rounded end,
+  as the drawing's arrows and Rens's circles), one each on the left back, the back and the
+  four front walls Rens circled, two on the right arm's outer wall (its end and the back
+  corner). The two short front walls he did not mark (skirt-right-3, skirt-front-1) have none.
+- **C26:** Rens approved it on 14 Oct, after his remark of 9 Oct, with the same cut file (made
+  9 Oct 09:40): his approval stands, nothing changed.
+- **Vado:** `hull.plan_round_mm: 3000` in its cover.json (the closing that rounds bays): the
+  waisted sides and the front become gentle curves over the chair; 6 pieces instead of 7.
+  Only this cover ("deze hoes specifiek").
+- **Pico bended 2-seater and Pico corner: to Rens (Questions).** Their back in plan is already one
+  convex curve within 1–2 cm (closing the dents, or smoothing the outline and pushing it out
+  again where it would come too close, changed it by under 1 % or put ears on the corners), so
+  what "minder strak, één doorlopende curve" should change is not clear from the plan; a
+  question with the pictures. Not changed.
+- **Not swept live:** 19 of the 446 live covers have a vent (placed by the rule) on a rounded
+  corner today (read-only sweep, `out/rejections2/vents/corner_sweep.json`): S53, S60, D5, R3,
+  S37, S43, S44, S45, the Sato dining chair, Blocchi 2-seater moon right, Casto sofa bench,
+  Feroli chaise longue and corner, Fiora daybed, Pico corner, Pienza moonshape left, Vento
+  angled, Vento hocker, Vivaro L-part. They change when they are built again.
+- Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
+  constants, so the registry test tells them from the new default.
