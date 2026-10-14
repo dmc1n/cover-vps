@@ -9,6 +9,7 @@ then down to 38.1 cm at 99 cm from the back. The walls stand on the outline up t
 Pieces:
 - the top split along the profile's creases (the strip and the slope meet at a fold);
 - across, along the drawing's seam lines (at given distances along the back edge, square to it);
+  with `"strip_whole": true` they stop at the back strip, which stays one piece (S32);
 - the walls: the back wall and the front wall, cut at the same seam lines.
 
 Sizes in cm (as on the drawings), the surface in mm; z up.
@@ -199,8 +200,11 @@ def build(p: dict[str, Any], roll_mm: float = math.inf, wall_max_mm: float = 0.0
                 bands.append((a, g))
     pieces: list[Piece] = []
     k = 0
+    # `strip_whole`: the drawn seams stop at the back strip, the strip is one piece (Rens on S32,
+    # 9 Oct 2026: "the struck-through panels on the top one panel"); it is level, so flat
+    whole = bool(p.get("strip_whole"))
     for a, band in bands:
-        for part in _split(band, cut_lines):
+        for part in [band] if whole and a == 0 else _split(band, cut_lines):
             v, f = _tri_region(part, STEP_CM)
             z = zof(v)
             k += 1

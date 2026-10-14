@@ -323,6 +323,9 @@ def _end(p: dict[str, Any], side: str, st: Station, prof: np.ndarray) -> list[Pi
         out_dir = -out_dir
     if kind == "round":  # a half-round end: the top follows the cross-section, the wall round
         d = float(prof[-1, 0])
+        # `round_rim_cm`: the round wall at one height all round, the top falling to it from
+        # the cross-section at the end (a nose whose wall is as low as the front, S43)
+        rim = p.get("round_rim_cm")
         n = st.n / np.linalg.norm(st.n)
         centre = st.p + n * d / 2
         tops, walls = [], []
@@ -331,15 +334,16 @@ def _end(p: dict[str, Any], side: str, st: Station, prof: np.ndarray) -> list[Pi
             phi = math.pi * i / ROUND_STEPS
             off = d / 2 - d / 2 * math.cos(phi)
             z = float(np.interp(off, prof[:, 0], prof[:, 1]))
+            zr = z if rim is None else float(rim)
             q = centre - n * (d / 2) * math.cos(phi) + out_dir * (d / 2) * math.sin(phi)
             on_line = st.p + n * off
-            cur = (q, on_line, z)
+            cur = (q, on_line, z, zr)
             if prev is not None:
-                (q0, l0, z0), (q1, l1, z1) = prev, cur
-                tops.append([(*(l0 * MM), z0 * MM), (*(q0 * MM), z0 * MM),
-                             (*(q1 * MM), z1 * MM), (*(l1 * MM), z1 * MM)])  # fmt: skip
+                (q0, l0, z0, r0), (q1, l1, z1, r1) = prev, cur
+                tops.append([(*(l0 * MM), z0 * MM), (*(q0 * MM), r0 * MM),
+                             (*(q1 * MM), r1 * MM), (*(l1 * MM), z1 * MM)])  # fmt: skip
                 walls.append([(*(q0 * MM), 0.0), (*(q1 * MM), 0.0),
-                              (*(q1 * MM), z1 * MM), (*(q0 * MM), z0 * MM)])  # fmt: skip
+                              (*(q1 * MM), r1 * MM), (*(q0 * MM), r0 * MM)])  # fmt: skip
             prev = cur
         tops = [[(float(a), float(b), float(c)) for a, b, c in f] for f in tops]
         walls = [[(float(a), float(b), float(c)) for a, b, c in f] for f in walls]

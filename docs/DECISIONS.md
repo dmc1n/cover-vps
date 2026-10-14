@@ -4794,3 +4794,53 @@ icons on every menu item, tab, toolbar action and status chip, and the text redu
 Better, later: the Desk card's tabs as a segmented control on a phone; the glyphs as an SVG
 sprite if their number grows; a design-token export for the website (ADR-105) so both share
 the status colours.
+
+
+## ADR-131 — Rens's second round on pieces (9 Oct 2026): flat walls in one piece, a whole back strip, seams where he draws them
+
+Rens rejected eight covers on their pieces on 9 Oct 2026 (the remarks were processed on 14 Oct;
+staging out/rejections2/panels/, each built again, `cover audit` and `scripts/fewer_check.py`,
+a compare picture with his marked picture, looked at).
+
+- **D1, D2** ("doorgekruiste panelen reduceren tot één paneel"; the owner on D2: "some faces are
+  still split"): the front and back walls were cut at the 18 cm skirt line though each is one
+  plane, and the drawing's front view draws the front wall in one piece. The person-read shapes
+  (`testdata/drawing_shapes/drawing-d1/d2.json`) drop `skirt_cm`: the 18 cm seam stays on the
+  sides only, where the wall meets the leaning side strip. 11 → 9 pieces each; the slope stays
+  in two halves (222 and 186 cm across, wider than the roll both ways).
+- **S32** (strip struck through; "2 vents from the front to the sides"; "overall shape closer to
+  the drawing"): `plan_profile` takes `"strip_whole": true` — the drawn seams stop at the back
+  strip, as on the drawing, and the level strip is one piece (3.3 m by 42 cm, fits the roll).
+  Vents by hand (`features.vent_positions`): 2 front, 1 on each round end, 2 back, as the
+  drawing's 6 arrows. The overall shape: every written size matches (bottom 878.5 cm against
+  877.3, back 556.7 against 557.2, front 321.8 against 320.5, depth 98.3 against 99.1), so what
+  Rens means is asked (Questions).
+- **S43** ("shape and pieces exactly as on the drawing"): read again view by view. The side view
+  draws the back upright to 40.64 cm and then leaning in 9.4 cm to 88.01 cm (the dark band along
+  the back in the top view); the round nose is a piece of its own whose wall is 40.64 cm all
+  round, its top falling to it from the end of the strip and the slope; no seams across the strip
+  or the slope. Two swept options: `round_end_apart` (drawing_given: the round end is not joined
+  into the strip) and `round_rim_cm` (swept: the round wall at one height). 8 pieces as drawn:
+  back band, strip, slope, nose, end wall, front wall, nose wall, back wall; 0.0 % stretch.
+  S44 (S43 mirrored) still has the 8 Oct shape: the same change applies, not made.
+- **Lucia lounge chair, Feroli corner** (crossed panels one panel): the engine already joins
+  them (ADR-099/117, a 3 and a 10 degree fold); the live covers were built before. Rebuilt as
+  they are now: 7 → 6 pieces each.
+- **Aspen corner** ("a seam along the drawn line", back corner to front corner): the live box's
+  own faces given by hand (`box_shape.json`, ADR-117), the shape unchanged, the roof cut from
+  where the back chamfers meet, through the roof's kink, to the low front corner. 8 → 10 pieces.
+  The audit's gentle folds check now accepts pieces given by hand (that seam is in one plane).
+- **Avero corner** ("corners like this divided as the arrows show"): arrows from the high back
+  corner to both ends of the back and to the front corner. The Avero's ridge runs along one axis,
+  not the diagonal, so those seams cut across its faces and change the roof: asked (Questions),
+  not changed.
+
+**Rule and check (ADR-055).** A drawing cover's flat wall that the drawing draws in one piece is
+one piece: `cover audit` (gentle folds) now also looks at given covers' walls and fails two wall
+pieces in one plane (`seams.flat_split_max_deg`, 1 degree) that fit the roll together. The top's
+seams of a drawing cover are the drawing's own (ADR-097) and are not looked at. Swept over the
+live covers (read only): D1, D2 (fixed here) and **S18** (its front wall in two, not changed).
+Tests: test_facets.py, test_drawing_given.py; an AI lesson in config/ai_lessons.json. Not
+generalised (no clear rule from Rens yet): a level back strip split at the corners of C and L
+covers (about 35 live drawing covers have two strip pieces in one plane, which `strip_whole`
+or its like would join), and the corner layout of the Avero.

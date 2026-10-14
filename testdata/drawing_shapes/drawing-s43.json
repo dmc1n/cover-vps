@@ -13,10 +13,14 @@
   "profile": [
    [
     0,
+    40.64
+   ],
+   [
+    9.4,
     88.01
    ],
    [
-    33.07,
+    42.47,
     88.01
    ],
    [
@@ -24,15 +28,11 @@
     40.64
    ]
   ],
-  "seams_cm": [
-   55.4,
-   110.8,
-   166.2
-  ],
   "start_end": "square",
   "end_end": "round",
   "end_angle_deg": 0,
-  "skirt_cm": 40.64
+  "round_end_apart": true,
+  "round_rim_cm": 40.64
  },
- "read": "the live S43 shape (Rens: the shape right, the skirt not level): the back edge a 41.24 cm line and a 167.1 cm radius arc over 61.8 deg, the profile 88.01 cm back, a 33.07 cm strip, a slope to the 40.64 cm front 141.86 cm from the back, the round nose; now with a level skirt seam at the 40.64 cm front height all round (Rens's picture, the domain rule 13)."
+ "read": "S43 again from its own views (Rens, Desk 9 Oct 2026: 'shape and pieces exactly as on the drawing'): the back edge a 41.24 cm line and a 167.1 cm radius arc over 61.8 deg (as before); the side view's profile: the back wall upright to 40.64 cm, then leaning in 9.4 cm to 88.01 cm (the dark band along the back in the top view), a 33.07 cm strip, a slope to the 40.64 cm front 141.86 cm from the back bottom; the round nose its own piece (top and wall), as the top and 3D views draw it, its wall 40.64 cm all round (the side view) and its top falling to it from the end of the strip and the slope; no seams across the strip or the slope (the drawing draws none); every wall 40.64 cm high, so the seam round the cover is level at 40.64 cm."
 }

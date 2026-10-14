@@ -24,7 +24,10 @@ The kinds, sizes in cm, x along the back, y towards the front, z up:
 - "revolve": a round cover from a side view (`profile`: [[radius, height], ...] from the hem up
   to the top; `gores`: pieces round each band). A side view alone draws a round object (U2);
 - `skirt_cm` in the params of any kind: the walls cut at that height all round, a level skirt
-  seam (the domain rule 13; Rens on S43, the 18 cm line on D1 and D2);
+  seam (the domain rule 13; Rens on S43). A flat wall the drawing draws in one piece is not
+  cut: D1 and D2 give their 18 cm side walls as pieces of their own instead (Rens, 9 Oct 2026);
+- `round_end_apart` on a swept shape: its round end's top and wall are not joined to the rest
+  (S43's nose, as drawn);
 - "mirror": true on any kind mirrors it left to right (the drawings "24 & 24B are mirrored of
   each other", "S44 is S43 mirrored").
 """
@@ -83,7 +86,12 @@ def build(
     else:
         pieces = drawn.build(kind, p, roll_mm)
         if kind == "swept" and join is not None:
-            pieces = _joined(pieces, roll_mm, *join)
+            # `round_end_apart`: a round end's top and wall stay pieces of their own, as the
+            # drawing draws the nose (Rens on S43, 9 Oct 2026: "the pieces exactly as drawn");
+            # joined, the back strip ran on round the nose
+            apart = [q for q in pieces if p.get("round_end_apart") and "-round-" in q.name]
+            rest = [q for q in pieces if q not in apart]
+            pieces = _joined(rest, roll_mm, *join) + apart
     if p.get("skirt_cm"):
         pieces = level_skirt(pieces, float(p["skirt_cm"]) * MM, wall_max_mm)
     if spec.get("mirror"):

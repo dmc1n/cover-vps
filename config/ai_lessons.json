@@ -118,5 +118,15 @@
     "check": "engine/tests/test_given_creases.py::test_creases_only_for_organic_covers.",
     "applies_to": "given",
     "ai_model": "approver"
+  },
+  {
+    "time": 1791936000,
+    "model_id": "drawing-d1",
+    "complaint": "Crossed-out panels reduced to one panel (Rens, Desk 9 Oct 2026, D1 and D2; the owner: 'some faces are still split'): the front wall was cut at the 18 cm skirt line though it is one flat face on the drawing's front view.",
+    "cause": "skirt_cm in the person-read shape cut every upright wall at one height, also walls that run on in the same plane above the line.",
+    "rule": "A drawing cover's flat wall that the drawing draws in one piece is one piece; the level skirt seam only where the wall meets a face in another direction. The struck-through pieces of a level back strip are one piece when it fits the roll (S32, strip_whole).",
+    "check": "cover audit 'gentle folds' on given covers (seams.flat_split_max_deg); engine/tests/test_facets.py::test_the_audit_finds_a_flat_wall_split_on_a_drawing_cover, engine/tests/test_drawing_given.py::test_a_flat_wall_drawn_in_one_piece_is_one_piece.",
+    "applies_to": "given",
+    "ai_model": "approver"
   }
 ]

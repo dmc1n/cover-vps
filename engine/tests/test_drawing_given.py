@@ -61,8 +61,9 @@ def test_a_wide_hip_slope_is_cut_down_its_fall_line_for_the_roll() -> None:
 
 
 def test_a_level_skirt_cuts_every_wall_at_one_height() -> None:
-    """Rens on S43: "keep the skirt height level all round"; the domain rule 13."""
-    spec = json.loads((SHAPES / "drawing-s43.json").read_text())
+    """Rens on S43 (8 Oct): "keep the skirt height level all round"; the domain rule 13. S44 (the
+    mirror of S43's 8 Oct shape) still reads its skirt this way."""
+    spec = json.loads((SHAPES / "drawing-s44.json").read_text())
     pieces = dg.build(spec, ROLL, 3000.0, (3.0, 1.0))
     skirt = [p for p in pieces if p.name.startswith("skirt-")]
     assert len(skirt) >= 2  # a closed band needs a seam
@@ -90,9 +91,52 @@ def test_a_twisted_four_cornered_face_is_a_ruled_patch() -> None:
     """D1's sides lean in 22 cm along the whole length while the top falls from 82 to 40 cm."""
     spec = json.loads((SHAPES / "drawing-d1.json").read_text())
     pieces = dg.build(spec, ROLL, 3000.0)
-    assert len(pieces) == 11
+    assert len(pieces) == 9
     side = next(p for p in pieces if p.name == "side-left")
     assert len(side.faces) > 2  # the twisted half is many small flat faces
+
+
+@pytest.mark.parametrize("code", ["d1", "d2"])
+def test_a_flat_wall_drawn_in_one_piece_is_one_piece(code: str) -> None:
+    """Rens, Desk 9 Oct 2026, D1 and D2: "crossed-out panels reduced to one panel": the front
+    wall is one flat face from the hem to the top on the drawing's front view, so no level skirt
+    seam across it; the 18 cm seam stays on the sides, where the wall meets the leaning strip."""
+    spec = json.loads((SHAPES / f"drawing-{code}.json").read_text())
+    assert "skirt_cm" not in spec["params"]
+    pieces = dg.build(spec, ROLL, 3000.0)
+    for name in ("wall-front", "wall-back"):
+        v = _pts(pieces, name)
+        assert v[:, 2].min() == pytest.approx(0.0) and v[:, 2].max() >= 400.0 - 1e-6
+        assert np.ptp(v[:, 1]) < 1e-6  # one plane
+    assert _pts(pieces, "wall-left")[:, 2].max() == pytest.approx(180.0)
+
+
+def test_s43_nose_and_lean_as_drawn() -> None:
+    """Rens, Desk 9 Oct 2026, S43: "shape and pieces exactly as on the drawing": the back leans
+    in from 40.64 to 88.01 cm, the round nose is its own top and wall, and its wall is level
+    with the front (40.64 cm) all round."""
+    spec = json.loads((SHAPES / "drawing-s43.json").read_text())
+    pieces = dg.build(spec, ROLL, 3000.0, (3.0, 1.0))
+    names = [p.name for p in pieces]
+    assert "end-round-top" in names and "end-round-wall" in names
+    wall = _pts(pieces, "end-round-wall")
+    assert wall[:, 2].max() == pytest.approx(406.4, abs=0.1)
+    back = [p for p in pieces if p.name.startswith("back")]
+    assert back and max(
+        np.array([q for f in p.faces for q in f])[:, 2].max() for p in back
+    ) == pytest.approx(406.4, abs=0.1)
+    assert 6 <= len(pieces) <= 9
+
+
+def test_s32_back_strip_is_one_piece() -> None:
+    """Rens, Desk 9 Oct 2026, S32: the struck-through strip pieces one panel (`strip_whole`)."""
+    spec = json.loads((SHAPES / "drawing-s32.json").read_text())
+    whole = dg.build(spec, ROLL, 3000.0)
+    cut = dg.build({**spec, "params": {**spec["params"], "strip_whole": False}}, ROLL, 3000.0)
+    strip = lambda ps: [p for p in ps if p.name.startswith("top-")]  # noqa: E731
+    assert len(strip(cut)) - len(strip(whole)) == 3  # four strip pieces became one
+    z = np.vstack([np.array([q for f in p.faces for q in f]) for p in strip(whole)])
+    assert z[:, 2].max() == pytest.approx(863.6, abs=0.1)
 
 
 def test_every_shape_read_by_a_person_builds_and_fits_the_roll() -> None:
