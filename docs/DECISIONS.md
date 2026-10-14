@@ -4988,3 +4988,34 @@ minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
   angled, Vento hocker, Vivaro L-part. They change when they are built again.
 - Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
   constants, so the registry test tells them from the new default.
+
+## ADR-136 — The Questions answered 11–14 Oct 2026, processed (QUESTIONS 27–101)
+
+Twenty-four questions in Work → Questions (ADR-109) were answered but never processed. Each
+answer below is what was done with it; the Dutch note on the question says the same.
+
+- **BBQ covers with side tables (QUESTIONS 81, owner 12 Oct):** "one vent fewer on that side,
+  the rest by the rule". `features.vent_short_piece_ok` (default false; on in
+  `config/presets/bbq.yaml`): a piece whose bottom edge is too short for a vent plus a seam
+  allowance each side has none, and that is no warning (elsewhere it still warns "check").
+  Test `test_a_too_short_piece_may_simply_go_without_a_vent`; an AI lesson. The Kamado Joe
+  Classic III on cart, Monolith Classic with TWO.55 tables and The Bastard Large Complete
+  (each a 24–25 cm strip beside the front) were rebuilt in staging, pass the audit and the
+  re-measure, five vents each; the BGE Large with EGG Mates' problem is a scrap piece at a 3°
+  fold, not a vent, and stays out.
+- **Pico bended 2-seater and Pico corner (QUESTIONS 101, Rens 14 Oct):** "the back wall plus
+  the two back corners as one roomy arc from above, a few cm looser round the cushions, no
+  kink at the corners". `hull.plan_back_arc` (per model, default off) with
+  `plan_back_ease_mm` 30, `plan_back_round_mm` 150 and `plan_back_taper_mm` 400 (to confirm):
+  behind the plan's widest points the follow outline is filled out to its convex hull, grown
+  by the ease, its corners rounded where that stays outside the plan, the side walls leaning
+  out over the taper so there is no step; never smaller than the plan. `outline.back_arc`,
+  test `test_the_back_is_one_roomy_arc_on_request`; an AI lesson. Per model on request, so no
+  sweep: no other cover's plan changes.
+- **B2B terms (QUESTIONS 44–53, owner 11 Oct):** the payment term is 14 days
+  (`b2b.DEFAULTS["payment_days"]`, the studio's B2B terms form; no stored setting on live, so
+  the release carries it); everyone with a login may order (as built); no minimum order (as
+  built); dealers may order made-to-measure (the B2B configurator, as built) and "straight
+  into production" is the click of ADR-128 (QUESTIONS 86, 12 Oct, the later answer); fixed
+  prices per dealer (as built, per company in Shop → B2B customers; Sunsit's prices are the
+  owner's to enter); later online payment by Stripe (QUESTIONS 52).

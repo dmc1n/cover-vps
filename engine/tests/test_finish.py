@@ -7,6 +7,7 @@ import shapely
 from coverengine.export.cut import roll_length, write_export
 from coverengine.finish.finish import Piece, finish, finished_set, place_vents, vent_count
 from coverengine.params import Registry
+from coverengine.params.registry import load_yaml_layer, presets_dir
 
 FINISH = {
     "construction.method": "double_stitch",
@@ -234,6 +235,21 @@ def test_a_vent_on_a_too_short_piece_moves_to_a_roomy_one() -> None:
     vents, warnings = place_vents(d["panels"], params(**{"features.vents_total": 2}))
     assert len(vents["skirt-front-2"]) == 2 and "skirt-front-1" not in vents
     assert any("a vent needs 28 cm" in w for w in warnings)
+
+
+def test_a_too_short_piece_may_simply_go_without_a_vent() -> None:
+    """Owner, 12 Oct 2026 (QUESTIONS 81): on a BBQ cover with side tables the 25 cm strip beside
+    the front has no room for a vent; that side has one vent fewer and it is no warning."""
+    d = doc(wall("skirt-front-1", 1000, 400), wall("skirt-front-2", 250, 400),
+            wall("skirt-front-3", 1000, 400))  # fmt: skip
+    warned = place_vents(d["panels"], params())
+    accepted = place_vents(d["panels"], params(**{"features.vent_short_piece_ok": True}))
+    assert any("a vent needs 28 cm" in w for w in warned[1])
+    assert not accepted[1] and "skirt-front-2" not in accepted[0]
+    assert {k: len(v) for k, v in accepted[0].items()} == {k: len(v) for k, v in warned[0].items()}
+    bbq = load_yaml_layer(presets_dir() / "bbq.yaml")
+    assert Registry.load().resolve(preset=bbq)["features.vent_short_piece_ok"] is True
+    assert params()["features.vent_short_piece_ok"] is False
 
 
 def test_vents_go_round_every_side_first_in_the_middle_of_each_piece() -> None:

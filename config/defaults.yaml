@@ -55,6 +55,15 @@ hull:                            # the cover surface (drape hull)
   plan_round_mm: 500             # follow: bays and inner corners of the outline narrower than twice
                                  # this are rounded to this radius, so the seams along it are smooth
                                  # lines (rule 13; at least seams.min_weld_radius_mm)
+  plan_back_arc: false           # follow: the back wall and the two back corners as one roomy arc
+                                 # seen from above, a few cm looser round the cushions, no kink at
+                                 # the corners (Rens, 14 Oct 2026, QUESTIONS 101, the Pico sofas;
+                                 # per model). Behind the plan's widest points it is filled out to
+                                 # its convex hull, grown and rounded; never smaller
+  plan_back_ease_mm: 30          # to confirm: how much looser the back is ("een paar cm")
+  plan_back_round_mm: 150        # to confirm: the back corners rounded towards this radius where that
+                                 # stays outside the plan (seams.min_weld_radius_mm)
+  plan_back_taper_mm: 400        # the side walls lean out over this length to meet the wider back
   round_top_pieces: 0            # a round top in this many equal sectors; 0 = the fewest that fit
                                  # the roll (at least 2: a cone is not a flat disc)
   support: none                  # none | balloons | balloon | frame   support under the cover
@@ -218,7 +227,12 @@ features:                        # per-cover defaults, overridden per model
                                  # is no corner (to confirm)
   vent_seam_clearance_mm: 100    # to confirm; a vent keeps this far from a vertical seam; a short
                                  # side gets its vent centred, closer (owner: it must have one)
-  vent_hood_depth_mm: 80         # to confirm; the hood piece is this much deeper than the vent
+  vent_short_piece_ok: false     # a piece whose bottom edge is too short for a vent (shorter than
+                                 # the vent plus a seam allowance each side): false warns ("check");
+                                 # true: that piece simply has none, its side one vent fewer, the
+                                 # rest by the rule (owner, 12 Oct 2026, QUESTIONS 81: the BBQ
+                                 # covers' narrow strip beside the side tables; on in presets/bbq)
+  vent_hood_depth_mm: 80        # to confirm; the hood piece is this much deeper than the vent
   handles: 0
 
 fabric:

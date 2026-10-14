@@ -60,10 +60,10 @@ from coverapi.match_list import STOCK_MODEL
 
 SETTING = "b2b"
 DEFAULTS: dict[str, Any] = {
-    "online_payment": False,  # later: Mollie for B2B too; now every order is on account
-    "min_order_eur": 0,  # ex VAT; 0: no minimum (to confirm, QUESTIONS 72)
+    "online_payment": False,  # later: Stripe (owner, QUESTIONS 52); now all on account
+    "min_order_eur": 0,  # ex VAT; 0: no minimum (owner, 11 Oct 2026, QUESTIONS 46)
     "shipping_eur": 0,  # ex VAT per order on top; 0: shipping is in the price list's extras
-    "payment_days": 30,  # the invoice's term, shown in the confirmation (to confirm)
+    "payment_days": 14,  # the invoice term in the confirmation (owner, 11 Oct, QUESTIONS 44)
     # no "auto_produce" since ADR-128: a line goes to production only by a click in the studio
 }
 COOKIE = "b2b_session"

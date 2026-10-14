@@ -736,7 +736,7 @@ const B2B_DEFAULTS: B2BSettings = {
   online_payment: false,
   min_order_eur: 0,
   shipping_eur: 0,
-  payment_days: 30,
+  payment_days: 14,
 };
 
 /** The B2B terms (was a card on Admin → B2B customers): same API, PUT /api/admin/b2b/settings. */
