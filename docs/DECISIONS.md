@@ -4989,7 +4989,6 @@ minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
 - Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
   constants, so the registry test tells them from the new default.
 
-<<<<<<< HEAD
 ## ADR-136 — The Questions answered 11–14 Oct 2026, processed (QUESTIONS 27–101)
 
 Twenty-four questions in Work → Questions (ADR-109) were answered but never processed. Each
@@ -5070,7 +5069,7 @@ answer below is what was done with it; the Dutch note on the question says the s
   1480). Not changed: it decides which pieces fit the roll, and CLAUDE.md's "roll width
   1500 mm" says otherwise; the owner confirms first. Today no live cover has a piece between
   1440 and 1500 mm wide, so the change would only matter for covers built afterwards.
-=======
+
 ## ADR-137 — Sizes are measured from the cover's own lower edge; Rens's third round on C4, C8, C10 and the Nardo pair
 
 Rens at the Desk, 14 Oct 2026 (round 3, after ADR-133 made the plan sizes exact): C4, C8, C10
@@ -5107,4 +5106,3 @@ independently, by Codex.
   sqrt(35²+55²+60²); 225 = the back's top edge). `faces`, 10 pieces, 0.0 % stretch, vents by hand
   in the middle of the front wall and the arm end (2 per cover). Whether the second cover's long
   vent goes on its back as drawn: question #102.
->>>>>>> worktree-agent-aee32057a799ca98f
