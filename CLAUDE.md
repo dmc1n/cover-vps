@@ -269,6 +269,7 @@ uv run python scripts/film/veo.py photo URL --name N | frame NAME | submit SHOT 
                                              puts our cover on (end frame), Veo 3.1 Fast moves it; ledger, cap, sources.json
                                              (ADR-127, scripts/film/veo_shots.json, docs/plans/veo-shots.md; key GEMINI_API_KEY)
 uv run python scripts/film/story_frames.py OUT --name storyN --chapters DIR | --base SET --replace DIR   the story's WEBP sets (ADR-121)
+uv run python scripts/film/og_image.py apps/web/public/brand/og-shop.png   the shop's share picture from the film's still (ADR-136)
 make e2e        the web app flow in a real browser (Playwright in Docker)
 apps/web/e2e/memory3d.py URL                20 covers' 3D views in a row: every WebGL renderer let go, the heap flat (ADR-129)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
@@ -296,6 +297,9 @@ Settings → Publish & versions → Import     a price list as fixed prices, int
 COVER_DATA_DIR=~/cover-data uv run python scripts/prices_import.py FILE [--channel b2c] [--incl-vat|--ex-vat] [--json OUT] [--apply]
                                              the same matching report; --apply writes the draft, never publishes (ADR-113)
 apps/web/e2e/priceimport.py                 the import in a real browser (sample: e2e/priceimport_sheet.py; usage in its docstring)
+apps/api/coverapi/shipping.py              a consumer order's delivery: the carrier's rate by weight and box (`shipping.*`;
+                                             DHL once its keys are in deploy/.env), else the country's fixed amount
+                                             (ADR-136, docs/plans/shipping-carrier.md; payments: docs/plans/payments-stripe.md)
 <website>/b2b, Shop → B2B customers         the B2B shop: business logins, own prices ex VAT, orders on account with atomic checkout, retry keys and restart dispatch recovery (ADR-104)
 apps/web/e2e/b2b.py                         the B2B shop in a real browser (ADR-104; usage in its docstring)
 apps/web/e2e/measure.py                     Measure, Vent sizes, the check list and measured fits in a real browser (ADR-111)

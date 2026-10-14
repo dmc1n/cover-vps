@@ -31,13 +31,15 @@ Shop → **B2B customers**, click a company in the list:
   on the cover's own Price & shop tab, holds for every company on that list. The cover's tab
   also lists the companies with a price of their own for it.)
 - **VAT reverse-charged:** no VAT on its orders (an EU company outside NL with a valid VAT
-  number; check with the accountant).
+  number).
 - **Block (logs everyone out):** nobody of that company can log in or reset a password;
   *Unblock* opens it again.
 - **People who log in:** add someone (they get an invitation), send a new password link,
   switch a person off.
 - **Delivery addresses:** the company manages them itself in the shop; you see them here.
 - **Orders:** its B2B orders, with every line's status.
+
+VAT numbers are checked automatically in VIES when an admin creates a company or changes its VAT number or country; only a valid EU company outside NL gets reverse charge automatically. The last result, date and registered name appear beside the VAT number; **Check VIES** checks again, and an outage records the error while keeping the current VAT treatment. Changing the reverse-charge checkbox explicitly overrides the automatic result for that save and is recorded in the audit log; checkout never calls VIES.
 
 ## Orders
 

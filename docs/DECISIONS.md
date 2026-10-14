@@ -4989,6 +4989,87 @@ minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
 - Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
   constants, so the registry test tells them from the new default.
 
+## ADR-136 — The Questions answered 11–14 Oct 2026, processed (QUESTIONS 27–101)
+
+Twenty-four questions in Work → Questions (ADR-109) were answered but never processed. Each
+answer below is what was done with it; the Dutch note on the question says the same.
+
+- **BBQ covers with side tables (QUESTIONS 81, owner 12 Oct):** "one vent fewer on that side,
+  the rest by the rule". `features.vent_short_piece_ok` (default false; on in
+  `config/presets/bbq.yaml`): a piece whose bottom edge is too short for a vent plus a seam
+  allowance each side has none, and that is no warning (elsewhere it still warns "check").
+  Test `test_a_too_short_piece_may_simply_go_without_a_vent`; an AI lesson. The Kamado Joe
+  Classic III on cart, Monolith Classic with TWO.55 tables and The Bastard Large Complete
+  (each a 24–25 cm strip beside the front) were rebuilt in staging, pass the audit and the
+  re-measure, five vents each; the BGE Large with EGG Mates' problem is a scrap piece at a 3°
+  fold, not a vent, and stays out.
+- **Pico bended 2-seater and Pico corner (QUESTIONS 101, Rens 14 Oct):** "the back wall plus
+  the two back corners as one roomy arc from above, a few cm looser round the cushions, no
+  kink at the corners". `hull.plan_back_arc` (per model, default off) with
+  `plan_back_ease_mm` 30, `plan_back_round_mm` 150 and `plan_back_taper_mm` 400 (to confirm):
+  behind the plan's widest points the follow outline is filled out to its convex hull, grown
+  by the ease, its corners rounded where that stays outside the plan, the side walls leaning
+  out over the taper so there is no step; never smaller than the plan. `outline.back_arc`,
+  test `test_the_back_is_one_roomy_arc_on_request`; an AI lesson. Per model on request, so no
+  sweep: no other cover's plan changes.
+- **B2B terms (QUESTIONS 44–53, owner 11 Oct):** the payment term is 14 days
+  (`b2b.DEFAULTS["payment_days"]`, the studio's B2B terms form; no stored setting on live, so
+  the release carries it); everyone with a login may order (as built); no minimum order (as
+  built); dealers may order made-to-measure (the B2B configurator, as built) and "straight
+  into production" is the click of ADR-128 (QUESTIONS 86, 12 Oct, the later answer); fixed
+  prices per dealer (as built, per company in Shop → B2B customers; Sunsit's prices are the
+  owner's to enter); later online payment by Stripe (QUESTIONS 52).
+- **Delivery cost (QUESTIONS 28/29, owner 11 Oct):** "a link with the carrier (DHL), the cost
+  from weight and box". `coverapi/shipping.py`: a carrier interface with the fixed amount per
+  country (Shop settings → shipping) as the fallback; the parcel from the cover's cut fabric
+  (`shipping.fabric_g_per_m2`, `pack_g`, `folded_l_per_m2`, `boxes_cm`, all to confirm);
+  `shipping.carrier: fixed | dhl`. DHL gives no rate until the owner's account keys are in
+  deploy/.env, so nothing changes for orders today. The order records where its delivery cost
+  came from. Plan and the owner's steps (the account, the fixed amounts, the € 18.50 cost line
+  in the price set): docs/plans/shipping-carrier.md. Tests: apps/api/tests/test_shipping.py.
+- **Stripe or Mollie (QUESTIONS 30, 31, 52):** compared in docs/plans/payments-stripe.md
+  (Codex, public price pages of 14 Oct). Advice: Stripe for the consumer shop and dealers
+  later, behind a small provider interface that keeps Mollie's code; nothing is live with
+  Mollie, so there is nothing to migrate. Not built yet: it needs the owner's Stripe account
+  and test keys (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`).
+- **Turnstile (QUESTIONS 32, owner 11 Oct: "yes, I make the keys"):** built by Codex,
+  reviewed: `shop.turnstile_ok` verifies a token at Cloudflare only when
+  `TURNSTILE_SECRET_KEY` is set (environment or deploy/.env, `security.env_value`); then no
+  token, a refusal or no answer is "please try again". It guards the order, the "ask us"
+  match form (an e-mail given; the configurator's own automatic look-up stays free) and the
+  photo/link suggestion. A token works once, so a retry of the same checkout (its
+  idempotency key, ADR-129) is not asked again. The page shows the widget ("interaction-only")
+  only when `TURNSTILE_SITE_KEY` is set; the Worker's CSP and the studio's CSP for /shop/
+  allow https://challenges.cloudflare.com. The honeypot and the limits stay. Without keys
+  nothing changes. The owner's steps: docs/handbook/webshop.md.
+- **VIES (QUESTIONS 50, owner 11 Oct):** built by Codex, reviewed: `coverapi/vies.py` asks
+  the EU's VIES REST API when an admin adds a company or changes its VAT number or country,
+  and with "Check VIES" on the company; the result is kept on the company (`vies`). Reverse
+  charge then follows the rule (an EU country other than NL and a valid number); a change of
+  the switch in the same save overrides it and is noted; VIES unreachable leaves the switch
+  as it was and records the error. The checkout never calls VIES. Tests: test_vies.py.
+- **Cooling-off (QUESTIONS 27):** 14 days for a cover from our range, none for made-to-measure:
+  already so in the checkout's checkbox and the terms and returns pages (ADR-103). No change.
+- **Share picture (QUESTIONS 34):** `/brand/og-shop.png` is now a still of our own film (the
+  Kota 2-seater, ADR-108) with "Hoezen op maat. Made to measure.", made by
+  `scripts/film/og_image.py`. Live with the next release (the setting `og_image` stays empty).
+- **Balloons and frame (QUESTIONS 42):** always sold separately, as now. No change.
+- **The film's setting (QUESTIONS 54):** the owner is already making a film in an Ibiza setting;
+  the terrace film stays until then. No change here.
+- **Drawcord (QUESTIONS 65):** pulled tight: already `drape.hem: held` (4 Oct); the comment says
+  it is confirmed.
+- **A measured size is good within 0.5 cm (QUESTIONS 70):** `tolerance.cover_mm` 5, confirmed.
+- **S45 (QUESTIONS 79, Rens 13 Oct):** 358.4 cm round (141.1 in), as now. No rebuild.
+- **Defaults in Settings (QUESTIONS 93, Rens 14 Oct):** none editable, stay read-only.
+- **S32 (QUESTIONS 100, Rens 14 Oct):** "good as it is, with the strip and the vents changed";
+  the vents agent owns S32's rebuild; nothing done here.
+- **Usable roll width (QUESTIONS 64, owner 11 Oct: "b) 150 cm"):** the question read "Coverlast
+  is 152 cm wide; the program uses 148 usable. Is it 148, or 150 of the 152?", so the answer
+  most likely means `roll.width_mm` 1520 and `roll.usable_width_mm` 1500 (today 1500 and
+  1480). Not changed: it decides which pieces fit the roll, and CLAUDE.md's "roll width
+  1500 mm" says otherwise; the owner confirms first. Today no live cover has a piece between
+  1440 and 1500 mm wide, so the change would only matter for covers built afterwards.
+
 ## ADR-135 — Every Desk action says how it went; a second approval is refused; "Waiting for us"
 
 14 Oct 2026, v2.0.0: the owner reported that **Approve** on the Desk "seems to do nothing".
