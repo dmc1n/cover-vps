@@ -3,7 +3,6 @@
 import io
 import json
 import re
-import secrets
 import sqlite3
 import threading
 from pathlib import Path
@@ -11,7 +10,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import pytest
-from coverapi import agent_api, bodylimit, shop, shop_suggest
+from coverapi import bodylimit, shop, shop_suggest
 from coverapi.main import create_app
 from coverengine.params import Registry
 from fastapi.testclient import TestClient
@@ -110,15 +109,11 @@ def _admin(app: Any) -> TestClient:
 
 
 def _key(admin: TestClient, company: int | None = None) -> dict[str, Any]:
-    # Seed a valid stored key so the broken creation endpoint cannot hide caller-scoping bugs.
-    key = "cvk_" + secrets.token_urlsafe(32)
-    with sqlite3.connect(admin.app.state.auth.path) as db:
-        cur = db.execute(
-            "INSERT INTO agent_keys (name, hash, shown, created, company_id) "
-            "VALUES (?, ?, ?, ?, ?)",
-            ("partner", agent_api.hash_key(key), key[:8] + "…", agent_api.time.time(), company),
-        )
-    return {"id": cur.lastrowid, "name": "partner", "key": key}
+    """A partner key made as the admin does (Settings → Website & API keys)."""
+    r = admin.post("/api/admin/agent-api/keys", json={"name": "partner", "company_id": company})
+    assert r.status_code == 200, r.text
+    out: dict[str, Any] = r.json()
+    return out
 
 
 def _ok(response: Any) -> Any:
@@ -614,3 +609,46 @@ def test_preview_urls_stay_on_preview(factory: Any) -> None:
     assert _ok(c.get(f"/api/v2/covers/{CODE}", headers=headers))["page_url"].startswith(
         "https://preview.s2dio.living/"
     )
+
+
+def test_parallel_recognitions_cannot_pass_the_daily_slot(
+    limited: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Codex's review: two recognitions at the same moment with one slot left start one paid
+    call only (one at a time per key; the slot is taken before any await)."""
+    import asyncio
+
+    import httpx
+
+    admin = _admin(limited)
+    key = _key(admin)
+    calls: list[Any] = []
+
+    async def slow(*args: Any, **kwargs: Any) -> Any:
+        calls.append(args)
+        await asyncio.sleep(0.3)
+        return {"product": "sofa", "sizes": SIZES, "check": [], "summary": "", "recognised": None,
+                "comparable": None, "match": None}  # fmt: skip
+
+    monkeypatch.setattr(shop_suggest, "run_suggestion", slow)
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8), "red").save(buf, "PNG")
+
+    photo = {"photos": ("s.png", buf.getvalue(), "image/png")}
+    head = {"x-api-key": key["key"]}
+
+    async def three() -> list[int]:
+        transport = httpx.ASGITransport(app=limited)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+
+            async def one() -> int:
+                r = await c.post("/api/v2/suggest", headers=head, files=photo)
+                return r.status_code
+
+            return list(await asyncio.gather(one(), one(), one()))
+
+    assert sorted(asyncio.run(three())) == [200, 429, 429] and len(calls) == 1
+    c = TestClient(limited)
+    _ok(c.post("/api/v2/suggest", headers=head, files=photo))  # the second of 2 daily slots
+    _error(c.post("/api/v2/suggest", headers=head, files=photo), 429, "daily_limit")
+    assert len(calls) == 2

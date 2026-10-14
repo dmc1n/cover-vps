@@ -5052,7 +5052,10 @@ on the preview only**. Plan: docs/plans/agent-access.md; handbook: docs/handbook
   suggestion (`shop_suggest.run_suggestion`, moved out of the shop's route so both share it)
   with every paid call on the key's own ledger line (`spend.for_visitor("agent:key:<id>")`):
   at most `agent_key_photos_per_day` (20) a day and `agent_key_eur_day` (€1) of AI a day per
-  key; the month's budget (ADR-078) still stops everything. Anonymous: 401 `key_needed`, and
+  key; the month's budget (ADR-078) still stops everything. Codex's adversarial review found
+  that parallel requests could all pass the same checks: now one recognition runs at a time
+  per key (a second gets 429 `busy`, so the euro check sees every earlier call's cost) and the
+  day's slot is taken in one SQLite write transaction before any await. Anonymous: 401 `key_needed`, and
   `product_url` in a match is read as text only, never fetched. Its route has the shop's photo
   body limit (bodylimit and the Caddyfile).
 - **A person always pays.** `order_url` opens the configurator with the product, the sizes,

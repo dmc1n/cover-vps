@@ -422,6 +422,26 @@ class Usage:
             if len(self.totals) > 5000:  # noqa: PLR2004 - forget the days gone by
                 self.totals = {k: v for k, v in self.totals.items() if k[0] == day}
 
+    def reserve(self, who: str, endpoint: str, limit: int) -> bool:
+        """Take one of today's `limit` slots for this caller and endpoint, atomically (one
+        SQLite write transaction): False when none is left. Taken before any paid work starts."""
+        day = _day()
+        with self.lock, self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT count FROM agent_usage WHERE day=? AND who=? AND endpoint=?",
+                (day, who, endpoint),
+            ).fetchone()
+            if (int(row[0]) if row else 0) >= limit:
+                return False
+            db.execute(
+                "INSERT INTO agent_usage (day, who, endpoint, count) VALUES (?, ?, ?, 1) "
+                "ON CONFLICT(day, who, endpoint) DO UPDATE SET count = count + 1",
+                (day, who, endpoint),
+            )
+            self.totals[(day, who)] = self.totals.get((day, who), 0) + 1
+        return True
+
     def endpoint_today(self, who: str, endpoint: str) -> int:
         with self._db() as db:
             row = db.execute(
@@ -575,6 +595,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> FastAPI:  # noqa
     from coverapi.ratelimit import GlobalCap
 
     agent_cap = GlobalCap()
+    recognising: set[str] = set()  # callers whose photo recognition is running (one each)
     app.state.agent_usage = usage
 
     sub = FastAPI(
@@ -1520,14 +1541,18 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> FastAPI:  # noqa
             raise ApiError(
                 400, "invalid_field", f"at most {shop_suggest.MAX_PHOTOS} photos", "", "photos"
             )
-        if usage.endpoint_today(c.who, "AI suggest") >= int(p["limits.agent_key_photos_per_day"]):
+        # one recognition at a time per caller (the euro check below then sees every earlier
+        # call's cost in the ledger), and today's slot taken atomically before any await, so
+        # parallel requests cannot pass the same check (Codex's review)
+        if c.who in recognising:
             raise ApiError(
                 429,
-                "daily_limit",
-                "this key's recognitions of today are used up",
-                "Try again tomorrow, or give the sizes yourself (POST /match).",
-                headers={"Retry-After": str(int(86400 - time.time() % 86400) + 1)},
+                "busy",
+                "this key's previous recognition is still running",
+                "Wait for its answer, then ask again.",
+                headers={"Retry-After": "30"},
             )
+        tomorrow = {"Retry-After": str(int(86400 - time.time() % 86400) + 1)}
         who = f"agent:{c.who}"
         if spend.visitor_eur(who) >= float(p["limits.agent_key_eur_day"]):
             raise ApiError(
@@ -1535,14 +1560,25 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> FastAPI:  # noqa
                 "daily_limit",
                 "this key's AI budget of today is used up",
                 "Try again tomorrow, or give the sizes yourself (POST /match).",
-                headers={"Retry-After": str(int(86400 - time.time() % 86400) + 1)},
+                headers=tomorrow,
             )
+        if not usage.reserve(c.who, "AI suggest", int(p["limits.agent_key_photos_per_day"])):
+            raise ApiError(
+                429,
+                "daily_limit",
+                "this key's recognitions of today are used up",
+                "Try again tomorrow, or give the sizes yourself (POST /match).",
+                headers=tomorrow,
+            )
+        recognising.add(c.who)
         try:
-            pngs = await shop_suggest.read_photos(p, photos)
-        except shop_suggest.SuggestError as exc:
-            raise ApiError(400, "invalid_field", str(exc), "", "photos") from None
-        usage.count(_day(), c.who, "AI suggest")  # counted before the paid call is made
-        out = await shop_suggest.run_suggestion(p, pngs, url, lang, who, store.models, data)
+            try:
+                pngs = await shop_suggest.read_photos(p, photos)
+            except shop_suggest.SuggestError as exc:
+                raise ApiError(400, "invalid_field", str(exc), "", "photos") from None
+            out = await shop_suggest.run_suggestion(p, pngs, url, lang, who, store.models, data)
+        finally:
+            recognising.discard(c.who)
         product = out["product"]
         kinds = kinds_of_product(product)
         spec = kinds_doc()["kinds"][kinds[0]]
