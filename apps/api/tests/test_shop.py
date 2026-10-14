@@ -556,3 +556,116 @@ def test_the_barbecues_stay_off_the_live_shop_until_turned_on(app: Any) -> None:
     admin.put("/api/admin/shop/settings", json={"bbq_enabled": True})
     assert c.post("/api/shop/quote", json={"product": "bbq_gas"}).status_code == 200
     assert "bbq_gas" in c.get("/api/shop/info").json()["options"]["products"]
+
+
+@pytest.mark.parametrize("configured,success", [(False, False), (True, False), (True, True)])
+def test_shop_turnstile(
+    app: Any, monkeypatch: pytest.MonkeyPatch, configured: bool, success: bool
+) -> None:
+    import io
+    from urllib.parse import parse_qs
+
+    from coverapi import shop
+
+    monkeypatch.delenv("TURNSTILE_SECRET_KEY", raising=False)
+    if configured:
+        monkeypatch.setenv("TURNSTILE_SECRET_KEY", "test-secret")
+    monkeypatch.setenv("TURNSTILE_SITE_KEY", "public-key")
+    calls = []
+
+    def verify(req: Any, timeout: int) -> Any:
+        assert timeout == 5
+        assert req.full_url == "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+        fields = parse_qs(req.data.decode())
+        assert fields["response"] == ["test-token"]
+        assert "remoteip" in fields
+        calls.append(True)
+        return io.BytesIO(json.dumps({"success": success}).encode())
+
+    monkeypatch.setattr(shop.urllib.request, "urlopen", verify)
+    c = TestClient(app)
+    settings = c.get("/api/shop/info").json()["settings"]
+    assert settings["turnstile_site_key"] == "public-key"
+    assert "test-secret" not in json.dumps(settings)
+    monkeypatch.delenv("TURNSTILE_SITE_KEY")
+    assert c.get("/api/shop/info").json()["settings"]["turnstile_site_key"] == ""
+    q = c.post("/api/shop/quote", json={"product": "item", "sizes": {"length_cm": 60}}).json()
+    order = {
+        "quote_id": q["id"],
+        "name": "Anna",
+        "email": "anna@example.com",
+        "street": "Street 1",
+        "postcode": "1234 AB",
+        "city": "Utrecht",
+        "country": "NL",
+        "terms": True,
+        "turnstile": "test-token",
+    }
+    match = {"product": "item", "sizes": {}, "email": "anna@example.com", "turnstile": "test-token"}
+    for endpoint, body in [("order", order), ("match", match)]:
+        r = c.post(f"/api/shop/{endpoint}", json=body)
+        assert r.status_code == (400 if configured and not success else 200), r.text
+        if configured and not success:
+            assert r.json()["detail"] == "please try again"
+    assert len(calls) == (2 if configured else 0)
+
+
+def test_shop_turnstile_network_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from coverapi import shop
+
+    monkeypatch.setenv("TURNSTILE_SECRET_KEY", "test-secret")
+
+    def failed(*args: Any, **kwargs: Any) -> Any:
+        raise OSError("offline")
+
+    monkeypatch.setattr(shop.urllib.request, "urlopen", failed)
+    assert not shop.turnstile_ok("token", "127.0.0.1")
+    assert not shop.turnstile_ok(None, "127.0.0.1")
+    monkeypatch.delenv("TURNSTILE_SECRET_KEY")
+    assert shop.turnstile_ok(None, "127.0.0.1")
+
+
+@pytest.mark.parametrize("success", [False, True])
+def test_shop_turnstile_verification(monkeypatch: pytest.MonkeyPatch, success: bool) -> None:
+    import io
+
+    from coverapi import shop
+
+    monkeypatch.setenv("TURNSTILE_SECRET_KEY", "test-secret")
+    monkeypatch.setattr(
+        shop.urllib.request,
+        "urlopen",
+        lambda req, timeout: io.BytesIO(json.dumps({"success": success}).encode()),
+    )
+    assert shop.turnstile_ok("test-token", "127.0.0.1") is success
+
+
+def test_turnstile_spares_the_automatic_match_and_a_checkout_retry(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A token works once: the configurator's own look-up asks none, and a retry of the same
+    checkout (its idempotency key) gets the first order without being asked again."""
+    import io
+
+    from coverapi import shop
+
+    monkeypatch.setenv("TURNSTILE_SECRET_KEY", "test-secret")
+    seen: list[str] = []
+
+    def verify(req: Any, timeout: int) -> Any:
+        seen.append(req.data.decode())
+        return io.BytesIO(json.dumps({"success": len(seen) == 1}).encode())
+
+    monkeypatch.setattr(shop.urllib.request, "urlopen", verify)
+    c = TestClient(app)
+    looked = c.post("/api/shop/match", json={"product": "item", "sizes": {}})
+    assert looked.json().get("detail") != "please try again" and not seen  # no token asked
+    q = c.post("/api/shop/quote", json={"product": "item", "sizes": {"length_cm": 60}}).json()
+    order = {"quote_id": q["id"], "name": "Anna", "email": "anna@example.com",
+             "street": "Street 1", "postcode": "1234 AB", "city": "Utrecht", "country": "NL",
+             "terms": True, "turnstile": "once", "idempotency_key": "k" * 24}  # fmt: skip
+    first = c.post("/api/shop/order", json=order)
+    again = c.post("/api/shop/order", json=order)
+    assert first.status_code == again.status_code == 200, again.text
+    assert first.json()["order"] == again.json()["order"] and again.json()["repeat"]
+    assert len(seen) == 1 and first.json()["total_eur"] > 0

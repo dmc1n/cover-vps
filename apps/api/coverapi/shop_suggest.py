@@ -1060,7 +1060,7 @@ def read(
 
 def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
     from coverapi.security import _address
-    from coverapi.shop import link_ok, shop_params
+    from coverapi.shop import link_ok, shop_params, turnstile_ok
 
     asked: dict[str, list[float]] = {}
     uploads: dict[str, list[float]] = {}
@@ -1080,6 +1080,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
         url: str = Form(""),  # noqa: B008
         lang: str = Form("nl"),  # noqa: B008
         photos: list[UploadFile] = File(default_factory=list),  # noqa: B008
+        turnstile: str = Form("", max_length=2048),  # noqa: B008
         website: str = Form(""),  # noqa: B008 - the honeypot: people never see it (ADR-103)
     ) -> dict[str, Any]:
         """Sizes suggested from a photo and/or a link (nothing is stored)."""
@@ -1091,6 +1092,11 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
 
         if website:
             raise HTTPException(400, "this could not be sent")
+        ip = (request.headers.get("x-client-ip") if link_ok(auth, request) else None) or _address(
+            request
+        )
+        if not turnstile_ok(turnstile, ip):
+            raise HTTPException(400, "please try again")
         p = shop_params(auth)
         who, now = visitor(request), time.time()
         times = [t for t in asked.get(who, []) if now - t < DAY_S]

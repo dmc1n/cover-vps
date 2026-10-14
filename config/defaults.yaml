@@ -257,7 +257,8 @@ drape:                           # the drape simulation: the sewn cover falling 
   gpu: modal                     # modal: the Style3D fall on an NVIDIA GPU by API (ADR-069, ~7 min a sofa
                                  # instead of ~60); none: on this server. No keys or no answer: this server
   hem: held                      # held: the drawcord pulled tight and the corner elastics hold the hem in
-                                 # place (the owner, 2026-10-04: the cover must not ride up) | free
+                                 # place (the owner, 2026-10-04: the cover must not ride up; confirmed
+                                 # 11 Oct 2026, QUESTIONS 65: "strak getrokken") | free
   hem_band_mm: 15                # the hem: the open bottom edge's points this close to the lowest point
   style3d_stretch_weft: 5000.0   # to confirm: Style3D stretch stiffness across the roll (weft), N/m
   style3d_stretch_warp: 10000.0  # to confirm: along the roll (warp); Coverlast's warp is ~2x the weft
@@ -337,6 +338,18 @@ quote:                           # the webshop configurator's proposal and price
   bbq_slope_max_deg: 30          # between these two with the least fabric
   bbq_wall_min_cm: 35            # a barbecue cover's walls at least this high under the roof (a vent's
                                  # 22 cm plus its 5 cm above the hem, with room)
+shipping:                        # the consumer shop's delivery cost by carrier (owner, 11 Oct 2026,
+                                 # QUESTIONS 28/29: "a link with the carrier, DHL, by weight and box";
+                                 # docs/plans/shipping-carrier.md)
+  carrier: fixed                 # fixed | dhl   fixed: Shop settings → shipping, an amount per
+                                 # country; dhl: DHL's rate for the parcel once the account's keys are
+                                 # in deploy/.env (DHL_API_USER_ID, DHL_API_KEY), else fixed
+  fabric_g_per_m2: 300           # to confirm: Coverlast's weight per m² of cut fabric
+  pack_g: 450                    # to confirm: box, bag, drawcord, vents' inserts and the label
+  folded_l_per_m2: 2.5           # to confirm: litres a folded m² of cover takes in its box
+  boxes_cm: "40x30x15,50x40x20,60x40x30,80x60x40"   # to confirm: the workshop's boxes, L x W x H,
+                                 # smallest first; the first that holds the folded cover is used
+
 roll:
   width_mm: 1500
   usable_width_mm: 1480          # no panel wider than this in its narrowest orientation
@@ -521,7 +534,8 @@ import:
   max_plausible_size_mm: 6000    # ... or larger than this
 
 tolerance:
-  cover_mm: 5.0                  # overall fit target: ±5 mm
+  cover_mm: 5.0                  # overall fit target: ±5 mm; a measured size within this is good
+                                 # (owner, 11 Oct 2026, QUESTIONS 70: 0.5 cm, confirmed)
 
 ai:                              # AI advice on cover layouts (the key: DEEPSEEK_API_KEY in deploy/.env)
   provider: deepseek             # deepseek | gemini | none
