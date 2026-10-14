@@ -13,7 +13,9 @@ The program measures, for each model:
 - slivers: no piece narrower than seams.min_piece_width_mm (ADR-055); a top that would fit
   the roll in one piece with folds is noted.
 - gentle folds: a box cover has no seam between two pieces on the same side that meet at a fold
-  of at most seams.fold_join_max_deg and would fit the roll together (Rens, 8 Oct 2026; ADR-099).
+  of at most seams.fold_join_max_deg and would fit the roll together (Rens, 8 Oct 2026; ADR-099);
+  pieces given by hand (box_shape.json) are kept as drawn; a drawing cover has no seam inside
+  one flat face (seams.flat_split_max_deg; Rens on D1/D2, 9 Oct 2026; ADR-131).
 - vents: the drawing's number, round every side of the cover, none high up a wall (ADR-101);
 - plan: an arrangement built to follow its pieces lies, seen from above, within the pieces plus
   the clearance: no diagonal across an open corner (ADR-095).
@@ -227,14 +229,28 @@ def sliver_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, An
 def fold_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
     """A box cover: no seam between two pieces on the same side (top or skirt) whose faces meet
     at a fold of at most seams.fold_join_max_deg, when the two would fit the roll together:
-    those lie flat as one piece with a fold line (Rens, 8 Oct 2026, ADR-099)."""
+    those lie flat as one piece with a fold line (Rens, 8 Oct 2026, ADR-099). A drawing cover:
+    no seam inside one flat face (at most seams.flat_split_max_deg), ADR-131."""
     limit = float(params["seams.fold_join_max_deg"])
     cut_path, npz = model_dir / "panels.json", model_dir / "panels.npz"
     if limit <= 0 or not cut_path.is_file() or not npz.is_file():
         return []
     hull = json.loads((model_dir / "hull.json").read_text(encoding="utf-8"))
-    if hull.get("top") != "box":
+    if hull.get("top") == "given":
+        # a drawing cover: only a flat wall split in two (Rens on D1/D2, 9 Oct 2026: the front
+        # wall cut at the skirt height though it is one plane; ADR-131). The top's seams are the
+        # drawing's own (ADR-097), so only the walls are looked at
+        limit = float(params["seams.flat_split_max_deg"])
+        if limit <= 0:
+            return []
+    elif hull.get("top") != "box":
         return []
+    if (hull.get("box") or {}).get("chosen_by") == "hand":
+        # pieces a person gave corner by corner (box_shape.json, ADR-117): the approver's own
+        # layout, a seam across a flat face included (Rens on the Aspen corner, 9 Oct 2026)
+        return [
+            _check("gentle folds", True, "pieces given by hand (box_shape.json): kept as drawn")
+        ]
     plan = (hull.get("box") or {}).get("plan") or hull.get("plan")
     # a round cover: the top is a cone and the skirt a closed band, whose pieces never lie flat
     # as one (ADR-107: at least two sectors, the skirt strips under their seams; ADR-119)
@@ -266,6 +282,8 @@ def fold_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     for a, b in {(min(x, y), max(x, y)) for x, y in zip(la[across], lb[across], strict=True)}:
         pa, pb = panels[int(a)], panels[int(b)]
         if pa["region"] != pb["region"] or cone:
+            continue
+        if hull.get("top") == "given" and pa["region"] != "skirt":
             continue
         if max(spread[int(a)], spread[int(b)]) > limit:
             continue

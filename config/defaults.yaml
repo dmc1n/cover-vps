@@ -100,6 +100,11 @@ seams:
                                  # skirt) that meet at a fold this gentle are one piece with a
                                  # fold line in pen, if it fits the roll (Rens, 8 Oct 2026: gable
                                  # tops of 10 degrees "can become one panel"; ADR-099); 0 = never
+  flat_split_max_deg: 1          # a drawing cover (given surface): two neighbouring wall pieces
+                                 # meeting at most this far from one plane are one flat wall split
+                                 # by a seam the drawing does not draw; the audit flags
+                                 # it when the two fit the roll together (Rens, 9 Oct 2026, D1/D2:
+                                 # "crossed-out panels one panel"; ADR-131); 0 = no check
   given_crease_deg: 0            # a cover surface of its own (hull.top: given): its creases
                                  # sharper than this are the seams, the pieces are what they
                                  # enclose (Rens, 8 Oct 2026: "follow the original model's
