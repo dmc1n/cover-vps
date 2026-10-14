@@ -38,6 +38,10 @@ Array = NDArray[np.float64]
 IntArray = NDArray[np.int64]
 
 SIZES_PDF = "sizes.pdf"
+# The size drawing's own format: a sizes.pdf made by an older format is made again when it is
+# opened, even when it is newer than its pattern (2: heights from the cover's own lower edge,
+# Rens 14 Oct 2026; the approved/ stamped copies stay as they were approved).
+SIZES_FORMAT = "cover-sizes 2"
 MM_PER_CM = 10.0  # param-ok: unit conversion
 MM_PER_INCH = 25.4  # param-ok: unit conversion
 A4_MM = (210.0, 297.0)  # param-ok: paper size
@@ -117,6 +121,17 @@ class Cover:
         return out
 
 
+def hem_height(points: Array, hem: IntArray, hull: dict[str, Any]) -> float:
+    """The height of the cover's lower edge above the ground, measured on the cover itself:
+    the lowest point of its hem. hull.json's `hem.height_mm` is the parameter the hull was
+    asked for, but a cover surface of its own (a drawing cover, `hull.top: given`) ends where
+    the drawing ends, at the ground: taking the parameter there drew every height 5 cm short
+    (Rens, 14 Oct 2026: C4, C8, C10 "hoofdmaten komen niet overeen met de tekening")."""
+    if len(hem):
+        return float(points[hem, 2].min())
+    return float(hull["hem"]["height_mm"])
+
+
 def load_cover(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> Cover:
     data = np.load(model_dir / "panels.npz")
     cut = json.loads((model_dir / "panels.json").read_text(encoding="utf-8"))
@@ -144,7 +159,7 @@ def load_cover(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) ->
         seam_edges=np.asarray(data["seam_edges"], dtype=np.int64),
         seam_index=np.asarray(data["seam_index"], dtype=np.int64),
         hem=hem,
-        hem_z=float(hull["hem"]["height_mm"]),
+        hem_z=hem_height(points, hem, hull),
         hem_length=float(cut["hem_length_mm"]),
         area_m2=float(cut["area_m2"]),
         doc=doc,
@@ -1018,21 +1033,33 @@ def write_drawing(model_dir: Path, doc: dict[str, Any], params: EffectiveParams,
         ) as pdf:
             for fig in figures:
                 pdf.savefig(fig, dpi=DPI)
-        brand(pending)
+        brand(pending, SIZES_FORMAT)
         pending.replace(out)
     return out
 
 
+def _current(out: Path) -> bool:
+    """Whether a size drawing was made by this format (SIZES_FORMAT)."""
+    import pymupdf
+
+    try:
+        with pymupdf.open(out) as pdf_doc:
+            return (pdf_doc.metadata or {}).get("subject") == SIZES_FORMAT
+    except Exception:  # noqa: BLE001 - an unreadable file is made again
+        return False
+
+
 def ensure_sizes(model_dir: Path, params: EffectiveParams | None = None) -> Path | None:
     """The size drawing, made when it is asked for (ADR-080): flatten no longer writes it every
-    time. Made again when it is older than the pattern it shows. None without a pattern."""
+    time. Made again when it is older than the pattern it shows or made by an older format
+    (SIZES_FORMAT). None without a pattern."""
     import json
 
     pattern = model_dir / "pattern.json"
     out = model_dir / SIZES_PDF
     if not pattern.is_file():
         return None
-    if out.is_file() and out.stat().st_mtime >= pattern.stat().st_mtime:
+    if out.is_file() and out.stat().st_mtime >= pattern.stat().st_mtime and _current(out):
         return out
     if params is None:
         from coverengine.params.registry import Registry, resolve_model

@@ -4989,6 +4989,7 @@ minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
 - Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
   constants, so the registry test tells them from the new default.
 
+<<<<<<< HEAD
 ## ADR-136 — The Questions answered 11–14 Oct 2026, processed (QUESTIONS 27–101)
 
 Twenty-four questions in Work → Questions (ADR-109) were answered but never processed. Each
@@ -5069,3 +5070,41 @@ answer below is what was done with it; the Dutch note on the question says the s
   1480). Not changed: it decides which pieces fit the roll, and CLAUDE.md's "roll width
   1500 mm" says otherwise; the owner confirms first. Today no live cover has a piece between
   1440 and 1500 mm wide, so the change would only matter for covers built afterwards.
+=======
+## ADR-137 — Sizes are measured from the cover's own lower edge; Rens's third round on C4, C8, C10 and the Nardo pair
+
+Rens at the Desk, 14 Oct 2026 (round 3, after ADR-133 made the plan sizes exact): C4, C8, C10
+"hoofdmaten komen niet overeen met de tekening"; cover 44 & 45 (S13 & S14 Nardo) "beter de vorm
+volgen zoals in de tekening". Staging `out/rejections3/sizes/`; every size checked by me and,
+independently, by Codex.
+
+- **The cause (C4/C8/C10).** The covers were right (pieces, 3D, cut file, check list: C8 357 x 282,
+  back 84, inner front walls 44, arm ends 31, arms 92 deep, strip 30, end run 40, as written). The
+  size drawing (`sizes.pdf`) and the cover's Sizes tab measured every height from hull.json's
+  `hem.height_mm`, the hem *parameter* (5 cm); a drawing cover (`hull.top: given`) ends at the
+  ground, so every height they showed was 5 cm short (C8/C10 79/39/26 for 84/44/31, C4 85/38/21.4
+  for 90/43/26.4), and "5.0 cm above ground". The round-2 plan sizes (344 x 344, 357 x 282,
+  357 x 357) hold.
+- **The rule (ADR-055), every cover:** `export.drawing.hem_height` takes the lowest point of the
+  cover's own hem; hull.json of a plain (box/given) cover records the lower edge as built. A
+  sizes.pdf carries its format (`SIZES_FORMAT`, PDF subject); an older one is made again when
+  opened, even when newer than its pattern (the approved/ stamped copies stay as approved). Read-only
+  sweep: 118 live covers (115 drawing covers, D8/S53/S60 cover surfaces) end below the hem
+  parameter, so their size drawings change; no pattern or cut file changes.
+- **Check:** the audit's `written heights` (an isofit drawing cover's shown height and lowest
+  skirt against the written back and end heights; all 9 live isofit covers pass with the fix).
+  Test `test_size_drawing_measures_from_the_covers_own_lower_edge`; a lesson in
+  config/ai_lessons.json. Not changed: C4's bracketed "(17 cm)" is 43 − 26.4 = 16.6 on the cover
+  (the drawing's own rounding). C3, C9, C30, C31 still fail `written sizes` (ADR-133, not rebuilt).
+- **Live:** the fixed sizes.pdf put in C4/C8/C10 (no rebuild); C8/C10 back to Rens; C4 he approved
+  after his remark, so it stays approved with a note. The Sizes tab shows the right heights only
+  after the release.
+- **Nardo (S13 & S14):** the AI had built one 260 cm wedge with 88.6 as depth. Read again corner by
+  corner from the drawing's vector lines (every corner within 0.2 pt; Codex the same within 0.06):
+  two covers of one shape, mirror images (one seen from the front, one from behind): 260 x 80, back
+  87 with a 25 cm strip, an arm block 25 cm wide at 87, the seat to a 42 cm front over 145 cm, a
+  55 cm ramp to the arm, a 27 cm low end rising over 35 cm with a hip (88.6 = the hip edge,
+  sqrt(35²+55²+60²); 225 = the back's top edge). `faces`, 10 pieces, 0.0 % stretch, vents by hand
+  in the middle of the front wall and the arm end (2 per cover). Whether the second cover's long
+  vent goes on its back as drawn: question #102.
+>>>>>>> worktree-agent-aee32057a799ca98f

@@ -13,7 +13,7 @@ MARGIN_PT = 26.0  # param-ok: from the page edge
 GAP_PT = 6.0  # param-ok: between the logos
 
 
-def brand(path: Path) -> Path:
+def brand(path: Path, subject: str = "") -> Path:
     import pymupdf
 
     logos = []
@@ -32,7 +32,8 @@ def brand(path: Path) -> Path:
             )
             page.show_pdf_page(box, logo, 0)
             x -= w + GAP_PT
-    doc.set_metadata({"creator": "Cover Studio (S2DIO x SUNS)", "producer": "cover-pattern-engine"})
+    meta = {"creator": "Cover Studio (S2DIO x SUNS)", "producer": "cover-pattern-engine"}
+    doc.set_metadata({**meta, "subject": subject} if subject else meta)
     data = doc.tobytes(garbage=3, deflate=True, no_new_id=True)
     path.write_bytes(data)
     return path
