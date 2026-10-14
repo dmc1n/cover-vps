@@ -418,6 +418,35 @@ MANY_PIECES = 60  # param-ok: a drawing cover in more pieces than this is a brok
 WRITTEN_CM = 0.15  # param-ok: a footprint length further than this from its written size is off
 
 
+def _shown_heights(model_dir: Path, iso: dict[str, Any]) -> list[dict[str, Any]]:
+    """The heights the size drawing and the Sizes tab show (Rens, 14 Oct 2026, C4/C8/C10:
+    "hoofdmaten komen niet overeen met de tekening": they showed every height 5 cm short, the
+    hem parameter taken off a cover that ends at the ground) against the drawing's written back
+    and arm-end heights."""
+    pattern = model_dir / "pattern.json"
+    if not (pattern.is_file() and (model_dir / "panels.npz").is_file()):
+        return []
+    from coverengine.export.drawing import load_cover, measure, skirt_height
+    from coverengine.params.registry import Registry, resolve_model
+
+    try:
+        params = resolve_model(model_dir, {}, Registry.load(None), None)
+        cover = load_cover(model_dir, json.loads(pattern.read_text(encoding="utf-8")), params)
+        top = (measure(cover, "total_height") or 0.0) / MM_PER_CM
+        pairs = zip(cover.names, cover.regions, strict=True)
+        skirts = [skirt_height(cover, n) / MM_PER_CM for n, r in pairs if r == "skirt"]
+    except Exception:  # noqa: BLE001 - a cover that cannot be loaded is another check's failure
+        return []
+    off = []
+    if abs(top - float(iso["back_cm"])) > WRITTEN_CM:
+        off.append(f"height {top:.1f} cm where the drawing writes {float(iso['back_cm']):g}")
+    end = iso.get("end_cm")
+    if end and skirts and abs(min(skirts) - float(end)) > WRITTEN_CM:
+        off.append(f"arm end {min(skirts):.1f} cm where the drawing writes {float(end):g}")
+    say = "; ".join(off) or f"height {top:.1f} cm as written"
+    return [_check("written heights", not off, say)]
+
+
 def drawing_checks(model_dir: Path) -> list[dict[str, Any]]:
     """Rens's shape rejections (8 Oct 2026) as checks on a drawing cover: an angled sofa
     (the top view's back arms meet at 140 degrees, S21) must not be built as a 90 degree L, and
@@ -450,6 +479,9 @@ def drawing_checks(model_dir: Path) -> list[dict[str, Any]]:
         off = [(a, w) for a, w in pairs if w is not None and abs(a - w) > WRITTEN_CM]
         say = "; ".join(f"{a:g} cm where the drawing writes {w:g}" for a, w in off)
         out.append(_check("written sizes", not off, say or "the top view's lengths as written"))
+    iso = doc.get("isofit") or {}
+    if doc.get("reader") == "isofit" and iso.get("back_cm"):
+        out += _shown_heights(model_dir, iso)
     if not ref.is_file():
         return out
     from coverengine.drawing_vectors import back_angle

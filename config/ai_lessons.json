@@ -148,5 +148,15 @@
     "check": "The audit's vents check ('on a rounded corner') and engine/tests/test_finish.py::test_no_vent_on_a_rounded_corner.",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792000100,
+    "model_id": "drawing-c8",
+    "complaint": "The main sizes do not match the drawing (Rens at the Desk, 14 Oct 2026, C4, C8 and C10, after their plan sizes had been made exact).",
+    "cause": "The size drawing (sizes.pdf) and the Sizes tab measured every height from hull.json's hem.height_mm, the hem parameter (5 cm). A drawing cover ends where the drawing ends, at the ground, so every height they showed was 5 cm short (84 cm drawn as 79, 31 as 26); the pieces, the 3D cover and the check list were right.",
+    "rule": "Sizes are measured on the cover itself: heights from the lowest point of its own hem, never from a parameter. hull.json for a cover surface of its own records the lower edge as built. A size drawing of an older format is made again when it is opened.",
+    "check": "The audit's 'written heights' check (an isofit drawing cover's shown height and arm-end height against the drawing's written back and end heights) and engine/tests/test_flatten.py::test_size_drawing_measures_from_the_covers_own_lower_edge.",
+    "applies_to": "all",
+    "ai_model": "approver"
   }
 ]
