@@ -724,3 +724,12 @@ def test_a_recognition_starts_only_with_a_whole_run_of_budget_left(
         "/api/v2/suggest", headers={"x-api-key": key["key"]}, data={"url": "https://x.example/s"}
     )
     _error(r, 429, "daily_limit")
+
+
+@pytest.mark.parametrize("path", ["/shop/covers", "/llms-full.txt", "/shop/measure"])
+def test_agent_pages_count_against_the_anonymous_limits(limited: Any, path: str) -> None:
+    """Codex's review, round 6: the catalogue pages and llms-full.txt count like anonymous
+    calls and answer 429 over the limits."""
+    c = TestClient(limited)
+    codes = [c.get(path).status_code for _ in range(5)]
+    assert codes[0] == 200 and 429 in codes

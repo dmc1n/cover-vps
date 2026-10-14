@@ -59,11 +59,20 @@ def install(app: FastAPI, auth: Any, sub: FastAPI) -> None:
         s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
         return str(s["company"]["name"] or "S2DIO")
 
-    def gate(request: Request) -> None:
+    def gate(request: Request, page: str | None = None) -> None:
+        """404 where the agent API is off; a counted page (`page`) answers 429 over the
+        anonymous limits."""
         from fastapi import HTTPException
+
+        from coverapi.agent_api import ApiError
 
         if not agent_on(auth, request):
             raise HTTPException(404, "not here")
+        if page is not None:
+            try:
+                sub.state.count_page(request, page)
+            except ApiError as e:
+                raise HTTPException(e.status, e.message, headers=e.headers) from None
 
     def kinds_of(request: Request) -> dict[str, Any]:
         out: dict[str, Any] = sub.state.kinds(request)
@@ -79,7 +88,7 @@ def install(app: FastAPI, auth: Any, sub: FastAPI) -> None:
     # ---- the measuring guide ---------------------------------------------------------------
     @app.get("/shop/measure", include_in_schema=False)
     def measure(request: Request) -> HTMLResponse:
-        gate(request)
+        gate(request, "/measure")
         doc = kinds_of(request)
         site = sub.state.site_root(request)
         g = doc["how_to_measure"]
@@ -108,7 +117,7 @@ def install(app: FastAPI, auth: Any, sub: FastAPI) -> None:
 
     @app.get("/shop/measure/{kind}", include_in_schema=False)
     def measure_kind(kind: str, request: Request) -> HTMLResponse:
-        gate(request)
+        gate(request, "/measure/{kind}")
         doc = kinds_of(request)
         k = next((x for x in doc["kinds"] if x["kind"] == kind), None)
         if k is None:
@@ -150,7 +159,7 @@ def install(app: FastAPI, auth: Any, sub: FastAPI) -> None:
     # ---- the existing covers ---------------------------------------------------------------
     @app.get("/shop/covers", include_in_schema=False)
     def covers_page(request: Request) -> HTMLResponse:
-        gate(request)
+        gate(request, "/covers")
         site = sub.state.site_root(request)
         items = sub.state.covers(request)["covers"]
         rows = "".join(
@@ -227,7 +236,7 @@ def install(app: FastAPI, auth: Any, sub: FastAPI) -> None:
     # ---- llms-full.txt ---------------------------------------------------------------------
     @app.get("/llms-full.txt", include_in_schema=False)
     def llms_full(request: Request) -> PlainTextResponse:
-        gate(request)
+        gate(request, "/llms-full.txt")
         site = sub.state.site_root(request)
         api = sub.state.api_root(request)
         doc = kinds_of(request)

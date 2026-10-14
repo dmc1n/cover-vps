@@ -1711,13 +1711,21 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> FastAPI:  # noqa
     # (anonymous) sees them
     sub.state.kinds = kinds
 
-    def cover_public(code: str, request: Request, lang: str = "en") -> dict[str, Any]:
-        """A cover page's facts with the public price, counted like an anonymous API call
-        (the page computes a price: its visitor's hourly and the anonymous daily limits)."""
+    def count_page(request: Request, name: str) -> Caller:
+        """A page for agents (the guide, the covers, llms-full.txt) counts like an anonymous
+        API call: its visitor's hourly and the anonymous daily limits (ApiError 429 over them;
+        Codex's review)."""
         anon = Caller("anonymous", visitor(request))
         limiter.hit(anon, shop_params(auth))
-        usage.count(_day(), anon.who, "GET page /covers/{code}")
+        usage.count(_day(), anon.who, f"GET page {name}")
+        return anon
+
+    def cover_public(code: str, request: Request, lang: str = "en") -> dict[str, Any]:
+        """A cover page's facts with the public price (counted as a page)."""
+        anon = count_page(request, "/covers/{code}")
         return cover_facts(cover_card(code, request), request, anon, lang)
+
+    sub.state.count_page = count_page
 
     sub.state.cover_public = cover_public
     sub.state.covers = covers

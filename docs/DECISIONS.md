@@ -5065,7 +5065,11 @@ on the preview only**. Plan: docs/plans/agent-access.md; handbook: docs/handbook
   day is left. Round 5: a run can cost more than that estimate (grounded searches bill per
   query), so the key's day cap now holds at every paid stage: `spend.for_visitor(who,
   cap_eur)` makes `spend.guard` (called before every paid call) refuse once the key's day is
-  reached; only stages already in flight (the parallel searches) can still finish.
+  reached; only stages already in flight (the parallel searches) can still finish. Round 6:
+  that residue stays (a per-stage cost reservation inside the shop's recognition pipeline is
+  for later; it is bounded by the stages in flight, the 20 recognitions a day per key and the
+  month's budget); and every agent page (the guide, the covers, llms-full.txt) now counts
+  like an anonymous call.
   Anonymous: 401 `key_needed`, and
   `product_url` in a match is read as text only, never fetched. Its route has the shop's photo
   body limit (bodylimit and the Caddyfile).
