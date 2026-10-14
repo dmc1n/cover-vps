@@ -5055,7 +5055,10 @@ on the preview only**. Plan: docs/plans/agent-access.md; handbook: docs/handbook
   key; the month's budget (ADR-078) still stops everything. Codex's adversarial review found
   that parallel requests could all pass the same checks: now one recognition runs at a time
   per key (a second gets 429 `busy`, so the euro check sees every earlier call's cost) and the
-  day's slot is taken in one SQLite write transaction before any await. Anonymous: 401 `key_needed`, and
+  day's slot is taken in one SQLite write transaction before any await. Its second round: a
+  B2B login alone may not start a paid recognition (a partner key only, individually
+  revocable), and a cover page (which computes a price) counts against the anonymous limits
+  and answers 429, not 404, over them. Anonymous: 401 `key_needed`, and
   `product_url` in a match is read as text only, never fetched. Its route has the shop's photo
   body limit (bodylimit and the Caddyfile).
 - **A person always pays.** `order_url` opens the configurator with the product, the sizes,

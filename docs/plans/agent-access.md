@@ -48,7 +48,7 @@ Who may call and what they get:
 | anonymous | nothing | `agent_per_hour` per address (IPv6 /64), `agent_anon_per_day` all together | public B2C incl. VAT | no |
 | partner key | `X-Api-Key` or `Authorization: Bearer` | `agent_key_per_hour`, `agent_key_per_day` | public B2C | `agent_key_photos_per_day`, `agent_key_eur_day` |
 | B2B key | a partner key linked to a company | as a key | that company's ex VAT (ADR-104) | as a key |
-| B2B session | the `b2b_session` cookie on `/api/b2b/v2` | as a key | that company's ex VAT | as a key |
+| B2B session | the `b2b_session` cookie on `/api/b2b/v2` | as a key | that company's ex VAT | no (a key only) |
 
 ### 2. MCP server (phase 2, not built)
 

@@ -181,10 +181,12 @@ def install(app: FastAPI, auth: Any, sub: FastAPI) -> None:
         site = sub.state.site_root(request)
         try:
             c = sub.state.cover_public(code, request)
-        except ApiError:
+        except ApiError as e:
             from fastapi import HTTPException
 
-            raise HTTPException(404, "no such cover") from None
+            if e.status == 404:  # noqa: PLR2004
+                raise HTTPException(404, "no such cover") from None
+            raise HTTPException(e.status, e.message, headers=e.headers) from None  # 429: limits
         f = c["fits"]
         pr = c.get("price") or {}
         price = (

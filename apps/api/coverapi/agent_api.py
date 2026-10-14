@@ -1526,7 +1526,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> FastAPI:  # noqa
         from coverapi import shop_suggest
 
         c = caller(request)
-        if not c.partner:
+        if c.key_id is None:  # a partner key only: not anonymous, not a B2B login
             raise ApiError(
                 401,
                 "key_needed",
@@ -1684,9 +1684,16 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> FastAPI:  # noqa
     # for the website's pages (agent_pages): the kinds and a cover's public facts, as the public
     # (anonymous) sees them
     sub.state.kinds = kinds
-    sub.state.cover_public = lambda code, request, lang="en": cover_facts(
-        cover_card(code, request), request, Caller("anonymous", ""), lang
-    )
+
+    def cover_public(code: str, request: Request, lang: str = "en") -> dict[str, Any]:
+        """A cover page's facts with the public price, counted like an anonymous API call
+        (the page computes a price: its visitor's hourly and the anonymous daily limits)."""
+        anon = Caller("anonymous", visitor(request))
+        limiter.hit(anon, shop_params(auth))
+        usage.count(_day(), anon.who, "GET page /covers/{code}")
+        return cover_facts(cover_card(code, request), request, anon, lang)
+
+    sub.state.cover_public = cover_public
     sub.state.covers = covers
     sub.state.site_root = lambda request: site_root(auth, request)
     sub.state.api_root = lambda request: api_root(auth, request)

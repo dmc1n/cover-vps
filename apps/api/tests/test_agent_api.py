@@ -459,10 +459,10 @@ def test_b2b_session_is_scoped_to_its_cookie_path(app: Any) -> None:
     )
     b.change_company(cid, {"fixed": {CODE: 512.5}})
     uid = b.add_user(cid, "dealer@a.example", "Dealer", "en")
-    b.set_password(b.token(uid, "invite"), "a-long-business-password")
+    b.set_password(b.token(uid, "invite"), "tall-green-umbrella-77")
     c = TestClient(app)
     login = c.post(
-        "/api/b2b/login", json={"email": "dealer@a.example", "password": "a-long-business-password"}
+        "/api/b2b/login", json={"email": "dealer@a.example", "password": "tall-green-umbrella-77"}
     )
     _ok(login)
     assert "Path=/api/b2b/" in login.headers["set-cookie"]
@@ -652,3 +652,32 @@ def test_parallel_recognitions_cannot_pass_the_daily_slot(
     _ok(c.post("/api/v2/suggest", headers=head, files=photo))  # the second of 2 daily slots
     _error(c.post("/api/v2/suggest", headers=head, files=photo), 429, "daily_limit")
     assert len(calls) == 2
+
+
+def test_a_b2b_login_alone_gets_no_paid_recognition(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Codex's review: photo recognition needs a partner key; a B2B session is not one."""
+    b = app.state.b2b
+    cid = b.add_company({"name": "Dealer", "email": "d@d.example", "price_list": "b2b"}, "active")
+    uid = b.add_user(cid, "dealer@shop.example", "Dealer", "en")
+    b.set_password(b.token(uid, "invite"), "tall-green-umbrella-77")
+    c = TestClient(app)
+    login = c.post("/api/b2b/login", json={"email": "dealer@shop.example",
+                                          "password": "tall-green-umbrella-77"})  # fmt: skip
+    assert login.status_code == 200, login.text
+
+    async def never(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("a paid recognition ran")
+
+    monkeypatch.setattr(shop_suggest, "run_suggestion", never)
+    _error(c.post("/api/b2b/v2/suggest", data={"url": "https://example.com/sofa"}), 401,
+           "key_needed")  # fmt: skip
+
+
+def test_cover_pages_count_against_the_anonymous_limits(limited: Any) -> None:
+    """Codex's review: a cover page computes a price, so it counts like an anonymous call and
+    answers 429 (not 404) over the limit."""
+    c = TestClient(limited)
+    codes = [c.get(f"/shop/covers/{CODE}").status_code for _ in range(5)]
+    assert codes[0] == 200 and 429 in codes
