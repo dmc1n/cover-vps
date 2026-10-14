@@ -121,6 +121,10 @@ and Google's **Agent Payments Protocol (AP2)** / **Universal Commerce Protocol (
 - Made-to-measure covers need sizes a person measured: an agent must not order on estimated
   sizes. Probably only existing covers at first.
 
+Note (ADR-136, docs/plans/payments-stripe.md): Stripe is advised for online payment. ACP is
+built with Stripe (its Shared Payment Tokens), so if the shop moves to Stripe the first question
+above largely answers itself; verify then that ACP is offered for EU merchants and EUR.
+
 Until then: no endpoint creates a paid order, and the order link expires.
 
 ## Open questions for the owner
