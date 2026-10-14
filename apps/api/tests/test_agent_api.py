@@ -681,3 +681,26 @@ def test_cover_pages_count_against_the_anonymous_limits(limited: Any) -> None:
     c = TestClient(limited)
     codes = [c.get(f"/shop/covers/{CODE}").status_code for _ in range(5)]
     assert codes[0] == 200 and 429 in codes
+
+
+def test_3d_previews_count_on_the_work_cap(app: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex's review, round 3: a new 3D preview counts on the agents' work cap; an ignored
+    field makes no new one."""
+    c = TestClient(app)
+    url = _ok(c.post("/api/v2/match", json=SOFA))["results"][-1]["preview_3d_url"]
+    path = url.split("testserver", 1)[1]
+    assert c.get(path).status_code == 200
+    built: list[Any] = []
+    import coverengine.quote as q
+
+    real = q.preview_glb
+    monkeypatch.setattr(q, "preview_glb", lambda *a: built.append(a) or real(*a))
+    sizes = json.dumps({"length_cm": 230, "depth_cm": 90, "back_height_cm": 85, "x": 1})
+    r = c.get("/api/v2/preview.glb", params={"product": "sofa", "sizes": sizes})
+    assert r.status_code == 200 and built == []  # the same preview: no new work
+    from coverapi.ratelimit import GlobalCap
+
+    monkeypatch.setattr(GlobalCap, "hit", lambda self, now=None: False)
+    sizes = json.dumps({"length_cm": 231, "depth_cm": 90, "back_height_cm": 85})
+    r = c.get("/api/v2/preview.glb", params={"product": "sofa", "sizes": sizes})
+    assert r.status_code == 429 and r.json()["error"] == "busy"

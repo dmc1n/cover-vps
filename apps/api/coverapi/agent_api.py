@@ -1454,9 +1454,28 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> FastAPI:  # noqa
         out["price_basis"] = basis(c)
         return out
 
-    @lru_cache(maxsize=64)
+    glbs: dict[str, bytes] = {}  # the last 64 previews, by product and its own sizes
+
     def glb(product: str, sizes_json: str) -> bytes:
-        return q.preview_glb(product, json.loads(sizes_json), shop_params(auth))
+        """A 3D preview: only the product's own fields are kept (an unknown one makes no new
+        preview), and a new one counts on the agents' work cap like a proposal (Codex's
+        review: else anonymous callers could bypass it with 3D previews)."""
+        spec = q.PRODUCTS[product]["fields"]
+        given = json.loads(sizes_json)
+        sizes = {
+            k: float(v) if isinstance(v, int | float) and not isinstance(v, bool) else v
+            for k in sorted(spec)
+            if k in given and (v := given[k]) is not None
+        }
+        key = product + json.dumps(sizes, sort_keys=True)
+        if key not in glbs:
+            if not agent_cap.hit():
+                raise ApiError(429, "busy", "many previews are asked just now",
+                               "Try again in a minute.", headers={"Retry-After": "60"})  # fmt: skip
+            if len(glbs) >= 64:  # noqa: PLR2004 - a small cache
+                glbs.pop(next(iter(glbs)))
+            glbs[key] = q.preview_glb(product, sizes, shop_params(auth))
+        return glbs[key]
 
     @sub.get("/covers/{code}/preview.glb", summary="A cover's 3D preview (glTF binary)")
     def cover_glb(code: str, request: Request) -> Response:
