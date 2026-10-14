@@ -5058,7 +5058,11 @@ on the preview only**. Plan: docs/plans/agent-access.md; handbook: docs/handbook
   day's slot is taken in one SQLite write transaction before any await. Its second round: a
   B2B login alone may not start a paid recognition (a partner key only, individually
   revocable), and a cover page (which computes a price) counts against the anonymous limits
-  and answers 429, not 404, over them. Anonymous: 401 `key_needed`, and
+  and answers 429, not 404, over them. Round 3: a new 3D preview counts on the agents' work
+  cap and only the product's own sizes make its cache key. Round 4: the pipeline's paid
+  stages check only the month's budget, so a recognition starts only while a whole run's
+  worth (`limits.agent_key_eur_per_recognition`, €0.10; a run costs €0.03-0.05) of the key's
+  day is left. Anonymous: 401 `key_needed`, and
   `product_url` in a match is read as text only, never fetched. Its route has the shop's photo
   body limit (bodylimit and the Caddyfile).
 - **A person always pays.** `order_url` opens the configurator with the product, the sizes,

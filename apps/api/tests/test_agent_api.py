@@ -704,3 +704,23 @@ def test_3d_previews_count_on_the_work_cap(app: Any, monkeypatch: pytest.MonkeyP
     sizes = json.dumps({"length_cm": 231, "depth_cm": 90, "back_height_cm": 85})
     r = c.get("/api/v2/preview.glb", params={"product": "sofa", "sizes": sizes})
     assert r.status_code == 429 and r.json()["error"] == "busy"
+
+
+def test_a_recognition_starts_only_with_a_whole_run_of_budget_left(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Codex's review, round 4: just below the key's day budget no new recognition starts
+    (a run's worth, limits.agent_key_eur_per_recognition, must be left)."""
+    from coverengine import spend
+
+    key = _key(_admin(app))
+
+    async def never(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("a paid recognition ran")
+
+    monkeypatch.setattr(shop_suggest, "run_suggestion", never)
+    monkeypatch.setattr(spend, "visitor_eur", lambda who, now=None: 0.95)  # cap 1.0, run 0.1
+    r = TestClient(app).post(
+        "/api/v2/suggest", headers={"x-api-key": key["key"]}, data={"url": "https://x.example/s"}
+    )
+    _error(r, 429, "daily_limit")

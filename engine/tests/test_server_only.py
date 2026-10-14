@@ -25,6 +25,7 @@ SERVER_KEYS = (
     "limits.agent_key_photos_per_day",
     "limits.agent_key_eur_day",
     "limits.agent_link_hours",
+    "limits.agent_key_eur_per_recognition",
 )
 
 

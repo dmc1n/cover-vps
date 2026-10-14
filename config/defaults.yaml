@@ -483,6 +483,9 @@ limits:                          # what a request or an uploaded file may hold (
   agent_key_photos_per_day: 20   # photo or link recognition (a paid AI call) per partner key a day; never anonymous
   agent_key_eur_day: 1.0         # ... and what one key's recognitions may cost the AI in a day (EUR, the ledger);
                                  # the month's budget (spend.budget_eur_month) still stops everything
+  agent_key_eur_per_recognition: 0.1  # ... a recognition starts only while this much of the key's day is
+                                 # left (a run costs about €0.03-0.05: image search, identification, searches,
+                                 # comparison, sizing), so one run cannot carry the key over its day's budget
   agent_link_hours: 24           # an order link (POST /api/v2/order-link) opens the configurator this long
   agent_results_max: 5           # at most this many existing covers in one match answer
 

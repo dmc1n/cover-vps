@@ -1573,7 +1573,11 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> FastAPI:  # noqa
             )
         tomorrow = {"Retry-After": str(int(86400 - time.time() % 86400) + 1)}
         who = f"agent:{c.who}"
-        if spend.visitor_eur(who) >= float(p["limits.agent_key_eur_day"]):
+        # a run starts only while a whole run's worth of the day's budget is left (Codex's
+        # review: the pipeline's stages check only the month's budget, so a run near the cap
+        # would carry the key over it)
+        run_eur = float(p["limits.agent_key_eur_per_recognition"])
+        if spend.visitor_eur(who) + run_eur > float(p["limits.agent_key_eur_day"]):
             raise ApiError(
                 429,
                 "daily_limit",
