@@ -1599,7 +1599,10 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> FastAPI:  # noqa
                 pngs = await shop_suggest.read_photos(p, photos)
             except shop_suggest.SuggestError as exc:
                 raise ApiError(400, "invalid_field", str(exc), "", "photos") from None
-            out = await shop_suggest.run_suggestion(p, pngs, url, lang, who, store.models, data)
+            out = await shop_suggest.run_suggestion(
+                p, pngs, url, lang, who, store.models, data,
+                cap_eur=float(p["limits.agent_key_eur_day"]),  # every paid stage holds to it
+            )  # fmt: skip
         finally:
             recognising.discard(c.who)
         product = out["product"]

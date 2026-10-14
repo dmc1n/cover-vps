@@ -1067,8 +1067,16 @@ async def read_photos(p: Any, photos: list[UploadFile]) -> list[bytes]:
     return pngs
 
 
-async def run_suggestion(p: Any, pngs: list[bytes], url: str, lang: str, who: str,
-                         models: Path, data: Path) -> dict[str, Any]:  # fmt: skip
+async def run_suggestion(
+    p: Any,
+    pngs: list[bytes],
+    url: str,
+    lang: str,
+    who: str,
+    models: Path,
+    data: Path,
+    cap_eur: float = 0.0,
+) -> dict[str, Any]:
     """The suggestion for these photos and/or this link, every paid call on `who`'s ledger line
     (a visitor, or an agent API key: ADR-135), with the existing cover that fits. The caller has
     checked its limits. HTTPException 400/502/503 on a problem."""
@@ -1081,7 +1089,7 @@ async def run_suggestion(p: Any, pngs: list[bytes], url: str, lang: str, who: st
     # the web and the AI take up to a minute: off the event loop, so the rest of the app keeps
     # answering meanwhile
     def read_for_visitor() -> tuple[dict[str, Any], dict[str, Any] | None]:
-        with spend.for_visitor(who):  # every paid call on this visitor's line
+        with spend.for_visitor(who, cap_eur):  # every paid call on this visitor's line
             return read(p, pngs, url, lang)
 
     try:
@@ -1091,6 +1099,8 @@ async def run_suggestion(p: Any, pngs: list[bytes], url: str, lang: str, who: st
     except CoverError as exc:  # the month's AI budget, or the AI did not answer
         msg = str(exc)
         log.warning("suggest: %s", msg)  # the reason only (no photo, no key)
+        if "caller's AI budget" in msg:  # a partner key's day (ADR-135)
+            raise HTTPException(429, "this key's AI budget of today is used up") from None
         if "budget" in msg:
             raise HTTPException(503, "this service is resting for now; please choose by "
                                      "hand below") from None  # fmt: skip
