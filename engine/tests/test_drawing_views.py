@@ -87,3 +87,16 @@ def test_inches_count_when_no_cm_is_written(tmp_path: Path) -> None:
     page.insert_text((60, 300), "45.0cm 17.7in")
     doc.save(tmp_path / "w.pdf")
     assert dv.written_cm(tmp_path / "w.pdf") == [45.0, 190.0]
+
+
+def test_the_drawings_own_cm_value_wins_over_an_inch_value_beside_it(tmp_path: Path) -> None:
+    """C8 (Rens, 9 Oct 2026): "111.00" in inches is 281.94 cm, the drawing writes "282 cm" beside
+    it; the size is 282. The order's own number ("cover 86") is no size."""
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((60, 60), "Note: *All Dimensions are in inches")
+    page.insert_text((60, 100), "111.00")
+    page.insert_text((60, 300), "282 cm")
+    page.insert_text((300, 500), "cover 86")
+    doc.save(tmp_path / "w.pdf")
+    assert dv.written_cm(tmp_path / "w.pdf") == [282.0]

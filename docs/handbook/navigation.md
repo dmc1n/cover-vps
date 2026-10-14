@@ -12,7 +12,7 @@ The index of the whole handbook, in the same order: [README.md](README.md).
 
 ```
 Work        Desk · Questions · Workshop
-Covers      All covers · Arrangements · New cover | Learning · Product list
+Covers      All covers · Arrangements · New cover | Learning · Links · Product list
 Shop        Orders · Requests · B2B customers | Website (AI)
 Settings    one page with vertical tabs (admins; editors: the three Prices & costs tabs)
 Right side  Search (everything) · Guide (book) · theme button · your name (My account) · Log out (arrow)
@@ -67,6 +67,7 @@ for you.
 | Work: Desk, Questions | look | look (approving: approvers only) | everything | look; comments, pictures, fit measurements and its own questions |
 | Work: Workshop | look (without the customers' fit answers) | look; Send to production | look; Send to production | look; approved files, no prices or customers' fit answers |
 | Covers: All covers, Arrangements, Learning | yes | yes | yes | – |
+| Covers: Links | look | confirm, reject, choose | confirm, reject, choose | – |
 | Covers: New cover, Product list | – | yes | yes | – |
 | Shop: Website (AI) | – | draft and preview | also publish | – |
 | Shop: Orders, Requests, B2B customers | – | – | yes | – |
@@ -156,6 +157,9 @@ There are four kinds of page:
   reference pairs (a zip) ([web-app.md](web-app.md), [learning.md](learning.md)).
 - **Learning** (`#/covers/learning`): the uploaded reference batches and their results
   ([learning.md](learning.md)).
+- **Links** (`#/covers/links[?q=<cover>]`): a drawing cover and a 3D-model cover of the same
+  product, proposed with a score and reasons; editors and admins confirm or correct
+  ([links.md](links.md), ADR-132).
 - **Product list** (`#/covers/products`): upload the workshop's product list (Excel); the Desk
   shows the products on each card ([desk.md](desk.md), *The product list*).
 

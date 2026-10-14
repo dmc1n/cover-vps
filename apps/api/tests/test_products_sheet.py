@@ -122,7 +122,9 @@ def test_the_desk_shows_searches_and_sorts_by_products(app: Any) -> None:
     assert card["column"] == "Code" and card["columns"][:3] == [
         "WEATHER MAX MID GREY COLOR", "Cover", "Code"]  # fmt: skip
     assert card["rows"][0][:3] == ["Bellano/Sato - Lounge chair", "Cover 105", "s40"]
-    assert card["suns"]["linked"] == ["suns-lounge-sato-lounge-chair"]
+    # the sheet's link is a proposal until a person confirms it in Covers → Links (ADR-132)
+    assert card["suns"]["proposed"] == ["suns-lounge-sato-lounge-chair"]
+    assert card["suns"]["linked"] == []
     # the SUNS model knows its drawing too, and shows it as its product
     assert items["suns-lounge-sato-lounge-chair"]["products"] == [
         "S40 · Bellano/Sato - Lounge chair"]  # fmt: skip

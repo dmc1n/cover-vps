@@ -13,7 +13,9 @@ The program measures, for each model:
 - slivers: no piece narrower than seams.min_piece_width_mm (ADR-055); a top that would fit
   the roll in one piece with folds is noted.
 - gentle folds: a box cover has no seam between two pieces on the same side that meet at a fold
-  of at most seams.fold_join_max_deg and would fit the roll together (Rens, 8 Oct 2026; ADR-099).
+  of at most seams.fold_join_max_deg and would fit the roll together (Rens, 8 Oct 2026; ADR-099);
+  pieces given by hand (box_shape.json) are kept as drawn; a drawing cover has no seam inside
+  one flat face (seams.flat_split_max_deg; Rens on D1/D2, 9 Oct 2026; ADR-131).
 - vents: the drawing's number, round every side of the cover, none high up a wall (ADR-101);
 - plan: an arrangement built to follow its pieces lies, seen from above, within the pieces plus
   the clearance: no diagonal across an open corner (ADR-095).
@@ -227,14 +229,28 @@ def sliver_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, An
 def fold_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
     """A box cover: no seam between two pieces on the same side (top or skirt) whose faces meet
     at a fold of at most seams.fold_join_max_deg, when the two would fit the roll together:
-    those lie flat as one piece with a fold line (Rens, 8 Oct 2026, ADR-099)."""
+    those lie flat as one piece with a fold line (Rens, 8 Oct 2026, ADR-099). A drawing cover:
+    no seam inside one flat face (at most seams.flat_split_max_deg), ADR-131."""
     limit = float(params["seams.fold_join_max_deg"])
     cut_path, npz = model_dir / "panels.json", model_dir / "panels.npz"
     if limit <= 0 or not cut_path.is_file() or not npz.is_file():
         return []
     hull = json.loads((model_dir / "hull.json").read_text(encoding="utf-8"))
-    if hull.get("top") != "box":
+    if hull.get("top") == "given":
+        # a drawing cover: only a flat wall split in two (Rens on D1/D2, 9 Oct 2026: the front
+        # wall cut at the skirt height though it is one plane; ADR-131). The top's seams are the
+        # drawing's own (ADR-097), so only the walls are looked at
+        limit = float(params["seams.flat_split_max_deg"])
+        if limit <= 0:
+            return []
+    elif hull.get("top") != "box":
         return []
+    if (hull.get("box") or {}).get("chosen_by") == "hand":
+        # pieces a person gave corner by corner (box_shape.json, ADR-117): the approver's own
+        # layout, a seam across a flat face included (Rens on the Aspen corner, 9 Oct 2026)
+        return [
+            _check("gentle folds", True, "pieces given by hand (box_shape.json): kept as drawn")
+        ]
     plan = (hull.get("box") or {}).get("plan") or hull.get("plan")
     # a round cover: the top is a cone and the skirt a closed band, whose pieces never lie flat
     # as one (ADR-107: at least two sectors, the skirt strips under their seams; ADR-119)
@@ -266,6 +282,8 @@ def fold_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     for a, b in {(min(x, y), max(x, y)) for x, y in zip(la[across], lb[across], strict=True)}:
         pa, pb = panels[int(a)], panels[int(b)]
         if pa["region"] != pb["region"] or cone:
+            continue
+        if hull.get("top") == "given" and pa["region"] != "skirt":
             continue
         if max(spread[int(a)], spread[int(b)]) > limit:
             continue
@@ -319,7 +337,13 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     up a wall (a vent hung from a free top edge, upside down, C24)."""
     import math
 
-    from coverengine.finish.finish import vent_bases, vent_walls
+    from coverengine.finish.finish import (
+        arc_position,
+        bend_deg,
+        has_straight,
+        vent_bases,
+        vent_walls,
+    )
     from coverengine.finish.vents3d import ensure_vents
 
     path = ensure_vents(model_dir) if (model_dir / "panels.npz").is_file() else None
@@ -363,6 +387,23 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
         high = [x["piece"] for x in vents if min(c[2] for c in x["corners_mm"]) - low > reach]
         if high:
             problems.append("high up a wall (upside down?): " + ", ".join(high))
+    if vents and not places and not params["features.vent_on_corners"]:
+        # Rens, 9 Oct 2026: no vents on rounded corners (ADR-134); a piece that is round all
+        # along (a round cover) has no straight stretch to give them
+        limit = float(params["features.vent_corner_max_deg"])  # type: ignore[arg-type]
+        w = float(params["features.vent_width_mm"])  # type: ignore[arg-type]
+        clear = float(params["features.vent_seam_clearance_mm"])  # type: ignore[arg-type]
+        corner = []
+        for x in vents:
+            hem = walls.hems.get(x["piece"])
+            if hem is None or "height_line_mm" not in x:
+                continue
+            at = arc_position(hem[0], np.array(x["height_line_mm"][1]))
+            bend = bend_deg(hem[0], at, w / 2 + clear)
+            if bend > limit and has_straight(hem[0], w / 2 + clear, limit):
+                corner.append(f"{x['piece']} ({bend:.0f}°)")
+        if corner:
+            problems.append("on a rounded corner: " + ", ".join(corner))
     detail = "; ".join(problems) or (
         f"{len(vents)} vents on {sum(1 for k in per if k)} of {len(sides)} sides, at the "
         + str(params["features.vent_align"])
@@ -372,6 +413,9 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
 
 ANGLED_DEG = (100.0, 175.0)  # param-ok: two back arms meeting between these angles: an angled sofa
 MANY_PIECES = 60  # param-ok: a drawing cover in more pieces than this is a broken shape (7,846)
+
+
+WRITTEN_CM = 0.15  # param-ok: a footprint length further than this from its written size is off
 
 
 def drawing_checks(model_dir: Path) -> list[dict[str, Any]]:
@@ -398,6 +442,14 @@ def drawing_checks(model_dir: Path) -> list[dict[str, Any]]:
                 .get("features", {}).get("vents_total"))  # fmt: skip
         out.append(_check("decided vents", have == decided,
                           f"{have} vents asked, {decided} decided by a person"))  # fmt: skip
+    read = model_dir / "drawing_read.json"
+    doc = json.loads(read.read_text(encoding="utf-8")) if read.is_file() else {}
+    lens = (doc.get("isofit") or {}).get("lengths") if doc.get("reader") == "isofit" else None
+    if lens:  # Rens, 9 Oct 2026: "343.6 cm becomes 344 cm" (C4); the back's bits, not the depth
+        pairs = list(zip(lens["lengths_cm"], lens["written_cm"], strict=True))[:-1]
+        off = [(a, w) for a, w in pairs if w is not None and abs(a - w) > WRITTEN_CM]
+        say = "; ".join(f"{a:g} cm where the drawing writes {w:g}" for a, w in off)
+        out.append(_check("written sizes", not off, say or "the top view's lengths as written"))
     if not ref.is_file():
         return out
     from coverengine.drawing_vectors import back_angle

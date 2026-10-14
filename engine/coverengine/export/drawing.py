@@ -54,6 +54,7 @@ COLUMN_MM = 20.0  # param-ok: geometric search radius
 STRAIGHT_MM = 3.0  # param-ok: geometric tolerance
 # A panel's typical width is the median across its length between these fractions.
 WIDTH_SPAN = (0.2, 0.8)  # param-ok: measurement definition
+WIDTH_SAMPLES = 25  # param-ok: sampling, stations across WIDTH_SPAN
 # Paper scales tried for a panel page, largest drawing first.
 SCALES = (1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100)  # param-ok: drawing scales
 # A panel label is drawn in a view when this share of the panel faces the viewer.
@@ -231,7 +232,9 @@ def panel_width(cover: Cover, name: str) -> float:
     lo, hi = along.min(), along.max()
     reach = float(np.ptp(pts @ across)) + 1.0
     widths = []
-    for t in np.linspace(lo + WIDTH_SPAN[0] * (hi - lo), lo + WIDTH_SPAN[1] * (hi - lo), 25):
+    for t in np.linspace(
+        lo + WIDTH_SPAN[0] * (hi - lo), lo + WIDTH_SPAN[1] * (hi - lo), WIDTH_SAMPLES
+    ):
         base = axis * t + across * float((pts @ across).min() - 0.5)  # param-ok: layout
         line = shapely.LineString([base, base + across * reach])
         widths.append(float(poly.intersection(line).length))

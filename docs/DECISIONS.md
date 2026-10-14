@@ -4795,6 +4795,200 @@ Better, later: the Desk card's tabs as a segmented control on a phone; the glyph
 sprite if their number grows; a design-token export for the website (ADR-105) so both share
 the status colours.
 
+
+## ADR-131 — Rens's second round on pieces (9 Oct 2026): flat walls in one piece, a whole back strip, seams where he draws them
+
+Rens rejected eight covers on their pieces on 9 Oct 2026 (the remarks were processed on 14 Oct;
+staging out/rejections2/panels/, each built again, `cover audit` and `scripts/fewer_check.py`,
+a compare picture with his marked picture, looked at).
+
+- **D1, D2** ("doorgekruiste panelen reduceren tot één paneel"; the owner on D2: "some faces are
+  still split"): the front and back walls were cut at the 18 cm skirt line though each is one
+  plane, and the drawing's front view draws the front wall in one piece. The person-read shapes
+  (`testdata/drawing_shapes/drawing-d1/d2.json`) drop `skirt_cm`: the 18 cm seam stays on the
+  sides only, where the wall meets the leaning side strip. 11 → 9 pieces each; the slope stays
+  in two halves (222 and 186 cm across, wider than the roll both ways).
+- **S32** (strip struck through; "2 vents from the front to the sides"; "overall shape closer to
+  the drawing"): `plan_profile` takes `"strip_whole": true` — the drawn seams stop at the back
+  strip, as on the drawing, and the level strip is one piece (3.3 m by 42 cm, fits the roll).
+  Vents by hand (`features.vent_positions`): 2 front, 1 on each round end, 2 back, as the
+  drawing's 6 arrows. The overall shape: every written size matches (bottom 878.5 cm against
+  877.3, back 556.7 against 557.2, front 321.8 against 320.5, depth 98.3 against 99.1), so what
+  Rens means is asked (Questions).
+- **S43** ("shape and pieces exactly as on the drawing"): read again view by view. The side view
+  draws the back upright to 40.64 cm and then leaning in 9.4 cm to 88.01 cm (the dark band along
+  the back in the top view); the round nose is a piece of its own whose wall is 40.64 cm all
+  round, its top falling to it from the end of the strip and the slope; no seams across the strip
+  or the slope. Two swept options: `round_end_apart` (drawing_given: the round end is not joined
+  into the strip) and `round_rim_cm` (swept: the round wall at one height). 8 pieces as drawn:
+  back band, strip, slope, nose, end wall, front wall, nose wall, back wall; 0.0 % stretch.
+  S44 (S43 mirrored) still has the 8 Oct shape: the same change applies, not made.
+- **Lucia lounge chair, Feroli corner** (crossed panels one panel): the engine already joins
+  them (ADR-099/117, a 3 and a 10 degree fold); the live covers were built before. Rebuilt as
+  they are now: 7 → 6 pieces each.
+- **Aspen corner** ("a seam along the drawn line", back corner to front corner): the live box's
+  own faces given by hand (`box_shape.json`, ADR-117), the shape unchanged, the roof cut from
+  where the back chamfers meet, through the roof's kink, to the low front corner. 8 → 10 pieces.
+  The audit's gentle folds check now accepts pieces given by hand (that seam is in one plane).
+- **Avero corner** ("corners like this divided as the arrows show"): arrows from the high back
+  corner to both ends of the back and to the front corner. The Avero's ridge runs along one axis,
+  not the diagonal, so those seams cut across its faces and change the roof: asked (Questions),
+  not changed.
+
+**Rule and check (ADR-055).** A drawing cover's flat wall that the drawing draws in one piece is
+one piece: `cover audit` (gentle folds) now also looks at given covers' walls and fails two wall
+pieces in one plane (`seams.flat_split_max_deg`, 1 degree) that fit the roll together. The top's
+seams of a drawing cover are the drawing's own (ADR-097) and are not looked at. Swept over the
+live covers (read only): D1, D2 (fixed here) and **S18** (its front wall in two, not changed).
+Tests: test_facets.py, test_drawing_given.py; an AI lesson in config/ai_lessons.json. Not
+generalised (no clear rule from Rens yet): a level back strip split at the corners of C and L
+covers (about 35 live drawing covers have two strip pieces in one plane, which `strip_whole`
+or its like would join), and the corner layout of the Avero.
+
+## ADR-132 — Links: a drawing cover and a 3D-model cover of the same product, proposed, decided by a person
+
+The owner, 14 Oct 2026: many products are in the range twice, as a drawing cover (drawing-*) and
+as a cover computed on the manufacturer's 3D model (suns-*); "link them so we can learn from
+them; propose what belongs together, we confirm it, and correct it by hand when it is wrong; use
+everything you have." The same day, the example: D2 showed as "sunlounger evora", because the
+product list import (ADR-091) turned the word "Evora" in "Evora normal D- Bed" into the SUNS
+Evora sunlounger and showed it as a fact. Plan and numbers: docs/plans/drawing-model-links.md.
+
+1. **A link is a proposal until a person decides.** app.db `model_links` (drawing, model,
+   status proposed / confirmed / rejected / manual, score, strength, signals, reasons, doubts,
+   both covers' facts, mirror, source sheet / proposer / person, note, stale, who and when, a
+   version) and `model_link_log` (every change, never deleted). Confirmed, rejected and manual
+   (chosen by hand) are a person's decision: `scripts/link_proposals.py` never changes them (not
+   the status, score, reasons or version); proposals it no longer makes are marked stale, never
+   deleted. Every decision names the version it saw (required); a stale page gets 409. "Choose
+   another" also checks the replaced link's version, keeps a target someone already confirmed,
+   and refuses a target someone rejected unless the person says so (`override`); bulk
+   confirmation sends each row's version and skips stale (withdrawn) proposals, so nothing the
+   proposer took back becomes a learning pair (Codex's adversarial review). One row per pair;
+   many-to-one both ways (one drawing for both hands, one table drawing for three 340 tables).
+2. **Mirror** is a flag on the link (the drawing is the other hand of the model), from the
+   names or the hand of the L in plan; a mirror pair is proposed and flagged, never refused, and
+   anything that compares or learns mirrors the drawing first (`link_compare.py` swaps its left
+   and right skirt sides).
+3. **The score** (`coverapi/link_score.py`, weights `links.*` in config/defaults.yaml): names
+   (families, types; a D-bed is not a sunlounger), the two covers' boxes, the plan shape read
+   from hull.glb from above (straight, L, U, round; the L's hand), the ADR-114 kind, the hand,
+   the cover.png silhouettes; the product list's link adds a bonus; a name that says "pair"
+   against a size, plan or type that says no multiplies the score by 0.57 and says why. Doubts
+   (another family, a type, size, plan or kind that disagrees, the two lists naming different
+   hands) make a proposal "unsure" whatever its score. High (≥ 0.85, no doubt) may be confirmed
+   in bulk after a confirmation step; the server checks each again. Gemini looks only at tied
+   proposals (`--gemini-ties`), as a reason and +0.03, ledger, at most €5 (8 calls, €0.01 on 14
+   Oct).
+4. **The product list's links are proposals.** Every pair namecode.xlsx linked is in the queue
+   whatever its score (93 on live; 41 high, 51 unsure, D2's at 0.34). The Desk card's Products
+   block shows them as "proposed by the product list" until confirmed; a rejected or replaced
+   link disappears from it, from the SUNS model's Desk label and from the price import's
+   `linked_suns` (ADR-113). products.json and drawings.json are never changed. The shop's
+   direct order (ADR-118) never read these links (kind and size, the price list's families as a
+   tie-break), so nothing changes there.
+5. **Learning reads confirmed and manual links only** (`links.learning_pairs`); a proposal never
+   teaches anything. The first use: `scripts/link_compare.py`, the box, each skirt side's hem and
+   height, each top piece (matched by size), pieces, vents, hem, seams and fabric per pair.
+6. **Rights in the API**: viewers and up read `GET /api/links…`; `decide`, `choose` and
+   `bulk-confirm` need `edit` (editors, admins); the workshop login is not on its allow-list
+   (security.py) and the routes refuse it too. Page: Covers → Links (own glyph), and a
+   "Linked to …" chip on a cover's page.
+
+Tests: apps/api/tests/test_links.py (Codex: scoring, D2, mirror, plan shapes, never overwriting a
+person, stale, versions, choose/replace, learning only from people, the Desk card and price
+import following decisions, rights per role, bulk floor, the script's dry run writing nothing);
+test_products_sheet follows the new meaning; the staging test lists the three scripts;
+apps/web/e2e/links.py and uinav's Links checks on a scratch copy (fresh app.db, test users).
+
+Better, later: arrangements for the whole corner sets (the 19 drawings without a partner);
+products_sheet.kinds telling a D-bed from a sunlounger and a new upload feeding the queue; the
+weights fitted on the people's decisions; per-family rules (ADR-082) from the compare report.
+
+## ADR-133 — A fitted drawing cover is true to the drawing's written sizes; mirror-equal skirts one size
+
+Rens rejected five corner covers on their sizes in the second round (9 Oct 2026): C4 "the main
+size 343.6 cm becomes 344 cm", C8 "356 cm should be 357 cm", C10 "357 x 357 cm; skirt right and
+skirt front not equal, both 92 cm", C29 and S33 "the side skirts and the back skirts do not match
+each other nor the drawing; the rest is good". All five are built by the isofit reader (ADR-094),
+whose footprint was the traced top view: every edge a few mm off its written size and a hair out
+of square, so walls that are each other's mirror image differed by up to 1.2 cm.
+
+- **True to the written sizes** (`drawing_isofit.true_sizes`, before the heights are fitted):
+  each outline edge within `drawing.isofit_size_tol` of a written size gets exactly that size;
+  an edge within `drawing.isofit_square_deg` (2.5) of a multiple of 45 degrees to the outline's
+  frame is turned onto it; the edges without a written size take up the rest (a least-squares
+  fit over the corners; refused when a corner would move more than a reading error). A curved
+  outline is left as traced. `drawing_read.json` isofit.true_to_written says what changed.
+- **Mirror-equal edges are one size**: on an outline that is its own mirror image, mirrored
+  edges get one size and mirrored directions, the larger of their written sizes when the drawing
+  writes them at most `drawing.isofit_same_cm` (0.5) apart (S33: 244.1 and 243.8 → both 244.1).
+  Written further apart they stay as written (C29: 247.7 and 243.3, the drawing's own top edge
+  runs 2 degrees off level): the drawing's sizes win over symmetry.
+- **The drawing's own number** (`drawing_views.written_cm`): a size converted from inches (C8
+  "111.00" = 281.94 cm) is left out when the drawing writes a cm value within 0.5 cm ("282 cm");
+  the order's number ("cover 86", "cover 89") is no size (it made C29's 85.9 cm read as 86.0).
+- **The hip is cut on the strip's line** (C4, C8, C10, as the drawings draw it): over the strip it
+  is one plane; in one piece with the part over the slope its seams were 8-12 mm off flattened.
+  Now 5-6 mm; the audit's pieces check still fails these three (the part over the slope is a
+  twisted quad; better, later: two flat triangles with a fold line, to be decided).
+- Zero-width spikes that exact edges leave in the top's regions are removed before they are
+  triangulated (they made 3 x 61 mm slivers, and C8 failed to triangulate).
+- **Audit** `written sizes`: a fitted cover whose back lengths are off their written size by more
+  than 1.5 mm fails. Lesson in config/ai_lessons.json; tests in test_drawing_isofit.py,
+  test_drawing_views.py, test_drawing_given.py.
+
+Results (staging out/rejections2/sizes/, compare pictures in its compare/): C29 and S33 pass the
+audit and `scripts/fewer_check.py` (seam pairs 0.4 / 0.0 mm) and go live; C4, C8, C10 have their
+written sizes but fail the pieces check on the hip ends (as the live covers do, by more): to the
+owner. The rule changes the other isofit covers when rebuilt: C3, C9, C30, C31 (all approved; not
+swept live).
+
+## ADR-134 — No air vents on rounded corners; Rens's second-round remarks of 9 Oct on vents and smoothing
+
+Rens at the Desk, 9 October 2026 (round 2, processed 14 Oct; staging `out/rejections2/vents/`):
+on the Casto daybed "geen vents op afgeronde hoeken, verder prima hoes!"; on C27 "vents
+verdelen zoals eerder aangegeven op tekening"; on C26 "vents herpositioneren zoals aangegeven op
+de afbeelding"; on the Vado dining chair "deze hoes specifiek volgt de outline wel heel precies,
+mag meer gesmooth worden"; on the Pico bended 2-seater and the Pico corner "achterzijde iets
+minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
+
+- **The rule (ADR-055), for every cover:** `features.vent_on_corners: false`. The vents are placed
+  as before (ADR-101), then a vent whose bottom edge with `features.vent_seam_clearance_mm`
+  either side (a corner is kept clear like a seam) turns more than
+  `features.vent_corner_max_deg` (25: a curve tighter than about 1 m radius) in plan, its turns
+  added up, moves along its piece to the nearest straight stretch, clear of the piece's other
+  vents (`finish._off_corners`). The plan of each piece's bottom edge and the pieces at its two
+  ends come from panels.npz (`Walls.hems`); the flat bottom edge is matched to it by its end
+  seams (both ways round when they cannot tell). A piece that is round all along (a round
+  cover's strip, a chair's curved back) keeps its vents; places a person set
+  (`features.vent_positions`) are kept. The audit's vents check fails "on a rounded corner"
+  with the same measure (only where the piece has a straight stretch); test_finish.py
+  `test_no_vent_on_a_rounded_corner`, `test_a_round_wall_keeps_its_vents`; an AI lesson.
+- **C27:** the drawing draws its "10 Air Pocket" with ten arrows; Rens's marks of 8 Oct (circles
+  on four front walls and the left arm's end, crosses on the back) agree with them. Placed by
+  hand (`vent_positions`): two on the long left arm's outer wall (its side and its rounded end,
+  as the drawing's arrows and Rens's circles), one each on the left back, the back and the
+  four front walls Rens circled, two on the right arm's outer wall (its end and the back
+  corner). The two short front walls he did not mark (skirt-right-3, skirt-front-1) have none.
+- **C26:** Rens approved it on 14 Oct, after his remark of 9 Oct, with the same cut file (made
+  9 Oct 09:40): his approval stands, nothing changed.
+- **Vado:** `hull.plan_round_mm: 3000` in its cover.json (the closing that rounds bays): the
+  waisted sides and the front become gentle curves over the chair; 6 pieces instead of 7.
+  Only this cover ("deze hoes specifiek").
+- **Pico bended 2-seater and Pico corner: to Rens (Questions).** Their back in plan is already one
+  convex curve within 1–2 cm (closing the dents, or smoothing the outline and pushing it out
+  again where it would come too close, changed it by under 1 % or put ears on the corners), so
+  what "minder strak, één doorlopende curve" should change is not clear from the plan; a
+  question with the pictures. Not changed.
+- **Not swept live:** 19 of the 446 live covers have a vent (placed by the rule) on a rounded
+  corner today (read-only sweep, `out/rejections2/vents/corner_sweep.json`): S53, S60, D5, R3,
+  S37, S43, S44, S45, the Sato dining chair, Blocchi 2-seater moon right, Casto sofa bench,
+  Feroli chaise longue and corner, Fiora daybed, Pico corner, Pienza moonshape left, Vento
+  angled, Vento hocker, Vivaro L-part. They change when they are built again.
+- Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
+  constants, so the registry test tells them from the new default.
+
 ## ADR-134 — Every Desk action says how it went; a second approval is refused; "Waiting for us"
 
 14 Oct 2026, v2.0.0: the owner reported that **Approve** on the Desk "seems to do nothing".

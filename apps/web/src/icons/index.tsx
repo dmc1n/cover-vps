@@ -383,11 +383,13 @@ const TONE: Record<string, [Tone, IconName]> = {
   active: ["ok", "st-ok"],
   published: ["ok", "st-ok"],
   production: ["ok", "st-ok"],
+  confirmed: ["ok", "st-ok"], // a link a person confirmed (ADR-132)
   // waiting for someone or something
   waiting: ["wait", "st-wait"],
   new: ["wait", "st-wait"],
   queued: ["wait", "st-wait"],
   pending: ["wait", "st-wait"],
+  proposed: ["wait", "st-wait"],
   open: ["wait", "st-wait"],
   "ai-checked": ["wait", "st-ai"],
   running: ["wait", "st-running"],

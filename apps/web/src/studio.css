@@ -6502,3 +6502,234 @@ a.icon-btn.ws-file {
 .d-actions .d-btn .ico {
   margin-left: -2px;
 }
+
+/* ---- Covers → Links (ADR-132): a drawing cover and a 3D-model cover side by side ---------- */
+.links-page .links-count {
+  margin-left: 6px;
+  font-size: var(--fs-small);
+  opacity: 0.85;
+}
+.links-bulk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lk-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.4fr) minmax(
+      180px,
+      1fr
+    );
+  gap: 16px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+.lk-row.lk-rejected {
+  background: var(--sunken);
+}
+.lk-row.lk-alone {
+  grid-template-columns: minmax(180px, 1fr) minmax(260px, 2.4fr);
+}
+.lk-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.lk-pics {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.lk-pics img {
+  width: 100%;
+  max-width: 220px;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: var(--stage);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.lk-pics img.lk-ref {
+  max-width: 96px;
+  aspect-ratio: 3 / 4;
+}
+.lk-name {
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.lk-sub {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  min-height: 1em;
+}
+.lk-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  margin: 4px 0 0;
+  font-size: var(--fs-small);
+}
+.lk-facts dt {
+  color: var(--muted);
+}
+.lk-facts dd {
+  margin: 0;
+  color: var(--ink);
+}
+.lk-mid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.lk-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lk-num {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.lk-signals {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 4px 12px;
+}
+.lk-sig {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+.lk-sig-w {
+  width: 52px;
+  flex: none;
+}
+.lk-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--stone);
+  overflow: hidden;
+}
+.lk-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.lk-reasons,
+.lk-doubts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--fs-small);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lk-reasons li {
+  color: var(--ink-2);
+}
+.lk-reasons .ico {
+  color: var(--ok);
+}
+.lk-doubts li {
+  color: var(--warn);
+}
+.lk-who {
+  margin: 0;
+  font-size: var(--fs-small);
+}
+.lk-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lk-picker {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--sunken);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lk-picker-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lk-picker-row input[type="search"] {
+  flex: 1;
+  min-width: 200px;
+}
+.lk-mirror {
+  font-size: var(--fs-small);
+  color: var(--ink);
+}
+.lk-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 4px;
+}
+.lk-hits button {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 8px;
+  text-align: left;
+}
+.lk-hits img {
+  width: 40px;
+  height: 30px;
+  object-fit: contain;
+  background: var(--stage);
+  border-radius: 4px;
+}
+.lk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: var(--fs-small);
+  background: var(--ok-soft);
+  color: var(--ok);
+  text-decoration: none;
+}
+.lk-chip a {
+  color: var(--ok);
+  font-weight: 600;
+}
+.lk-chip.lk-chip-wait {
+  background: var(--wait-soft);
+  color: var(--wait);
+}
+@media (max-width: 900px) {
+  .lk-row,
+  .lk-row.lk-alone {
+    grid-template-columns: 1fr;
+  }
+}

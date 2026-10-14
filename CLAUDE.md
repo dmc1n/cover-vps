@@ -52,7 +52,8 @@ one-line edit there.
   edge 5 cm above the lower end of the cover, one per full metre of hem length, spread evenly,
   at least one, round every side of the cover including the front walls in the inner corner of L, U and C
   shapes (owner, 2026-10-09, QUESTIONS 71, ADR-110; `features.vent_inner_walls`, default on). Round every side first,
-  one in the middle of each piece, the drawing's count kept, never on a free top edge (Rens, 2026-10-08, ADR-101). Built as a cut opening with a hood of extra fabric holding a plastic insert
+  one in the middle of each piece, the drawing's count kept, never on a free top edge (Rens, 2026-10-08, ADR-101). Never on a rounded corner
+  (Rens, 2026-10-09, ADR-134; `features.vent_on_corners`, `vent_corner_max_deg`). Built as a cut opening with a hood of extra fabric holding a plastic insert
   that keeps it open, and a membrane inside against dirt (`features.vent_*`, pieces in M5).
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
   or needs stroked lines, arc support). Learned in M0 by cutting a test sheet.
@@ -238,6 +239,16 @@ uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--o
                                              a person's vents_total there or in drawing_corrections.json survives a rebuild, ADR-116)
 COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py [--out out/matchcards]   approved drawing covers as existing covers:
                                              kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114)
+Covers → Links (#/covers/links[?q=<cover>])   a drawing cover and a 3D-model cover of the same product: proposed with a
+                                             score and reasons, a person confirms, rejects or chooses another; the product
+                                             list's links are proposals too (D2 is not the Evora sunlounger); learning reads
+                                             confirmed and chosen links only; a cover's page shows "Linked to …" (ADR-132)
+COVER_DATA_DIR=~/cover-data uv run python scripts/link_inventory.py [--json OUT]   drawing/suns/bbq/arr counts, the sheet's links
+COVER_DATA_DIR=~/cover-data uv run python scripts/link_proposals.py --dry-run|--apply [--json OUT] [--gemini-ties N]
+                                             fill Links in app.db; never changes a person's decision (main session applies)
+COVER_DATA_DIR=~/cover-data uv run python scripts/link_compare.py [--pairs d:m,...]   confirmed pairs compared: box, skirt
+                                             sides, top pieces, vents, hem (out/links/compare)
+apps/web/e2e/links.py                       Links in a real browser on a scratch copy (usage in its docstring)
 uv run python scripts/desk_import.py --pdfs DIR   fill the Desk (desk.json, check.json) from the checks so far (ADR-079)
 COVER_DATA_DIR=~/cover-data uv run python scripts/learned_check.py [--recalc --models STAGING]   do the Desk's corrections still hold?
                                              (ADR-082; --recalc on live models is refused, ADR-129)
@@ -358,7 +369,7 @@ Staging scripts validate output roots and model destinations with
 `~/cover-data/models` (including symlink aliases and ancestors) must never be staging outputs.
 Every script in scripts/ that writes model folders does this (ADR-129, `engine/tests/test_scripts_staging.py`
 keeps the list); only the deliberate live-metadata tools (desk_fingerprints, desk_arrangements,
-desk_import, questions, prices_import, quotes_clean) write live data, each dry-run first.
+desk_import, questions, prices_import, quotes_clean, link_proposals) write live data, each dry-run first.
 
 Stability rules (ADR-129): jobs a stopped server left are "interrupted" on start-up; a mail is
 "sent" only when the SMTP server accepted it, through `coverapi.mailer.queue` (outbox, retries)

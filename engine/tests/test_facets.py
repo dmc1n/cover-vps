@@ -114,3 +114,44 @@ def test_the_audit_finds_a_seam_on_a_gentle_fold(tmp_path: Path) -> None:
         (tmp_path / "hull.json").write_text(json.dumps({"top": "box"}))
         (check,) = fold_checks(tmp_path, params)
         assert check["ok"] is ok, check
+    # pieces a person gave by hand keep their seams (Rens's line across the Aspen's flat roof,
+    # 9 Oct 2026): the two-piece gable passes when it is box_shape.json's
+    (tmp_path / "hull.json").write_text(json.dumps({"top": "box", "box": {"chosen_by": "hand"}}))
+    new = np.unique(facets.join(hull, label, top, 100, 1450, 3000, False, 0.0)[0],
+                    return_inverse=True)[1].ravel()  # fmt: skip
+    np.savez(tmp_path / "panels.npz", vertices=hull.vertices, faces=hull.faces, labels=new,
+             original_vertex=np.arange(len(hull.vertices)))  # fmt: skip
+    (check,) = fold_checks(tmp_path, params)
+    assert check["ok"] is True, check
+
+
+def test_the_audit_finds_a_flat_wall_split_on_a_drawing_cover(tmp_path: Path) -> None:
+    """Rens, 9 Oct 2026, D1 and D2: the front wall cut at the 18 cm skirt line though it is one
+    plane ("crossed-out panels one panel"): a drawing cover fails with a flat wall in two pieces,
+    passes with one; the top's seams are the drawing's own and are not looked at (ADR-131)."""
+    from coverengine.audit import fold_checks
+    from coverengine.params import Registry
+
+    xs, zs = np.linspace(0, 2000, 11), np.linspace(0, 400, 11)
+    v = np.array([[x, 0.0, z] for z in zs for x in xs])
+    f = []
+    for j in range(10):
+        for i in range(10):
+            a = j * 11 + i
+            f += [[a, a + 1, a + 12], [a, a + 12, a + 11]]
+    faces = np.array(f)
+    low = v[faces].mean(axis=1)[:, 2] < 180.0
+    params = Registry.load(None).resolve()
+    (tmp_path / "hull.json").write_text(json.dumps({"top": "given"}))
+    for labels, region, ok in (
+        (np.where(low, 0, 1), "skirt", False),
+        (np.zeros(len(faces), int), "skirt", True),
+        (np.where(low, 0, 1), "top", True),
+    ):
+        np.savez(tmp_path / "panels.npz", vertices=v, faces=faces, labels=labels,
+                 original_vertex=np.arange(len(v)))  # fmt: skip
+        panels = [{"name": f"p{k}", "region": region, "flat_width_mm": 220.0}
+                  for k in range(labels.max() + 1)]  # fmt: skip
+        (tmp_path / "panels.json").write_text(json.dumps({"panels": panels}))
+        (check,) = fold_checks(tmp_path, params)
+        assert check["ok"] is ok, (region, check)

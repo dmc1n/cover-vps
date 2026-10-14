@@ -94,6 +94,13 @@ export const SECTIONS: Section[] = [
         sep: true,
       },
       {
+        id: "links",
+        icon: "links",
+        label: "Links",
+        who: "all", // viewers look; editors and admins decide (the API checks it, ADR-132)
+        hint: "A drawing and a 3D model of the same product, linked: confirm or correct",
+      },
+      {
         id: "products",
         icon: "product-list",
         label: "Product list",
