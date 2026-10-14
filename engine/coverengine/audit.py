@@ -392,6 +392,9 @@ ANGLED_DEG = (100.0, 175.0)  # param-ok: two back arms meeting between these ang
 MANY_PIECES = 60  # param-ok: a drawing cover in more pieces than this is a broken shape (7,846)
 
 
+WRITTEN_CM = 0.15  # param-ok: a footprint length further than this from its written size is off
+
+
 def drawing_checks(model_dir: Path) -> list[dict[str, Any]]:
     """Rens's shape rejections (8 Oct 2026) as checks on a drawing cover: an angled sofa
     (the top view's back arms meet at 140 degrees, S21) must not be built as a 90 degree L, and
@@ -416,6 +419,14 @@ def drawing_checks(model_dir: Path) -> list[dict[str, Any]]:
                 .get("features", {}).get("vents_total"))  # fmt: skip
         out.append(_check("decided vents", have == decided,
                           f"{have} vents asked, {decided} decided by a person"))  # fmt: skip
+    read = model_dir / "drawing_read.json"
+    doc = json.loads(read.read_text(encoding="utf-8")) if read.is_file() else {}
+    lens = (doc.get("isofit") or {}).get("lengths") if doc.get("reader") == "isofit" else None
+    if lens:  # Rens, 9 Oct 2026: "343.6 cm becomes 344 cm" (C4); the back's bits, not the depth
+        pairs = list(zip(lens["lengths_cm"], lens["written_cm"], strict=True))[:-1]
+        off = [(a, w) for a, w in pairs if w is not None and abs(a - w) > WRITTEN_CM]
+        say = "; ".join(f"{a:g} cm where the drawing writes {w:g}" for a, w in off)
+        out.append(_check("written sizes", not off, say or "the top view's lengths as written"))
     if not ref.is_file():
         return out
     from coverengine.drawing_vectors import back_angle

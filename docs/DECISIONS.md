@@ -4904,3 +4904,42 @@ apps/web/e2e/links.py and uinav's Links checks on a scratch copy (fresh app.db, 
 Better, later: arrangements for the whole corner sets (the 19 drawings without a partner);
 products_sheet.kinds telling a D-bed from a sunlounger and a new upload feeding the queue; the
 weights fitted on the people's decisions; per-family rules (ADR-082) from the compare report.
+
+## ADR-133 — A fitted drawing cover is true to the drawing's written sizes; mirror-equal skirts one size
+
+Rens rejected five corner covers on their sizes in the second round (9 Oct 2026): C4 "the main
+size 343.6 cm becomes 344 cm", C8 "356 cm should be 357 cm", C10 "357 x 357 cm; skirt right and
+skirt front not equal, both 92 cm", C29 and S33 "the side skirts and the back skirts do not match
+each other nor the drawing; the rest is good". All five are built by the isofit reader (ADR-094),
+whose footprint was the traced top view: every edge a few mm off its written size and a hair out
+of square, so walls that are each other's mirror image differed by up to 1.2 cm.
+
+- **True to the written sizes** (`drawing_isofit.true_sizes`, before the heights are fitted):
+  each outline edge within `drawing.isofit_size_tol` of a written size gets exactly that size;
+  an edge within `drawing.isofit_square_deg` (2.5) of a multiple of 45 degrees to the outline's
+  frame is turned onto it; the edges without a written size take up the rest (a least-squares
+  fit over the corners; refused when a corner would move more than a reading error). A curved
+  outline is left as traced. `drawing_read.json` isofit.true_to_written says what changed.
+- **Mirror-equal edges are one size**: on an outline that is its own mirror image, mirrored
+  edges get one size and mirrored directions, the larger of their written sizes when the drawing
+  writes them at most `drawing.isofit_same_cm` (0.5) apart (S33: 244.1 and 243.8 → both 244.1).
+  Written further apart they stay as written (C29: 247.7 and 243.3, the drawing's own top edge
+  runs 2 degrees off level): the drawing's sizes win over symmetry.
+- **The drawing's own number** (`drawing_views.written_cm`): a size converted from inches (C8
+  "111.00" = 281.94 cm) is left out when the drawing writes a cm value within 0.5 cm ("282 cm");
+  the order's number ("cover 86", "cover 89") is no size (it made C29's 85.9 cm read as 86.0).
+- **The hip is cut on the strip's line** (C4, C8, C10, as the drawings draw it): over the strip it
+  is one plane; in one piece with the part over the slope its seams were 8-12 mm off flattened.
+  Now 5-6 mm; the audit's pieces check still fails these three (the part over the slope is a
+  twisted quad; better, later: two flat triangles with a fold line, to be decided).
+- Zero-width spikes that exact edges leave in the top's regions are removed before they are
+  triangulated (they made 3 x 61 mm slivers, and C8 failed to triangulate).
+- **Audit** `written sizes`: a fitted cover whose back lengths are off their written size by more
+  than 1.5 mm fails. Lesson in config/ai_lessons.json; tests in test_drawing_isofit.py,
+  test_drawing_views.py, test_drawing_given.py.
+
+Results (staging out/rejections2/sizes/, compare pictures in its compare/): C29 and S33 pass the
+audit and `scripts/fewer_check.py` (seam pairs 0.4 / 0.0 mm) and go live; C4, C8, C10 have their
+written sizes but fail the pieces check on the hip ends (as the live covers do, by more): to the
+owner. The rule changes the other isofit covers when rebuilt: C3, C9, C30, C31 (all approved; not
+swept live).

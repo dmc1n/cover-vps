@@ -358,6 +358,11 @@ drawing:
   isofit_trust_share: 0.66       # this share of the footprint's lengths (back bits, depth) must be
                                  # written on the drawing, or the footprint is not trusted
   isofit_size_tol: 0.025         # a length matches a written size within 2.5 % (or 2.5 cm)
+  isofit_square_deg: 2.5         # the top view made true to the written sizes (Rens, 9 Oct 2026): an
+                                 # outline edge this close to a multiple of 45 degrees to the longest is
+                                 # turned onto it, each edge near a written size gets exactly that size
+  isofit_same_cm: 0.5            # mirror-equal edges whose written sizes differ by at most this are one
+                                 # size (the larger); written further apart they stay as written
   isofit_height_min_cm: 11.5     # heights tried: written sizes between these
   isofit_height_max_cm: 175
   isofit_strip_share: 0.56       # a flat back strip is at most this share of the arm's depth

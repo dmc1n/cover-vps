@@ -49,6 +49,7 @@ CORNER_CM = 1.5  # param-ok: the footprint's corners, found on an outline smooth
 HULL_NEAR_CM = 2.0  # param-ok: a corner this close to the convex hull is on the outside
 WALL_TURN_DEG = 20.0  # param-ok: the outline turning more than this is a corner between walls
 PAD_PARTS = 8  # param-ok: the grid reaches past the picture by this part of its width
+SPIKE_CM = 1e-6  # param-ok: a corner this far off the line through its neighbours is on it
 SLIVER_MM2 = 1.0  # param-ok: a triangle smaller than this (twice its area, mm²) is no face
 
 
@@ -57,7 +58,7 @@ def _params(params: EffectiveParams) -> dict[str, float]:
             "isofit_edge_px", "isofit_edge_weight", "isofit_trust_share", "isofit_size_tol",
             "isofit_height_min_cm", "isofit_height_max_cm", "isofit_strip_share",
             "isofit_hip_share", "isofit_end_share", "isofit_min_gain",
-            "isofit_min_crease")  # fmt: skip
+            "isofit_min_crease", "isofit_square_deg", "isofit_same_cm")  # fmt: skip
     return {k: float(params[f"drawing.{k}"]) for k in keys}  # type: ignore[arg-type]
 
 
@@ -416,6 +417,36 @@ def _bisectors(fp: Footprint) -> list[Any]:
     return out
 
 
+def _unspiked(g: Any) -> Any:
+    """A region without zero-width spikes (the ring running out along an edge and straight
+    back) and repeated corners. No other corner moves or goes: a corner midway on a straight
+    edge stays, a neighbouring region meets it there."""
+    import shapely
+
+    if g.geom_type != "Polygon":
+        return g
+
+    def ring(c: np.ndarray) -> np.ndarray:
+        c = c[:-1] if len(c) > 1 and np.allclose(c[0], c[-1]) else c
+        changed = True
+        while changed and len(c) > 3:  # param-ok: a triangle stays
+            changed = False
+            for i in range(len(c)):
+                a, b, d = c[i - 1], c[i], c[(i + 1) % len(c)]
+                u, w = b - a, d - b
+                lu, lw = float(np.linalg.norm(u)), float(np.linalg.norm(w))
+                back = abs(u[0] * w[1] - u[1] * w[0]) <= SPIKE_CM * (lu + lw) and u @ w < 0
+                if back or min(lu, lw) <= SPIKE_CM:
+                    c = np.delete(c, i, axis=0)
+                    changed = True
+                    break
+        return c
+
+    out = shapely.Polygon(ring(np.asarray(g.exterior.coords)),
+                          [ring(np.asarray(h.coords)) for h in g.interiors])  # fmt: skip
+    return out.buffer(0)
+
+
 def layout(
     fp: Footprint, strip: float, hip: float, has_end: bool, roll_cm: float, step: float = STEP_CM
 ) -> Layout:
@@ -433,6 +464,11 @@ def layout(
         rest = plan.difference(hz)
     if strip > 0:
         sb = fp.back.buffer(strip, quad_segs=32)
+        # the hip is cut on the strip's line too, as the drawings draw it (C4, C8, C10): over
+        # the strip it is one plane; in one piece with the part over the slope it does not lie
+        # flat (its seams 8 mm off, the audit's pieces check)
+        zones = [(k, g.intersection(sb) if k == "hip" else g) for k, g in zones] + [
+            (k, g.difference(sb)) for k, g in zones if k == "hip"]  # fmt: skip
         zones = [("strip", rest.intersection(sb)), ("slope", rest.difference(sb)), *zones]
     else:
         zones = [("slope", rest), *zones]
@@ -448,7 +484,14 @@ def layout(
             for g in parts:
                 nxt += [x for x in split(g, ln).geoms if x.area > 1.0]  # param-ok: cm²
             parts = nxt
+        # an outline true to the written sizes lines up exactly with the zones' edges: the
+        # differences leave zero-width spikes along them, which would triangulate into slivers
+        clean = []
         for g in parts:
+            c = _unspiked(g)
+            clean += [x for x in getattr(c, "geoms", [c]) if x.geom_type == "Polygon"
+                      and x.area > 1.0]  # fmt: skip  # param-ok: cm², no slivers
+        for g in clean:
             for k, sub in enumerate(_roll_strips(g, roll_cm)):
                 v, f = _tri_region(sub, step)
                 tops.append((f"{kind}-{len(tops) + 1}" + (chr(97 + k) if k else ""), v, f))
@@ -583,6 +626,126 @@ def _near(x: float, sizes: list[float], tol: float) -> float | None:
     return min(near, key=lambda s: abs(s - x)) if near else None
 
 
+SQUARE_STEP_DEG = 45.0  # param-ok: edges are squared onto multiples of this to the longest edge
+TRUE_REACH_CM = 100.0  # param-ok: residual scale: an angle counts as its offset over 1 m
+TRUE_LEN_W = 100.0  # param-ok: a written length weighs this much ...
+TRUE_SQUARE_W = 10.0  # param-ok: ... a squared direction this much ...
+TRUE_MIRROR_W = 10.0  # param-ok: ... a mirror pair this much, the traced directions 1
+
+
+def _mirror(pts: np.ndarray, tol_cm: float) -> tuple[np.ndarray, np.ndarray, list[int]] | None:
+    """The outline's mirror line when its corners lie on each other mirrored within `tol_cm`:
+    (a point on it, its direction, each corner's mirror corner); else None."""
+    c = pts.mean(axis=0)
+    best: tuple[float, float, list[int]] | None = None
+    for deg in np.arange(0.0, 180.0, 0.25):  # param-ok: the mirror line's angle tried in steps
+        d = np.array([math.cos(math.radians(deg)), math.sin(math.radians(deg))])
+        q = pts - c
+        r = 2 * np.outer(q @ d, d) - q + c
+        dist = np.linalg.norm(r[:, None, :] - pts[None, :, :], axis=2)
+        j = dist.argmin(axis=1)
+        worst = float(dist[np.arange(len(pts)), j].max())
+        if len(set(j.tolist())) == len(pts) and (best is None or worst < best[0]):
+            best = (worst, float(deg), [int(x) for x in j])
+    if best is None or best[0] > tol_cm:
+        return None
+    a = math.radians(best[1])
+    return c, np.array([math.cos(a), math.sin(a)]), best[2]
+
+
+def true_sizes(
+    plan: Any, sizes: list[float], tol: float, square_deg: float, same_cm: float
+) -> tuple[Any, list[str]]:
+    """The traced top view made true to the drawing's written sizes (Rens, 9 Oct 2026: "the main
+    size 343.6 cm becomes 344 cm", "skirt right and skirt front both 92 cm"). Each outline edge
+    within tolerance of a written size gets exactly that length; an edge within `square_deg` of a
+    multiple of 45 degrees to the longest edge is turned onto it; an outline that is its own
+    mirror image gets mirror-equal edges of one size (the larger of their written sizes when
+    these differ by at most `same_cm`; edges written further apart stay as written). The edges
+    without a written size take up the rest. A curved outline (more than its corners) is left as
+    traced. Returns the plan and what was changed."""
+    import shapely
+    from scipy.optimize import least_squares
+
+    pts = _corners(plan)
+    n = len(pts)
+    off = abs(shapely.Polygon(pts).area - plan.area)
+    if n < 3 or off > tol / 10 * plan.area:  # param-ok: a tenth of the tolerance
+        return plan, []
+    e = np.roll(pts, -1, axis=0) - pts
+    lens = np.linalg.norm(e, axis=1)
+    ang = np.arctan2(e[:, 1], e[:, 0])
+    target: list[float | None] = [_near(float(L), sizes, tol) for L in lens]
+    step = math.radians(SQUARE_STEP_DEG)
+
+    def offs(ref: float) -> np.ndarray:
+        return np.array([math.remainder(a - ref, step) for a in ang])
+
+    # the squaring's frame: the edge direction most of the outline (by length) is square to,
+    # moved by their mean offset so no one traced edge sets it
+    ref = max(ang, key=lambda r: float(lens[np.abs(offs(r)) <= math.radians(square_deg)].sum()))
+    on = np.abs(offs(ref)) <= math.radians(square_deg)
+    ref += float((offs(ref)[on] * lens[on]).sum() / lens[on].sum())
+    square: list[float | None] = []
+    for a, o in zip(ang, offs(ref), strict=True):
+        square.append(a - o if abs(o) <= math.radians(square_deg) else None)
+    mir = _mirror(pts, max(tol * 100.0, tol * float(lens.max())))  # param-ok: % or cm, as _near
+    pairs: list[tuple[int, int]] = []
+    if mir is not None:
+        _, _, j = mir
+        for i in range(n):
+            # edge i runs from corner i to i+1; its mirror runs between their mirror corners
+            a, b = j[i], j[(i + 1) % n]
+            k = a if (b - a) % n == 1 else (b if (a - b) % n == 1 else None)
+            if k is None or k <= i:
+                continue
+            ti, tk = target[i], target[k]
+            if ti is not None and tk is not None and abs(ti - tk) > same_cm:
+                continue  # the drawing writes them apart: as written
+            t = max(x for x in (ti, tk, None) if x is not None) if (ti or tk) else None
+            target[i] = target[k] = t
+            pairs.append((i, k))
+    if not any(t is not None for t in target):
+        return plan, []
+
+    def res(x: np.ndarray) -> np.ndarray:
+        p = x.reshape(n, 2)
+        v = np.roll(p, -1, axis=0) - p
+        ln = np.linalg.norm(v, axis=1)
+        an = np.arctan2(v[:, 1], v[:, 0])
+        out = [(p[0] - pts[0]) * 1.0]  # param-ok: the first corner stays where it was traced
+        for i in range(n):
+            t = target[i]
+            if t is not None:
+                out.append(np.array([TRUE_LEN_W * (ln[i] - t)]))
+            want, w = (square[i], TRUE_SQUARE_W) if square[i] is not None else (ang[i], 1.0)
+            out.append(np.array([w * TRUE_REACH_CM * math.remainder(float(an[i] - want),
+                                                                    2 * math.pi)]))  # fmt: skip
+        for i, k in pairs:
+            out.append(np.array([TRUE_MIRROR_W * (ln[i] - ln[k])]))
+            if mir is not None:  # mirrored, edge k runs back along edge i's mirror image
+                d = mir[1]
+                r = v[i] - 2 * (v[i] @ d) * d
+                out.append(np.array([TRUE_MIRROR_W * TRUE_REACH_CM * math.remainder(
+                    float(an[k] - math.atan2(r[1], r[0])), 2 * math.pi)]))  # fmt: skip
+        return np.concatenate(out)
+
+    sol = least_squares(res, pts.ravel(), xtol=1e-12, ftol=1e-12, gtol=1e-12)
+    new = sol.x.reshape(n, 2)
+    moved = float(np.linalg.norm(new - pts, axis=1).max())
+    if moved > max(tol * 100.0, tol * float(lens.max())):  # param-ok: no more than a reading error
+        return plan, [f"the written sizes would move a corner {moved:.1f} cm: kept as traced"]
+    poly = shapely.Polygon(new)
+    if not poly.is_valid:
+        return plan, []
+    ne = np.linalg.norm(np.roll(new, -1, axis=0) - new, axis=1)
+    done = [f"{lens[i]:.1f} -> {ne[i]:.1f} cm" for i in range(n) if target[i] is not None
+            and abs(lens[i] - ne[i]) >= 0.05]  # fmt: skip  # param-ok: a change worth saying
+    if pairs:
+        done.append(f"{len(pairs)} mirror pair(s) one size")
+    return poly, done
+
+
 def _plan(read: dict[str, Any], tol: float) -> tuple[Any, float] | None:
     """The top view's outline in cm, its scale corrected so its long lengths along the outside
     are the written ones (the views' scale is a median over the sheet)."""
@@ -706,8 +869,14 @@ def fit(pdf: Path, read: dict[str, Any], params: EffectiveParams, roll_cm: float
     if got is None:
         return {"fit": None, "why": "no top view"}
     plan, fix = got
+    sizes = sorted(set(read["sizes_cm"]))
+    plan, trued = true_sizes(plan, sizes, p["isofit_size_tol"], p["isofit_square_deg"],
+                             p["isofit_same_cm"])  # fmt: skip
     pic = picture(pdf, iso, int(p["isofit_px"]), p["isofit_shade_step"])
-    return fit_picture(plan, sorted(set(read["sizes_cm"])), pic, params, roll_cm, fix)
+    res = fit_picture(plan, sizes, pic, params, roll_cm, fix)
+    if res["fit"] is not None:
+        res["fit"]["trued"] = trued
+    return res
 
 
 def fit_picture(plan: Any, sizes: list[float], pic: Picture, params: EffectiveParams,
@@ -783,6 +952,7 @@ def info(best: dict[str, Any]) -> dict[str, Any]:
         "arm_ends": len(best["fp"].ends), "seen_from_deg": best["azimuth"],
         "fits_3d_view": round(float(best["iou"]), 3), "creases": round(float(best["crease"]), 3),
         "lengths": best["lengths"], "scale_fix": round(float(best["scale_fix"]), 4),
+        "true_to_written": best.get("trued") or [],
     }  # fmt: skip
 
 

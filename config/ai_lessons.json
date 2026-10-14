@@ -128,5 +128,15 @@
     "check": "cover audit 'gentle folds' on given covers (seams.flat_split_max_deg); engine/tests/test_facets.py::test_the_audit_finds_a_flat_wall_split_on_a_drawing_cover, engine/tests/test_drawing_given.py::test_a_flat_wall_drawn_in_one_piece_is_one_piece.",
     "applies_to": "given",
     "ai_model": "approver"
+  },
+  {
+    "time": 1791979660,
+    "model_id": "drawing-c4",
+    "complaint": "The main size 343.6 cm must be 344 cm (C4), 356 cm must be 357 cm (C8), the cover 357 x 357 cm with skirt right and skirt front both 92 cm (C10); the side and back skirts of S33 and C29 not equal to each other and not as drawn (Rens at the Desk, 9 Oct 2026).",
+    "cause": "A cover fitted to the drawing's 3D view (isofit, ADR-094) took its footprint from the traced top view: each edge a few mm off its written size and a hair out of square, so mirror-equal walls differed (91.6 / 92.1 cm). Inch values converted (111.00 in = 281.9 cm) stood beside the drawing's own '282 cm', and the order number ('cover 86') was read as a size.",
+    "rule": "The top view is made true to the drawing's written sizes before the heights are fitted: every outline edge near a written size is exactly that size (the drawing's own cm value, never our measured or inch-converted one), edges near square are square, and on a mirror-symmetric outline mirror-equal edges are one size (the larger, when the drawing writes them at most drawing.isofit_same_cm apart; written further apart they stay as written).",
+    "check": "The audit's 'written sizes' check (a fitted top view's back lengths off their written size fail); engine/tests/test_drawing_isofit.py::test_the_traced_top_view_is_made_true_to_the_written_sizes and ::test_mirror_edges_written_a_hair_apart_are_one_size_written_far_apart_stay; engine/tests/test_drawing_views.py::test_the_drawings_own_cm_value_wins_over_an_inch_value_beside_it.",
+    "applies_to": "drawing",
+    "ai_model": "approver"
   }
 ]
