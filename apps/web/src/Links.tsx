@@ -125,6 +125,7 @@ export function Links({ initialQ = "" }: { initialQ?: string }) {
   const highs = (data?.links ?? []).filter(
     (l) =>
       l.status === "proposed" &&
+      !l.stale &&
       (l.score ?? 0) >= (data?.bulk_min ?? 1) &&
       l.doubts.length === 0,
   );
@@ -133,7 +134,10 @@ export function Links({ initialQ = "" }: { initialQ?: string }) {
     try {
       const r = await call<{ confirmed: number[]; skipped: unknown[] }>(
         "/api/links/bulk-confirm",
-        { ids: bulk.map((l) => l.id), min_score: data.bulk_min },
+        {
+          items: bulk.map((l) => ({ id: l.id, version: l.version })),
+          min_score: data.bulk_min,
+        },
       );
       setMsg(
         `${r.confirmed.length} confirmed` +
@@ -441,6 +445,7 @@ function LinkRow({
           <Picker
             drawing={l.drawing_id}
             replaces={l.id}
+            replacesVersion={l.version}
             onDone={() => {
               setPicking(false);
               onDone();
@@ -482,6 +487,7 @@ function NoPartner({
           <Picker
             drawing={id}
             replaces={null}
+            replacesVersion={null}
             onDone={() => {
               setPicking(false);
               onDone();
@@ -496,10 +502,12 @@ function NoPartner({
 function Picker({
   drawing,
   replaces,
+  replacesVersion,
   onDone,
 }: {
   drawing: string;
   replaces: number | null;
+  replacesVersion: number | null;
   onDone: () => void;
 }) {
   const [q, setQ] = useState("");
@@ -522,6 +530,7 @@ function Picker({
         drawing_id: drawing,
         model_id: model,
         replaces,
+        replaces_version: replacesVersion,
         mirror,
       });
       onDone();

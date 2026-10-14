@@ -283,7 +283,13 @@ def test_choose_replaces_and_logs_both(db: sqlite3.Connection, existing: bool) -
     old = insert(db)
     new = insert(db, model_id="suns-other") if existing else None
     result = links.choose(
-        db, DRAWING, "suns-other", "editor", replaces=old["id"], note="better fit"
+        db,
+        DRAWING,
+        "suns-other",
+        "editor",
+        replaces=old["id"],
+        note="better fit",
+        replaces_version=old["version"],
     )
     assert result["link"]["status"] == "manual"
     assert result["link"]["model_id"] == "suns-other"
@@ -453,7 +459,10 @@ def test_editor_admin_decisions_versions_and_invalid_status(app: Any, role: str)
         response = client.post(url, json={"status": "rejected", "version": confirmed["version"]})
         assert response.status_code == 200, response.text
         assert response.json()["status"] == "rejected"
-        assert client.post(url, json={"status": "manual"}).status_code == 400
+        bad = {"status": "manual", "version": confirmed["version"]}
+        assert client.post(url, json=bad).status_code == 400
+        # the version is required: a page that does not say what it saw cannot decide
+        assert client.post(url, json={"status": "confirmed"}).status_code == 422
         detail = client.get(f"/api/links/{row['id']}")
         assert detail.status_code == 200
         assert detail.json()["status"] == "rejected"
@@ -467,12 +476,10 @@ def test_bulk_confirm_enforces_floor_and_skip_reasons(app: Any, p: Any) -> None:
     doubtful = api_insert(app, model_id="suns-doubt", score=1.0, doubts=["another family"])
     rejected = api_insert(app, model_id="suns-rejected", score=1.0)
     with links.opened(Path(app.state.store.root) / "app.db") as db:
-        links.decide(db, rejected["id"], "rejected", "editor")
+        rejected = links.decide(db, rejected["id"], "rejected", "editor")
     with login(app, "editor") as client:
-        response = client.post(
-            "/api/links/bulk-confirm",
-            json={"ids": [r["id"] for r in (high, low, doubtful, rejected)], "min_score": 0.0},
-        )
+        items = [{"id": r["id"], "version": r["version"]} for r in (high, low, doubtful, rejected)]
+        response = client.post("/api/links/bulk-confirm", json={"items": items, "min_score": 0.0})
         assert response.status_code == 200, response.text
         result = response.json()
         assert result["min_score"] == floor
@@ -731,3 +738,62 @@ def test_script_apply_preserves_confirmed_pair(
     with links.opened(path) as db:
         assert dict(links.get(db, row["id"])) == before
         assert links.history(db, row["id"]) == log_before
+
+
+# ---- Codex's adversarial review: stale pages and withdrawn proposals ---------------------------
+
+
+def test_choose_refuses_a_stale_replaced_link(db: sqlite3.Connection) -> None:
+    old = insert(db)
+    seen = old["version"]
+    links.decide(db, old["id"], "confirmed", "rens", version=seen)  # someone confirmed meanwhile
+    with pytest.raises(HTTPException) as err:
+        links.choose(db, DRAWING, "suns-other", "editor", replaces=old["id"], replaces_version=seen)
+    assert err.value.status_code == 409
+    assert links.get(db, old["id"])["status"] == "confirmed"
+    assert links._pair(db, DRAWING, "suns-other") is None
+    with pytest.raises(HTTPException) as err:
+        links.choose(db, DRAWING, "suns-other", "editor", replaces=old["id"])
+    assert err.value.status_code == 400  # the version of the replaced link is required
+
+
+def test_choose_never_revives_a_rejected_target_silently(db: sqlite3.Connection) -> None:
+    target = insert(db, model_id="suns-other")
+    links.decide(db, target["id"], "rejected", "rens", version=target["version"])
+    with pytest.raises(HTTPException) as err:
+        links.choose(db, DRAWING, "suns-other", "editor")
+    assert err.value.status_code == 409
+    assert links.get(db, target["id"])["status"] == "rejected"
+    out = links.choose(db, DRAWING, "suns-other", "editor", override=True)
+    assert out["link"]["status"] == "manual"
+
+
+def test_choose_keeps_a_confirmed_target_as_it_is(db: sqlite3.Connection) -> None:
+    target = insert(db, model_id="suns-other")
+    confirmed = links.decide(db, target["id"], "confirmed", "rens", version=target["version"])
+    out = links.choose(db, DRAWING, "suns-other", "editor", note="mine")
+    assert out["link"]["status"] == "confirmed"
+    assert out["link"]["version"] == confirmed["version"]
+    assert links.get(db, target["id"])["decided_by"] == "rens"
+
+
+def test_bulk_skips_withdrawn_and_changed_proposals(app: Any, p: Any) -> None:
+    score = min(1.0, float(p["links.bulk_min"]) + 0.05)
+    withdrawn = api_insert(app, model_id="suns-old", score=score)
+    changed = api_insert(app, model_id="suns-changed", score=score)
+    with links.opened(Path(app.state.store.root) / "app.db") as db:
+        links.mark_stale(db, {(DRAWING, "suns-changed")})
+    items = [
+        {"id": withdrawn["id"], "version": withdrawn["version"] + 1},  # as the page now shows it
+        {"id": changed["id"], "version": changed["version"] - 1},  # an older page
+    ]
+    with login(app, "editor") as client:
+        response = client.post("/api/links/bulk-confirm", json={"min_score": 0.0, "items": items})
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result["confirmed"] == []
+        why = {r["id"]: r["why"] for r in result["skipped"]}
+        assert "old proposal" in why[withdrawn["id"]]
+        assert "changed meanwhile" in why[changed["id"]]
+    pairs = links.learning_pairs(Path(app.state.store.root) / "app.db")
+    assert not [r for r in pairs if r["model_id"] in ("suns-old", "suns-changed")]

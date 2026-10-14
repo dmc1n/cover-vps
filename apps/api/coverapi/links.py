@@ -329,21 +329,40 @@ def choose(
     mirror: bool = False,
     scored: dict[str, Any] | None = None,
     facts: dict[str, Any] | None = None,
+    replaces_version: int | None = None,
+    override: bool = False,
 ) -> dict[str, Any]:
     """ "Choose another": a person links this drawing and this model (status manual). The link
-    it replaces, if any, becomes rejected with a note, so it is no longer used anywhere."""
+    it replaces, if any, becomes rejected with a note, so it is no longer used anywhere.
+
+    Never over another person's newer decision (Codex's review): the replaced link must still be
+    at the version the page saw (409 otherwise), and a target pair someone already decided is
+    left as it is (confirmed, chosen) or refused (rejected: 409 unless `override`, a person
+    saying "yes, I mean this one after all")."""
     if drawing_id == model_id:
         raise HTTPException(400, "a cover cannot be linked to itself")
     old = _pair(db, drawing_id, model_id)
+    if old is not None and old["status"] == "rejected" and not override:
+        raise HTTPException(
+            409,
+            f"{model_id} was rejected for {drawing_id} by {old['decided_by']}; "
+            "open it under Not a pair to decide again",
+        )
     replaced = None
     if replaces is not None:
         rep = get(db, replaces)
         if rep["drawing_id"] != drawing_id:
             raise HTTPException(400, "the link it replaces belongs to another drawing")
+        if replaces_version is None:
+            raise HTTPException(400, "replaces_version: the version of the link it replaces")
         if rep["id"] != (old["id"] if old else None):
-            replaced = decide(db, rep["id"], "rejected", who, note=f"replaced by {model_id}")
-    if old is not None:
-        out = decide(db, old["id"], "manual", who, note=note, mirror=mirror)
+            replaced = decide(db, rep["id"], "rejected", who, note=f"replaced by {model_id}",
+                              version=replaces_version)  # fmt: skip
+    if old is not None and old["status"] in LEARN:
+        out = row_out(old)  # already a person's yes: kept as it is
+    elif old is not None:
+        out = decide(db, old["id"], "manual", who, note=note, mirror=mirror,
+                     version=int(old["version"]))  # fmt: skip
     else:
         now = time.time()
         s = scored or {}
@@ -514,7 +533,7 @@ def links_of(db_path: Path, model_id: str) -> list[dict[str, Any]]:
 class DecideIn(BaseModel):
     status: str  # confirmed | rejected | proposed (reopen)
     note: str = ""
-    version: int | None = None
+    version: int  # the version the page saw: a newer decision is never overwritten (409)
     mirror: bool | None = None
 
 
@@ -522,12 +541,19 @@ class ChooseIn(BaseModel):
     drawing_id: str
     model_id: str
     replaces: int | None = None
+    replaces_version: int | None = None
     note: str = ""
     mirror: bool = False
+    override: bool = False  # choose a pair someone rejected before, knowingly
+
+
+class BulkItem(BaseModel):
+    id: int
+    version: int
 
 
 class BulkIn(BaseModel):
-    ids: list[int]
+    items: list[BulkItem]
     min_score: float
 
 
@@ -693,6 +719,8 @@ def install(app: FastAPI, store: Any) -> None:
                 body.mirror,
                 scored,
                 facts,
+                replaces_version=body.replaces_version,
+                override=body.override,
             )
 
     @app.post("/api/links/bulk-confirm")
@@ -702,15 +730,20 @@ def install(app: FastAPI, store: Any) -> None:
         user = require(request, "edit")
         p = Registry.load(None).resolve()
         floor = max(float(body.min_score), float(p["links.bulk_min"]))  # type: ignore[arg-type]
-        if len(body.ids) > BULK_MAX:
+        if len(body.items) > BULK_MAX:
             raise HTTPException(400, f"at most {BULK_MAX} links at once")
         done, skipped = [], []
+        seen = {it.id: it.version for it in body.items}
         with opened(db_path) as db:
-            for lid in dict.fromkeys(body.ids):
+            for lid, version in seen.items():
                 r = db.execute("SELECT * FROM model_links WHERE id=?", (lid,)).fetchone()
                 why = None if r is not None else "no such link"
-                if r is not None and r["status"] != "proposed":
+                if r is not None and int(r["version"]) != int(version):
+                    why = "changed meanwhile"
+                elif r is not None and r["status"] != "proposed":
                     why = f"already {r['status']}"
+                elif r is not None and r["stale"]:
+                    why = "an old proposal: the last run no longer makes it"
                 elif r is not None and (r["score"] is None or r["score"] < floor):
                     why = f"score below {floor:g}"
                 elif r is not None and json.loads(r["doubts"]):
@@ -718,7 +751,7 @@ def install(app: FastAPI, store: Any) -> None:
                 if why:
                     skipped.append({"id": lid, "why": why})
                     continue
-                decide(db, lid, "confirmed", user.username, note="bulk confirm")
+                decide(db, lid, "confirmed", user.username, note="bulk confirm", version=version)
                 done.append(lid)
         return {"confirmed": done, "skipped": skipped, "min_score": floor}
 

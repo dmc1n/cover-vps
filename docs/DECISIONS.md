@@ -4811,7 +4811,11 @@ Evora sunlounger and showed it as a fact. Plan and numbers: docs/plans/drawing-m
    version) and `model_link_log` (every change, never deleted). Confirmed, rejected and manual
    (chosen by hand) are a person's decision: `scripts/link_proposals.py` never changes them (not
    the status, score, reasons or version); proposals it no longer makes are marked stale, never
-   deleted. A decision names the version it saw; a stale page gets 409. One row per pair;
+   deleted. Every decision names the version it saw (required); a stale page gets 409. "Choose
+   another" also checks the replaced link's version, keeps a target someone already confirmed,
+   and refuses a target someone rejected unless the person says so (`override`); bulk
+   confirmation sends each row's version and skips stale (withdrawn) proposals, so nothing the
+   proposer took back becomes a learning pair (Codex's adversarial review). One row per pair;
    many-to-one both ways (one drawing for both hands, one table drawing for three 340 tables).
 2. **Mirror** is a flag on the link (the drawing is the other hand of the model), from the
    names or the hand of the L in plan; a mirror pair is proposed and flagged, never refused, and
