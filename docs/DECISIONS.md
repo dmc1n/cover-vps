@@ -4989,7 +4989,7 @@ minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
 - Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
   constants, so the registry test tells them from the new default.
 
-## ADR-134 — Every Desk action says how it went; a second approval is refused; "Waiting for us"
+## ADR-135 — Every Desk action says how it went; a second approval is refused; "Waiting for us"
 
 14 Oct 2026, v2.0.0: the owner reported that **Approve** on the Desk "seems to do nothing".
 Root causes, from a reproduction on a scratch copy and the live log:

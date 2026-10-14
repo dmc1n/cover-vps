@@ -20,7 +20,7 @@ or marked produced is listed for the workshop, with its files and how it fitted,
   7. approved and produced covers come last.
 
   Filter by status, by series (C, S, D, …) or search. Two filters answer "has anything
-  happened since my remark?" (Rens, 14 Oct 2026; ADR-134):
+  happened since my remark?" (Rens, 14 Oct 2026; ADR-135):
   - **Waiting for us** (with its number): every cover with a remark (a rejection, a comment
     or a fit) newer than the studio's last change. The studio still has to answer it; the
     daily round lists the same covers (`scripts/desk_open_remarks.py`).
@@ -64,7 +64,7 @@ or marked produced is listed for the workshop, with its files and how it fitted,
     the top right says **Approved: <cover>**, the counts and the list follow, and the next
     cover of the list opens. Approving a rejected cover works the same way. A cover that is
     already approved for its current cutting file is not approved twice: the message says
-    who approved it and when (ADR-134).
+    who approved it and when (ADR-135).
   - **Every action says how it went.** A refusal (for example "nothing to undo", "approve
     the cover before marking it produced", "already approved by …") shows in red at the top
     right and next to the buttons, with the server's reason. It never fails silently.
