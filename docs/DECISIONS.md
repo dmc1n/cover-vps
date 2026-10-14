@@ -4794,3 +4794,64 @@ icons on every menu item, tab, toolbar action and status chip, and the text redu
 Better, later: the Desk card's tabs as a segmented control on a phone; the glyphs as an SVG
 sprite if their number grows; a design-token export for the website (ADR-105) so both share
 the status colours.
+
+## ADR-134 — Every Desk action says how it went; a second approval is refused; "Waiting for us"
+
+14 Oct 2026, v2.0.0: the owner reported that **Approve** on the Desk "seems to do nothing".
+Root causes, from a reproduction on a scratch copy and the live log:
+
+1. **An approval is slow and the button gave no sign.** `desk.apply` stamps `sizes.pdf` and
+   `cutting-list.pdf` (ADR-128) and makes the size drawing first when it is missing
+   (`approval.prepare` → `ensure_sizes`): 8 s on a drawing cover, 40 s for three overlapping
+   ones. `CardView.act` cleared its message, showed nothing busy and left every button live
+   for that time, so the click looked lost and people clicked again (a rejected cover
+   included: the server approves it like any other; a browser check that waited 2.5 s saw
+   no answer yet).
+2. **Nothing refused a second approval.** Each extra click re-stamped the PDFs and added an
+   approval to the history.
+3. **The next card was chosen from the list as it was when the button was rendered**, by a
+   timer 900 ms after the answer, whether or not the person was still on that card; the
+   queue reload was not awaited, and a failed reload replaced the whole Desk with an error.
+4. **Refusals were easy to miss and Undo was offered with nothing to undo.** On live (09:37)
+   the cover's history holds a fit, an undo, then three `409 nothing to undo`: the Undo icon
+   stays while the history is not empty. The message was a grey line beside the buttons.
+5. The `401` in the console is the session probe (`GET /api/auth/me`) before the login:
+   harmless.
+
+No element covers the action bar (`elementFromPoint` on the Approve button is the button,
+Chromium, WebKit, Firefox, 1440 and 1024).
+
+Decision:
+- One action at a time per card (`busyRef`): the clicked button says **Approving…** (a
+  spinner), every other action and key waits; when the answer comes a message at the top
+  right (**Approved: <cover>**, kept while the next card opens), the queue and the card are
+  refreshed and awaited, then the next card opens. The next card is chosen **before** the
+  action (the list changes after it) and opened only while the person is still on that card;
+  after the last card the message says so.
+- A refusal (409, 400, 403) shows the server's reason in red, as a message at the top right
+  (`role=alert`) and beside the buttons ("Approve D2 refused: already approved by Wout …"),
+  and the card and the queue are reloaded (someone else may have acted).
+- `POST /api/desk/<id>` `approve` on a cover whose approval holds for its current cut is a
+  `409` naming who approved it and when, checked before stamping and again under the lock.
+  A new cut can be approved again as before; an order on an approved catalogue cover is
+  noted by `mark_order` (ADR-128).
+- The card answers `can_undo`; the Undo icon and the key `u` follow it.
+- The keys do what the buttons do: not while a dialog, a zoomed picture or an action is
+  open, not with Ctrl/Cmd/Alt or a held key; `a` on an approved cover says so.
+- The order's quick approval in the queue: busy, its own message, the queue and the open card
+  refreshed.
+
+Rens asked the same day: "if a cover is not under 2nd round, does that mean it hasn't been
+changed since my last comment?" Each queue item now carries `last_remark_time` (a person's
+reject, comment, note or fit, not undone), `last_change_time` (the studio's last action) and
+`open_remark` (the remark is newer). Rows and the card head show **Changed <date>** or
+**Not changed yet** (orange). **Waiting for us** lists the covers with an open remark, the
+rule of `scripts/desk_open_remarks.py` (which now takes its names from `desk.STUDIO_NAMES` and
+`desk.REMARK_ACTIONS`); **2nd round** lists only covers changed after a remark that wait
+again (new or AI checked).
+
+Checked by `apps/web/e2e/desk_actions.py` (Chromium, WebKit, Firefox at 1440 and 1024 touch:
+approve an AI-checked and a rejected card by the button, by the key, reject, comment, a
+refusal, an order's quick approval; counts, list and next card each time; the filters) and
+`apps/api/tests/test_desk.py`. Not done: making the approval itself faster (the size drawing
+could be made when the cover is built instead of at the approval).

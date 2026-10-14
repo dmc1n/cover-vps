@@ -24,7 +24,14 @@ import {
   uploadPictures,
   type Pending,
 } from "./DeskPictures";
-import { Icon, IconButton, IconLink, Info, type IconName } from "./icons";
+import {
+  Icon,
+  IconButton,
+  IconLink,
+  Info,
+  StatusChip,
+  type IconName,
+} from "./icons";
 import { useSession } from "./Session";
 import {
   arrangementHref,
@@ -65,6 +72,11 @@ interface Item {
    * (ADR-128); `built`: its cutting file exists */
   order?: { order: number; b2b: boolean; by: string; time: number } | null;
   built?: boolean;
+  /** the last remark a person left (reject, comment, fit) and the studio's last change: a
+   * remark newer than the change waits for us (Rens, 14 Oct 2026; desk_open_remarks.py) */
+  last_remark_time?: number | null;
+  last_change_time?: number | null;
+  open_remark?: boolean;
 }
 interface Spend {
   month_eur: number;
@@ -113,6 +125,8 @@ interface Card extends Item {
     preferred_revision?: number;
     history: Hist[];
   };
+  /** something in the history an undo can take back (the server decides) */
+  can_undo?: boolean;
   check: {
     outcome?: string;
     gemini?: Verdict;
@@ -247,18 +261,88 @@ const when = (t?: number) =>
 const tone = (s: number | null | undefined) =>
   s == null ? "none" : s >= 80 ? "good" : s >= 60 ? "mid" : "bad";
 
+/** A refusal or a failure with the server's own reason (409, 400, 403...). */
+export class DeskError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function getJSON<T>(url: string, body?: unknown): Promise<T> {
-  const r = await fetch(url, {
-    method: body === undefined ? "GET" : "POST",
-    headers:
-      body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let r: Response;
+  try {
+    r = await fetch(url, {
+      method: body === undefined ? "GET" : "POST",
+      headers:
+        body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new DeskError(0, `no connection to the studio (${String(e)})`);
+  }
   if (r.status === 401) window.dispatchEvent(new Event("login-needed"));
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.detail ?? `${r.status}`);
+  if (!r.ok) {
+    const detail =
+      typeof data.detail === "string"
+        ? data.detail
+        : data.detail
+          ? JSON.stringify(data.detail)
+          : r.statusText || "no reason given";
+    throw new DeskError(r.status, detail);
+  }
   return data as T;
 }
+
+/** What a failed action says on the screen: never silent (14 Oct 2026). */
+export function failText(what: string, e: unknown): string {
+  const err = e as DeskError;
+  const why = String(err?.message ?? e);
+  if (err?.status === 409 || err?.status === 400)
+    return `${what} refused: ${why}`;
+  if (err?.status === 403) return `${what} not allowed: ${why}`;
+  if (err?.status === 401) return `${what}: log in again (${why})`;
+  if (err?.status) return `${what} failed (${err.status}): ${why}`;
+  return `${what} failed: ${why}`;
+}
+
+const day = (t?: number | null) =>
+  t
+    ? new Date(t * 1000).toLocaleDateString(undefined, {
+        day: "numeric",
+        month: "short",
+      })
+    : "";
+
+/** "Changed 12 Oct" or "Not changed yet": has the studio changed the cover since the last
+ * remark a person left? (Rens, 14 Oct 2026) Nothing when nobody left a remark. */
+function RemarkChip({ item }: { item: Item }) {
+  if (!item.last_remark_time) return null;
+  if (item.open_remark)
+    return (
+      <StatusChip
+        status="warning"
+        className="d-remark-chip"
+        title={`Your last remark (${when(item.last_remark_time)}) is newer than the studio's last change${item.last_change_time ? ` (${when(item.last_change_time)})` : ""}: it waits for us`}
+      >
+        Not changed yet
+      </StatusChip>
+    );
+  if (!item.last_change_time) return null;
+  return (
+    <StatusChip
+      status="changed"
+      className="d-remark-chip"
+      title={`Changed by the studio ${when(item.last_change_time)}, after the last remark (${when(item.last_remark_time)})`}
+    >
+      Changed {day(item.last_change_time)}
+    </StatusChip>
+  );
+}
+
+type Toast = { text: string; kind: "ok" | "err" | "busy"; n: number };
 
 export function Desk({
   selected,
@@ -274,13 +358,36 @@ export function Desk({
   const [series, setSeries] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("need");
+  // the queue and its counts; a refresh that fails says so and keeps what is on the screen
+  const [refreshErr, setRefreshErr] = useState("");
+  const loaded = useRef(false);
   const load = useCallback(
     () =>
       getJSON<Queue>("/api/desk")
-        .then(setQ)
-        .catch((e) => setErr(String(e.message ?? e))),
+        .then((data) => {
+          loaded.current = true;
+          setQ(data);
+          setRefreshErr("");
+        })
+        .catch((e) => {
+          if (loaded.current) setRefreshErr(failText("Refreshing the list", e));
+          else setErr(String((e as Error).message ?? e));
+        }),
     [],
   );
+  // one message for every action, also after its card was left (a toast at the top)
+  const [toast, setToast] = useState<Toast | null>(null);
+  const notify = useCallback((text: string, kind: Toast["kind"]) => {
+    setToast((t) => ({ text, kind, n: (t?.n ?? 0) + 1 }));
+  }, []);
+  useEffect(() => {
+    if (!toast || toast.kind !== "ok") return;
+    const t = setTimeout(
+      () => setToast((cur) => (cur?.n === toast.n ? null : cur)),
+      6000,
+    );
+    return () => clearTimeout(t);
+  }, [toast]);
   useEffect(() => {
     load();
   }, [load]);
@@ -288,13 +395,21 @@ export function Desk({
   const items = useMemo(() => {
     const all = q?.items ?? [];
     const shown = all.filter((i) => {
-      if (status === "second" && !i.second_round) return false;
+      // 2nd round: changed after a remark and waiting for a look again (Rens, 14 Oct 2026)
+      if (
+        status === "second" &&
+        !(i.second_round && ["new", "ai-checked"].includes(i.status))
+      )
+        return false;
+      // waiting for us: a remark newer than the studio's last change (desk_open_remarks.py)
+      if (status === "waiting" && !i.open_remark) return false;
       if (status === "open" && ["approved", "produced"].includes(i.status))
         return false;
       if (
         status !== "open" &&
         status !== "all" &&
         status !== "second" &&
+        status !== "waiting" &&
         i.status !== status
       )
         return false;
@@ -328,17 +443,45 @@ export function Desk({
   };
   // an order's quick approval from the queue: one click (ADR-128)
   const [quickMsg, setQuickMsg] = useState("");
+  const [quickBusy, setQuickBusy] = useState<string | null>(null);
+  const [cardRev, setCardRev] = useState(0); // the open card reloads after a quick approval
   const quick = async (i: Item) => {
-    setQuickMsg("");
+    if (quickBusy) return;
+    setQuickBusy(i.id);
+    const what = `Approving order ${i.order?.order}: ${i.code}`;
+    setQuickMsg(`${what}…`);
+    notify(
+      `${what}… (the drawings are stamped, this can take a while)`,
+      "busy",
+    );
     try {
       await getJSON(`/api/desk/${i.id}`, { action: "approve" });
-      setQuickMsg(`Approved order ${i.order?.order}: ${i.code}`);
-      load();
+      const done = `Approved order ${i.order?.order}: ${i.code}`;
+      setQuickMsg(done);
+      notify(done, "ok");
     } catch (e) {
-      setQuickMsg(String((e as Error).message ?? e));
+      const m = failText(`Approving order ${i.order?.order}`, e);
+      setQuickMsg(m);
+      notify(m, "err");
+    } finally {
+      setQuickBusy(null);
+      await load();
+      setCardRev((n) => n + 1);
     }
   };
   const idx = items.findIndex((i) => i.id === selected);
+  // the newest list and selection, for an action that ends after a re-render
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  /** the card after this one in the list as it is now (before the action changes it) */
+  const nextAfter = useCallback((id: string): string | null => {
+    const list = itemsRef.current;
+    const k = list.findIndex((i) => i.id === id);
+    if (k < 0) return null;
+    return list[k + 1]?.id ?? null;
+  }, []);
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
@@ -377,8 +520,25 @@ export function Desk({
     ["new", c.new ?? 0],
     ["rejected", c.rejected ?? 0],
   ] as const;
+  const waiting = q.items.filter((i) => i.open_remark).length;
   return (
     <div className="desk tpl tpl-queue">
+      {toast && (
+        <div
+          className={`d-toast t-${toast.kind}`}
+          role={toast.kind === "err" ? "alert" : "status"}
+          data-testid="desk-toast"
+        >
+          <span>{toast.text}</span>
+          <button
+            type="button"
+            aria-label="Close the message"
+            onClick={() => setToast(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <section className="d-top">
         <div className="d-title">
           <div className="head-row">
@@ -453,6 +613,7 @@ export function Desk({
             <div className="d-seg-ctl">
               {[
                 "open",
+                "waiting",
                 "second",
                 "all",
                 "rejected",
@@ -462,15 +623,25 @@ export function Desk({
                 <button
                   key={s}
                   className={status === s ? "on" : ""}
+                  data-filter={s}
+                  title={
+                    s === "waiting"
+                      ? "A remark (reject, comment, fit) newer than the studio's last change"
+                      : s === "second"
+                        ? "Changed after a remark, waiting for a look again"
+                        : undefined
+                  }
                   onClick={() => setStatus(s)}
                 >
                   {s === "open"
                     ? "To do"
-                    : s === "all"
-                      ? "All"
-                      : s === "second"
-                        ? "2nd round"
-                        : STATUS_LABEL[s]}
+                    : s === "waiting"
+                      ? `Waiting for us${waiting ? ` ${waiting}` : ""}`
+                      : s === "all"
+                        ? "All"
+                        : s === "second"
+                          ? "2nd round"
+                          : STATUS_LABEL[s]}
                 </button>
               ))}
             </div>
@@ -503,14 +674,23 @@ export function Desk({
             </label>
           </div>
           {quickMsg && (
-            <p className="d-msg" role="status">
+            <p className="d-msg" role="status" data-testid="desk-quick-msg">
               {quickMsg}
+            </p>
+          )}
+          {refreshErr && (
+            <p className="d-msg d-msg-err" role="alert">
+              {refreshErr}{" "}
+              <button className="d-btn d-ghost d-small" onClick={() => load()}>
+                Try again
+              </button>
             </p>
           )}
           <ul className="d-list">
             {items.map((i) => (
               <li
                 key={i.id}
+                data-id={i.id}
                 className={i.id === selected ? "sel" : ""}
                 onClick={() => open(i.id)}
               >
@@ -528,6 +708,7 @@ export function Desk({
                     <strong>{i.code}</strong>
                     <Pill status={i.status} arrangement={i.arrangement} />
                   </div>
+                  <RemarkChip item={i} />
                   {i.order && (
                     <div className="d-order" data-testid="desk-order">
                       <span
@@ -542,13 +723,16 @@ export function Desk({
                           <button
                             className="d-btn d-primary d-small"
                             title="The order's quick approval: the DXF follows at once"
+                            data-testid="desk-quick-approve"
+                            disabled={!!quickBusy}
+                            aria-busy={quickBusy === i.id}
                             onClick={(e) => {
                               e.stopPropagation();
                               quick(i);
                             }}
                           >
                             <Icon name="approve" size={14} />
-                            Approve
+                            {quickBusy === i.id ? "Approving…" : "Approve"}
                           </button>
                         ) : (
                           <span className="d-muted">being calculated…</span>
@@ -618,11 +802,16 @@ export function Desk({
               picturesMax={q.pictures_max ?? 8}
               onChanged={load}
               flash={flash}
-              onNext={(done) =>
-                idx >= 0 &&
-                idx + 1 < items.length &&
-                open(items[idx + 1].id, `${done}: ${items[idx].code}`)
-              }
+              rev={cardRev}
+              notify={notify}
+              nextAfter={nextAfter}
+              onNext={(done, from, next) => {
+                // only when the person is still on that card: a click elsewhere wins
+                if (selectedRef.current !== from) return;
+                if (next) open(next, done);
+                else
+                  notify(`${done} · that was the last one in this list`, "ok");
+              }}
             />
           ) : (
             <div className="d-placeholder">Pick a cover from the list.</div>
@@ -709,19 +898,27 @@ function CardView({
   picturesMax,
   onChanged,
   onNext,
+  nextAfter = () => null,
+  notify = () => {},
+  rev = 0,
   flash = "",
   canNote = false,
 }: {
   id: string;
   tab: string;
   flash?: string;
+  /** reload the card (a quick approval in the queue changed it) */
+  rev?: number;
+  notify?: (text: string, kind: "ok" | "err" | "busy") => void;
+  nextAfter?: (id: string) => string | null;
   canAct: boolean;
   /** the workshop login: Comment and After sewing (a fit, measured sizes), nothing else */
   canNote?: boolean;
   reasons: string[];
   picturesMax: number;
-  onChanged: () => void;
-  onNext: (done: string) => void;
+  onChanged: () => void | Promise<unknown>;
+  /** after an approval or a rejection: the next card (`next`, chosen before the list changed) */
+  onNext: (done: string, from: string, next: string | null) => void;
 }) {
   const { user } = useSession();
   const workshopLogin = isWorkshop(user); // no cover page, no product list (ADR-128)
@@ -749,18 +946,22 @@ function CardView({
   const [aiNote, setAiNote] = useState("");
   const textRef = useRef<HTMLTextAreaElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const load = useCallback(() => {
-    getJSON<Card>(`/api/desk/${id}`)
-      .then(setCard)
-      .catch((e) => setMsg(String(e.message ?? e)));
-    api
-      .model(id)
-      .then(setModel)
-      .catch(() => setModel(null));
-  }, [id]);
+  const load = useCallback(
+    () =>
+      Promise.all([
+        getJSON<Card>(`/api/desk/${id}`)
+          .then(setCard)
+          .catch((e) => setMsg(failText("Loading the card", e))),
+        api
+          .model(id)
+          .then(setModel)
+          .catch(() => setModel(null)),
+      ]),
+    [id],
+  );
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, rev]);
   useEffect(() => {
     setMeasuring(false);
     setMeasured({});
@@ -801,23 +1002,57 @@ function CardView({
     return () => clearInterval(t);
   }, [aiJob, id, load, onChanged]);
 
+  // one action at a time (14 Oct 2026: an approval stamps the drawings for seconds, the button
+  // gave no sign and people clicked again): busy on the screen, then the outcome in words,
+  // the list and its counts refreshed, and on to the next card
+  const [busy, setBusy] = useState("");
+  const [msgErr, setMsgErr] = useState(false);
+  const busyRef = useRef(false);
+  const code = card?.code ?? id;
   const act = useCallback(
-    async (body: Record<string, unknown>, done: string, next = false) => {
-      setMsg("");
+    async (
+      body: Record<string, unknown>,
+      done: string,
+      next = false,
+      doing = "Saving…",
+    ) => {
+      if (busyRef.current) return false;
+      busyRef.current = true;
+      setBusy(doing);
+      setMsg(doing);
+      setMsgErr(false);
+      const action = String(body.action);
+      const slow = action === "approve";
+      notify(
+        slow
+          ? `${doing} ${code}: the drawings are stamped, this can take a while`
+          : `${doing} ${code}`,
+        "busy",
+      );
+      const following = next ? nextAfter(id) : null; // before the list changes
       try {
         await getJSON(`/api/desk/${id}`, body);
-        setMsg(done);
-        setDialog("");
-        load();
-        onChanged();
-        if (next) setTimeout(() => onNext(done), 900);
-        return true;
       } catch (e) {
-        setMsg(String((e as Error).message ?? e));
+        const m = failText(`${ACTION_NAME[action] ?? action} ${code}`, e);
+        setMsg(m);
+        setMsgErr(true);
+        notify(m, "err");
+        busyRef.current = false;
+        setBusy("");
+        // the card and the list as they are now: someone else may have acted
+        await Promise.all([load(), onChanged()]);
         return false;
       }
+      setDialog("");
+      setMsg(done);
+      notify(`${done}: ${code}`, "ok");
+      await Promise.all([load(), onChanged()]);
+      busyRef.current = false;
+      setBusy("");
+      if (next) onNext(`${done}: ${code}`, id, following);
+      return true;
     },
-    [id, load, onChanged, onNext],
+    [id, code, load, onChanged, onNext, nextAfter, notify],
   );
 
   // a reject or a comment: the pictures go up first, then the action names them
@@ -838,7 +1073,14 @@ function CardView({
       );
       setPending(sent);
       const pictures = sent.map((p) => p.name as string);
-      if (await act({ ...body, pictures }, done, next)) {
+      if (
+        await act(
+          { ...body, pictures },
+          done,
+          next,
+          body.action === "reject" ? "Rejecting…" : "Saving the comment…",
+        )
+      ) {
         sent.forEach((p) => URL.revokeObjectURL(p.url));
         setPending([]);
         setText("");
@@ -864,11 +1106,19 @@ function CardView({
       const t = e.target as HTMLElement;
       if (!card || !(canAct || canNote)) return;
       if (t && ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) return;
+      if (t?.isContentEditable) return;
+      // the keys do what the buttons do, only when the buttons are there
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      if (e.defaultPrevented || dialog || zoom || busyRef.current) return;
       if (!canAct) {
         if (e.key === "c") openDialog("note"); // the workshop: a comment only
         return;
       }
-      if (e.key === "a") act({ action: "approve" }, "Approved", true);
+      const done = ["approved", "produced"].includes(card.desk.status);
+      if (e.key === "a") {
+        if (done) notify(`${card.code} is already ${card.desk.status}`, "ok");
+        else act({ action: "approve" }, "Approved", true, "Approving…");
+      }
       if (e.key === "r") openDialog("reject");
       if (e.key === "c") openDialog("note");
       if (e.key === "p")
@@ -876,11 +1126,12 @@ function CardView({
           { action: "produced", done: card.desk.status !== "produced" },
           card.desk.status !== "produced" ? "Marked produced" : "Not produced",
         );
-      if (e.key === "u") act({ action: "undo" }, "Undone");
+      if (e.key === "u" && card.can_undo !== false)
+        act({ action: "undo" }, "Undone", false, "Undoing…");
     };
     window.addEventListener("keydown", on);
     return () => window.removeEventListener("keydown", on);
-  }, [canAct, canNote, card, act]);
+  }, [canAct, canNote, card, act, dialog, zoom, notify]);
 
   if (!card) return <div className="d-card d-loading">{msg || "Loading…"}</div>;
   const ck = card.check;
@@ -1017,6 +1268,7 @@ function CardView({
             </>
           )}
           <Pill status={st.status} arrangement={!!arr} />
+          <RemarkChip item={card} />
           {!workshopLogin && (
             <IconLink
               icon="open"
@@ -1449,16 +1701,38 @@ function CardView({
               <>
                 <button
                   className="d-btn d-primary"
+                  data-testid="desk-approve"
+                  aria-busy={busy === "Approving…"}
                   disabled={
-                    st.status === "approved" || st.status === "produced"
+                    !!busy ||
+                    st.status === "approved" ||
+                    st.status === "produced"
                   }
-                  onClick={() => act({ action: "approve" }, "Approved", true)}
+                  title={
+                    st.status === "approved" || st.status === "produced"
+                      ? `Already ${st.status}`
+                      : undefined
+                  }
+                  onClick={() =>
+                    act({ action: "approve" }, "Approved", true, "Approving…")
+                  }
                 >
                   <Icon name="approve" />
-                  Approve <kbd>a</kbd>
+                  {busy === "Approving…" ? (
+                    <>
+                      <span className="d-spin" aria-hidden="true" />
+                      Approving…
+                    </>
+                  ) : (
+                    <>
+                      Approve <kbd>a</kbd>
+                    </>
+                  )}
                 </button>
                 <button
                   className="d-btn d-danger"
+                  data-testid="desk-reject"
+                  disabled={!!busy}
                   onClick={() => openDialog("reject")}
                 >
                   <Icon name="reject" />
@@ -1468,6 +1742,8 @@ function CardView({
             )}
             <button
               className="d-btn d-ghost"
+              data-testid="desk-comment"
+              disabled={!!busy}
               title="A remark with pictures, without changing the status"
               onClick={() => openDialog("note")}
             >
@@ -1485,12 +1761,15 @@ function CardView({
               <Icon name="sewing" />
               After sewing {sewing || measuring ? "▴" : "▾"}
             </button>
-            {canAct && st.history.length > 0 && (
+            {canAct && st.history.length > 0 && card.can_undo !== false && (
               <IconButton
                 icon="undo"
                 label="Undo (u)"
                 className="d-undo"
-                onClick={() => act({ action: "undo" }, "Undone")}
+                disabled={!!busy}
+                onClick={() =>
+                  act({ action: "undo" }, "Undone", false, "Undoing…")
+                }
               />
             )}
             {(sewing || measuring) && (
@@ -1503,6 +1782,7 @@ function CardView({
                       type="checkbox"
                       checked={st.status === "produced"}
                       disabled={
+                        !!busy ||
                         !(st.status === "approved" || st.status === "produced")
                       }
                       onChange={(e) =>
@@ -1533,6 +1813,7 @@ function CardView({
                     <button
                       key={String(fits)}
                       className="d-btn d-ghost"
+                      disabled={!!busy}
                       onClick={async () => {
                         const values = measuring ? measured : {};
                         const n = Object.keys(values).length;
@@ -1602,7 +1883,8 @@ function CardView({
             />
             <button
               className={`d-btn ${dialog === "reject" ? "d-danger" : "d-primary"}`}
-              disabled={sending}
+              data-testid="desk-dialog-send"
+              disabled={sending || !!busy}
               onClick={() =>
                 dialog === "reject"
                   ? send(
@@ -1619,12 +1901,24 @@ function CardView({
                   ? "Reject"
                   : "Save comment"}
             </button>
-            <button className="d-btn d-ghost" onClick={() => setDialog("")}>
+            <button
+              className="d-btn d-ghost"
+              disabled={sending || !!busy}
+              onClick={() => setDialog("")}
+            >
               Cancel
             </button>
           </div>
         )}
-        {msg && <span className="d-msg">{msg}</span>}
+        {msg && (
+          <span
+            className={`d-msg ${msgErr ? "d-msg-err" : ""} ${busy ? "busy" : ""}`}
+            role={msgErr ? "alert" : "status"}
+            data-testid="desk-msg"
+          >
+            {msg}
+          </span>
+        )}
       </div>
 
       {zoom && (
@@ -1635,6 +1929,17 @@ function CardView({
     </article>
   );
 }
+
+/** An action's name in a message ("Approve D2 refused: ..."). */
+const ACTION_NAME: Record<string, string> = {
+  approve: "Approve",
+  reject: "Reject",
+  note: "Comment",
+  produced: "Produced",
+  fit: "Fit",
+  undo: "Undo",
+  prefer: "Prefer",
+};
 
 /** Where an arrangement stands, in one line for its card (ADR-115). */
 function arrStatus(st: Card["desk"], sent: Item["sent"]): string {

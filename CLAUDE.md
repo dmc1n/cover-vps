@@ -261,6 +261,8 @@ uv run python scripts/film/story_frames.py OUT --name storyN --chapters DIR | --
 make e2e        the web app flow in a real browser (Playwright in Docker)
 apps/web/e2e/memory3d.py URL                20 covers' 3D views in a row: every WebGL renderer let go, the heap flat (ADR-129)
 apps/web/e2e/desk_pictures.py               the Desk's marked pictures in a real browser (ADR-096; usage in its docstring)
+apps/web/e2e/desk_actions.py                every Desk action in a real browser: busy, message, counts, list, next card, refusals,
+                                             the quick approval, Waiting for us / 2nd round (ADR-134; --prepare marks orders on a scratch copy)
 apps/web/e2e/prices.py                      prices in a real browser: Settings → Prices & costs, a cover's Price & shop,
                                              a stale page refused (ADR-098, ADR-126; usage in its docstring)
 Work → Questions (#/work/questions)         the owner's and the workshop's questions, answered in the studio (ADR-109)

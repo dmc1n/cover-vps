@@ -82,6 +82,10 @@ ARRANGEMENT_JSON = "arrangement.json"  # as coverengine.arrange
 WAITING = "ai-checked"  # an arrangement sent to the Desk: ready for approval (ADR-115)
 DONE = ("approved", "produced")
 NO_COVER_ACTIONS = ("note", "undo")  # all a model that needs no cover takes at the Desk
+# a remark a person leaves (Rens, 14 Oct 2026: "is a cover not under 2nd round unchanged since
+# my comment?") and who answers it: the studio's own actions (scripts/desk_open_remarks.py)
+STUDIO_NAMES = ("Claude", "the studio")
+REMARK_ACTIONS = ("reject", "comment", "note", "fit")
 
 
 class Action(BaseModel):
@@ -242,6 +246,29 @@ def _code(d: Path) -> str:
     return re.sub(r"\s+", " ", name.replace("-", " ").replace("_", " ")).strip()[:80]
 
 
+def remark_times(st: dict[str, Any]) -> tuple[float | None, float | None]:
+    """(the last remark a person left that is not undone, the studio's last action): a remark
+    newer than the studio's last action waits for us (desk_open_remarks.py, the same rule)."""
+    hist = st.get("history") or []
+    remark = max((float(h.get("time") or 0) for h in hist
+                  if h.get("by") not in STUDIO_NAMES and h.get("action") in REMARK_ACTIONS
+                  and not h.get("undone")), default=None)  # fmt: skip
+    change = max(
+        (float(h.get("time") or 0) for h in hist if h.get("by") in STUDIO_NAMES), default=None
+    )
+    return remark, change
+
+
+def remark_open(st: dict[str, Any]) -> bool:
+    remark, change = remark_times(st)
+    return remark is not None and remark > (change or 0)
+
+
+def _approval_holds(d: Path, st: dict[str, Any]) -> bool:
+    """Approved (or produced) for the cutting file it has now: a second approval adds nothing."""
+    return st["status"] in DONE and not _changed_since_approval(d, st)
+
+
 def brief(d: Path) -> dict[str, Any]:
     st = state(d)
     c = check(d)
@@ -250,6 +277,7 @@ def brief(d: Path) -> dict[str, Any]:
     cover = _read(d / "cover.json")
     last = st["history"][-1] if st["history"] else None
     order = waiting_order(st)
+    remark, change = remark_times(st)
     return {
         "id": d.name,
         "code": _code(d),
@@ -271,6 +299,11 @@ def brief(d: Path) -> dict[str, Any]:
         "second_round": (st.get("second_round") or {}).get("why")
         if st["status"] not in ("approved", "produced", "rejected")
         else None,
+        # the last remark a person left and the studio's last change: "Changed <date>" or
+        # "Not changed yet", and the "Waiting for us" filter (Rens, 14 Oct 2026)
+        "last_remark_time": remark,
+        "last_change_time": change,
+        "open_remark": remark is not None and remark > (change or 0),
         # a shop order's cover sent to production: first in the queue, approved with one
         # click (ADR-128); `built`: its cutting file exists, so the click can approve it
         "order": order and {k: order.get(k) for k in ("order", "b2b", "by", "time")},
@@ -740,6 +773,9 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
     who = user.name or user.username
     prepared: dict[str, Any] | None = None
     if a.action == "approve":
+        # a second click while the first approval was still stamping (14 Oct 2026): said, not
+        # stamped again
+        _refuse_approved(d, state(d))
         # every cover: the approval is for its cutting file (ADR-120, ADR-128)
         cut_before = cut_fingerprint(d)
         if cut_before is None:
@@ -764,6 +800,7 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
             now = time.time()
             entry: dict[str, Any] = {"action": a.action, "by": who, "time": now}
             if a.action == "approve":
+                _refuse_approved(d, st)
                 cut = cut_fingerprint(d)
                 if cut != cut_before:
                     raise HTTPException(409, "the cutting file changed while approving: look again")
@@ -793,6 +830,14 @@ def apply(d: Path, a: Action, user: Any, learning: Path) -> dict[str, Any]:
             from coverapi import approval
 
             approval.discard(prepared)
+
+
+def _refuse_approved(d: Path, st: dict[str, Any]) -> None:
+    if _approval_holds(d, st):
+        ok = st.get("approved") or {}
+        when = time.strftime("%d %b %H:%M", time.localtime(float(ok.get("time") or 0)))
+        raise HTTPException(409, f"already approved by {ok.get('by', 'someone')} ({when}) for this "
+                            "cutting file: nothing to approve again")  # fmt: skip
 
 
 def _act(
@@ -1241,10 +1286,13 @@ def install(app: FastAPI, store: Any) -> None:
 
             pages = min(pymupdf.open(pdf).page_count, MAX_PAGES)
         st = state(d)
+        # what an undo can take back (the button and the key follow it, never a silent 409)
+        can_undo = any("before" in h and not h.get("undone") for h in st["history"])
         st["history"] = [{k: v for k, v in h.items() if k != "before"} for h in st["history"]]
         return {
             **brief(d),
             "desk": st,
+            "can_undo": can_undo,
             "check": check(d),
             "read": _read(d / "drawing_features.json"),
             "notes": _read(d / "cover.json").get("notes", ""),

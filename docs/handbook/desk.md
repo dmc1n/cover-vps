@@ -19,7 +19,17 @@ or marked produced is listed for the workshop, with its files and how it fitted,
   6. covers both found right;
   7. approved and produced covers come last.
 
-  Filter by status, by series (C, S, D, …) or search.
+  Filter by status, by series (C, S, D, …) or search. Two filters answer "has anything
+  happened since my remark?" (Rens, 14 Oct 2026; ADR-134):
+  - **Waiting for us** (with its number): every cover with a remark (a rejection, a comment
+    or a fit) newer than the studio's last change. The studio still has to answer it; the
+    daily round lists the same covers (`scripts/desk_open_remarks.py`).
+  - **2nd round**: only covers the studio changed after a remark and that now wait for a look
+    again (new or AI checked). Approved or rejected-again covers are not in it.
+
+  On each row and on the card's head a small chip says it: **Changed 12 Oct** (the studio
+  changed it after the last remark; the date is the change) or **Not changed yet** (orange:
+  your last remark is newer than the studio's last change). No chip: nobody left a remark.
 - **The card** (`#/work/desk/<cover>`) has four tabs, each with its own address:
   - **Check**: the latest rejection and what happened since; the drawing (click to enlarge)
     beside our cover in 3D (the **Vents** toggle shows the air vents); the products; what the
@@ -48,7 +58,16 @@ or marked produced is listed for the workshop, with its files and how it fitted,
   or start the AI.
 - **The actions** (the decision bar at the bottom of the card; the after-sewing ones under
   **After sewing ▾**):
-  - **Approve** (key `a`): the catalogue status becomes "checked".
+  - **Approve** (key `a`): the catalogue status becomes "checked". The approval stamps the
+    size drawing and the cutting list, which can take from a few seconds to a minute: the
+    button says **Approving…** and every action waits until it is done. Then a message at
+    the top right says **Approved: <cover>**, the counts and the list follow, and the next
+    cover of the list opens. Approving a rejected cover works the same way. A cover that is
+    already approved for its current cutting file is not approved twice: the message says
+    who approved it and when (ADR-134).
+  - **Every action says how it went.** A refusal (for example "nothing to undo", "approve
+    the cover before marking it produced", "already approved by …") shows in red at the top
+    right and next to the buttons, with the server's reason. It never fails silently.
   - **Reject** (`r`): choose a reason (shape, size, seams, vents, pieces) and write what is
     wrong. It is kept in the history. To change the cover itself, use "Correct this cover".
   - **Comment** (`c`): a remark for the history; the status stays as it is.

@@ -18,8 +18,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "api"))
 from coverapi import desk  # noqa: E402
 
-STUDIO = ("Claude", "the studio")
-REMARKS = ("reject", "comment", "note", "fit")
+STUDIO = desk.STUDIO_NAMES  # one rule with the Desk's "Waiting for us" filter (desk.remark_open)
+REMARKS = desk.REMARK_ACTIONS
 
 
 def open_remarks(models: Path) -> list[dict]:

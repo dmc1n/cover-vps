@@ -1026,6 +1026,69 @@ svg.plan {
   font-size: 13px;
   color: var(--muted);
 }
+/* a Desk action's outcome: never silent (14 Oct 2026) */
+.d-msg.d-msg-err {
+  color: var(--bad);
+  font-weight: 600;
+}
+.d-msg.busy {
+  color: var(--ink);
+}
+.d-spin {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-right: 2px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: d-spin 0.8s linear infinite;
+}
+.d-btn[aria-busy="true"] {
+  cursor: progress;
+}
+.d-toast {
+  position: fixed;
+  top: calc(var(--top-h) + 12px);
+  right: 16px;
+  left: auto;
+  z-index: 60;
+  max-width: min(460px, calc(100vw - 32px));
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
+  font-size: 14px;
+}
+.d-toast.t-ok {
+  border-left: 4px solid var(--ok);
+}
+.d-toast.t-busy {
+  border-left: 4px solid var(--wait);
+}
+.d-toast.t-err {
+  border-left: 4px solid var(--bad);
+  color: var(--bad);
+  font-weight: 600;
+}
+.d-toast button {
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.d-remark-chip {
+  margin-top: 2px;
+  align-self: flex-start;
+}
 .d-zoom {
   position: fixed;
   inset: 0;
