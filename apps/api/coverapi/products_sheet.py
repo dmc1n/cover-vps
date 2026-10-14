@@ -521,24 +521,44 @@ def product_labels(d: Path) -> list[str]:
     a SUNS model is linked to ("D1 · Portofino/ Aspen/ Kota normal D-Bed")."""
     if d.name.startswith("suns-"):
         return [f"{r['code']} · {r['product']}".strip(" ·")
-                for r in _doc(d / DRAWINGS_JSON).get("linked") or []]  # fmt: skip
+                for r in _sheet_drawings(d).get("linked") or []]  # fmt: skip
     return [str(x) for x in _doc(d / PRODUCTS_JSON).get("labels") or []]
+
+
+def _sheet_drawings(d: Path) -> dict[str, list[dict[str, Any]]]:
+    """A SUNS model's drawings.json as people decided in Covers → Links (ADR-132): a drawing a
+    person rejected for this model is left out, so the Desk no longer shows or sorts by it."""
+    from coverapi import links
+
+    doc = _doc(d / DRAWINGS_JSON)
+    if not doc:
+        return {}
+    dec = links.decisions(links.db_for_model(d))
+    keep = {k: [r for r in doc.get(k) or [] if dec.get((str(r.get("id")), d.name)) != "rejected"]
+            for k in ("linked", "suggested")}  # fmt: skip
+    return {**doc, **keep}
 
 
 def products_card(d: Path) -> dict[str, Any]:
     """The card's Products part: the sheet's rows, and the SUNS links either way."""
     if d.name.startswith("suns-"):
-        doc = _doc(d / DRAWINGS_JSON)
+        doc = _sheet_drawings(d)
         return {"drawings": {"linked": doc.get("linked") or [],
                              "suggested": doc.get("suggested") or []}} if doc else {}  # fmt: skip
     doc = _doc(d / PRODUCTS_JSON)
     if not doc:
         return {}
+    from coverapi import links
+
+    # the sheet's SUNS links as people decided them in Covers → Links (ADR-132): a link is a
+    # proposal until confirmed; a rejected or replaced one is not shown as a link any more
+    sheet: Any = doc.get("suns") or {}
+    suns = links.sheet_view(d.name, sheet, links.db_for_model(d))
     rows = doc.get("rows") or []
     columns = [c for c in (rows[0] if rows else {}) if not c.startswith("_")]
-    return {"source": doc.get("source"), "column": doc.get("column"), "time": doc.get("time"),
-            "columns": columns, "rows": [[r.get(c, "") for c in columns] for r in rows],
-            "suns": doc.get("suns") or {"linked": [], "suggested": []}}  # fmt: skip
+    return {"drawing": d.name, "source": doc.get("source"), "column": doc.get("column"),
+            "time": doc.get("time"), "columns": columns,
+            "rows": [[r.get(c, "") for c in columns] for r in rows], "suns": suns}  # fmt: skip
 
 
 # ---- the endpoint ---------------------------------------------------------------------------

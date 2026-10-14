@@ -39,6 +39,7 @@ import {
   Welcome,
 } from "./Session";
 import { Drawing, Learning } from "./Learning";
+import { LinkChip, Links } from "./Links";
 import { ProductsUpload } from "./DeskProducts";
 import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
@@ -327,6 +328,7 @@ function Page({ route, user }: { route: Route; user: User }) {
         );
       if (page === "new") return <NewCover />;
       if (page === "learning") return <Learning />;
+      if (page === "links") return <Links initialQ={query.get("q") ?? ""} />;
       if (page === "products") return <ProductList />;
       return (
         <AllCovers
@@ -715,6 +717,7 @@ function ModelPage({
             </StatusChip>
             <StatusChip status={model.status} title="Catalogue status" />
             {model.no_cover && <span className="badge no-cover">no cover</span>}
+            <LinkChip id={id} />
             {model.desk_status && (
               <a href={deskHref(id)} title="Its Desk card">
                 <StatusChip status={model.desk_status}>

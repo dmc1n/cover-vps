@@ -141,6 +141,9 @@ def create_app(
 
     # the workshop's product list linked to the drawing covers (ADR-091)
     import_products = products_sheet.install(app, store)
+    from coverapi import links
+
+    links.install(app, store)  # a drawing cover and a 3D-model cover linked (ADR-132)
     from coverapi import shop
 
     shop.install(app, auth, store.root, jobs, store)

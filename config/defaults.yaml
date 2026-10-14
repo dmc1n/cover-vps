@@ -401,6 +401,23 @@ products:                        # the workshop's product list linked to the dra
   max_bytes: 52428800            # an uploaded list, or a zip unpacked, at most this large (50 MB)
   max_files: 2000                # a zip with more entries than this is refused whole
 
+links:                           # a drawing cover and a 3D-model cover of the same product, linked so we
+                                 # learn from the pair (owner, 14 Oct 2026; ADR-132). A proposal is only a
+                                 # proposal: nothing learns from a pair until a person confirmed it
+  weights: "names=0.25,size=0.30,shape=0.15,kind=0.10,side=0.10,picture=0.10"
+                                 # each signal's share of the score (0..1); a signal we lack is left out
+  sheet_bonus: 0.08              # the product list (namecode.xlsx) names the pair: this much on top
+  sheet_suggested_bonus: 0.04    # ... or only suggests it (a family, no type)
+  size_tol_cm: 6.5               # two covers' lengths that differ by this little are the same size
+  size_falloff_cm: 45            # ... beyond it the size score falls to 0 over this many cm
+  height_falloff_cm: 30          # ... and the height's over this many
+  contradiction_factor: 0.57     # the name says "pair" but the size or the plan shape says no: the score
+                                 # times this, and the row says why (D2 "Evora D-Bed" is not the sunlounger)
+  propose_min: 0.5               # a pair is proposed from this score on (pairs the product list names always)
+  bulk_min: 0.85                 # "Confirm all above" only for pairs scoring at least this, without a doubt
+  plan_cells: 48                 # the plan shape is read on a grid this many cells along the longest side
+  picture_px: 36                 # the renders' silhouettes are compared at this many pixels wide
+
 limits:                          # what a request or an uploaded file may hold (ADR-123) [server-only]
   body_mb: 2                     # any request body at most this large (MiB) unless its route allows more;
                                  # also the margin for the form round the files of an upload route

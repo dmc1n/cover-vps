@@ -4794,3 +4794,60 @@ icons on every menu item, tab, toolbar action and status chip, and the text redu
 Better, later: the Desk card's tabs as a segmented control on a phone; the glyphs as an SVG
 sprite if their number grows; a design-token export for the website (ADR-105) so both share
 the status colours.
+
+
+## ADR-132 — Links: a drawing cover and a 3D-model cover of the same product, proposed, decided by a person
+
+The owner, 14 Oct 2026: many products are in the range twice, as a drawing cover (drawing-*) and
+as a cover computed on the manufacturer's 3D model (suns-*); "link them so we can learn from
+them; propose what belongs together, we confirm it, and correct it by hand when it is wrong; use
+everything you have." The same day, the example: D2 showed as "sunlounger evora", because the
+product list import (ADR-091) turned the word "Evora" in "Evora normal D- Bed" into the SUNS
+Evora sunlounger and showed it as a fact. Plan and numbers: docs/plans/drawing-model-links.md.
+
+1. **A link is a proposal until a person decides.** app.db `model_links` (drawing, model,
+   status proposed / confirmed / rejected / manual, score, strength, signals, reasons, doubts,
+   both covers' facts, mirror, source sheet / proposer / person, note, stale, who and when, a
+   version) and `model_link_log` (every change, never deleted). Confirmed, rejected and manual
+   (chosen by hand) are a person's decision: `scripts/link_proposals.py` never changes them (not
+   the status, score, reasons or version); proposals it no longer makes are marked stale, never
+   deleted. A decision names the version it saw; a stale page gets 409. One row per pair;
+   many-to-one both ways (one drawing for both hands, one table drawing for three 340 tables).
+2. **Mirror** is a flag on the link (the drawing is the other hand of the model), from the
+   names or the hand of the L in plan; a mirror pair is proposed and flagged, never refused, and
+   anything that compares or learns mirrors the drawing first (`link_compare.py` swaps its left
+   and right skirt sides).
+3. **The score** (`coverapi/link_score.py`, weights `links.*` in config/defaults.yaml): names
+   (families, types; a D-bed is not a sunlounger), the two covers' boxes, the plan shape read
+   from hull.glb from above (straight, L, U, round; the L's hand), the ADR-114 kind, the hand,
+   the cover.png silhouettes; the product list's link adds a bonus; a name that says "pair"
+   against a size, plan or type that says no multiplies the score by 0.57 and says why. Doubts
+   (another family, a type, size, plan or kind that disagrees, the two lists naming different
+   hands) make a proposal "unsure" whatever its score. High (≥ 0.85, no doubt) may be confirmed
+   in bulk after a confirmation step; the server checks each again. Gemini looks only at tied
+   proposals (`--gemini-ties`), as a reason and +0.03, ledger, at most €5 (8 calls, €0.01 on 14
+   Oct).
+4. **The product list's links are proposals.** Every pair namecode.xlsx linked is in the queue
+   whatever its score (93 on live; 41 high, 51 unsure, D2's at 0.34). The Desk card's Products
+   block shows them as "proposed by the product list" until confirmed; a rejected or replaced
+   link disappears from it, from the SUNS model's Desk label and from the price import's
+   `linked_suns` (ADR-113). products.json and drawings.json are never changed. The shop's
+   direct order (ADR-118) never read these links (kind and size, the price list's families as a
+   tie-break), so nothing changes there.
+5. **Learning reads confirmed and manual links only** (`links.learning_pairs`); a proposal never
+   teaches anything. The first use: `scripts/link_compare.py`, the box, each skirt side's hem and
+   height, each top piece (matched by size), pieces, vents, hem, seams and fabric per pair.
+6. **Rights in the API**: viewers and up read `GET /api/links…`; `decide`, `choose` and
+   `bulk-confirm` need `edit` (editors, admins); the workshop login is not on its allow-list
+   (security.py) and the routes refuse it too. Page: Covers → Links (own glyph), and a
+   "Linked to …" chip on a cover's page.
+
+Tests: apps/api/tests/test_links.py (Codex: scoring, D2, mirror, plan shapes, never overwriting a
+person, stale, versions, choose/replace, learning only from people, the Desk card and price
+import following decisions, rights per role, bulk floor, the script's dry run writing nothing);
+test_products_sheet follows the new meaning; the staging test lists the three scripts;
+apps/web/e2e/links.py and uinav's Links checks on a scratch copy (fresh app.db, test users).
+
+Better, later: arrangements for the whole corner sets (the 19 drawings without a partner);
+products_sheet.kinds telling a D-bed from a sunlounger and a new upload feeding the queue; the
+weights fitted on the people's decisions; per-family rules (ADR-082) from the compare report.

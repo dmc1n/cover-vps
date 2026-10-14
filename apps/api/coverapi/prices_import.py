@@ -227,6 +227,7 @@ class Matcher:
         from coverengine import quote as q
 
         self.cat = catalogue(models)
+        self.db = data_dir / "app.db"  # Covers → Links (ADR-132)
         self.codes = ps_sheet.drawing_keys(models, data_dir)
         self.names = name_keys(self.cat)
         self.suns = ps_sheet.suns_index(models)
@@ -266,7 +267,13 @@ class Matcher:
                   if not re.fullmatch(r"(?i)cover\s*\d+\w?", str(x).strip())]  # fmt: skip
         if len(labels) > 1:
             return []
-        return [m for m in (doc.get("suns") or {}).get("linked") or [] if m in self.cat]
+        from coverapi import links
+
+        # the sheet's links nobody rejected in Covers → Links, and the ones a person confirmed
+        # or chose there (ADR-132): a rejected or replaced link carries no price
+        sheet = [str(m) for m in (doc.get("suns") or {}).get("linked") or []]
+        used = links.used_suns(drawing, sheet, self.db)
+        return [m for m in used if m in self.cat]
 
     def is_configurator(self, value: str) -> bool:
         return ps_sheet.norm(value) in self.configurator

@@ -28,12 +28,20 @@ interface Ref {
   product: string;
 }
 export interface ProductList {
+  drawing?: string; // the drawing cover's id (its Links queue)
   source?: string;
   column?: string;
   time?: number;
   columns?: string[];
   rows?: string[][];
-  suns?: { linked: string[]; suggested: string[] };
+  // the sheet's SUNS links as people decided them in Covers → Links (ADR-132): linked = a
+  // person confirmed or chose it; proposed = the sheet's link, waiting for a person
+  suns?: {
+    linked: string[];
+    suggested: string[];
+    proposed?: string[];
+    rejected?: string[];
+  };
   drawings?: { linked: Ref[]; suggested: Ref[] };
 }
 
@@ -328,14 +336,35 @@ export function ProductsPanel({ list }: { list: ProductList }) {
           </tbody>
         </table>
       </div>
-      {(suns.linked.length > 0 || suns.suggested.length > 0) && (
+      {(suns.linked.length > 0 ||
+        suns.suggested.length > 0 ||
+        (suns.proposed ?? []).length > 0) && (
         <div className="dp-suns">
           {suns.linked.length > 0 && (
-            <span className="dp-sub">SUNS models</span>
+            <span className="dp-sub">Linked SUNS models</span>
           )}
           {suns.linked.map((id) => (
             <a key={id} className="dp-chip" href={deskHref(id)}>
               {sunsName(id)}
+            </a>
+          ))}
+          {(suns.proposed ?? []).length > 0 && (
+            <a
+              className="dp-sub"
+              href={`#/covers/links?q=${encodeURIComponent(list.drawing ?? "")}`}
+              title="The product list's links: proposals until a person confirms them in Covers → Links"
+            >
+              proposed by the product list
+            </a>
+          )}
+          {(suns.proposed ?? []).map((id) => (
+            <a
+              key={id}
+              className="dp-chip soft"
+              href={deskHref(id)}
+              title="A proposal: confirm or correct it in Covers → Links"
+            >
+              {sunsName(id)}?
             </a>
           ))}
           {suns.suggested.length > 0 && (

@@ -35,6 +35,9 @@ CASES = {
     "desk_marks": ["MODEL", "PIC", "LIVE/marks"],
     "fewer_check": ["MODEL", "--json", "LIVE/report.json"],
     "matchcards": ["--out", "LIVE"],
+    "link_inventory": ["--json", "LIVE/inventory.json"],
+    "link_proposals": ["--dry-run", "--json", "LIVE/proposals.json"],
+    "link_compare": ["--out", "LIVE"],
     "given_build": ["LIVE"],
     "fewer_build": ["LIVE"],
 }

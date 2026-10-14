@@ -49,6 +49,8 @@ The studio's buttons stay English (owner question #91, ADR-128).
   - Reference pairs: [learning.md — Upload](learning.md#upload-covers--new-cover-reference-pairs)
 - **Learning** — your reference batches and their results:
   [learning.md — Results](learning.md#results-covers--learning)
+- **Links** — a drawing cover and a 3D-model cover of the same product: proposals, confirm or
+  correct, the product list's links as proposals: [links.md](links.md)
 - **Product list** — the workshop's product list (Excel), linked to the drawings:
   [desk.md — The product list](desk.md#the-product-list-adr-091)
 
