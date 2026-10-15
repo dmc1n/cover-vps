@@ -750,3 +750,36 @@ def test_the_paid_calls_of_a_photo_carry_the_visitor_into_their_threads(
         sg.find_comparable(p, _png(), 5, 1000, 1000)
     assert seen == ["search", "search"]
     assert spend.visitor_eur("203.0.113.9") == pytest.approx(0.04)
+
+
+@pytest.mark.parametrize("configured,success", [(False, False), (True, False), (True, True)])
+def test_suggest_turnstile(
+    app: Any, monkeypatch: pytest.MonkeyPatch, configured: bool, success: bool
+) -> None:
+    from coverapi import shop
+
+    monkeypatch.delenv("TURNSTILE_SECRET_KEY", raising=False)
+    if configured:
+        monkeypatch.setenv("TURNSTILE_SECRET_KEY", "test-secret")
+    calls = []
+
+    def verify(req: Any, timeout: int) -> Any:
+        calls.append(True)
+        return io.BytesIO(json.dumps({"success": success}).encode())
+
+    monkeypatch.setattr(shop.urllib.request, "urlopen", verify)
+    monkeypatch.setattr(
+        sg,
+        "ask",
+        lambda *a, **k: {
+            "product": "item",
+            "fields": {"length_cm": {"value": 60, "source": "photo", "confidence": 0.5}},
+        },
+    )
+    r = TestClient(app).post(
+        "/api/shop/suggest",
+        data={"turnstile": "test-token"},
+        files=[("photos", ("a.png", _png(), "image/png"))],
+    )
+    assert r.status_code == (400 if configured and not success else 200), r.text
+    assert len(calls) == (1 if configured else 0)

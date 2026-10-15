@@ -351,3 +351,65 @@ def test_the_flat_pattern_dxf_is_only_served_as_the_approval_saw_it(
     (d / "pattern.dxf").write_text("0\nSECTION\n0\nEOF\n")  # flattened again
     assert vera.get(url).status_code == 403
     assert vera.get("/api/models/suns-chair/files/cut.dxf").status_code == 200
+
+
+def test_a_second_approval_is_refused_with_its_reason(app: Any, tmp_path: Path) -> None:
+    """14 Oct 2026: the approval stamps PDFs for seconds and the button gave no sign; people
+    clicked again. A second approval of the same cut is a 409 that says who approved it."""
+    from coverapi import desk
+
+    rens = login(app, "rens")
+    assert rens.post("/api/desk/drawing-a", json={"action": "approve"}).status_code == 200
+    r = rens.post("/api/desk/drawing-a", json={"action": "approve"})
+    assert r.status_code == 409 and "already approved by Rens" in r.json()["detail"]
+    d = tmp_path / "data" / "models" / "drawing-a"
+    assert [h["action"] for h in desk.state(d)["history"]] == ["approve"]
+    # a rejected cover is approved like any other
+    r = rens.post("/api/desk/drawing-b", json={"action": "reject", "reasons": ["shape"]})
+    assert r.status_code == 200
+    r = rens.post("/api/desk/drawing-b", json={"action": "approve"})
+    assert r.json()["status"] == "approved"
+    # a new cut: approving again is allowed
+    (d / "cut.dxf").write_text("0\nSECTION\n0\nEOF\n")
+    assert rens.post("/api/desk/drawing-a", json={"action": "approve"}).status_code == 200
+
+
+def test_remarks_and_studio_changes_in_the_queue(app: Any, tmp_path: Path) -> None:
+    """Rens, 14 Oct 2026: "is a cover not under 2nd round unchanged since my comment?" Each
+    item says when the last remark and the studio's last change were; open_remark is the rule
+    of scripts/desk_open_remarks.py."""
+    import importlib.util
+
+    from coverapi import desk
+
+    rens, vera = login(app, "rens"), login(app, "vera")
+
+    def item() -> dict[str, Any]:
+        items = vera.get("/api/desk").json()["items"]
+        return next(i for i in items if i["id"] == "drawing-c")
+
+    assert item()["last_remark_time"] is None and item()["open_remark"] is False
+    r = rens.post("/api/desk/drawing-c", json={"action": "note", "text": "vents?"})
+    assert r.status_code == 200
+    it = item()
+    assert it["open_remark"] is True and it["last_change_time"] is None
+    script = Path(__file__).resolve().parents[3] / "scripts" / "desk_open_remarks.py"
+    spec = importlib.util.spec_from_file_location("desk_open_remarks", script)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    models = tmp_path / "data" / "models"
+
+    def same_as_script() -> None:
+        rows = {r["model"] for r in mod.open_remarks(models)}
+        opened = {i["id"] for i in vera.get("/api/desk").json()["items"] if i["open_remark"]}
+        assert rows == opened
+
+    same_as_script()
+    d = models / "drawing-c"
+    st = desk.state(d)
+    st["history"].append({"action": "reopen", "by": "Claude", "time": time.time() + 1})
+    desk._write(d / "desk.json", st)
+    it = item()
+    assert it["open_remark"] is False and it["last_change_time"] > it["last_remark_time"]
+    same_as_script()

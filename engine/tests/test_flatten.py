@@ -268,6 +268,42 @@ def test_drawing_sizes_agree(covers: dict[str, Any]) -> None:
     assert measure(turned, "plan_extent_a") == pytest.approx(measure(cover, "plan_extent_b"))
 
 
+def test_size_drawing_measures_from_the_covers_own_lower_edge(
+    covers: dict[str, Any], tmp_path: Path
+) -> None:
+    """Rens, 14 Oct 2026 (C4, C8, C10): "hoofdmaten komen niet overeen met de tekening". A
+    drawing cover ends at the ground, but the size drawing took the hem parameter (5 cm) from
+    hull.json as its lower edge: every height 5 cm short. Heights are measured from the
+    cover's own hem, whatever hull.json says."""
+    src = covers["root"] / "box_with_legs"
+    root = tmp_path / "lied"
+    shutil.copytree(src, root)
+    hull = json.loads((root / "hull.json").read_text())
+    hull["hem"]["height_mm"] = 999.0  # not where this cover's hem is
+    (root / "hull.json").write_text(json.dumps(hull))
+    _, doc, _ = covers["box_with_legs"]
+    cover = load_cover(root, doc, params())
+    lowest = float(cover.points[cover.hem, 2].min())
+    assert cover.hem_z == pytest.approx(lowest)
+    assert lowest == pytest.approx(params()["hull.hem_height_mm"], abs=0.5)
+    top = float(cover.vertices[:, 2].max())
+    assert measure(cover, "total_height") == pytest.approx(top - lowest)
+    # a size drawing of the older format (heights off the parameter) is made again when it is
+    # opened, even when it is newer than its pattern
+    import pymupdf
+    from coverengine.export.drawing import SIZES_FORMAT, ensure_sizes
+
+    (root / "pattern.json").write_text(json.dumps(doc))
+    old = root / "sizes.pdf"
+    stale = pymupdf.open()
+    stale.new_page()
+    stale.save(old)
+    made = ensure_sizes(root, params())
+    assert made is not None
+    with pymupdf.open(made) as pdf:
+        assert pdf.metadata["subject"] == SIZES_FORMAT and pdf.page_count > 1
+
+
 def test_wiggle_finds_zig_zags_not_corners() -> None:
     x = np.linspace(0, 1000, 2001)
     straight = np.column_stack([x, np.zeros_like(x)])

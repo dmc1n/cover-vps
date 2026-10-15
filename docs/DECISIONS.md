@@ -4988,3 +4988,184 @@ minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
   angled, Vento hocker, Vivaro L-part. They change when they are built again.
 - Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
   constants, so the registry test tells them from the new default.
+
+## ADR-136 — The Questions answered 11–14 Oct 2026, processed (QUESTIONS 27–101)
+
+Twenty-four questions in Work → Questions (ADR-109) were answered but never processed. Each
+answer below is what was done with it; the Dutch note on the question says the same.
+
+- **BBQ covers with side tables (QUESTIONS 81, owner 12 Oct):** "one vent fewer on that side,
+  the rest by the rule". `features.vent_short_piece_ok` (default false; on in
+  `config/presets/bbq.yaml`): a piece whose bottom edge is too short for a vent plus a seam
+  allowance each side has none, and that is no warning (elsewhere it still warns "check").
+  Test `test_a_too_short_piece_may_simply_go_without_a_vent`; an AI lesson. The Kamado Joe
+  Classic III on cart, Monolith Classic with TWO.55 tables and The Bastard Large Complete
+  (each a 24–25 cm strip beside the front) were rebuilt in staging, pass the audit and the
+  re-measure, five vents each; the BGE Large with EGG Mates' problem is a scrap piece at a 3°
+  fold, not a vent, and stays out.
+- **Pico bended 2-seater and Pico corner (QUESTIONS 101, Rens 14 Oct):** "the back wall plus
+  the two back corners as one roomy arc from above, a few cm looser round the cushions, no
+  kink at the corners". `hull.plan_back_arc` (per model, default off) with
+  `plan_back_ease_mm` 30, `plan_back_round_mm` 150 and `plan_back_taper_mm` 400 (to confirm):
+  behind the plan's widest points the follow outline is filled out to its convex hull, grown
+  by the ease, its corners rounded where that stays outside the plan, the side walls leaning
+  out over the taper so there is no step; never smaller than the plan. `outline.back_arc`,
+  test `test_the_back_is_one_roomy_arc_on_request`; an AI lesson. Per model on request, so no
+  sweep: no other cover's plan changes.
+- **B2B terms (QUESTIONS 44–53, owner 11 Oct):** the payment term is 14 days
+  (`b2b.DEFAULTS["payment_days"]`, the studio's B2B terms form; no stored setting on live, so
+  the release carries it); everyone with a login may order (as built); no minimum order (as
+  built); dealers may order made-to-measure (the B2B configurator, as built) and "straight
+  into production" is the click of ADR-128 (QUESTIONS 86, 12 Oct, the later answer); fixed
+  prices per dealer (as built, per company in Shop → B2B customers; Sunsit's prices are the
+  owner's to enter); later online payment by Stripe (QUESTIONS 52).
+- **Delivery cost (QUESTIONS 28/29, owner 11 Oct):** "a link with the carrier (DHL), the cost
+  from weight and box". `coverapi/shipping.py`: a carrier interface with the fixed amount per
+  country (Shop settings → shipping) as the fallback; the parcel from the cover's cut fabric
+  (`shipping.fabric_g_per_m2`, `pack_g`, `folded_l_per_m2`, `boxes_cm`, all to confirm);
+  `shipping.carrier: fixed | dhl`. DHL gives no rate until the owner's account keys are in
+  deploy/.env, so nothing changes for orders today. The order records where its delivery cost
+  came from. Plan and the owner's steps (the account, the fixed amounts, the € 18.50 cost line
+  in the price set): docs/plans/shipping-carrier.md. Tests: apps/api/tests/test_shipping.py.
+- **Stripe or Mollie (QUESTIONS 30, 31, 52):** compared in docs/plans/payments-stripe.md
+  (Codex, public price pages of 14 Oct). Advice: Stripe for the consumer shop and dealers
+  later, behind a small provider interface that keeps Mollie's code; nothing is live with
+  Mollie, so there is nothing to migrate. Not built yet: it needs the owner's Stripe account
+  and test keys (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`).
+- **Turnstile (QUESTIONS 32, owner 11 Oct: "yes, I make the keys"):** built by Codex,
+  reviewed: `shop.turnstile_ok` verifies a token at Cloudflare only when
+  `TURNSTILE_SECRET_KEY` is set (environment or deploy/.env, `security.env_value`); then no
+  token, a refusal or no answer is "please try again". It guards the order, the "ask us"
+  match form (an e-mail given; the configurator's own automatic look-up stays free) and the
+  photo/link suggestion. A token works once, so a retry of the same checkout (its
+  idempotency key, ADR-129) is not asked again. The page shows the widget ("interaction-only")
+  only when `TURNSTILE_SITE_KEY` is set; the Worker's CSP and the studio's CSP for /shop/
+  allow https://challenges.cloudflare.com. The honeypot and the limits stay. Without keys
+  nothing changes. The owner's steps: docs/handbook/webshop.md.
+- **VIES (QUESTIONS 50, owner 11 Oct):** built by Codex, reviewed: `coverapi/vies.py` asks
+  the EU's VIES REST API when an admin adds a company or changes its VAT number or country,
+  and with "Check VIES" on the company; the result is kept on the company (`vies`). Reverse
+  charge then follows the rule (an EU country other than NL and a valid number); a change of
+  the switch in the same save overrides it and is noted; VIES unreachable leaves the switch
+  as it was and records the error. The checkout never calls VIES. Tests: test_vies.py.
+- **Cooling-off (QUESTIONS 27):** 14 days for a cover from our range, none for made-to-measure:
+  already so in the checkout's checkbox and the terms and returns pages (ADR-103). No change.
+- **Share picture (QUESTIONS 34):** `/brand/og-shop.png` is now a still of our own film (the
+  Kota 2-seater, ADR-108) with "Hoezen op maat. Made to measure.", made by
+  `scripts/film/og_image.py`. Live with the next release (the setting `og_image` stays empty).
+- **Balloons and frame (QUESTIONS 42):** always sold separately, as now. No change.
+- **The film's setting (QUESTIONS 54):** the owner is already making a film in an Ibiza setting;
+  the terrace film stays until then. No change here.
+- **Drawcord (QUESTIONS 65):** pulled tight: already `drape.hem: held` (4 Oct); the comment says
+  it is confirmed.
+- **A measured size is good within 0.5 cm (QUESTIONS 70):** `tolerance.cover_mm` 5, confirmed.
+- **S45 (QUESTIONS 79, Rens 13 Oct):** 358.4 cm round (141.1 in), as now. No rebuild.
+- **Defaults in Settings (QUESTIONS 93, Rens 14 Oct):** none editable, stay read-only.
+- **S32 (QUESTIONS 100, Rens 14 Oct):** "good as it is, with the strip and the vents changed";
+  the vents agent owns S32's rebuild; nothing done here.
+- **Usable roll width (QUESTIONS 64, owner 11 Oct: "b) 150 cm"):** the question read "Coverlast
+  is 152 cm wide; the program uses 148 usable. Is it 148, or 150 of the 152?", so the answer
+  most likely means `roll.width_mm` 1520 and `roll.usable_width_mm` 1500 (today 1500 and
+  1480). Not changed: it decides which pieces fit the roll, and CLAUDE.md's "roll width
+  1500 mm" says otherwise; the owner confirms first. Today no live cover has a piece between
+  1440 and 1500 mm wide, so the change would only matter for covers built afterwards.
+
+## ADR-137 — Sizes are measured from the cover's own lower edge; Rens's third round on C4, C8, C10 and the Nardo pair
+
+Rens at the Desk, 14 Oct 2026 (round 3, after ADR-133 made the plan sizes exact): C4, C8, C10
+"hoofdmaten komen niet overeen met de tekening"; cover 44 & 45 (S13 & S14 Nardo) "beter de vorm
+volgen zoals in de tekening". Staging `out/rejections3/sizes/`; every size checked by me and,
+independently, by Codex.
+
+- **The cause (C4/C8/C10).** The covers were right (pieces, 3D, cut file, check list: C8 357 x 282,
+  back 84, inner front walls 44, arm ends 31, arms 92 deep, strip 30, end run 40, as written). The
+  size drawing (`sizes.pdf`) and the cover's Sizes tab measured every height from hull.json's
+  `hem.height_mm`, the hem *parameter* (5 cm); a drawing cover (`hull.top: given`) ends at the
+  ground, so every height they showed was 5 cm short (C8/C10 79/39/26 for 84/44/31, C4 85/38/21.4
+  for 90/43/26.4), and "5.0 cm above ground". The round-2 plan sizes (344 x 344, 357 x 282,
+  357 x 357) hold.
+- **The rule (ADR-055), every cover:** `export.drawing.hem_height` takes the lowest point of the
+  cover's own hem; hull.json of a plain (box/given) cover records the lower edge as built. A
+  sizes.pdf carries its format (`SIZES_FORMAT`, PDF subject); an older one is made again when
+  opened, even when newer than its pattern (the approved/ stamped copies stay as approved). Read-only
+  sweep: 118 live covers (115 drawing covers, D8/S53/S60 cover surfaces) end below the hem
+  parameter, so their size drawings change; no pattern or cut file changes.
+- **Check:** the audit's `written heights` (an isofit drawing cover's shown height and lowest
+  skirt against the written back and end heights; all 9 live isofit covers pass with the fix).
+  Test `test_size_drawing_measures_from_the_covers_own_lower_edge`; a lesson in
+  config/ai_lessons.json. Not changed: C4's bracketed "(17 cm)" is 43 − 26.4 = 16.6 on the cover
+  (the drawing's own rounding). C3, C9, C30, C31 still fail `written sizes` (ADR-133, not rebuilt).
+- **Live:** the fixed sizes.pdf put in C4/C8/C10 (no rebuild); C8/C10 back to Rens; C4 he approved
+  after his remark, so it stays approved with a note. The Sizes tab shows the right heights only
+  after the release.
+- **Nardo (S13 & S14):** the AI had built one 260 cm wedge with 88.6 as depth. Read again corner by
+  corner from the drawing's vector lines (every corner within 0.2 pt; Codex the same within 0.06):
+  two covers of one shape, mirror images (one seen from the front, one from behind): 260 x 80, back
+  87 with a 25 cm strip, an arm block 25 cm wide at 87, the seat to a 42 cm front over 145 cm, a
+  55 cm ramp to the arm, a 27 cm low end rising over 35 cm with a hip (88.6 = the hip edge,
+  sqrt(35²+55²+60²); 225 = the back's top edge). `faces`, 10 pieces, 0.0 % stretch, vents by hand
+  in the middle of the front wall and the arm end (2 per cover). Whether the second cover's long
+  vent goes on its back as drawn: question #102.
+
+## ADR-135 — Every Desk action says how it went; a second approval is refused; "Waiting for us"
+
+14 Oct 2026, v2.0.0: the owner reported that **Approve** on the Desk "seems to do nothing".
+Root causes, from a reproduction on a scratch copy and the live log:
+
+1. **An approval is slow and the button gave no sign.** `desk.apply` stamps `sizes.pdf` and
+   `cutting-list.pdf` (ADR-128) and makes the size drawing first when it is missing
+   (`approval.prepare` → `ensure_sizes`): 8 s on a drawing cover, 40 s for three overlapping
+   ones. `CardView.act` cleared its message, showed nothing busy and left every button live
+   for that time, so the click looked lost and people clicked again (a rejected cover
+   included: the server approves it like any other; a browser check that waited 2.5 s saw
+   no answer yet).
+2. **Nothing refused a second approval.** Each extra click re-stamped the PDFs and added an
+   approval to the history.
+3. **The next card was chosen from the list as it was when the button was rendered**, by a
+   timer 900 ms after the answer, whether or not the person was still on that card; the
+   queue reload was not awaited, and a failed reload replaced the whole Desk with an error.
+4. **Refusals were easy to miss and Undo was offered with nothing to undo.** On live (09:37)
+   the cover's history holds a fit, an undo, then three `409 nothing to undo`: the Undo icon
+   stays while the history is not empty. The message was a grey line beside the buttons.
+5. The `401` in the console is the session probe (`GET /api/auth/me`) before the login:
+   harmless.
+
+No element covers the action bar (`elementFromPoint` on the Approve button is the button,
+Chromium, WebKit, Firefox, 1440 and 1024).
+
+Decision:
+- One action at a time per card (`busyRef`): the clicked button says **Approving…** (a
+  spinner), every other action and key waits; when the answer comes a message at the top
+  right (**Approved: <cover>**, kept while the next card opens), the next card opens at once
+  and the queue (the Desk's own state, which outlives the card) refreshes its list and counts;
+  a Comment reloads its card. The next card is chosen **before** the action (the list changes
+  after it) and opened only while the person is still on that card; after the last card the
+  message says so. `desk_pictures.py` now waits for that move before it reloads the page
+  (WebKit reports a fetch cut off by a reload as an error).
+- A refusal (409, 400, 403) shows the server's reason in red, as a message at the top right
+  (`role=alert`) and beside the buttons ("Approve D2 refused: already approved by Wout …"),
+  and the card and the queue are reloaded (someone else may have acted).
+- `POST /api/desk/<id>` `approve` on a cover whose approval holds for its current cut is a
+  `409` naming who approved it and when, checked before stamping and again under the lock.
+  A new cut can be approved again as before; an order on an approved catalogue cover is
+  noted by `mark_order` (ADR-128).
+- The card answers `can_undo`; the Undo icon and the key `u` follow it.
+- The keys do what the buttons do: not while a dialog, a zoomed picture or an action is
+  open, not with Ctrl/Cmd/Alt or a held key; `a` on an approved cover says so.
+- The order's quick approval in the queue: busy, its own message, the queue and the open card
+  refreshed.
+
+Rens asked the same day: "if a cover is not under 2nd round, does that mean it hasn't been
+changed since my last comment?" Each queue item now carries `last_remark_time` (a person's
+reject, comment, note or fit, not undone), `last_change_time` (the studio's last action) and
+`open_remark` (the remark is newer). Rows and the card head show **Changed <date>** or
+**Not changed yet** (orange). **Waiting for us** lists the covers with an open remark, the
+rule of `scripts/desk_open_remarks.py` (which now takes its names from `desk.STUDIO_NAMES` and
+`desk.REMARK_ACTIONS`); **2nd round** lists only covers changed after a remark that wait
+again (new or AI checked).
+
+Checked by `apps/web/e2e/desk_actions.py` (Chromium, WebKit, Firefox at 1440 and 1024 touch:
+approve an AI-checked and a rejected card by the button, by the key, reject, comment, a
+refusal, an order's quick approval; counts, list and next card each time; the filters) and
+`apps/api/tests/test_desk.py`. Not done: making the approval itself faster (the size drawing
+could be made when the cover is built instead of at the approval).

@@ -42,6 +42,10 @@ def test_nothing_without_a_login(app: Any) -> None:
     r = c.get("/api/health")
     assert r.headers["x-frame-options"] == "SAMEORIGIN"
     assert "frame-ancestors" in r.headers["content-security-policy"]
+    assert "challenges.cloudflare.com" not in r.headers["content-security-policy"]
+    shop_csp = c.get("/shop/").headers["content-security-policy"]  # Turnstile (ADR-136)
+    assert "script-src 'self' https://challenges.cloudflare.com" in shop_csp
+    assert "frame-src 'self' https://challenges.cloudflare.com" in shop_csp
 
 
 def test_wrong_passwords_lock_the_account(app: Any) -> None:

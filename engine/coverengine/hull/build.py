@@ -604,9 +604,15 @@ def _plain_report(
     warnings: list[str],
 ) -> dict[str, Any]:
     """hull.json for a cover surface not grown from a height map (box, given)."""
-    hem = _p(params, "hull.hem_height_mm")
     edges = mesh.edges_sorted
     hem_edges = edges[group_rows(edges, require_count=1)]
+    # the lower edge as built: a given surface (a drawing cover) ends where it ends, at the
+    # ground, not at hull.hem_height_mm (C4/C8/C10's size drawing was 5 cm short, 14 Oct 2026)
+    hem = (
+        round(float(mesh.vertices[hem_edges.ravel(), 2].min()), 3)
+        if len(hem_edges)
+        else _p(params, "hull.hem_height_mm")
+    )
     hem_len = float(
         np.linalg.norm(
             mesh.vertices[hem_edges[:, 0]] - mesh.vertices[hem_edges[:, 1]], axis=1
