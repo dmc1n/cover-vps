@@ -92,7 +92,7 @@ test("the preview is never indexed", async () => {
 
 const agentPaths = [
   "/api/v2/match", "/api/v2/openapi.json", "/llms-full.txt", "/measure",
-  "/measure/sofa", "/covers/x", "/api/b2b/v2/match",
+  "/measure/sofa", "/covers/x", "/api/b2b/v2/match", "/mcp",
 ];
 
 test("agent routes on live are closed by default while llms.txt still reaches studio", async () => {
@@ -197,4 +197,50 @@ test("every answer names the build it came from (x-site-build), the deploys stam
     .scripts as Record<string, string>;
   for (const name of ["deploy", "deploy:preview"])
     assert.match(scripts[name], /wrangler deploy\b.*--var BUILD:\$\(git describe --always --dirty\)/, name);
+});
+
+// ADR-145: the MCP server passes like /api/v2: on the preview with the caller's partner key
+// (Authorization) and without cookies; on the live site a 404 at the edge until AGENT_API.
+test("the MCP server (/mcp) is open on the preview and a 404 on live", async () => {
+  const seen: { path: string; headers: Headers; method: string; body: string }[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const req = new Request(input, { ...init, duplex: "half" } as RequestInit);
+    reached.push(new URL(req.url).pathname);
+    seen.push({ path: new URL(req.url).pathname, headers: req.headers,
+      method: req.method, body: await req.text() });
+    return new Response('{"jsonrpc":"2.0","id":1,"result":{}}', {
+      headers: { "content-type": "application/json", "set-cookie": "cover_session=secret" },
+    });
+  }) as typeof fetch;
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" });
+  const init = () => ({
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream",
+      authorization: "Bearer cvk_partner", "mcp-protocol-version": "2025-11-25",
+      cookie: "cover_session=private" },
+    body,
+  });
+  // live: closed at the edge, nothing reaches the studio
+  for (const path of ["/mcp", "/mcp/", "/mcp/x"]) {
+    const res = await worker.fetch(new Request(`https://shop.example${path}`, init()) as never,
+      env as never, ctx as never);
+    assert.equal(res.status, 404, path);
+  }
+  assert.deepEqual(reached, []);
+  // the preview: to the studio's /mcp with the body, the key and the Worker's own headers
+  const penv = { ...env, PREVIEW: "1", ASSETS: { fetch: async () => new Response("asset") } };
+  const res = await worker.fetch(new Request("https://preview.example/mcp", init()) as never,
+    penv as never, ctx as never);
+  assert.equal(res.status, 200);
+  assert.equal(reached.at(-1), "/mcp");
+  const got = seen.at(-1)!;
+  assert.equal(got.method, "POST");
+  assert.equal(got.body, body);
+  assert.equal(got.headers.get("authorization"), "Bearer cvk_partner");
+  assert.equal(got.headers.get("mcp-protocol-version"), "2025-11-25");
+  assert.equal(got.headers.get("cookie"), null);
+  assert.equal(got.headers.get("x-link-key"), env.LINK_KEY);
+  assert.equal(got.headers.get("x-site-host"), "preview.example");
+  assert.equal(res.headers.get("set-cookie"), null);
+  assert.match(res.headers.get("x-robots-tag")!, /noindex/);
 });

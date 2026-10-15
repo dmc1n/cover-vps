@@ -1,5 +1,6 @@
 // The API for AI agents and its pages on the website (ADR-139): /api/v2/* (JSON, its OpenAPI and
-// docs), /llms-full.txt, the measuring guide (/measure, /measure/<kind>) and the existing covers
+// docs), the MCP server /mcp (ADR-145: the caller's Authorization passes, for a partner key),
+// /llms-full.txt, the measuring guide (/measure, /measure/<kind>) and the existing covers
 // (/covers, /covers/<code>). They pass to the studio with the website's key, like the shop, but
 // only where they are switched on: the preview (preview.<domain>) always, the live site only with
 // AGENT_API = "1" in wrangler.toml (after the owner's go). Never cached at the edge (prices and
@@ -7,7 +8,7 @@
 
 import type { Env } from "./worker.ts";
 
-export const AGENT = /^\/(api\/v2(\/|$)|llms-full\.txt$|measure(\/|$)|covers(\/|$))/;
+export const AGENT = /^\/(api\/v2(\/|$)|mcp(\/|$)|llms-full\.txt$|measure(\/|$)|covers(\/|$))/;
 export const AGENT_B2B = /^\/api\/b2b\/v2(\/|$)/; // a B2B session's own prices (b2b.ts passes it)
 const PAGES = /^\/(measure|covers)(\/|$)/; // pages: the studio serves them under /shop/
 const HOP = ["cookie", "host", "x-link-key", "x-site-host", "x-client-ip", "cf-connecting-ip"];
