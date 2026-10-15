@@ -5661,6 +5661,8 @@ preview is recognised the same way (`x-site-host` + the Worker's key), live stay
   are swept at most once a minute and the window holds at most `MAX_CALLERS`, the least recent
   going first. Round 2: the Origin check trusted the request's Host, which a rebinding attacker
   controls — now configured addresses only (test with a matching attacker Host and Origin).
+  Round 3: approved, no material findings. After it: the gate runs before the Origin check, so
+  on live `/mcp` is a 404 whatever is sent (a foreign Origin no longer reveals it with a 403).
 - **Discovery.** `/llms.txt`, `/llms-full.txt` and `/api/v2/docs` name the endpoint and the
   tools. No `/.well-known` entry: the 2026-07-28 spec defines none for servers (only OAuth
   metadata), and the server card (SEP-2127) is an extension whose path is not settled yet.

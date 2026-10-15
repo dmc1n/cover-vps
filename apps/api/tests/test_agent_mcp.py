@@ -403,7 +403,7 @@ def test_a_foreign_origin_is_refused(factory: Any) -> None:
         "tools/list",
         headers={"x-site-host": "preview.s2dio.living", "origin": "https://preview.s2dio.living"},
     )
-    assert r.status_code in (403, 404)
+    assert r.status_code == 404  # off there: /mcp does not exist, whatever the origin
 
 
 def test_the_protocol_window_forgets_idle_callers() -> None:

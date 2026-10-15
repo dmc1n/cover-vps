@@ -620,6 +620,15 @@ class McpEndpoint:
             await with_cors({"type": "http.response.start", "status": status, "headers": hs})
             await with_cors({"type": "http.response.body", "body": raw})
 
+        # live first: where the agent API is off /mcp does not exist, whatever is sent
+        if not agent_api.agent_on(self.auth, request):
+            await reply(
+                404,
+                agent_api.error_body(
+                    "not_found", "not here", "This MCP server is not open on this address yet."
+                ),
+            )
+            return
         if not allowed:  # the spec: an Origin present and not ours is a 403 (DNS rebinding)
             await reply(
                 403,
@@ -640,14 +649,6 @@ class McpEndpoint:
                     "X-Api-Key, Mcp-Protocol-Version, Mcp-Session-Id, Mcp-Method, Mcp-Name",
                     "Access-Control-Max-Age": "600",
                 },
-            )
-            return
-        if not agent_api.agent_on(self.auth, request):
-            await reply(
-                404,
-                agent_api.error_body(
-                    "not_found", "not here", "This MCP server is not open on this address yet."
-                ),
             )
             return
         if request.method != "POST":  # no SSE stream to open (GET) and no session to end
