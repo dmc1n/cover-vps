@@ -68,6 +68,10 @@ EDGE_MM = 40.0  # param-ok: geometric constant
 SLOPE_TOLERANCE_DEG = 1e-6  # param-ok: numerical tolerance
 # Gaps that stay open after closing: closed further, this many times at most.
 CLOSE_TRIES = 8  # param-ok: loop guard
+# The hinged side face (QUESTIONS 59): its slope found by fixed-point steps, at most this many,
+# until it changes less than this (rise per mm).
+HINGE_TRIES = 60  # param-ok: loop guard
+HINGE_TOLERANCE = 1e-7  # param-ok: numerical tolerance
 
 
 def _p(params: EffectiveParams, key: str) -> float:
@@ -194,9 +198,31 @@ def grid(shape: shapely.Geometry, cell: float) -> Array:
 def candidates(m: Member, any_way: bool) -> list[Array]:
     """Top faces tangent to the member and tilted only along its own axes: down to its front
     (-y in its own frame), or (any_way) also down to its back and sides."""
-    out: list[Array] = []
     axes = m.axes()
-    for a in axes if any_way else axes[-1:]:
+    return tilted(m, axes if any_way else axes[-1:])
+
+
+def outside_sides(m: Member, others: list[Polygon], reach: float) -> list[Array]:
+    """The member's own sides (its left and right, +-u) with no other member within reach
+    beyond them. A roof sloping down to such a side sends the water off the cover; one sloping
+    to a side a neighbour stands against would make a valley between the two (rule 12)."""
+    u, v = m.axes()[:2]
+    centre = np.asarray(m.rect.centroid.coords[0])
+    corners = np.asarray(m.rect.exterior.coords)[:-1] - centre
+    hu, hv = float(np.abs(corners @ u).max()), float(np.abs(corners @ v).max())
+    out: list[Array] = []
+    for d in (u, -u):
+        a, b = centre + d * hu, centre + d * (hu + reach)
+        strip = Polygon([a - v * hv, b - v * hv, b + v * hv, a + v * hv])
+        if not any(strip.intersects(o) for o in others):
+            out.append(d)
+    return out
+
+
+def tilted(m: Member, axes: list[Array]) -> list[Array]:
+    """Top faces tangent to the member, each sloping down towards one of the given axes."""
+    out: list[Array] = []
+    for a in axes:
         flat = np.column_stack([m.points[:, :2] @ a, m.points[:, 2]])
         try:
             hull = ConvexHull(flat)
@@ -215,9 +241,50 @@ def candidates(m: Member, any_way: bool) -> list[Array]:
     return out
 
 
-def roofs(m: Member, hem: float, clearance: float, params: EffectiveParams) -> None:
+def _edge_height(plane: Array, d: Array, edge: float) -> float:
+    """A face sloping down towards d: its height over the plan line at distance edge along d."""
+    return float((-plane[3] - edge * (plane[0] * d[0] + plane[1] * d[1])) / plane[2])
+
+
+def _hinged(m: Member, d: Array, edge: float, height: float, clearance: float) -> Array | None:
+    """The face hinged on the member's side line (at `edge` along d, at `height`) and tipped up
+    over the member until it clears every furniture point by the clearance: the steepest side
+    slope that leaves the side a wall of that height. None when that would stand upright."""
+    s = m.points[:, :2] @ d
+    z = m.points[:, 2]
+    gap = edge - s
+    if (gap <= COPLANAR_MM).any():
+        return None
+    k = 0.0
+    for _ in range(HINGE_TRIES):  # k: the rise per mm inwards; the clearance is along the normal
+        nxt = max(0.0, float(((z - height + clearance * math.hypot(1.0, k)) / gap).max()))
+        if abs(nxt - k) < HINGE_TOLERANCE:
+            k = nxt
+            break
+        k = nxt
+    else:
+        return None
+    n = np.array([k * d[0], k * d[1], 1.0]) / math.hypot(1.0, k)
+    if k <= 0.0 or n[2] < UPRIGHT_NZ:
+        return None
+    plane = np.append(n, -(k * edge + height) / math.hypot(1.0, k))
+    if float((m.points @ n).max()) + clearance > -plane[3] + COPLANAR_MM:
+        return None  # not clear of the furniture after all
+    return plane
+
+
+def roofs(
+    m: Member,
+    hem: float,
+    clearance: float,
+    params: EffectiveParams,
+    sides: list[Array] | None = None,
+) -> None:
     """The member's top faces: the flat top, then greedily the face that takes away the most
-    room, while it takes away at least arrange.top_gain_pct of it."""
+    room, while it takes away at least arrange.top_gain_pct of it. Then (arrange.side_slopes,
+    QUESTIONS 59) per outside side the face sloping down to it that takes away the most room,
+    when that is worth arrange.top_gain_pct too; each side is weighed against the same top, so
+    a member with two outside sides gets both or neither alike (no lopsided roof)."""
     assert m.area is not None
     cell = _p(params, "arrange.cell_mm")
     xy = grid(m.area, cell)
@@ -242,6 +309,24 @@ def roofs(m: Member, hem: float, clearance: float, params: EffectiveParams) -> N
             break
         planes.append(options.pop(k))
         now = best
+    extra: list[Array] = []
+    low = float(heights(planes, xy).min())  # the top's lowest edge (the front's), before sides
+    for d in sides or []:
+        edge = float((np.asarray(m.rect.exterior.coords)[:, :2] @ d).max()) + clearance
+        # the side keeps a wall at least as high as the front's: a face resting on the
+        # furniture (an arm's top) that meets the side above that, or the one that meets it at
+        # exactly that height; never a slope down to the hem that removes the side's wall
+        side = [o for o in (_plane(n, m.points, clearance) for n in tilted(m, [d]))
+                if _edge_height(o, d, edge) >= low - COPLANAR_MM]  # fmt: skip
+        hinged = _hinged(m, d, edge, low, clearance)
+        if hinged is not None:
+            side.append(hinged)
+        scored = [(room([*planes, o]), k) for k, o in enumerate(side)]
+        if scored:
+            best, k = min(scored)
+            if now - best >= gain * now:
+                extra.append(side[k])
+    planes += extra
     # faces that are nowhere the lowest are not part of the top
     h = np.stack([(-p[3] - xy @ p[:2]) / p[2] for p in planes])
     used = np.unique(np.argmin(h, axis=0))
@@ -428,10 +513,12 @@ def build(
     footprint: str,
     gap_mm: float,
     params: EffectiveParams,
+    side_slopes: bool = False,
 ) -> PlanCover:
     """The cover over an arrangement whose plan follows its members (footprint follow) or is
     one rectangle round them (box). points: the furniture above the hem (mm, Z up), rects: each
-    member's plan rectangle (four corners)."""
+    member's plan rectangle (four corners). side_slopes: roofs may also slope down to a
+    member's outside sides (arrange.side_slopes, for arrangements; QUESTIONS 59)."""
     from manifold3d import Manifold, OpType
 
     hem = _p(params, "hull.hem_height_mm")
@@ -454,8 +541,10 @@ def build(
         if not members:
             raise CoverError("no furniture inside the members' rectangles")
     regions(members, plan, c)
-    for m in members:
-        roofs(m, hem, c, params)
+    for i, m in enumerate(members):
+        others = [o.rect for k, o in enumerate(members) if k != i]
+        sides = outside_sides(m, others, 2 * c + align) if side_slopes else None
+        roofs(m, hem, c, params, sides)
     for i, m in enumerate(members):
         drain(m, plan, [o.rect for k, o in enumerate(members) if k != i], c, params)
     harmonise(members, align)
@@ -501,6 +590,7 @@ def build(
         "outline_mm": [[round(float(x), 1), round(float(y), 1)] for x, y in plan.exterior.coords],
         "members": len(members),
         "top_faces": [len(m.planes) for m in members],
+        "side_slopes": side_slopes,
         "split_tops": len(splits),
         "drainage": water,
     }

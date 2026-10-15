@@ -586,6 +586,11 @@ arrange:                         # furniture placed together, one cover over the
                                  # the top of its back), so walls stand straight and every seam on the top
                                  # runs straight across the member; any: also down to its back and sides
                                  # (hip seams then run diagonally across the top)
+  side_slopes: true              # arrangements (arr-*): each member's roof may also slope down to its own
+                                 # outside sides (none to a side a neighbour stands against: no valley),
+                                 # each side when it takes away top_gain_pct of the room, both sides alike;
+                                 # a hip seam where it meets the front slope (Rens, 15 Oct 2026, QUESTIONS 59:
+                                 # "ja, ook naar de zijkanten"). Not for plan_members.json models (ADR-117)
   cell_mm: 20                    # follow and box: grid for the room and the water check (mm)
 
 suggest:                         # "start from a photo or a link" in the configurator (ADR-086)
