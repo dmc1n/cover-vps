@@ -148,5 +148,15 @@
     "check": "The audit's vents check ('on a rounded corner') and engine/tests/test_finish.py::test_no_vent_on_a_rounded_corner.",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792000600,
+    "model_id": "drawing-c27",
+    "complaint": "Crosses on vents the cover no longer has and circles where it already has vents (Rens at the Desk, 14 Oct 2026, C27 and S32, minutes after both were rebuilt).",
+    "cause": "The Desk's 3D asked for the cover's files under one fixed address (?v=0) and the server sent no Cache-Control, so the browser showed its cached vents.json and panels of 9 Oct: Rens marked the old vents.",
+    "rule": "A cover's files are served with Cache-Control: no-cache (the browser asks every time, a 304 when nothing changed) and the Desk's viewer asks for them with the time the card was loaded. Before reading an approver's marks, compare the vents in his picture with the cover's current vents (scripts/desk_marks.py draws them): when they differ, read the marks against the state he saw.",
+    "check": "apps/api/tests/test_api.py::test_model_summary_and_files (no-cache) and engine/tests/test_desk_marks.py (the current vents drawn on the picture).",
+    "applies_to": "all",
+    "ai_model": "approver"
   }
 ]

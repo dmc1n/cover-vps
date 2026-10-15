@@ -228,7 +228,7 @@ uv run python scripts/drawing_rebuild.py OUT --pdfs DIR --dry-run   drawing cove
 uv run python scripts/drawing_merge.py [--only ...] --dry-run   free-form drawing covers in fewer pieces, compared only (ADR-076, 129)
 uv run python scripts/fewer_build.py OUT --codes C27,... | --merge all   drawing covers rebuilt in staging, slivers joined (ADR-097)
 uv run python scripts/fewer_check.py DIR ...   re-measure a built cover from its cut.dxf and patterns (ADR-097)
-uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT   the Desk picture's red marks mapped onto the cover's panels and 3D (camera fitted, ADR-100)
+uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT   the Desk picture's red marks mapped onto the cover's panels and 3D (camera fitted, ADR-100); the current vents drawn on it (ADR-138)
 uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   drawing, old and new cover side by side
 uv run python scripts/vents_compare.py OUT.png --old DIR --new DIR [--pics ...]   a cover's vents before/after, with the Desk's marked pictures (ADR-101)
 uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--staged DIR]   covers with inner walls rebuilt in staging, vents on the front walls, checked twice (ADR-110)

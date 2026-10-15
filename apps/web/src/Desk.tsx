@@ -727,6 +727,8 @@ function CardView({
   const workshopLogin = isWorkshop(user); // no cover page, no product list (ADR-128)
   const [card, setCard] = useState<Card | null>(null);
   const [model, setModel] = useState<ModelDetail | null>(null);
+  // when the cover was loaded: its 3D files are asked for afresh after a rebuild (ADR-138)
+  const [stamp, setStamp] = useState(0);
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
   // the dialog at the bottom: a reject (reasons, words, pictures) or a comment (ADR-096)
@@ -755,7 +757,10 @@ function CardView({
       .catch((e) => setMsg(String(e.message ?? e)));
     api
       .model(id)
-      .then(setModel)
+      .then((m) => {
+        setModel(m);
+        setStamp(Date.now());
+      })
       .catch(() => setModel(null));
   }, [id]);
   useEffect(() => {
@@ -1192,12 +1197,12 @@ function CardView({
             <Viewer
               id={card.id}
               files={model.files}
-              stamp={0}
+              stamp={stamp}
               snapshot={snap}
             />
           ) : card.has_picture ? (
             <img
-              src={`/api/models/${card.id}/files/cover.png`}
+              src={`/api/models/${card.id}/files/cover.png?v=${stamp}`}
               alt="our cover"
             />
           ) : (

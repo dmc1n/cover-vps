@@ -4988,3 +4988,38 @@ minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
   angled, Vento hocker, Vivaro L-part. They change when they are built again.
 - Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
   constants, so the registry test tells them from the new default.
+
+## ADR-138 — The Desk shows a cover's current files; Rens's third round on vents (14 Oct 2026)
+
+Rens rejected C27, C28 and S32 again on 14 Oct 2026 on their vents ("kruisjes weg, cirkels erbij";
+staging `out/rejections3/vents/`, each picture mapped with `scripts/desk_marks.py`, the live
+vents projected on it, read twice: by us and independently by Codex).
+
+- **The cause on C27 and S32 was not the vents.** Both were rebuilt and reopened at 14:44 and
+  14:35; Rens marked them at 14:49 and 14:43 on pictures that show the vents (and on S32 the
+  split back strip) of 9 Oct. The Desk's 3D asked for a cover's files with a fixed `?v=0` and the
+  API sent no Cache-Control, so the browser kept its cached `vents.json` and panels. **Fix:**
+  `/api/models/{id}/files/*` answers with `Cache-Control: no-cache` (the browser asks again every
+  time; a 304 when nothing changed), and the Desk's viewer asks with the time the card was
+  loaded (`Desk.tsx`, also its cover.png). Test: test_api.py (no-cache on vents.json).
+  `scripts/desk_marks.py` now draws the cover's current vents (green facing, grey away,
+  numbered) on the picture and lists them in its JSON, so a picture of an older state shows at
+  once (test_desk_marks.py). An AI lesson. Any cover reopened after a rebuild may have been
+  judged on its old 3D the same way; not swept (the Desk keeps no record of what a browser drew).
+- **C27** (marks read on the 9 Oct state): the two vents of each inner wall pair (left arm
+  `skirt-right-2`/`-3`, right arm `skirt-front-1`/`-2`) crossed, one circle between them; circles
+  on both arm ends; the vents on `skirt-right-1` and `skirt-front-3` kept. Against the live
+  cover: the vent on skirt-right-2 moves from its middle to the circle (84 cm along, the seam
+  clearance stops it 6 cm short), the one on skirt-front-2 to the circle (23 cm from front-1),
+  the two arm-end vents onto the circles (15–23 cm). 10 vents, as the drawing.
+- **C28** (the picture shows the live vents): crosses on front-2, front-1 (the middle front) and
+  left-3; circles on both arm ends. 9 vents; the drawing writes 10: Rens is asked (Questions #103).
+- **S32** (marks read on the 9 Oct state, four front vents): all four crossed, one circle between
+  each pair, circles on both round ends. The two front vents move to the circles (from the
+  middles of the long front pieces, 1.0 m from the centre, to 0.7–0.8 m), the end vents onto the
+  circles (25 cm). 6 vents, as the drawing.
+- **C26:** not changed (approved 14 Oct 09:21 with the cut file of 9 Oct, after his remark of
+  9 Oct asking to move the inner vents to the arm ends, which that file does not do): asked on
+  the card and in Questions (#104) whether the approval stands.
+- All by hand (`features.vent_positions`), so a rebuild keeps them. Checked twice (audit, fewer_check;
+  Codex read the marks and the staged result independently and agreed); live 14 Oct, reopened.

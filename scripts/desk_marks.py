@@ -7,9 +7,14 @@ back onto the panel and 3D point under it.
 
   uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT_PREFIX
 
-Writes OUT_PREFIX.json (camera, IoU, per stroke the panels hit and 3D points) and OUT_PREFIX.png
-(the picture with the fitted panel outlines and names). A fit with IoU under about 0.9 is a
-guess: treat its mapping as a proposal for a person to check.
+Writes OUT_PREFIX.json (camera, IoU, per stroke the panels hit and 3D points, the cover's
+vents as the camera sees them) and OUT_PREFIX.png (the picture with the fitted panel outlines and
+names, and the cover's current vents from vents.json: green facing the camera, grey facing away,
+numbered). A fit with IoU under about 0.9 is a guess: treat its mapping as a proposal for a
+person to check. Vents in the picture where no green box is drawn, or green boxes on bare wall,
+mean the picture shows another state of the cover than the files now (ADR-138: Rens marked C27
+and S32 on 14 Oct 2026 on the vents of 9 Oct, the Desk's 3D cached): read the marks against
+that state, not against the current vents.
 """
 
 from __future__ import annotations
@@ -80,6 +85,23 @@ class Cam:
     def ray(self, px: float, py: float) -> np.ndarray:
         d = self.f * self.focal + self.right * (px - self.w / 2) - self.up * (py - self.h / 2)
         return d / np.linalg.norm(d)
+
+
+def vent_boxes(cam: Cam, model_dir: Path) -> list[dict]:
+    """The cover's vents (vents.json) in the picture: number, piece, the opening's corners in
+    pixels and whether it faces the camera."""
+    path = model_dir / "vents.json"
+    if not path.is_file():
+        return []
+    out = []
+    for v in json.loads(path.read_text())["vents"]:
+        corners = cam.project(np.asarray(v["corners_mm"], float))
+        seen = bool(
+            float((np.asarray(v["centre_mm"], float) - cam.eye) @ np.asarray(v["normal"])) < 0
+        )
+        px = [[round(float(x)), round(float(y))] for x, y in corners]
+        out.append({"number": v["number"], "piece": v["piece"], "seen": seen, "corners_px": px})
+    return out
 
 
 def render_labels(
@@ -209,6 +231,7 @@ def main() -> None:
         "iou": round(float(iou), 3),
         "loss": round(fun, 3),
         "strokes": [],
+        "vents": vent_boxes(cam, model_dir),
     }
     for s in strokes(red):
         pick = s[:: max(1, len(s) // 150)]
@@ -274,6 +297,11 @@ def main() -> None:
         c = verts[faces[sel]].reshape(-1, 3).mean(axis=0)
         q = cam.project(c[None])[0]
         dr.text((q[0], q[1]), nm, fill=(0, 0, 160))
+    for v in result["vents"]:  # the cover's current vents: does the picture show these?
+        col = (0, 150, 60) if v["seen"] else (150, 150, 150)
+        box = [tuple(c) for c in v["corners_px"]]
+        dr.polygon(box, outline=col, width=2)
+        dr.text((min(c[0] for c in box), max(c[1] for c in box) + 2), str(v["number"]), fill=col)
     over.save(prefix.with_suffix(".png"))
     print(
         json.dumps({k: result[k] for k in ("camera", "iou", "loss")}),
