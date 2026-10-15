@@ -235,8 +235,10 @@ uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--stag
 uv run python scripts/answers_stage.py SPECS.json --out out/answers [--only a,b]   covers rebuilt in staging from the Desk's answers
                                              (cover.json changes, per-model files), audit + re-measure + compare picture (ADR-117)
 uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--only a,b]   drawing covers from a shape a person read
-                                             (drawing_shape.json: hip, faces, revolve, plan-profile, level skirt, mirror; ADR-102;
-                                             a person's vents_total there or in drawing_corrections.json survives a rebuild, ADR-116)
+                                             (drawing_shape.json: hip, faces, revolve, plan-profile, flat-bag, level skirt, mirror; ADR-102;
+                                             a person's vents_total there or in drawing_corrections.json survives a rebuild, ADR-116;
+                                             flat-bag: two panels of one outline stitched all round but the bottom, U1/U2, ADR-138)
+uv run python scripts/s43_shape.py testdata/drawing_shapes   S43/S44's pieces with the seams as drawn, as a "faces" shape (ADR-138)
 COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py [--out out/matchcards]   approved drawing covers as existing covers:
                                              kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114)
 Covers → Links (#/covers/links[?q=<cover>])   a drawing cover and a 3D-model cover of the same product: proposed with a

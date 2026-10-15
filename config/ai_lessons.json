@@ -172,5 +172,25 @@
     "check": "The audit's 'written heights' check (an isofit drawing cover's shown height and arm-end height against the drawing's written back and end heights) and engine/tests/test_flatten.py::test_size_drawing_measures_from_the_covers_own_lower_edge.",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792060000,
+    "model_id": "drawing-u2",
+    "complaint": "The cover must simply be twice the panel on the drawing, the two stitched together all round except the bottom line (Rens at the Desk, 14 Oct 2026, U1 and U2, parasol covers).",
+    "cause": "A drawing with one side view only was turned into a round cover (U2, ADR-102) or read as a sloped box (U1). The drawing draws the flat panel itself.",
+    "rule": "A drawing of one flat outline alone, open at the bottom, is a flat bag: two equal panels of that outline, stitched together on every edge but the lowest line (drawing_given 'flat-bag'; the route-A side-view reader builds it too), no air vents.",
+    "check": "engine/tests/test_drawing_given.py::test_a_flat_bag_is_two_panels_stitched_round_but_the_bottom and ::test_a_side_view_alone_is_a_flat_bag_of_the_drawn_panel.",
+    "applies_to": "drawing",
+    "ai_model": "approver"
+  },
+  {
+    "time": 1792060001,
+    "model_id": "drawing-s43",
+    "complaint": "Follow the seams better, as on the drawing (Rens at the Desk, 14 Oct 2026, S43 and S44).",
+    "cause": "The swept builder ends the strip and the slope square across at the arc's end and puts the round nose beyond it; the drawing ends the strip on a slanted line, runs the back band on round the nose and the slope on to the nose's front. While building it, two arcs sampled at other angles left two pieces unjoined along 163 cm, and no check saw it.",
+    "rule": "Seams of a drawing cover are where the drawing draws them, traced point by point when no builder makes them (scripts/s43_shape.py writes them as faces). Two pieces that touch but are not joined above the hem are an error.",
+    "check": "The audit's 'open seams' check (free edges of two pieces in one place above the hem, from panels.npz) and engine/tests/test_drawing_given.py::test_s43_seams_as_drawn, ::test_the_audit_flags_two_pieces_left_unjoined.",
+    "applies_to": "all",
+    "ai_model": "approver"
   }
 ]
