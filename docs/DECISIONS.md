@@ -3703,6 +3703,17 @@ source for the kind, before products.json and the shape.
   umbrellas). Read-only.
 - **First run (9 Oct, live data read-only):** 76 approved, 62 offered: 20 corner sofas, 13
   sofas, 12 chairs/side tables/hockers, 7 dining sets, 7 round sets, 3 loungers. 14 doubtful.
+- **A row the list gets wrong (15 Oct 2026, QUESTIONS 74):** Rens: "D6: hocker of daybed? →
+  Onze hoes is goed: daybed (prijslijst aanpassen)". The uploaded Excel stays as it is;
+  `prices/list_corrections.json` corrects a row by its code (`coverapi.match_list.correct`:
+  section, item, suitable, size; `was` names what the row must still say, so a newer list that
+  fixed it wins; `why`; an optional `doubt` keeps the cover off the shop until a person
+  confirms with `match.kind`). Every reader of the list follows: the match cards, Links' names
+  (no "hocker" type for D6), a cover's Price & shop, the agent API. D6 now reads "Suns cover
+  daybed – Blocchi daybed", kind lounger (the configurator's daybed), category Daybeds. Its
+  published fixed B2C price, €249, came from the hocker's row (ADR-113 import): the doubt
+  keeps D6 unsold until the daybed's own price is set. Test:
+  `test_a_corrected_price_list_row_makes_d6_a_daybed`.
 - **Better later:** the customer's own hand for Ibiza-style and U-shaped sets in the
   configurator; a family question in the configurator itself; the customer-facing name per
   language (the list is in English).
