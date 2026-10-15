@@ -260,7 +260,8 @@ def create_app(
         file, kind = _named(model_id, name)
         # a cover's files change when it is built again under the same address: the browser
         # asks every time (ETag, 304) and never shows a cached old one. Rens judged C27 and S32
-        # on 14 Oct 2026 by the vents of 9 Oct, the Desk's 3D cached (ADR-138)
+        # on 14 Oct 2026 by the vents of 9 Oct, D1 and D2 by their pieces of 9 Oct, the Desk's
+        # 3D cached (ADR-138, ADR-140)
         return FileResponse(d / name, media_type=MEDIA.get(suffix, "application/octet-stream"),
                             filename=file, content_disposition_type=kind,
                             headers={"Cache-Control": "no-cache"})  # fmt: skip

@@ -61,9 +61,14 @@ def test_a_wide_hip_slope_is_cut_down_its_fall_line_for_the_roll() -> None:
 
 
 def test_a_level_skirt_cuts_every_wall_at_one_height() -> None:
-    """Rens on S43 (8 Oct): "keep the skirt height level all round"; the domain rule 13. S44 (the
-    mirror of S43's 8 Oct shape) still reads its skirt this way."""
-    spec = json.loads((SHAPES / "drawing-s44.json").read_text())
+    """Rens on S43 (8 Oct): "keep the skirt height level all round"; the domain rule 13 (S44's
+    shape of 8 Oct, a swept shape with `skirt_cm`)."""
+    spec = {"shape": "swept", "mirror": True, "params": {
+        "path": [{"line": 41.24}, {"arc": 167.1, "angle": 61.835}],
+        "profile": [[0, 88.01], [33.07, 88.01], [141.86, 40.64]],
+        "seams_cm": [55.4, 110.8, 166.2],
+        "start_end": "square", "end_end": "round", "end_angle_deg": 0,
+        "skirt_cm": 40.64}}  # fmt: skip
     pieces = dg.build(spec, ROLL, 3000.0, (3.0, 1.0))
     skirt = [p for p in pieces if p.name.startswith("skirt-")]
     assert len(skirt) >= 2  # a closed band needs a seam
@@ -111,21 +116,42 @@ def test_a_flat_wall_drawn_in_one_piece_is_one_piece(code: str) -> None:
     assert _pts(pieces, "wall-left")[:, 2].max() == pytest.approx(180.0)
 
 
-def test_s43_nose_and_lean_as_drawn() -> None:
-    """Rens, Desk 9 Oct 2026, S43: "shape and pieces exactly as on the drawing": the back leans
-    in from 40.64 to 88.01 cm, the round nose is its own top and wall, and its wall is level
-    with the front (40.64 cm) all round."""
+def test_s43_seams_as_drawn() -> None:
+    """Rens, Desk 14 Oct 2026, S43 and S44: "seams beter volgen zoals op tekening". The strip
+    ends on a line A-B, the leaning back band runs on round the nose's back to C on the rim, the
+    slope runs on to D on the front of the nose, the walls are cut below C and D; every wall
+    40.64 cm high (the level seam of 9 Oct kept). S44 is the mirror."""
     spec = json.loads((SHAPES / "drawing-s43.json").read_text())
-    pieces = dg.build(spec, ROLL, 3000.0, (3.0, 1.0))
-    names = [p.name for p in pieces]
-    assert "end-round-top" in names and "end-round-wall" in names
-    wall = _pts(pieces, "end-round-wall")
-    assert wall[:, 2].max() == pytest.approx(406.4, abs=0.1)
-    back = [p for p in pieces if p.name.startswith("back")]
-    assert back and max(
-        np.array([q for f in p.faces for q in f])[:, 2].max() for p in back
-    ) == pytest.approx(406.4, abs=0.1)
-    assert 6 <= len(pieces) <= 9
+    assert spec["shape"] == "faces"
+    pieces = dg.build(spec, ROLL, 3000.0)
+    names = {p.name for p in pieces}
+    assert names == {"back-band", "strip", "slope", "nose", "wall-end", "wall-back",
+                     "wall-front-1", "wall-front-2", "wall-front-3", "wall-nose"}  # fmt: skip
+    pts = {p.name: _pts(pieces, p.name) for p in pieces}
+
+    def shared(a: str, b: str) -> np.ndarray:
+        ka = {tuple(np.round(q, 1)) for q in pts[a]}
+        return np.array([q for q in {tuple(np.round(q, 1)) for q in pts[b]} if q in ka])
+
+    sd = shared("slope", "nose")  # the line A-D: from the strip's inner end to the nose's front
+    lo, hi = sd[sd[:, 2].argmin()], sd[sd[:, 2].argmax()]
+    assert hi[2] == pytest.approx(880.1, abs=0.1) and lo[2] == pytest.approx(406.4, abs=0.1)
+    assert hi[:2] == pytest.approx([1485, 1037], abs=15) and lo[:2] == pytest.approx(
+        [1196, 1923], abs=15
+    )
+    bc = shared("back-band", "nose")  # B-C: the band's end, down to the rim behind the nose
+    assert bc[:, 2].min() == pytest.approx(406.4, abs=0.1) and bc[:, 2].max() == pytest.approx(
+        880.1, abs=0.1
+    )
+    for name, p in pts.items():
+        if name.startswith("wall-") and name != "wall-end":
+            assert p[:, 2].max() == pytest.approx(406.4, abs=0.1) and p[:, 2].min() == 0.0
+    # the wall seams below D and C
+    assert len(shared("wall-front-3", "wall-nose")) and len(shared("wall-nose", "wall-back"))
+    mirrored = dg.build(json.loads((SHAPES / "drawing-s44.json").read_text()), ROLL, 3000.0)
+    assert {p.name for p in mirrored} == names
+    m = _pts(mirrored, "nose")
+    assert sorted(np.round(-m[:, 0], 1)) == sorted(np.round(pts["nose"][:, 0], 1))
 
 
 def test_s32_back_strip_is_one_piece() -> None:
@@ -146,7 +172,7 @@ def test_every_shape_read_by_a_person_builds_and_fits_the_roll() -> None:
         spec = json.loads(f.read_text())
         assert spec.get("read"), f"{f.name}: say how it was read"
         pieces = dg.build(spec, ROLL, 3000.0, (3.0, 1.0))
-        assert 3 <= len(pieces) <= 40, f.name
+        assert 2 <= len(pieces) <= 40, f.name  # a flat bag: two (U1, U2)
         for p in pieces:
             v = np.array([q for fc in p.faces for q in fc])
             assert np.isfinite(v).all() and v[:, 2].min() >= -1e-6, f.name
@@ -169,18 +195,21 @@ def test_one_arm_of_an_l_alone_may_come_down() -> None:
     assert "top-y end slope" in names and "top-x end slope" not in names
 
 
-def test_a_side_view_alone_is_turned_into_a_round_cover() -> None:
+def test_a_side_view_alone_is_a_flat_bag_of_the_drawn_panel() -> None:
     """U2: a parasol cover drawn from the side, 60 cm wide up to 180 cm, then narrowing to
-    47 cm at 244 cm: a cylinder and a cone, closed by a disc."""
-    outline = np.array([[0, 0], [60, 0], [60, 180], [53.5, 244], [6.5, 244], [0, 180]])
-    prof = dg.side_profile(outline * 0.5, 244.0)  # drawn at half scale: the height sets it
-    assert prof[0] == pytest.approx([30.0, 0.0], abs=0.1)
-    assert prof[1] == pytest.approx([30.0, 180.0], abs=0.5)
-    assert prof[-1] == [0.0, 244.0]
-    pieces = dg.revolve({"profile": prof}, ROLL)
-    bands = [p for p in pieces if p.name.startswith("band-1-")]
-    assert len(bands) == 2  # the cylinder in two gores: 188 cm round, 180 cm high
-    assert any(p.name.startswith("top") for p in pieces)
+    47 cm at 244 cm. Rens, 14 Oct 2026: "just twice the panel on the drawing, stitched all round
+    except the bottom line" (no longer the round cover turned from it, ADR-102)."""
+    outline = np.array([[0, 0.4], [60, 0], [60, 180], [53.5, 244], [6.5, 244], [0, 180]])
+    panel = dg.side_outline(outline * 0.5, 244.0)  # drawn at half scale: the height sets it
+    pts = np.array(panel)
+    assert pts[:, 1].max() == pytest.approx(244.0) and pts[:, 0].max() == pytest.approx(
+        60.0, abs=0.2
+    )
+    assert (pts[:, 1] == 0.0).sum() == 2  # one level open bottom line
+    front, back = dg.flat_bag({"outline_cm": panel})
+    assert len(front.faces) == len(back.faces)
+    v = _pts([front], front.name)
+    assert np.ptp(v[:, 2]) == pytest.approx(2440.0, abs=1.0)
 
 
 def _lines_pdf(path: Path, angle_deg: float) -> Path:
@@ -386,3 +415,60 @@ def test_a_front_wall_whose_top_runs_at_a_slant() -> None:
         top = front[front[:, 2] > 1.0]
         assert (round(top[:, 2].min() / MM, 1), round(top[:, 2].max() / MM, 1)) == (40.1, 59.9)
         assert any(p.name == "slope" for p in pieces)  # one panel, a ruled patch
+
+
+def test_a_flat_bag_is_two_panels_stitched_round_but_the_bottom() -> None:
+    """Rens, Desk 14 Oct 2026, U1/U2 (parasol covers): "just twice the panel on the drawing, the
+    two stitched together all round except the bottom line". Two panels of the drawn outline,
+    sharing every point of the stitched edges, apart only inside and along the open bottom."""
+    spec = json.loads((SHAPES / "drawing-u1.json").read_text())
+    assert spec["shape"] == "flat-bag" and spec["no_vents"]
+    front, back = dg.build(spec, ROLL, 3000.0)
+    a, b = _pts([front], front.name), _pts([back], back.name)
+    assert np.ptp(a[:, 0]) == pytest.approx(600.0) and np.ptp(a[:, 2]) == pytest.approx(2690.0)
+    # the same outline in plan (x, z), each panel standing off the middle by at most a little
+    assert np.allclose(a[:, [0, 2]], b[:, [0, 2]]) and np.abs(a[:, 1]).max() <= dg.BAG_STAND_MM
+    shared = np.isclose(a[:, 1], b[:, 1])  # the points the two panels have in common
+    left, right = np.isclose(a[:, 0], 0.0), np.isclose(a[:, 0], 600.0) & (a[:, 2] < 1800.0)
+    assert shared[left].all() and shared[right].all()  # the stitched sides
+    bottom = np.isclose(a[:, 2], 0.0) & (a[:, 0] > 100.0) & (a[:, 0] < 500.0)
+    assert bottom.any() and not shared[bottom].any()  # the bottom is open
+    # each panel lies flat as drawn: its 3D area is the outline's area (R10 and the small round)
+    tri = np.array(front.faces)
+    area = (
+        0.5 * np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1).sum()
+    )
+    ring = dg.filleted(spec["params"]["outline_cm"], spec["params"]["round_cm"]) * MM
+    x, z = ring[:, 0], ring[:, 1]
+    plan = 0.5 * abs(np.dot(x, np.roll(z, -1)) - np.dot(z, np.roll(x, -1)))
+    assert area == pytest.approx(plan, rel=1e-3)
+
+
+def test_a_rounded_corner_keeps_its_radius() -> None:
+    ring = dg.filleted([[0, 0], [100, 0], [100, 100], [0, 100]], [[2, 10]])
+    corner = ring[(ring[:, 0] > 90) & (ring[:, 1] > 90)]
+    assert np.allclose(np.hypot(corner[:, 0] - 90, corner[:, 1] - 90), 10)
+    assert len(dg.filleted([[0, 0], [10, 0], [10, 10]], [[1, 50]])) == 3  # no room: left sharp
+
+
+def test_the_audit_flags_two_pieces_left_unjoined(tmp_path: Path) -> None:
+    """S43, 14 Oct 2026: two arcs sampled at other angles left the back band and the back wall
+    unjoined along 163 cm: two free edges in one place, above the hem."""
+    from coverengine.audit import open_seam_checks
+    from coverengine.params import Registry
+
+    # a wall (0..400 mm high) and a roof piece above it, meeting along z = 400
+    v = np.array([[0, 0, 0], [1000, 0, 0], [1000, 0, 400], [0, 0, 400],  # the wall
+                  [0, 0, 400], [1000, 0, 400], [1000, 500, 600], [0, 500, 600]], float)  # fmt: skip
+    f = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7]])
+    labels = np.array([0, 0, 1, 1])
+    (tmp_path / "panels.json").write_text(json.dumps({"panels": [{"name": "skirt-back"},
+                                                                 {"name": "top-1"}]}))  # fmt: skip
+    params = Registry.load(None).resolve()
+    joined = np.array([0, 1, 2, 3, 3, 2, 6, 7])  # the seam's points are one point each
+    np.savez(tmp_path / "panels.npz", vertices=v, faces=f, labels=labels, original_vertex=joined)
+    assert open_seam_checks(tmp_path, params)[0]["ok"]
+    apart = np.arange(8)  # the same places, but two points each: not joined
+    np.savez(tmp_path / "panels.npz", vertices=v, faces=f, labels=labels, original_vertex=apart)
+    (check,) = open_seam_checks(tmp_path, params)
+    assert not check["ok"] and "skirt-back / top-1" in check["detail"]

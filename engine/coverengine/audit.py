@@ -330,6 +330,42 @@ def plan_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
                    "open corner?)")]  # fmt: skip
 
 
+def open_seam_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
+    """Two pieces meeting along an edge that neither calls a seam: both edges came out as free
+    (hem) edges at the same height and of the same length above the cover's bottom, so the cut
+    did not join them (S43, 14 Oct 2026: arcs sampled at other angles on the two sides left a
+    163 cm gap between the back band and the back wall, and every other check passed)."""
+    from scipy.spatial import cKDTree
+
+    npz, pj = model_dir / "panels.npz", model_dir / "panels.json"
+    if not npz.is_file() or not pj.is_file():
+        return []
+    tol = float(params["tolerance.cover_mm"])  # type: ignore[arg-type]
+    names = [p["name"] for p in json.loads(pj.read_text(encoding="utf-8"))["panels"]]
+    data = np.load(npz)
+    v, labels = data["vertices"], data["labels"]
+    ov = data["original_vertex"]  # the cut mesh is split along its seams: join it back first
+    f = ov[data["faces"]]
+    v = np.zeros((int(ov.max()) + 1, 3))
+    v[ov] = data["vertices"]
+    e = np.sort(np.vstack([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]]), axis=1)
+    owner = np.tile(labels, 3)
+    uniq, idx, count = np.unique(e, axis=0, return_index=True, return_counts=True)
+    edge, lab = uniq[count == 1], owner[idx[count == 1]]  # the cover's free edges
+    mid = v[edge].mean(axis=1)
+    up = mid[:, 2] > v[:, 2].min() + tol  # not the bottom hem
+    mid, lab = mid[up], lab[up]
+    if not len(mid):
+        return [_check("open seams", True, "no free edge above the hem")]
+    near = cKDTree(mid).query_pairs(tol, output_type="ndarray")
+    near = near[lab[near[:, 0]] != lab[near[:, 1]]] if len(near) else near
+    pairs = sorted({tuple(sorted((names[int(lab[a])], names[int(lab[b])]))) for a, b in near})
+    detail = "every edge above the hem is a seam or a free edge of its own"
+    if pairs:
+        detail = "pieces touching but not joined: " + ", ".join(f"{a} / {b}" for a, b in pairs)
+    return [_check("open seams", not pairs, detail)]
+
+
 def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
     """The air vents (Rens, 8 Oct 2026; ADR-101): the drawing's number; round every side of the
     cover (no side without one while another side has two), the front (inner) walls of an L, U or
@@ -657,6 +693,7 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     checks += fold_checks(model_dir, params)
     checks += plan_checks(model_dir, params)
     checks += vent_checks(model_dir, params)
+    checks += open_seam_checks(model_dir, params)
 
     checks += drawing_checks(model_dir)
 

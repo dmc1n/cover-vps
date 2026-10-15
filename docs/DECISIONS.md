@@ -5354,3 +5354,44 @@ vents projected on it, read twice: by us and independently by Codex).
   `test_the_front_walls_continue_the_top_seams` (fails on the old code). **Not swept:** the other
   plan-profile covers have the same fault until built again: C27 (front walls up to 40 cm off;
   waiting for Rens's round), C26 (approved; a rebuild needs a new approval), S32.
+
+## ADR-140 — Rens's third round on pieces and seams (14 Oct 2026): a flat bag, S43/S44's seams as drawn, a stale 3D view
+
+Rens rejected six covers again on 14 Oct 2026 (staging `out/rejections3/panels/`; each read with
+`scripts/desk_marks.py` and by looking, a second reading by Codex before building, `cover audit`
+and `scripts/fewer_check.py`, compare sheets and a size table in `compare/`, Codex again on those).
+
+- **D1, D2** ("doorgekruiste panelen reduceren tot 1 paneel per afbeelding", two pictures each): his
+  crosses straddle the 18 cm line on the front wall and on the back wall, but those walls have been
+  one piece each since 14 Oct 14:04 (ADR-131): the pictures show the 9 Oct cover, the Desk's 3D
+  view cached in his browser (the cause and fix of ADR-138, found here independently). Nothing
+  rebuilt; the cards reopened with the sizes (front 266/230 x 40 cm, back 266/230 x 82 cm, both on
+  the roll) and "reload with Ctrl+F5". The owner's "these faces must fit on a roll" and question
+  64's 150 cm change nothing: the crossed walls fit 148 already; the slope (not crossed) is
+  222 x 194.6 cm (D1) and 186 x 179 cm (D2), wider than 150 cm both ways. `roll.usable_width_mm`
+  stays 1480 (the questions round owns #64).
+- **S43, S44** ("seams beter volgen zoals op tekening"): the drawing ends the strip on a slanted
+  line A-B before the nose, runs the leaning back band on round the back of the nose to C on the
+  rim, the slope on to D on the front of the nose (A-D), and cuts the walls below C and D, where the
+  straight front turns into the curve and where the concave curve meets the nose. The swept builder
+  cannot do this (it ends both square at the arc's end), so `scripts/s43_shape.py` writes the pieces
+  as a "faces" shape: the same body as ADR-131, cones from A and B where the strip, band and slope
+  run on (every piece flat triangles and ruled quads, 0.0 % stretch); B where the written 185.94 cm
+  cushion circumference ends. 10 pieces (8 and 9 before), 4 vents placed by hand (end, back, round
+  front, nose wall; the 27 cm concave piece has none: `features.vent_short_piece_ok` per model).
+  Open: S43 writes the bottom circumference 252.88 in (642.3 cm), S44 262.98 in (668.0 cm) for
+  the same sizes; the cover measures 654.7 (question #112).
+- **U1, U2** ("de hoes moet gewoon 2x het paneel zijn ... rondom aan elkaar gestikt op de onderste
+  lijn na"): a new drawing shape `flat-bag` (`drawing_given.flat_bag`): two equal panels of one
+  outline (`outline_cm`, `round_cm` per corner), sharing every point of the stitched edges, standing
+  off each other inside by at most 5 mm so the 3D cover has an inside and a mouth (under 0.1 %
+  length); the lowest line is the open hem; `no_vents` in the shape (or the reader) sets
+  `features.vents_min`/`vents_per_metre` to 0. The route-A reader's lone side view (ADR-102, U2
+  turned round) now builds this flat bag too: U1 and U2 both read themselves this way. 2 pieces each,
+  63.0 x 275.5 / 250.5 cm cut. The pocket, zipper and rope are not in the pattern (question #113).
+- **Rule and check (ADR-055):** the audit's new `open seams` check fails two pieces whose free
+  edges lie in one place above the hem (from panels.npz, joined back by `original_vertex`): S43's
+  first faces left a 163 cm gap between the back band and the back wall that every other check
+  passed. Swept read-only over the live covers: C1, C2, C3, C9, C24, C26, C27, C28 and S32 have such
+  unjoined edges (plan-profile and isofit covers); not changed here, for the next round. Tests:
+  test_drawing_given.py (flat bag, rounded corner, side view, S43 seams, open seams); lessons in config/ai_lessons.json.
