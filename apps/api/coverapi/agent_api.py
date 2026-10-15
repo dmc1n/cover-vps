@@ -1724,6 +1724,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> FastAPI:  # noqa
         return cover_facts(cover_card(code, request), request, anon, lang)
 
     sub.state.count_page = count_page
+    sub.state.visitor = visitor  # the MCP server's window per address (agent_mcp, ADR-145)
 
     sub.state.cover_public = cover_public
     sub.state.covers = covers

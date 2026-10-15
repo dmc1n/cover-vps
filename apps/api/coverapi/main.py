@@ -159,7 +159,11 @@ def create_app(
     from coverapi import agent_api, agent_pages
 
     # the API for AI agents (/api/v2), its pages, llms-full.txt (ADR-139); after the B2B shop
-    agent_pages.install(app, auth, agent_api.install(app, auth, store.root, store))
+    agent_sub = agent_api.install(app, auth, store.root, store)
+    agent_pages.install(app, auth, agent_sub)
+    from coverapi import agent_mcp
+
+    agent_mcp.install(app, auth, agent_sub)  # the MCP server at /mcp over the same API (ADR-145)
 
     def model_or_404(model_id: str) -> Path:
         try:

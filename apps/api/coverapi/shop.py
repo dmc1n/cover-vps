@@ -935,7 +935,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
 
         path = request.url.path
         shop_path = path.startswith(("/api/shop/", "/media/", "/shop", "/api/v2/")) or path in (
-            "/sitemap.xml", "/llms.txt", "/llms-full.txt")  # fmt: skip
+            "/sitemap.xml", "/llms.txt", "/llms-full.txt", "/mcp")  # fmt: skip
         # the old webshop API (ADR-061) too, except for a webshop's own key (checked there)
         if path.startswith("/api/public/") and not request.headers.get("x-api-key"):
             shop_path = True
