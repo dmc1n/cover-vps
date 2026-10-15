@@ -2,271 +2,288 @@
  "shape": "faces",
  "params": {
   "pieces": {
-   "x-strip": [
+   "back-strip": [
     [
      [
+      20.32,
       0,
-      0,
-      83.8
+      83.82
      ],
      [
       345.44,
       0,
-      83.8
+      83.82
      ],
      [
       345.44,
-      27.9,
-      83.8
+      27.94,
+      83.82
      ],
      [
-      20.3,
-      27.9,
-      83.8
+      20.32,
+      27.94,
+      83.82
      ]
     ]
    ],
-   "y-strip": [
+   "seat": [
     [
      [
-      0,
-      0,
-      83.8
+      20.32,
+      27.94,
+      83.82
      ],
      [
-      20.3,
-      27.9,
-      83.8
+      345.44,
+      27.94,
+      83.82
      ],
      [
-      20.3,
-      210.8,
-      17.8
+      345.44,
+      104.14,
+      43.18
      ],
      [
-      0,
-      210.8,
-      17.8
+      132.08,
+      104.14,
+      43.18
      ]
     ]
    ],
-   "x-slope": [
+   "chaise-top": [
     [
      [
-      20.3,
-      27.9,
-      83.8
-     ],
-     [
-      345.44,
-      27.9,
-      83.8
-     ],
-     [
-      345.44,
-      104.1,
-      43.2
+      20.32,
+      27.94,
+      83.82
      ],
      [
       132.08,
-      104.1,
-      43.2
+      104.14,
+      43.18
+     ],
+     [
+      132.08,
+      210.82,
+      43.18
+     ],
+     [
+      20.32,
+      210.82,
+      43.18
      ]
     ]
    ],
-   "back-x": [
+   "chaise-side": [
     [
      [
       0,
-      0,
-      0
+      27.94,
+      17.78
      ],
      [
-      345.44,
-      0,
-      0
+      20.32,
+      27.94,
+      83.82
      ],
      [
-      345.44,
-      0,
-      83.8
+      20.32,
+      210.82,
+      43.18
      ],
      [
       0,
-      0,
-      83.8
+      210.82,
+      17.78
      ]
     ]
    ],
-   "back-y": [
+   "side-back": [
     [
      [
       0,
       0,
-      0
+      17.78
+     ],
+     [
+      20.32,
+      0,
+      83.82
+     ],
+     [
+      20.32,
+      27.94,
+      83.82
      ],
      [
       0,
-      0,
-      83.8
-     ],
-     [
-      0,
-      210.8,
-      17.8
-     ],
-     [
-      0,
-      210.8,
-      0
+      27.94,
+      17.78
      ]
     ]
    ],
-   "front-x": [
+   "band": [
     [
      [
-      132.08,
-      104.1,
-      0
-     ],
-     [
-      132.08,
-      104.1,
-      43.2
-     ],
-     [
-      345.44,
-      104.1,
-      43.2
-     ],
-     [
-      345.44,
-      104.1,
-      0
-     ]
-    ]
-   ],
-   "front-y": [
-    [
-     [
-      132.08,
-      104.1,
-      0
-     ],
-     [
-      132.08,
-      210.8,
-      0
-     ],
-     [
-      132.08,
-      210.8,
-      43.2
-     ],
-     [
-      132.08,
-      104.1,
-      43.2
-     ]
-    ]
-   ],
-   "end-x": [
-    [
-     [
-      345.44,
+      0,
       0,
       0
      ],
      [
-      345.44,
-      104.1,
-      0
-     ],
-     [
-      345.44,
-      104.1,
-      43.2
-     ],
-     [
-      345.44,
-      27.9,
-      83.8
-     ],
-     [
-      345.44,
       0,
-      83.8
-     ]
-    ]
-   ],
-   "end-y": [
-    [
-     [
       0,
-      210.8,
-      0
+      17.78
      ],
      [
       0,
-      210.8,
-      17.8
+      210.82,
+      17.78
      ],
      [
-      20.3,
-      210.8,
-      17.8
-     ],
-     [
-      132.08,
-      210.8,
-      43.2
-     ],
-     [
-      132.08,
-      210.8,
+      0,
+      210.82,
       0
      ]
     ]
    ],
-   "y-slope-a": [
+   "back": [
     [
      [
-      20.3,
-      27.9,
-      83.8
+      0,
+      0,
+      0
      ],
      [
-      132.08,
-      104.1,
-      43.2
+      345.44,
+      0,
+      0
      ],
      [
-      20.3,
-      210.8,
-      17.8
+      345.44,
+      0,
+      83.82
+     ],
+     [
+      20.32,
+      0,
+      83.82
+     ],
+     [
+      0,
+      0,
+      17.78
      ]
     ]
    ],
-   "y-slope-b": [
+   "end": [
+    [
+     [
+      345.44,
+      0,
+      0
+     ],
+     [
+      345.44,
+      104.14,
+      0
+     ],
+     [
+      345.44,
+      104.14,
+      43.18
+     ],
+     [
+      345.44,
+      27.94,
+      83.82
+     ],
+     [
+      345.44,
+      0,
+      83.82
+     ]
+    ]
+   ],
+   "front": [
     [
      [
       132.08,
-      104.1,
-      43.2
+      104.14,
+      0
      ],
      [
       132.08,
-      210.8,
-      43.2
+      104.14,
+      43.18
      ],
      [
-      20.3,
-      210.8,
-      17.8
+      345.44,
+      104.14,
+      43.18
+     ],
+     [
+      345.44,
+      104.14,
+      0
+     ]
+    ]
+   ],
+   "chaise-inner": [
+    [
+     [
+      132.08,
+      104.14,
+      0
+     ],
+     [
+      132.08,
+      210.82,
+      0
+     ],
+     [
+      132.08,
+      210.82,
+      43.18
+     ],
+     [
+      132.08,
+      104.14,
+      43.18
+     ]
+    ]
+   ],
+   "chaise-front": [
+    [
+     [
+      0,
+      210.82,
+      0
+     ],
+     [
+      0,
+      210.82,
+      17.78
+     ],
+     [
+      20.32,
+      210.82,
+      43.18
+     ],
+     [
+      132.08,
+      210.82,
+      43.18
+     ],
+     [
+      132.08,
+      210.82,
+      0
      ]
     ]
    ]
   }
  },
- "read": "the L1 drawing (covers 39 and 46 are mirrors: one pattern, cut once each way): arms 345.44 x 104.1 cm (strip 27.9) and 210.8 x 132.08 cm (strip 20.3), back 83.8 cm, front 43.2 cm all along; the short arm is a chaise whose back comes down from 83.8 cm at the corner to 17.8 cm at its end (the rear view: 7 in), as both 3D views draw, the mitre from the outside to the inside corner. 11 pieces: the chaise slope (its back comes down, its front stays level) in two flat halves folded along the line from the inside corner to the back of the end, so every piece lies flat and the seams meet exactly (Rens: 11 pieces)."
+ "mirror": true,
+ "vents_total": 6,
+ "read": "cover 39 & 46 (L1 & L5): the pair drawing is the L1 drawing page for page (the same written sizes, the same hand, the same 6 airpockets) with the note that covers 39 and 46 are mirrors of each other. Rens, 15 Oct 2026: match it to L1 (he calls this card L5). Built as drawing-l1.json (ADR-141: the STEP's shape at the drawing's sizes) mirrored left to right, so this card shows L5; L1 itself is its own card. One pattern, cut once each way. L1's read: The drawing's written sizes (inches x 2.54) with the shape of Rens's STEP ('39 V1_Portofino_Chaise-longue_28-01-2022.STEP', uploaded 15 Oct 2026): a chaise longue, not a second sofa arm. Long arm 136 in (345.44 cm) x 41 in (104.14 cm), back strip 11 in (27.94 cm) flat at the back height 33 in (83.82 cm), the seat one plane down to the front 17 in (43.18 cm). Chaise 52 in (132.08 cm) wide, 83 in (210.82 cm) from the back; its top low at the front (43.18 cm along the front and the inner side) and rising to the back height at the outer back corner, a twisted (ruled) surface as in the STEP, the mitre to the seat as drawn. The outer side: a chamfer 8 in (20.32 cm) wide in plan from the top down to a vertical band of 7 in (17.78 cm) (the rear view's small size), the chamfer cut where the back strip starts (the top view's short line). The STEP is up to 3 cm off the written sizes; the drawing wins."
 }

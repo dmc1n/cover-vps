@@ -262,5 +262,15 @@
     "check": "engine/tests/test_finish.py::test_a_vent_by_hand_one_panel_up_over_the_low_wall.",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792072800,
+    "model_id": "drawing-l3",
+    "complaint": "Move the outer-side vent to the indicated position (Rens at the Desk, 15 Oct 2026, L1, L2, L3: an arrow from the vent up onto the chamfer).",
+    "cause": "L1/L2 kept the vent on the 17.8 cm band as a lower opening; on L3 the 7.6 cm band and the chamfer are one piece and the vent, 5 cm above the hem, crossed the fold between them.",
+    "rule": "A vent never straddles a fold: above a low band it goes onto the piece above, full size, 5 cm over the band. Where band and chamfer are one piece, give its height by hand: features.vent_positions 'piece@fraction@cm' (the vent's bottom that far above the piece's edge).",
+    "check": "engine/tests/test_finish.py::test_a_vent_by_hand_at_a_height_off_the_fold.",
+    "applies_to": "all",
+    "ai_model": "approver"
   }
 ]

@@ -54,7 +54,7 @@ one-line edit there.
   shapes (owner, 2026-10-09, QUESTIONS 71, ADR-110; `features.vent_inner_walls`, default on). Round every side first,
   one in the middle of each piece, the drawing's count kept, never on a free top edge (Rens, 2026-10-08, ADR-101). Never on a rounded corner
   (Rens, 2026-10-09, ADR-134; `features.vent_on_corners`, `vent_corner_max_deg`). By hand
-  (`features.vent_positions`) a vent may go one panel up, over the seam on top of a low wall (D1/D2, ADR-142). Built as a cut opening with a hood of extra fabric holding a plastic insert
+  (`features.vent_positions`) a vent may go one panel up, over the seam on top of a low wall (D1/D2, ADR-142), or at a height given as "piece@fraction@cm" (L3, ADR-144). Built as a cut opening with a hood of extra fabric holding a plastic insert
   that keeps it open, and a membrane inside against dirt (`features.vent_*`, pieces in M5).
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
   or needs stroked lines, arc support). Learned in M0 by cutting a test sheet.

@@ -5568,3 +5568,33 @@ before live).
   covers of ADR-140's sweep (C1, C2, C3, C9, C24) have another cause, not looked at here. Whether a
   low side wall should hand its vent up by the rule instead of shrinking it is the owner's (1 Oct
   rule), not changed.
+
+## ADR-144 — Rens's fifth round on the L family (15 Oct 2026): the outer vent onto the chamfer, a vent's height by hand, the mirror pairs from L1–L3
+
+Rens at the Desk, 15 Oct 2026, 13:44–14:09 (staging `out/rejections5/lfamily/`). Each picture was mapped
+with `scripts/desk_marks.py` and checked by eye, and Codex read it independently before the build.
+Checks: `cover audit` and `scripts/fewer_check.py`, compare pictures and size tables in `compare/`, and
+Codex again on those before live.
+
+- **L1, L2, L3** ("vent verplaatsen naar aangegeven positie", one picture each: an arrow from the
+  outer-side vent straight up onto the chamfer; the pictures show the current vents). That is answer b
+  of question #114 and what page 2 of the drawings draws. L1/L2: the vent leaves the 17.8 cm band
+  (a 25 x 11 cm lower opening by the 1 Oct rule) for the chamfer `top-2`, full 25 x 22 cm, in the
+  middle of its bottom seam, 5 cm over the band (22.3 / 22.1 cm above the floor; ADR-142's vent one
+  panel up). L3: the 7.6 cm band and the chamfer are one piece (a 7.6 cm band alone would be a sliver
+  under `seams.min_piece_width_mm`), so its vent crossed the fold. `features.vent_positions` now takes
+  a height, "piece@fraction@cm": the vent's bottom sits that far above the piece's bottom edge, and a
+  height given by hand wins over `vent_align`. L3: "top-2@0.5@12.6" (7.6 + 5 cm), 12.3 cm above the floor. Other
+  vents and every piece unchanged. #114 done. Test `test_finish.py`
+  `test_a_vent_by_hand_at_a_height_off_the_fold`; a lesson in config/ai_lessons.json.
+- **The pairs 39 & 46 (L1 & L5), 40 & 47 (L2 & L6), 41 & 48 (L3 & L7)** ("match shape to L1", "L6,
+  straks matchen met L2", "L7, ... met L3"). Each pair drawing is its L drawing page for page (the same
+  written sizes, hand and 6 airpockets) plus "Cover N & M are mirror of each other". No size differs.
+  Rens names the cards L6 and L7, so each pair card is built as its L shape mirrored (`"mirror": true`,
+  `testdata/drawing_shapes/drawing-cover-*-mirror.json`; one pattern, cut once each way) with the L's
+  corrected vents mirrored. Every piece is the same size as the L's (0.0 mm difference) and every vent is its mirror.
+- **Open:** the audit's `kinks` check (ADR-143) fails L3 and the L3/L7 pair: `top-2` folds 32 degrees
+  over 48 cm where the joined 7.6 cm band meets the chamfer at the front (14 degrees at the back). It
+  was already in the live L3 (built before that check) and is kept for now (Rens: L3 "bijna goed");
+  asked in Questions (#115) whether to keep one piece or sew a separate 7.6 cm band. A release older than
+  this branch does not read "@cm": L3 and the L3/L7 pair must not be exported again on it.
