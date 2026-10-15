@@ -595,6 +595,9 @@ def test_pages_have_structured_data_and_agent_rules(app: Any) -> None:
     assert CODE in full.text and "230 × 90 ×" in full.text and "never orders or pays" in full.text
     assert "## For AI agents" in c.get("/llms.txt").text
     assert "/api/v2/docs" in c.get("/llms.txt").text
+    # the MCP server is named in llms.txt, llms-full.txt and the API's docs (ADR-145)
+    for path in ("/llms.txt", "/llms-full.txt", "/api/v2/docs"):
+        assert "/mcp" in c.get(path).text and "find_cover" in c.get(path).text, path
 
 
 def test_body_limits_before_parsing_and_photo_route(app: Any) -> None:

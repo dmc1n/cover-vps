@@ -309,6 +309,10 @@ def install(app: FastAPI, auth: Any, sub: FastAPI) -> None:
                 f"<p>{_e(par)}</p>"
                 for par in spec["info"]["description"].strip().replace("**", "").split("\n\n")
             ),
+            f"<p>MCP server (Streamable HTTP): <code>{_e(sub.state.feeds_root(request))}mcp</code>"
+            " — the same API as tools for MCP clients (Claude, ChatGPT, IDEs): list_kinds, "
+            "find_cover, get_quote, get_cover, create_order_link, suggest_from_photo (a partner "
+            "key only). Same limits and prices; a person always orders and pays.</p>",
         ]
         schemas = spec.get("components", {}).get("schemas", {})
         for path, ops in spec["paths"].items():
@@ -360,6 +364,9 @@ def agent_section(site: str, api: str, feeds: str) -> list[str]:
         f"- [Agent API]({api}/docs): give the kind and sizes, get the best covers with price, "
         "fit and an order link. JSON, open without a key within limits.",
         f"- [OpenAPI]({api}/openapi.json)",
+        f"- MCP server (Streamable HTTP, for Claude, ChatGPT and other MCP clients): {feeds}mcp "
+        "— tools list_kinds, find_cover, get_quote, get_cover, create_order_link and "
+        "suggest_from_photo (a partner key only, as `Authorization: Bearer <key>`).",
         f"- [Kinds and how to measure (JSON)]({api}/kinds)",
         f"- [How to measure]({site}measure)",
         f"- [Our existing covers]({site}covers)",
