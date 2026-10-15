@@ -17,10 +17,12 @@ the front):
 - the leaning back band runs on past B round the back of the nose to C on the rim, its end the
   line B-C (a cone from B);
 - the slope runs on to D on the front of the nose, its end the line A-D (a cone from A);
-- the nose top is what is left: A, B, C, the rim round to D (cones from B and from A);
-- the walls are cut where the drawing draws vertical lines: at the back corner and the front
-  corner of the straight end, where the straight front turns into the curve, where the concave
-  curve turns into the round nose, at D and at C.
+- the nose top is what is left: A, B, C, the rim round to D (the hull of the line A-B and the
+  rim: cones from B and from A and the triangle between, tangent to both, so it has no fold);
+- the walls are cut at the back corner and the front corner of the straight end, at D and at C;
+  the front wall from the straight end round the concave curve to D is one piece (Rens, Desk
+  15 Oct 2026: "de front skirts terugbrengen naar 1 paneel", over the drawing's vertical lines
+  where the straight front turns into the curve and where the curve turns into the nose).
 
 Every piece is made of flat triangles and quads that are rulings of cones, so each lies flat.
 """
@@ -106,7 +108,14 @@ def pieces() -> tuple[dict[str, list[list[list[float]]]], dict[str, float]]:
     ]
     front_arc = [arc_pt(RF, t) for t in steps(0, THETA, extra=(th_a,))]  # the concave curve
     front_round = [nose_pt(f) for f in steps(ph_front, ph_d)]  # the nose's front, to D
-    nose_rim = [nose_pt(f) for f in steps(ph_c, ph_d, 3.0)]
+    # P: where the nose's rim runs parallel to A-B, on the rim's side of it (see the nose top)
+    perp = np.array([b[1] - a[1], -(b[0] - a[0])])
+    perp /= np.linalg.norm(perp)
+    if (nose_pt(ph_c) + nose_pt(ph_d) - a - b) @ perp < 0:
+        perp = -perp
+    ph_p = math.degrees(math.atan2(perp[1], perp[0]))
+    assert ph_c < ph_p < ph_d, (ph_c, ph_p, ph_d)
+    nose_rim = [nose_pt(f) for f in steps(ph_c, ph_d, 3.0, extra=(ph_p,))]
 
     # back band: the straight part, the cone round the arc to B, the cone from B to C
     band = [[[0, 0, WALL], [LINE, 0, WALL], [LINE, BAND_IN, TOP], [0, BAND_IN, TOP]]]
@@ -141,14 +150,12 @@ def pieces() -> tuple[dict[str, list[list[list[float]]]], dict[str, float]]:
         slope.append([P(a, TOP), P(q1, WALL), P(q0, WALL)])
     out["slope"] = slope
 
-    # nose top: fans from B and from A over the rim, the triangle A-B-P between
-    mid = (a + b) / 2
-    perp = np.array([b[1] - a[1], -(b[0] - a[0])])
-    perp /= np.linalg.norm(perp)
-    if (N - mid) @ perp < 0:
-        perp = -perp
-    ph_p = min(nose_rim, key=lambda q: float(np.linalg.norm(q - (mid + perp * 1e3))))
-    ip = next(i for i, q in enumerate(nose_rim) if q is ph_p)
+    # nose top: the hull of the line A-B and the rim: fans from B and from A over the rim, the
+    # triangle A-B-P between, P where the rim runs parallel to A-B. There the triangle's plane is
+    # tangent to both fans, so the piece has no fold (Rens, 15 Oct 2026: "rare knik in paneel top
+    # 1"; P was taken on the strip's side, so B fanned over the whole rim and the triangle B-D-A
+    # folded 62 degrees).
+    ip = max(range(len(nose_rim)), key=lambda i: float(nose_rim[i] @ perp))
     nose = []
     for q0, q1 in zip(nose_rim[: ip + 1], nose_rim[1 : ip + 1], strict=False):
         nose.append([P(b, TOP), P(q0, WALL), P(q1, WALL)])
@@ -166,17 +173,17 @@ def pieces() -> tuple[dict[str, list[list[list[float]]]], dict[str, float]]:
     out["wall-end"] = [[[0, 0, 0], [0, DEPTH, 0], [0, DEPTH, WALL], [0, STRIP_IN, TOP],
                         [0, BAND_IN, TOP], [0, 0, WALL]]]  # fmt: skip
     out["wall-back"] = wall([np.array([0.0, 0.0])] + back_rim)
-    out["wall-front-1"] = wall([np.array([0.0, DEPTH]), np.array([LINE, DEPTH])])
-    out["wall-front-2"] = wall(front_arc)
-    out["wall-front-3"] = wall(front_round)
+    # the front skirt in one piece: the straight front, the concave curve and the nose's front
+    # to D (Rens, 15 Oct 2026: "de front skirts terugbrengen naar 1 paneel")
+    out["wall-front"] = wall([np.array([0.0, DEPTH])] + front_arc + front_round[1:])
     out["wall-nose"] = wall(nose_rim)
 
     def cm(q: np.ndarray) -> list[float]:
         return [round(float(v), 1) for v in q]
 
     read = {"A_deg_on_arc": th_a, "B_deg_on_arc": th_b, "C_deg_on_nose": ph_c,
-            "D_deg_on_nose": ph_d, "A": cm(a), "B": cm(b), "C": cm(nose_pt(ph_c)),
-            "D": cm(nose_pt(ph_d))}  # fmt: skip
+            "D_deg_on_nose": ph_d, "P_deg_on_nose": round(ph_p, 2), "A": cm(a), "B": cm(b),
+            "C": cm(nose_pt(ph_c)), "D": cm(nose_pt(ph_d))}  # fmt: skip
     return out, read
 
 
@@ -195,9 +202,11 @@ def main() -> int:
         f"A {pts['A']} - B {pts['B']} (B where the written 185.94 cm cushion circumference along "
         "the strip's outer edge ends); the leaning back band runs on round the back of the nose to "
         f"C {pts['C']} on the rim (the line B-C); the slope runs on to D {pts['D']} on the front "
-        "of the nose (the line A-D); the nose top is A-B-C and the rim round to D; the walls are "
-        "cut at the straight end's two corners, where the straight front turns into the curve, "
-        "where the concave curve turns into the nose, at D and at C, as the 3D views draw them. "
+        "of the nose (the line A-D); the nose top is A-B-C and the rim round to D, one smooth "
+        "piece without a fold; the walls are cut at the straight end's two corners, at D and at "
+        "C; the front wall from the straight end round the concave curve to D is one piece "
+        "(Rens, Desk 15 Oct 2026: 'rare knik in paneel top 1 wijzigen. Ook de front skirts "
+        "terugbrengen naar 1 paneel'). "
         "Written by scripts/s43_shape.py."
     )
     s44 = ("S44 is S43 mirrored (both drawings 196.95/197.0 x 192.63/192.4 cm, 88 cm back, 33 cm "
