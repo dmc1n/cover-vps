@@ -559,8 +559,8 @@ def build_server(sub: FastAPI) -> Server[Any]:
 
 
 def origin_ok(auth: Any, request: Request, origin: str) -> bool:
-    """An Origin is valid only when it is the site this request was made to: the website the
-    Worker answered for (its x-site-host, trusted with its key) or this server's own host.
+    """An Origin is valid only when it is one of our own sites: the website the Worker answered
+    for (its x-site-host, trusted with its key) or the studio's configured public address.
     MCP clients are not browsers and send none (ADR-145, the spec's DNS-rebinding rule)."""
     from urllib.parse import urlsplit
 
@@ -572,7 +572,12 @@ def origin_ok(auth: Any, request: Request, origin: str) -> bool:
         return False
     if parts.scheme not in ("https", "http") or not parts.netloc:
         return False
-    own = {request.headers.get("host", "")}
+    from coverapi.security import DEFAULT_PUBLIC_URL, PUBLIC_URL_KEY
+
+    # configured addresses only: a request's own Host is the attacker's during DNS rebinding
+    # (Codex's review, round 2)
+    public = str(auth.setting(PUBLIC_URL_KEY, DEFAULT_PUBLIC_URL) or DEFAULT_PUBLIC_URL)
+    own = {urlsplit(public).netloc}
     if link_ok(auth, request):
         own.add(site_host(request))
     return parts.netloc.lower() in {h.lower() for h in own if h}

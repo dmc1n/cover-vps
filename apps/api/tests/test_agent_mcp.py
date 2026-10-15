@@ -365,10 +365,10 @@ def test_methods_and_cors(app: Any) -> None:
     """GET is unsupported; OPTIONS answers our own pages only, without credentials."""
     c = TestClient(app)
     assert c.get("/mcp").status_code == 405
-    own = {"origin": "http://testserver"}
+    own = {"origin": "https://covers.suns.nu"}  # the studio's public address (default)
     response = c.options("/mcp", headers=own)
     assert response.status_code == 204
-    assert response.headers["access-control-allow-origin"] == "http://testserver"
+    assert response.headers["access-control-allow-origin"] == "https://covers.suns.nu"
     assert "POST" in response.headers["access-control-allow-methods"]
     for header in ("Authorization", "Mcp-Protocol-Version", "Mcp-Method", "Mcp-Name"):
         assert header in response.headers["access-control-allow-headers"]
@@ -393,6 +393,10 @@ def test_a_foreign_origin_is_refused(factory: Any) -> None:
         ):
             assert r.status_code == 403, (origin, r.text)
             assert "access-control-allow-origin" not in r.headers
+    # DNS rebinding (Codex's review, round 2): a matching Host and Origin of the attacker's
+    for host in ("evil.example:8080", "testserver"):
+        r = rpc(c, "tools/list", headers={**preview, "host": host, "origin": f"http://{host}"})
+        assert r.status_code == 403, (host, r.text)
     # without the Worker's key the preview's origin is not ours either
     r = rpc(
         c,

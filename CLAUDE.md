@@ -375,6 +375,13 @@ cd apps/site && npm test | npm run check     the Worker's tests (security header
                                              personal data; /llms.txt, /llms-full.txt, /measure, /covers with JSON-LD;
                                              preview only until the shop setting agent_api_enabled + the Worker's
                                              AGENT_API (ADR-139, docs/handbook/agent-api.md, docs/plans/agent-access.md)
+<website>/mcp                               the MCP server for Claude, ChatGPT and other agents (ADR-145): the official MCP SDK,
+                                             stateless Streamable HTTP (protocol 2026-07-28 and the 2024-11-05…2025-11-25
+                                             handshake), tools list_kinds, find_cover, get_quote, get_cover, create_order_link,
+                                             suggest_from_photo (partner key, Authorization: Bearer); each tool is one in-process
+                                             /api/v2 request with the caller's headers (same limits, prices, refusals);
+                                             limits.agent_mcp_per_hour for the protocol's own messages; behind the same two
+                                             switches as /api/v2 (coverapi/agent_mcp.py; adding it: docs/handbook/agent-api.md)
 uv tool install ./clients/cli; covers find --kind sofa --width 230 --depth 90 --height 85 [--json]
                                              the agent API from the command line (quote, kinds, link, cover; --api, --key)
 config/agent_kinds.json                     the kinds an agent may name, their sizes and the measuring guide's texts

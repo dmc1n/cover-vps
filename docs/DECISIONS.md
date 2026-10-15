@@ -5598,3 +5598,78 @@ Codex again on those before live.
   was already in the live L3 (built before that check) and is kept for now (Rens: L3 "bijna goed");
   asked in Questions (#115) whether to keep one piece or sew a separate 7.6 cm band. A release older than
   this branch does not read "@cm": L3 and the L3/L7 pair must not be exported again on it.
+
+## ADR-145 — The MCP server for AI agents (phase 2 of ADR-139): /mcp over the same API, preview only
+
+The owner approved the four-layer agent strategy (ADR-139); phase 2 is the MCP server, so Claude,
+ChatGPT and other agents can use the shop as tools. Built on the preview only, behind the same
+two switches as `/api/v2` (the shop setting `agent_api_enabled`, the Worker's `AGENT_API`); the
+preview is recognised the same way (`x-site-host` + the Worker's key), live stays off.
+
+- **Protocol and SDK.** The official MCP Python SDK (`mcp` 2.3.0, MIT, added to coverapi): its
+  lowlevel `Server` with explicit tool schemas and `StreamableHTTPSessionManager` in stateless
+  mode with JSON answers (no SSE streams, no sessions, no GET stream: GET/DELETE answer 405).
+  It speaks the current spec, **2026-07-28** (stateless: no initialize, per-request `_meta`,
+  `server/discover`, `resultType`, `ttlMs`/`cacheScope` on tools/list), and the handshake
+  versions 2024-11-05, 2025-03-26, 2025-06-18 and 2025-11-25 for today's clients. The SDK
+  needs a running task group; a fresh manager per request (`async with manager.run()`) gives
+  that without an app lifespan (TestClient and uvicorn alike) and keeps nothing between
+  requests. Writing the JSON-RPC by hand was the alternative; the 2026 protocol's envelope and
+  header rules made the SDK the safer choice.
+- **Where.** `/mcp` on the studio (`coverapi/agent_mcp.py`, a Starlette route before the static
+  files), passed by the Worker like `/api/v2` (`apps/site/src/agent.ts`: `/mcp` and `/mcp/…`
+  are a 404 at the edge on live; the caller's `Authorization` passes, cookies never). With the
+  website link closed the studio answers `/mcp` only through the website (`website_gate`).
+  Body limit: the default 2 MiB (Caddy's `@small` and `BodyLimit`; the SDK's own cap set to the
+  same).
+- **Tools** (always these six, in this order, the same for every caller as the 2026 spec asks):
+  `list_kinds` (optionally one kind or alias), `find_cover`, `get_quote`, `get_cover`,
+  `create_order_link`, `suggest_from_photo`. Their input schemas are the v2 request models'
+  own JSON schemas made plain (`MatchIn`, `QuoteIn`, `LinkIn`; `additionalProperties: false`);
+  the descriptions are written for models: sizes of the furniture in cm (or `unit: mm`), the
+  sizes per kind from config/agent_kinds.json, "never guess sizes", "a person orders and pays",
+  "partner key only". Annotations: the readers read-only; `create_order_link` additive, not
+  destructive. The server's `instructions` give the flow and the rules.
+- **Thin wrappers, one code path.** Each tool call is exactly one `/api/v2` request made
+  in-process (httpx's ASGI transport into the v2 sub-app) with the caller's own headers and
+  address: the gate, the per-address and daily limits, the partner key (`Authorization:
+  Bearer cvk_…` or `X-Api-Key`), the B2B company's prices ex VAT, the refusal of unknown
+  (personal) fields, the key-only photo recognition and its budgets all hold unchanged. A v2
+  error becomes a tool error (`isError`, text "code: message Hint: …", `structuredContent`
+  with error, message, hint, field, status and `retry_after_s`); an unknown tool is JSON-RPC
+  -32602. Success: the v2 JSON as `structuredContent` and as text, the rate-limit headers in
+  `_meta.ratelimit`. `suggest_from_photo` takes a product page and/or up to 3 base64 photos
+  (within the 2 MiB body); larger photos go to `POST /api/v2/suggest`.
+- **Limits.** A tool call counts once, on the v2 limits. The protocol's own messages
+  (initialize, tools/list, server/discover) are free like the API's docs but count on an
+  in-memory window per address, `limits.agent_mcp_per_hour` (600, server-only); over it an
+  HTTP 429 with `Retry-After` before the SDK runs.
+- **Keys and connectors.** Partner keys are a header, not OAuth: anonymous use needs no login,
+  and connectors that cannot send headers (claude.ai, ChatGPT) are simply anonymous. OAuth for
+  partner keys in connectors is for later.
+- **Origin.** The spec's DNS-rebinding rule holds: a request without `Origin` (every MCP client,
+  which runs server side) passes; with one, only our own configured sites (the website the
+  Worker answered for, its `x-site-host` trusted with its key, or the studio's public address,
+  `public_url`) are accepted and echoed in `Access-Control-Allow-Origin`; any other origin is a
+  403 before anything runs. Never the request's own Host: in DNS rebinding that is the
+  attacker's.
+- **Codex.** Codex wrote the protocol tests (reviewed: its fixtures were a copy of
+  test_agent_api's, now imported from there). Adversarial review, round 1: (a) Origin was not
+  validated at all (my first version accepted every origin like `/api/v2`'s open CORS) — fixed
+  as above; (b) the protocol window never forgot idle addresses (the clean-up only removed
+  empty windows, and scanned every caller on each request past 20,000) — now idle addresses
+  are swept at most once a minute and the window holds at most `MAX_CALLERS`, the least recent
+  going first. Round 2: the Origin check trusted the request's Host, which a rebinding attacker
+  controls — now configured addresses only (test with a matching attacker Host and Origin).
+- **Discovery.** `/llms.txt`, `/llms-full.txt` and `/api/v2/docs` name the endpoint and the
+  tools. No `/.well-known` entry: the 2026-07-28 spec defines none for servers (only OAuth
+  metadata), and the server card (SEP-2127) is an extension whose path is not settled yet.
+- **Tests.** `apps/api/tests/test_agent_mcp.py` (raw JSON-RPC, written by Codex and reviewed:
+  both eras, every tool, errors with hints, the shared hourly window, the protocol window,
+  partner and revoked keys, two B2B companies and anonymous, no personal data, preview-only,
+  GET and CORS); `test_agent_mcp_client.py` (the official `mcp.Client` in both eras);
+  `apps/site/test/worker.test.ts` (`/mcp` on the preview, 404 on live); llms.txt/docs mention.
+  A real check on a scrubbed scratch copy (no mail, domain, Mollie or link key; two-factor
+  off): the SDK client and the MCP Inspector CLI found, for a 230 × 90 × 85 cm sofa, drawing-s12
+  (95.3 %, €599), suns-sofa-bench-tagia (90.6 %), made to measure (€1,043.95) and the Rios
+  bended 2-seater as "possible".
