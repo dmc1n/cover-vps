@@ -1,4 +1,4 @@
-# The API for AI agents (ADR-139)
+# The API and MCP server for AI agents (ADR-139, ADR-145)
 
 AI assistants and their users can ask our website which cover fits a piece of furniture: they
 pass the kind and the sizes, and the best covers come straight back with a price and a link the
@@ -19,6 +19,7 @@ person uses to order and pay. For now this is **on the preview website only**
 | `/measure`, `/measure/<kind>` | the measuring guide as pages |
 | `/covers`, `/covers/<code>` | the existing covers as pages (with schema.org data) |
 | `/llms.txt`, `/llms-full.txt` | short and full texts for AI assistants |
+| `/mcp` | the MCP server for Claude, ChatGPT and other assistants (below) |
 
 Example (no key needed):
 
@@ -33,6 +34,58 @@ differences, the price incl. VAT, the delivery promise, a picture, a 3D preview,
 and the made-to-measure cover (price, lead time, order link). A fit under 90 % is marked
 "possible"; under 80 % it is not listed. Missing or wrong sizes give an error that says what to
 do ("depth missing for kind sofa", with how to measure it).
+
+## The MCP server: the shop inside Claude, ChatGPT and other assistants (ADR-145)
+
+MCP (Model Context Protocol) is how assistants such as Claude and ChatGPT use outside services
+as tools. Our MCP server is at **https://preview.s2dio.living/mcp** (preview only, like the
+API). It offers six tools, each the same as one API call, with the same limits and prices:
+
+| Tool | What it does |
+|---|---|
+| `list_kinds` | the kinds of furniture, the sizes each needs and how to measure them |
+| `find_cover` | kind + sizes (cm) → the best existing covers and made to measure, with prices and order links |
+| `get_quote` | the made-to-measure price for sizes and options |
+| `get_cover` | one existing cover by its code |
+| `create_order_link` | a 24-hour link that opens the checkout prefilled; **a person orders and pays** |
+| `suggest_from_photo` | kind and sizes from a product page or photos: a **partner key only** |
+
+**Add it to Claude (claude.ai or the Claude Desktop app):** Settings → Connectors → *Add custom
+connector*; name "S2DIO covers", URL `https://preview.s2dio.living/mcp`, no authentication. In a
+chat, switch it on under the tools button and ask, for example: *"Which S2DIO cover fits my
+sofa of 230 × 90 × 85 cm?"* (On Team/Enterprise plans an owner adds the connector for the
+organisation first.)
+
+**Add it to Claude Code (terminal):**
+
+```
+claude mcp add --transport http s2dio-covers https://preview.s2dio.living/mcp
+# with a partner key (higher limits, photo recognition, a B2B key: that company's prices):
+claude mcp add --transport http s2dio-covers https://preview.s2dio.living/mcp \
+  --header "Authorization: Bearer cvk_…"
+```
+
+**Add it to ChatGPT:** Settings → Apps & Connectors → Advanced settings → turn on *Developer
+mode*; then *Create* (a connector): name "S2DIO covers", URL `https://preview.s2dio.living/mcp`,
+authentication *No authentication*. In a chat choose it under the + menu (Developer mode).
+
+Claude.ai and ChatGPT connectors cannot send our partner key (they only know OAuth or no
+login), so they use the server anonymously: public prices and the anonymous limits. Partner
+keys work where a header can be set: Claude Code, the Claude API's MCP connector
+(`authorization_token`), the OpenAI Responses API (`headers`), and the official SDKs.
+
+Try it without an assistant (the official MCP Inspector, in a terminal):
+
+```
+npx @modelcontextprotocol/inspector --cli https://preview.s2dio.living/mcp --transport http \
+  --method tools/call --tool-name find_cover --tool-arg kind=sofa --tool-arg width=230 \
+  --tool-arg depth=90 --tool-arg height=85
+```
+
+The same rules hold as for the API: open with limits (each tool call counts as one API
+request; the protocol's own messages have a separate, generous hourly cap,
+`limits.agent_mcp_per_hour`), no personal data, an agent never pays. On the live website
+`/mcp` is a 404 until the API is switched on there (below).
 
 ## The command line
 
@@ -80,8 +133,8 @@ revoked key is refused (not treated as anonymous), and a key whose B2B account i
 2. In `apps/site/wrangler.toml` under `[vars]`: `AGENT_API = "1"`, then `npm run deploy` in
    apps/site.
 
-Until both are done the live website answers 404 on these addresses and its `/llms.txt` is
-unchanged.
+Until both are done the live website answers 404 on these addresses (the MCP server `/mcp`
+included) and its `/llms.txt` is unchanged.
 
 ## Lead time and delivery promise
 

@@ -13,7 +13,7 @@ preview only; phase 2 is the MCP server; phase 3 agent payments.
 | Layer | What | Phase | Where |
 |---|---|---|---|
 | 1. API | `/api/v2`: versioned JSON, OpenAPI, errors with hints, limits | 1 (built) | `apps/api/coverapi/agent_api.py` |
-| 2. MCP server | the same as tools for MCP clients (Claude, ChatGPT apps, IDEs) | 2 | not built |
+| 2. MCP server | the same as tools for MCP clients (Claude, ChatGPT apps, IDEs) | 2 (built, ADR-145) | `apps/api/coverapi/agent_mcp.py` |
 | 3. Discovery | `/llms.txt`, `/llms-full.txt`, the measuring guide, cover pages with schema.org JSON-LD | 1 (built) | `agent_pages.py`, `agent_ld.py` |
 | 4. CLI | `covers find/quote/kinds/link/cover`, table or JSON | 1 (built) | `clients/cli/` |
 
@@ -50,14 +50,17 @@ Who may call and what they get:
 | B2B key | a partner key linked to a company | as a key | that company's ex VAT (ADR-104) | as a key |
 | B2B session | the `b2b_session` cookie on `/api/b2b/v2` | as a key | that company's ex VAT | no (a key only) |
 
-### 2. MCP server (phase 2, not built)
+### 2. MCP server (phase 2, built: ADR-145)
 
-A thin MCP server (Streamable HTTP, `/mcp` on the same Worker or the studio) with tools
-`list_kinds`, `match_cover`, `quote`, `make_order_link` and `get_cover`, each calling the v2
-API with the caller's key (or anonymously), so the limits, the scoping and the "never pays" rule
-stay in one place. Tool descriptions from the OpenAPI descriptions. To decide then: the
-hosting (the Worker can proxy; a Python MCP SDK in the studio is simpler), and whether partner
-keys are passed by OAuth (MCP's authorisation spec) or as a header.
+`/mcp` on the website (preview only, the same two switches), served by the studio with the
+official MCP Python SDK: stateless Streamable HTTP with JSON answers, protocol 2026-07-28 and
+the handshake versions 2024-11-05 … 2025-11-25. Tools `list_kinds`, `find_cover`, `get_quote`,
+`get_cover`, `create_order_link`, `suggest_from_photo` (partner key only), each one in-process
+`/api/v2` request with the caller's headers, so the limits, the scoping and the "never pays"
+rule stay in one place. Partner keys as a header (`Authorization: Bearer`), not OAuth: the
+anonymous use needs no login, and connectors without headers (claude.ai, ChatGPT) are simply
+anonymous. How to add it: docs/handbook/agent-api.md. Later: OAuth for partner keys in
+connectors, a server card once that discovery format is settled (SEP-2127).
 
 ### 3. Discovery (phase 1)
 
