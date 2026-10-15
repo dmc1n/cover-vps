@@ -5125,6 +5125,15 @@ on the preview only**. Plan: docs/plans/agent-access.md; handbook: docs/handbook
   once Mollie supports them (what to verify: docs/plans/agent-access.md); the guide's texts in
   every language through the CMS; per-key limits set per partner; a price per B2B key in the
   cover pages' JSON-LD is never wanted (public pages are B2C).
+- **Fix (15 Oct 2026): the preview said "not open on this address".** Caddy 2.6 trusts no
+  proxy, so it replaces the Worker's `X-Forwarded-Host: preview.s2dio.living` with its own host
+  (`covers.suns.nu`; reproduced with a local Caddy and an echo server). The key arrived, the
+  host did not, so `agent_on` (and `bbq_on`, which only looked right on the preview because of
+  the build's overlay) never saw the preview. The Worker now also sends `x-site-host` (the host
+  it answered for, set by the Worker whatever a visitor sends; Caddy passes it), and the studio
+  reads it first (`shop.site_host`, `shop.preview_site`), trusted only with the Worker's key.
+  The live shop's host stays closed. Tests: `test_preview_gate_behind_caddy`, the Worker's
+  "x-site-host" test. Both the studio release and the preview Worker's deploy are needed.
 
 ## ADR-136 — The Questions answered 11–14 Oct 2026, processed (QUESTIONS 27–101)
 

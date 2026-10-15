@@ -152,6 +152,10 @@ SHOP_DEFAULTS: dict[str, Any] = {
 }
 LINK_SETTING = "shop_link_key"  # the website's key, hashed
 LINK_HEADER = "x-link-key"
+# The website's host as the Worker answered for it (preview.<domain> or the shop's domain).
+# Caddy (deploy/Caddyfile) replaces an incoming X-Forwarded-Host with its own host
+# (covers.suns.nu: it trusts no proxy), so the Worker sends the host in this header too.
+SITE_HOST_HEADER = "x-site-host"
 UI_JSON = Path(__file__).resolve().parents[3] / "config" / "shop_ui.json"
 LANG_NAMES = {"nl": "Dutch", "en": "English", "de": "German (informal du)",
               "fr": "French (vous)", "es": "Spanish", "it": "Italian", "da": "Danish",
@@ -427,14 +431,26 @@ def link_ok(auth: Any, request: Request) -> bool:
     return bool(key) and any(h and secrets.compare_digest(given, str(h)) for h in hashes)
 
 
+def site_host(request: Request) -> str:
+    """The website's host the request was answered for: the Worker's x-site-host (Caddy keeps
+    it), else X-Forwarded-Host (a direct call, the tests). Callers trust it only with
+    `link_ok` (the Worker's key), so a visitor cannot name the preview's host himself."""
+    host = request.headers.get(SITE_HOST_HEADER, "") or request.headers.get("x-forwarded-host", "")
+    return host.strip().lower()
+
+
+def preview_site(auth: Any, request: Request) -> bool:
+    """The request came from the preview website (preview.<domain>) through the Worker."""
+    return site_host(request).startswith("preview.") and link_ok(auth, request)
+
+
 def bbq_on(auth: Any, request: Request) -> bool:
     """The barbecues are offered (ADR-119): the shop setting `bbq_enabled`, or a request from the
     preview website (the Worker's key, its host preview.<domain>) so the owner can try them."""
     s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
     if s.get("bbq_enabled"):
         return True
-    host = request.headers.get("x-forwarded-host", "")
-    return host.startswith("preview.") and link_ok(auth, request)
+    return preview_site(auth, request)
 
 
 def bbq_refused(product: str, auth: Any, request: Request) -> None:

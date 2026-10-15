@@ -152,3 +152,26 @@ test("preview agent routes and llms.txt always reach studio instead of assets", 
   }
   assert.equal(assetCalls, 0);
 });
+
+test("the studio is told the website's host in x-site-host (Caddy rewrites X-Forwarded-Host)", async () => {
+  const seen: Headers[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    seen.push(new Request(input, init).headers);
+    return new Response("{}");
+  }) as typeof fetch;
+  const penv = { ...env, PREVIEW: "1", ASSETS: { fetch: async () => new Response("asset") } };
+  const forged = { "x-site-host": "preview.example", "x-forwarded-host": "preview.example" };
+  // the preview's agent API: its own host, with the Worker's key
+  await worker.fetch(new Request("https://preview.example/api/v2/kinds") as never,
+    penv as never, ctx as never);
+  assert.equal(seen.at(-1)!.get("x-site-host"), "preview.example");
+  assert.equal(seen.at(-1)!.get("x-link-key"), env.LINK_KEY);
+  // the live shop: a visitor cannot pass himself off as the preview
+  for (const path of ["/api/shop/info", "/api/b2b/me", "/about"]) {
+    await get(path, { headers: forged });
+    assert.equal(seen.at(-1)!.get("x-site-host"), "shop.example", path);
+  }
+  await worker.fetch(new Request("https://shop.example/api/v2/kinds", { headers: forged }) as never,
+    { ...env, AGENT_API: "1" } as never, ctx as never);
+  assert.equal(seen.at(-1)!.get("x-site-host"), "shop.example");
+});
