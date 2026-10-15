@@ -1,6 +1,7 @@
 // The website's Worker without Cloudflare (ADR-103): `npm test` (node's own test runner, types
 // stripped). The studio is a fake `fetch` that records what reached it; the edge cache a Map.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { beforeEach, test } from "node:test";
 import { SECURITY_HEADERS } from "../src/security.ts";
 import worker from "../src/worker.ts";
@@ -174,4 +175,26 @@ test("the studio is told the website's host in x-site-host (Caddy rewrites X-For
   await worker.fetch(new Request("https://shop.example/api/v2/kinds", { headers: forged }) as never,
     { ...env, AGENT_API: "1" } as never, ctx as never);
   assert.equal(seen.at(-1)!.get("x-site-host"), "shop.example");
+});
+
+// 15 Oct: the preview answered the agent API with the studio's 404 because it still ran code from
+// before x-site-host; a LINK_KEY rotation had made a fresh-looking version from that old code.
+// Every answer now names the commit it was built from, and both deploy scripts stamp it.
+test("every answer names the build it came from (x-site-build), the deploys stamp it", async () => {
+  const penv = { ...env, PREVIEW: "1", ASSETS: { fetch: async () => new Response("asset") } };
+  const BUILD = "v2.5.0-3-gabc1234";
+  for (const [path, e] of [
+    ["https://preview.example/api/v2/kinds", { ...penv, BUILD }],
+    ["https://preview.example/configure", { ...penv, BUILD }],
+    ["https://shop.example/api/admin/users", { ...env, BUILD }], // the Worker's own 404
+    ["http://shop.example/", { ...env, BUILD }], // the redirect to https
+  ] as const) {
+    const res = await worker.fetch(new Request(path) as never, e as never, ctx as never);
+    assert.equal(res.headers.get("x-site-build"), BUILD, path);
+  }
+  assert.equal((await get("/")).headers.get("x-site-build"), "unknown"); // deployed unstamped
+  const scripts = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
+    .scripts as Record<string, string>;
+  for (const name of ["deploy", "deploy:preview"])
+    assert.match(scripts[name], /wrangler deploy\b.*--var BUILD:\$\(git describe --always --dirty\)/, name);
 });

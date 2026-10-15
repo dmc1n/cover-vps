@@ -5137,6 +5137,14 @@ on the preview only**. Plan: docs/plans/agent-access.md; handbook: docs/handbook
   `*` for GET and the POSTs, no credentials; the B2B mount has no CORS (its own pages only).
   With the website link closed the studio answers these paths only through the website, as
   the shop (ADR-066).
+- **Which code answers (15 Oct)**: the preview's `/api/v2/kinds` was the studio's 404 ("not open
+  on this address") although the source sent `x-site-host`: the preview still ran the bundle of
+  15 Oct 09:08 UTC, from before that header (da0deaa, 10:19 UTC), and the LINK_KEY rotation at
+  11:07 UTC had made a new version from that old bundle (a secret change never rebuilds). Without
+  `x-site-host` the studio reads X-Forwarded-Host, which Caddy rewrites to covers.suns.nu, so
+  `preview_site` was false; the key itself was fine. Now every Worker answer carries
+  `x-site-build` (`git describe` of the deployed source, `--var BUILD:` in both deploy scripts,
+  "unknown" when deployed without them), so one `curl -I` shows a stale Worker.
 - **The CLI** (`clients/cli/covers.py`, standard library, `uv tool install ./clients/cli`):
   `covers find|quote|kinds|link|cover`, a table or `--json`, `--api` (default the preview),
   `--key`; exit codes 0, 2 (the input), 3 (429), 1.

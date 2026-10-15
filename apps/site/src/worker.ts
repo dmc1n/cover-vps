@@ -14,6 +14,10 @@ export interface Env {
   // the API for AI agents and its pages (ADR-139): on the preview always, on the live site only
   // with AGENT_API = "1" (after the owner's go; the studio's shop setting agent_api_enabled too)
   AGENT_API?: string;
+  // the commit this Worker was built from (`git describe`, set by `npm run deploy[:preview]`).
+  // A secret change makes a new version from the last deployed code, so a stale Worker can look
+  // fresh in the dashboard; every answer's x-site-build shows which code really answers.
+  BUILD?: string;
   STUDIO_URL: string;
   LINK_KEY: string;
   PAGE_TTL: string;
@@ -65,7 +69,9 @@ function cacheFor(url: URL, method: string, env: Env): number {
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    return secure(await route(req, env, ctx)); // ADR-103: every answer with the headers
+    const out = secure(await route(req, env, ctx)); // ADR-103: every answer with the headers
+    out.headers.set("x-site-build", env.BUILD || "unknown");
+    return out;
   },
 } satisfies ExportedHandler<Env>;
 

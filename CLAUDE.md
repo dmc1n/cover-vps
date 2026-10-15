@@ -366,6 +366,7 @@ make backup     the data directory to ~/backups (5 kept, room checked first; R2 
 Settings → System & logs → Mail             the mail outbox: waiting and failed mails, Send again; every send attempt logged (ADR-129)
 POST /api/jobs/<id>/rerun                   "Run again" for a job a restart interrupted (or a failed one; ADR-129)
 cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build
+curl -sI <website> | grep x-site-build       the commit the deployed Worker was built from (a secret change keeps the old code; ADR-139)
 cd apps/site && npm test | npm run check     the Worker's tests (security headers, no studio routes) and typecheck (ADR-103)
 <website>/api/v2 (docs, openapi.json, kinds, match, quote, order-link, covers, suggest)   the API for AI agents: open
                                              with limits (limits.agent_*), partner keys (Settings → Website & API keys;
