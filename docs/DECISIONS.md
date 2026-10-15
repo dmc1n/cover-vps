@@ -2558,6 +2558,28 @@ Owner's answers (7 Oct 2026, QUESTIONS 69): the step where a longer top meets a 
 right (no blending); covering each piece as its plan rectangle is fine; an arrangement gets one
 cover over the whole, never covers zipped together (closes that question from ADR-089).
 
+**Side slopes (Rens, 15 Oct 2026, QUESTIONS 59: "ja, ook naar de zijkanten").** New key
+`arrange.side_slopes: true` (`top_slopes` stays `front`: no slopes to the back). For
+arrangements only (`arr-*`; a model built from its parts' plan, `plan_members.json`, keeps its
+approved roofs). After the front faces, each member's roof may also slope down to each of its
+*outside* sides (no other member within 2 x clearance + `align_mm` beyond it), never to a side
+a neighbour stands against, so no valley forms between two members (rule 12). The side face
+keeps the side a wall at least as high as the member's front: either a face resting on the
+furniture (an arm's top) that meets the side line above that height, or the face hinged on
+the side line at exactly that height and tipped up until it clears the furniture
+(`plan._hinged`: the least tip angle that clears, sampled from flat to upright and halved
+between two samples; Codex's review showed a fixed-point solution giving up on valid faces and
+refusing a low point just beyond the side line); a first version without this let the chaise's side face run down to the hem
+and its whole left wall vanished, rejected. A side is added when it takes away
+`top_gain_pct` (5 %) of the room, each side weighed against the same front-only top, so two
+outside sides of a member come out alike; a hip seam runs where a side face meets the front
+slope. Water still runs off (the drainage grid). Tests: engine/tests/test_arrange_sides.py.
+The live Portofino arrangements rebuilt in staging (out/q59/, checked twice, compare pictures,
+Codex's second look): unchanged. The Portofino has no arms; the chaise's best wall-keeping side
+face takes away 4.1 % (< 5 %), and the 2-seater's back cushions reach its outside end. Their
+hull pieces are identical and cut.dxf differs only in its revision label, so nothing was
+replaced live. A set with high arms or a back lower at its ends gets the side slopes.
+
 ## ADR-096 — Pictures at the Desk: the approver attaches and marks them himself
 
 The owner (7 October): "make an option so Rens can add a screenshot himself". Until now a
@@ -3703,6 +3725,17 @@ source for the kind, before products.json and the shape.
   umbrellas). Read-only.
 - **First run (9 Oct, live data read-only):** 76 approved, 62 offered: 20 corner sofas, 13
   sofas, 12 chairs/side tables/hockers, 7 dining sets, 7 round sets, 3 loungers. 14 doubtful.
+- **A row the list gets wrong (15 Oct 2026, QUESTIONS 74):** Rens: "D6: hocker of daybed? →
+  Onze hoes is goed: daybed (prijslijst aanpassen)". The uploaded Excel stays as it is;
+  `prices/list_corrections.json` corrects a row by its code (`coverapi.match_list.correct`:
+  section, item, suitable, size; `was` names what the row must still say, so a newer list that
+  fixed it wins; `why`; an optional `doubt` keeps the cover off the shop until a person
+  confirms with `match.kind`). Every reader of the list follows: the match cards, Links' names
+  (no "hocker" type for D6), a cover's Price & shop, the agent API. D6 now reads "Suns cover
+  daybed – Blocchi daybed", kind lounger (the configurator's daybed), category Daybeds. Its
+  published fixed B2C price, €249, came from the hocker's row (ADR-113 import): the doubt
+  keeps D6 unsold until the daybed's own price is set. Test:
+  `test_a_corrected_price_list_row_makes_d6_a_daybed`.
 - **Better later:** the customer's own hand for Ibiza-style and U-shaped sets in the
   configurator; a family question in the configurator itself; the customer-facing name per
   language (the list is in English).
@@ -5125,6 +5158,15 @@ on the preview only**. Plan: docs/plans/agent-access.md; handbook: docs/handbook
   once Mollie supports them (what to verify: docs/plans/agent-access.md); the guide's texts in
   every language through the CMS; per-key limits set per partner; a price per B2B key in the
   cover pages' JSON-LD is never wanted (public pages are B2C).
+- **Fix (15 Oct 2026): the preview said "not open on this address".** Caddy 2.6 trusts no
+  proxy, so it replaces the Worker's `X-Forwarded-Host: preview.s2dio.living` with its own host
+  (`covers.suns.nu`; reproduced with a local Caddy and an echo server). The key arrived, the
+  host did not, so `agent_on` (and `bbq_on`, which only looked right on the preview because of
+  the build's overlay) never saw the preview. The Worker now also sends `x-site-host` (the host
+  it answered for, set by the Worker whatever a visitor sends; Caddy passes it), and the studio
+  reads it first (`shop.site_host`, `shop.preview_site`), trusted only with the Worker's key.
+  The live shop's host stays closed. Tests: `test_preview_gate_behind_caddy`, the Worker's
+  "x-site-host" test. Both the studio release and the preview Worker's deploy are needed.
 
 ## ADR-136 — The Questions answered 11–14 Oct 2026, processed (QUESTIONS 27–101)
 

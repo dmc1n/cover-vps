@@ -30,6 +30,8 @@ SHEET = [
     ["#VALUE!", "Suns Cover dining tables ", "Tables 340 x 100 cm incuding chairs",
      "350 x 166 x 87 cm", "1 / box", 999, "T1"],
     ["#VALUE!", "Suns Cover dining tables ", "Table 300x100", "300x100", "1 / box", 1049, "T9"],
+    [None, None, "Blocchi items"],
+    ["#VALUE!", "", "Blocchi hocker", "140x113x45", "1 / box", 249, "D6"],
     [None, None, "Umbrellas"],
     ["#VALUE!", "Suns cover umbrella ", "Umbrella cover 3*4", "269x60", "2 / boxes", 279, "U1"],
 ]  # fmt: skip
@@ -168,3 +170,53 @@ def test_a_colleague_may_choose_a_drawing_cover(app: Any) -> None:
     req = admin.get("/api/admin/matches").json()["requests"][0]
     a = admin.put(f"/api/admin/matches/{req['id']}", json={"chosen": "drawing-t1"})
     assert a.status_code == 200, a.text
+
+
+def test_a_corrected_price_list_row_makes_d6_a_daybed(app: Any) -> None:
+    """QUESTIONS 74 (Rens, 15 Oct): drawing-d6 is the Blocchi daybed; the list's D6 row is the
+    hocker's. prices/list_corrections.json corrects the row without touching the upload: the
+    match card, the Links' names and the Price & shop rows read a daybed; its doubt keeps it off
+    the shop until a person confirms; a newer list that fixed the row makes it stale."""
+    from coverapi import link_score
+    from coverengine import match_drawings as md
+    from coverengine.params import Registry
+
+    root = app.state.store.root
+    m = app.state.store.models
+    d6 = _drawing(m, "drawing-d6", (215, 180, 87), "Drawing D6: shape read (hip)", "approved",
+                  ["Blocchi daybed"])  # fmt: skip
+    p = Registry.load(None).resolve()
+    before = md.review(d6, p, match_list.for_data(root))
+    assert before is not None and before["kind"] == "lounger" and not before["offered"]
+    assert any("140x113x45" in x for x in before["doubts"])  # the hocker's sizes
+    assert "hocker" in link_score.facts(d6, p, match_list.for_data(root)).types
+    fix = {"D6": {"was": {"suitable": "Blocchi hocker"}, "section": "Daybeds",
+                  "item": "Suns cover daybed", "suitable": "Blocchi daybed",
+                  "size": "215x180x87", "why": "QUESTIONS 74",
+                  "doubt": "the list's price is the hocker's: set the daybed's price"}}  # fmt: skip
+    (root / "prices" / "list_corrections.json").write_text(json.dumps(fix))
+    lst = match_list.for_data(root)
+    assert lst is not None
+    row = lst["rows"]["d6"][0]
+    assert (row["item"], row["suitable"], row["corrected"]) == (
+        "Suns cover daybed",
+        "Blocchi daybed",
+        "QUESTIONS 74",
+    )
+    assert row["original"]["suitable"] == "Blocchi hocker"
+    r = md.review(d6, p, lst)
+    assert r is not None and r["kind"] == "lounger" and r["price_list"][0]["used"]
+    assert r["doubts"] == ["D6: the list's price is the hocker's: set the daybed's price"]
+    assert not r["offered"]  # until a person confirms the price
+    types = link_score.facts(d6, p, lst).types
+    assert "hocker" not in types and "d-bed" in types  # a daybed (link_score.lounger_type)
+    fix["D6"].pop("doubt")
+    (root / "prices" / "list_corrections.json").write_text(json.dumps(fix))
+    os.utime(root / "prices" / "list_corrections.json", (time.time() + 5,) * 2)
+    r = md.review(d6, p, match_list.for_data(root))
+    assert r is not None and r["offered"] and r["doubts"] == []
+    # the correction holds only while the row still reads as the hocker's
+    fix["D6"]["was"] = {"suitable": "Blocchi pouf"}
+    (root / "prices" / "list_corrections.json").write_text(json.dumps(fix))
+    os.utime(root / "prices" / "list_corrections.json", (time.time() + 10,) * 2)
+    assert match_list.for_data(root)["rows"]["d6"][0]["suitable"] == "Blocchi hocker"  # type: ignore[index]

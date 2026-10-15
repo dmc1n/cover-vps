@@ -10,7 +10,7 @@ import type { Env } from "./worker.ts";
 export const AGENT = /^\/(api\/v2(\/|$)|llms-full\.txt$|measure(\/|$)|covers(\/|$))/;
 export const AGENT_B2B = /^\/api\/b2b\/v2(\/|$)/; // a B2B session's own prices (b2b.ts passes it)
 const PAGES = /^\/(measure|covers)(\/|$)/; // pages: the studio serves them under /shop/
-const HOP = ["cookie", "host", "x-link-key", "x-client-ip", "cf-connecting-ip"];
+const HOP = ["cookie", "host", "x-link-key", "x-site-host", "x-client-ip", "cf-connecting-ip"];
 
 export function agentOn(env: Env): boolean {
   return Boolean(env.PREVIEW) || env.AGENT_API === "1";
@@ -22,6 +22,8 @@ export async function agent(req: Request, url: URL, env: Env): Promise<Response>
   headers.set("x-link-key", env.LINK_KEY);
   headers.set("x-client-ip", req.headers.get("cf-connecting-ip") ?? "");
   headers.set("x-forwarded-host", url.host);
+  // Caddy replaces X-Forwarded-Host with its own host: the studio reads this one
+  headers.set("x-site-host", url.host);
   headers.set("x-forwarded-proto", "https");
   const path = PAGES.test(url.pathname) ? `/shop${url.pathname}` : url.pathname;
   const res = await fetch(new URL(path + url.search, env.STUDIO_URL), {

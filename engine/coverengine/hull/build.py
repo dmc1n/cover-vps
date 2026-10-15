@@ -509,7 +509,10 @@ def _arrangement_plan(
     footprint = arrange.footprint_of(doc, params)
     if footprint == "smooth":
         return None
-    built = plan.build(points, rects, footprint, float(doc.get("gap_mm") or 0.0), params)
+    # side slopes for arrangements only (QUESTIONS 59); a model built from its parts' plan
+    # (plan_members.json) keeps the roofs it was approved with
+    sides = bool(params["arrange.side_slopes"]) and not own_parts
+    built = plan.build(points, rects, footprint, float(doc.get("gap_mm") or 0.0), params, sides)
     v, f = np.asarray(model.vertices), np.asarray(model.faces)
     report = _plain_report(model_dir, built.mesh, v, f, params, "box", built.warnings)
     report["drainage"] = built.report["drainage"]

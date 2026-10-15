@@ -149,6 +149,29 @@ def test_off_by_default_and_preview_gate(factory: Any) -> None:
     assert "## For AI agents" in c.get("/llms.txt").text
 
 
+def test_preview_gate_behind_caddy(factory: Any) -> None:
+    """Caddy replaces the Worker's X-Forwarded-Host with its own host (covers.suns.nu), so the
+    preview answered `not_found` on 15 Oct: the Worker's x-site-host names the preview, and it
+    counts only with the Worker's key; the live shop's host stays closed."""
+    a = factory(enabled=False)
+    key = _ok(_admin(a).post("/api/admin/shop/link-key"))["key"]
+    c = TestClient(a)
+    behind = {"x-forwarded-host": "covers.suns.nu", "x-forwarded-proto": "https"}
+    for site, with_key, status in (
+        ("preview.s2dio.living", True, 200),
+        ("preview.s2dio.living", False, 404),
+        ("shop.s2dio.living", True, 404),
+    ):
+        headers = {**behind, "x-site-host": site, **({"x-link-key": key} if with_key else {})}
+        assert c.get("/api/v2/kinds", headers=headers).status_code == status, (site, with_key)
+    headers = {**behind, "x-site-host": "preview.s2dio.living", "x-link-key": key}
+    answer = _ok(c.post("/api/v2/match", json=SOFA, headers=headers))
+    assert answer["results"][0]["order_url"].startswith("https://preview.s2dio.living/")
+    assert c.get("/api/shop/info", headers=headers).json()["settings"]["bbq_enabled"] is True
+    # what Caddy sends without the new header: closed, as before
+    assert c.get("/api/v2/kinds", headers={**behind, "x-link-key": key}).status_code == 404
+
+
 def test_match_ranking_units_and_shared_costing(app: Any) -> None:
     """Exact sofa matches rank first and use the configurator's stock and custom prices."""
     c = TestClient(app)

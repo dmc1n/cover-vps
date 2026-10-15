@@ -28,7 +28,7 @@ const API = /^\/(api\/shop\/|media\/)/;
 const MODELS =
   /^\/api\/shop\/(demo\.glb|story\/[\w-]+\.(bin|json|glb)|scene\/[0-9a-f]{16}(-\w+)?\.glb)$/;
 const FEEDS = new Set(["/robots.txt", "/sitemap.xml", "/llms.txt"]);
-const HOP = ["cookie", "host", "x-link-key", "x-client-ip", "cf-connecting-ip"];
+const HOP = ["cookie", "host", "x-link-key", "x-site-host", "x-client-ip", "cf-connecting-ip"];
 
 interface Info {
   content: Record<string, unknown>;
@@ -42,6 +42,8 @@ function studio(req: Request, url: URL, env: Env, path: string): Promise<Respons
   headers.set("x-link-key", env.LINK_KEY);
   headers.set("x-client-ip", req.headers.get("cf-connecting-ip") ?? "");
   headers.set("x-forwarded-host", url.host);
+  // Caddy replaces X-Forwarded-Host with its own host: the studio reads this one
+  headers.set("x-site-host", url.host);
   headers.set("x-forwarded-proto", "https");
   return fetch(new URL(path + url.search, env.STUDIO_URL), {
     method: req.method,
@@ -140,6 +142,8 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
     headers.set("x-link-key", env.LINK_KEY);
     headers.set("x-client-ip", req.headers.get("cf-connecting-ip") ?? "");
     headers.set("x-forwarded-host", url.host);
+    // Caddy replaces X-Forwarded-Host with its own host: the studio reads this one
+    headers.set("x-site-host", url.host);
     headers.set("x-forwarded-proto", "https");
     const res = await fetch(target, {
       method: req.method,

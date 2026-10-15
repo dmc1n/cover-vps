@@ -7,7 +7,7 @@ import type { Env } from "./worker.ts";
 
 export const B2B = /^\/(b2b(\/|$)|api\/b2b\/)/;
 const OURS = /^b2b_[a-z_]+=/i;
-const HOP = ["cookie", "host", "x-link-key", "x-client-ip", "cf-connecting-ip"];
+const HOP = ["cookie", "host", "x-link-key", "x-site-host", "x-client-ip", "cf-connecting-ip"];
 
 // only the B2B shop's own cookies, from the browser to the studio
 function b2bCookies(req: Request): string {
@@ -34,6 +34,8 @@ export async function b2b(req: Request, url: URL, env: Env): Promise<Response> {
   headers.set("x-link-key", env.LINK_KEY);
   headers.set("x-client-ip", req.headers.get("cf-connecting-ip") ?? "");
   headers.set("x-forwarded-host", url.host);
+  // Caddy replaces X-Forwarded-Host with its own host: the studio reads this one
+  headers.set("x-site-host", url.host);
   headers.set("x-forwarded-proto", "https");
   const path = api ? url.pathname : `/shop${url.pathname}`;
   const res = await fetch(new URL(path + url.search, env.STUDIO_URL), {

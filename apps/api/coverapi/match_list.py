@@ -10,10 +10,18 @@ Tondo: 2-seater left, ..."). "#VALUE!" cells are ignored.
 `listing(folder)` reads the newest kept list that has a drawing-code column, once per file
 change, as {"source", "stamp", "rows": {code: [row, ...]}, "unplaced": [...]}; the engine's
 match_drawings decides the kind from it.
+
+A row the list gets wrong is corrected in `prices/list_corrections.json` (next to imports/; the
+uploaded file is never rewritten): {"D6": {"was": {"suitable": "Blocchi hocker"}, "item": ...,
+"suitable": ..., "size": ..., "section": ..., "why": ..., "doubt": ...}}. A correction applies
+only while the row still reads as `was` says (a newer list that fixed the row wins); the row
+keeps `corrected` (the why) and, with `doubt`, a doubt that keeps the cover off the shop until a
+person confirms it (QUESTIONS 74: D6 is the Blocchi daybed, the list's row is the hocker's).
 """
 
 from __future__ import annotations
 
+import json
 import re
 import threading
 from pathlib import Path
@@ -81,6 +89,36 @@ def parse(tables: list[dict[str, Any]], source: str = "") -> dict[str, Any]:
     return {"source": source, "rows": rows, "unplaced": unplaced}
 
 
+CORRECTIONS = "list_corrections.json"  # in prices/, next to imports/
+FIXABLE = ("section", "family", "item", "suitable", "size")
+
+
+def corrections(path: Path) -> dict[str, dict[str, Any]]:
+    """The corrections by normalised code ({} when there are none or the file is unreadable)."""
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(doc, dict):
+        return {}
+    return {norm(k): v for k, v in doc.items() if isinstance(v, dict) and not k.startswith("_")}
+
+
+def correct(doc: dict[str, Any], fixes: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """The parsed list with the corrections applied to the rows they still describe."""
+    for code, fix in fixes.items():
+        was = fix.get("was") or {}
+        for row in doc["rows"].get(code, []):
+            if any(str(row.get(k) or "").strip() != str(v).strip() for k, v in was.items()):
+                continue  # the list says something else now: the correction is stale
+            row["original"] = {k: row.get(k) for k in FIXABLE if k in fix}
+            row.update({k: str(fix[k]) for k in FIXABLE if k in fix})
+            row["corrected"] = str(fix.get("why") or "corrected")
+            if fix.get("doubt"):
+                row["doubt"] = str(fix["doubt"])
+    return doc
+
+
 _lock = threading.Lock()
 _cache: dict[str, Any] = {}
 
@@ -97,7 +135,10 @@ def newest(folder: Path) -> list[Path]:
 def listing(folder: Path) -> dict[str, Any] | None:
     """The newest kept list with a drawing-code column, parsed (None: there is none)."""
     files = newest(folder)
+    fixes_path = folder.parent / CORRECTIONS
     stamp = "|".join(f"{p.name}:{p.stat().st_mtime}" for p in files)
+    if fixes_path.is_file():
+        stamp += f"|{CORRECTIONS}:{fixes_path.stat().st_mtime}"
     with _lock:
         if _cache.get("stamp") == stamp and _cache.get("folder") == str(folder):
             out: dict[str, Any] | None = _cache["listing"]
@@ -110,7 +151,8 @@ def listing(folder: Path) -> dict[str, Any] | None:
             continue
         doc = parse(tables, p.name)
         if doc["rows"]:
-            doc["stamp"] = f"{p.name}:{p.stat().st_mtime}"
+            correct(doc, corrections(fixes_path))
+            doc["stamp"] = stamp  # the match cards' cache follows a correction too
             found = doc
             break
     with _lock:
