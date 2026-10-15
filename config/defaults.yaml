@@ -114,6 +114,13 @@ seams:
                                  # by a seam the drawing does not draw; the audit flags
                                  # it when the two fit the roll together (Rens, 9 Oct 2026, D1/D2:
                                  # "crossed-out panels one panel"; ADR-131); 0 = no check
+  piece_kink_max_deg: 25         # a drawing cover (given surface): no fold inside one top piece
+                                 # sharper than this; the eye sees it as a crease (Rens, 15 Oct
+                                 # 2026, S43's nose top: "rare knik in paneel top 1"; ADR-141);
+                                 # the audit's "kinks"; 0 = no check
+  piece_kink_min_mm: 120         # ... when such folds inside one piece run at least this far
+                                 # together (single sliver facets of a traced outline are no
+                                 # crease; S43's ran 91 cm)
   given_crease_deg: 0            # a cover surface of its own (hull.top: given): its creases
                                  # sharper than this are the seams, the pieces are what they
                                  # enclose (Rens, 8 Oct 2026: "follow the original model's

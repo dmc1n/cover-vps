@@ -212,5 +212,15 @@
     "check": "engine/tests/test_plan_profile.py::test_the_front_walls_continue_the_top_seams.",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792060000,
+    "model_id": "drawing-s43",
+    "complaint": "An odd kink in panel top 1 (the round nose's top); bring the front skirts back to one panel (Rens at the Desk, 15 Oct 2026, S43 and S44).",
+    "cause": "The nose top was built as fans over the rim from the two ends of its top edge; the point where the fans meet was taken on the wrong side of that edge, so one fan covered the whole rim and a sliver triangle folded 62 degrees against it. The front wall had been cut at the drawing's vertical lines into three short pieces.",
+    "rule": "A piece given by hand is flat or a smooth surface: no fold inside it that the eye sees as a crease. A curved piece between a straight top edge and a curved rim is their hull, the fans meeting where the rim runs parallel to the edge. A skirt that runs on round a curve stays one piece when the approver asks, as long as it fits the roll.",
+    "check": "engine/coverengine/audit.py::kink_checks (seams.piece_kink_max_deg, seams.piece_kink_min_mm); engine/tests/test_drawing_given.py::test_the_audit_flags_a_sharp_fold_inside_a_piece and ::test_s43_seams_as_drawn.",
+    "applies_to": "all",
+    "ai_model": "approver"
   }
 ]

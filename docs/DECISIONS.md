@@ -5395,3 +5395,40 @@ and `scripts/fewer_check.py`, compare sheets and a size table in `compare/`, Cod
   passed. Swept read-only over the live covers: C1, C2, C3, C9, C24, C26, C27, C28 and S32 have such
   unjoined edges (plan-profile and isofit covers); not changed here, for the next round. Tests:
   test_drawing_given.py (flat bag, rounded corner, side view, S43 seams, open seams); lessons in config/ai_lessons.json.
+
+## ADR-141 — Rens's fourth round on shape and pieces (15 Oct 2026): S43/S44's nose without a fold, their front skirt in one piece; the Nardo was the cached 3D
+
+Rens at the Desk, 15 Oct 2026 (staging `out/rejections4/shapes/`; each remark read with
+`scripts/desk_marks.py` and by looking, a second reading by Codex before building, `cover audit`
+and `scripts/fewer_check.py`, compare sheets and a size table in `compare/`, Codex again on those).
+
+- **S43, S44** ("rare knik in paneel top 1 wijzigen. Ook de front skirts terugbrengen naar 1
+  paneel", one picture: a cross over the nose top by the slope seam, a cross over the front
+  skirts). The kink was a construction error in `scripts/s43_shape.py` (ADR-140): the nose top is
+  the hull of the line A-B and the rim (a fan from B, the triangle A-B-P, a fan from A), with P
+  where the rim runs parallel to A-B; the side test took P on the strip's side, so B fanned over
+  the whole rim and a sliver B-D-A stood 62 degrees against it, the line Rens saw. P is now at 29.0
+  degrees on the nose (Codex found the same): no fold, facets meet at 3.5 degrees at most. The
+  front wall (straight 41.24 + concave 27.24 + the nose's front to D 70.11 cm) is one piece again,
+  over the drawing's vertical lines, as he asks: 138.6 x 40.64 cm net, 141.6 x 47.1 cm cut, on the
+  roll. 10 → 8 pieces; every written size unchanged; the 4 vents where they were
+  (`skirt-front@0.747`, S44 `@0.253`: the middle of the former nose-front piece, not on the
+  concave curve). Live, back to Rens. Question #112 answered with every skirt measured: back
+  240.84 + front 138.59 + nose 133.44 + end 141.86 = 654.72 cm per cover (the drawings write
+  642.3 and 668.0 for one shape).
+- **Cover 44 & 45 (Nardo S13 & S14)** ("volgt nog steeds totaal niet de vorm ... seams en paneel
+  verdeling", 10:23): Rens approved it at 10:46. The server's log shows why: at 10:18-10:23 his
+  browser drew the card without asking for panels.glb (last fetched 14 Oct 13:39, before the
+  16:19 rebuild; the no-cache fix of ADR-138 went live at 11:06), so he judged the old wedge; at
+  10:42 it fetched the new panels and he approved. Codex read the drawing independently: 10
+  panels and 19 seams, "no difference within 1 cm" with the live faces. Not rebuilt; #102 (vents
+  front and arm end, answer a) kept and marked done. Its drape.glb/drape.png are still the
+  5 Oct wedge (the Drape view, not the default): to drape again.
+- **Rule and check (ADR-055):** the audit's new `kinks` check fails a drawing cover (hull.top
+  given) whose top piece folds inside itself sharper than `seams.piece_kink_max_deg` (25) along
+  at least `seams.piece_kink_min_mm` (120) together; triangles under the fit tolerance squared
+  and walls folded round a corner are left out. Swept read-only over the 118 live given covers:
+  S43/S44 before this fix, and **C27** (top-4, 37 degrees over 28 cm) and **C30** (top-6, 66
+  degrees over 32 cm), isofit covers with traced, twisted top pieces (ADR-133); not changed here,
+  for the next round. Tests: test_drawing_given.py (S43: one front wall, no fold in the nose; the
+  audit's kink check); a lesson in config/ai_lessons.json.

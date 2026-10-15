@@ -366,6 +366,58 @@ def open_seam_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str,
     return [_check("open seams", not pairs, detail)]
 
 
+def kink_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
+    """A drawing cover (hull.top: given): no sharp fold inside one piece, sharper than
+    seams.piece_kink_max_deg. A piece a person gives is flat or a gently curved surface; a sharp
+    fold inside it is a construction error the eye sees as a crease (Rens on S43's nose top,
+    15 Oct 2026: "rare knik in paneel top 1"; a triangle folded 62 degrees against its fan)."""
+    limit = float(params["seams.piece_kink_max_deg"])
+    npz, pj, hj = model_dir / "panels.npz", model_dir / "panels.json", model_dir / "hull.json"
+    if limit <= 0 or not npz.is_file() or not pj.is_file() or not hj.is_file():
+        return []
+    if json.loads(hj.read_text(encoding="utf-8")).get("top") != "given":
+        return []
+    names = [p["name"] for p in json.loads(pj.read_text(encoding="utf-8"))["panels"]]
+    data = np.load(npz)
+    labels = np.asarray(data["labels"])
+    mesh = trimesh.Trimesh(np.asarray(data["vertices"]), np.asarray(data["faces"]), process=False)
+    pairs = np.asarray(mesh.face_adjacency)  # the cut mesh is split at seams: inside pieces only
+    if not len(pairs):
+        return [_check("kinks", True, "no fold inside a piece")]
+    n = mesh.face_normals
+    angle = np.degrees(np.arccos(np.clip(np.einsum("ij,ij->i", n[pairs[:, 0]], n[pairs[:, 1]]),
+                                         -1.0, 1.0)))  # fmt: skip
+    same = labels[pairs[:, 0]] == labels[pairs[:, 1]]
+    # a wall folded round a corner is a skirt strip without a seam there, as built (ADR-102);
+    # the tops are looked at. Triangles smaller than the fit tolerance squared have no normal
+    # worth the name
+    tops = np.array([n.startswith("top") for n in names])[labels]
+    big = mesh.area_faces > float(params["tolerance.cover_mm"]) ** 2  # type: ignore[arg-type]
+    same &= tops[pairs[:, 0]] & big[pairs[:, 0]] & big[pairs[:, 1]]
+    ends = np.asarray(mesh.face_adjacency_edges)
+    length = np.linalg.norm(mesh.vertices[ends[:, 0]] - mesh.vertices[ends[:, 1]], axis=1)
+    sharp = np.flatnonzero(same & (angle > limit))
+    along = np.zeros(int(labels.max()) + 1)  # a crease the eye sees runs some way
+    np.add.at(along, labels[pairs[sharp, 0]], length[sharp])
+    least = float(params["seams.piece_kink_min_mm"])
+    worst: dict[str, float] = {}
+    for k in sharp:
+        if along[labels[pairs[k, 0]]] < least:
+            continue
+        name = names[int(labels[pairs[k, 0]])]
+        worst[name] = max(worst.get(name, 0.0), float(angle[k]))
+    detail = (
+        "a sharp fold inside a piece: "
+        + ", ".join(
+            f"{p} ({a:.0f} degrees over {along[names.index(p)] / MM_PER_CM:.0f} cm)"
+            for p, a in sorted(worst.items())
+        )
+        if worst
+        else f"no fold inside a piece sharper than {limit:g} degrees"
+    )
+    return [_check("kinks", not worst, detail)]
+
+
 def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
     """The air vents (Rens, 8 Oct 2026; ADR-101): the drawing's number; round every side of the
     cover (no side without one while another side has two), the front (inner) walls of an L, U or
@@ -694,6 +746,7 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     checks += plan_checks(model_dir, params)
     checks += vent_checks(model_dir, params)
     checks += open_seam_checks(model_dir, params)
+    checks += kink_checks(model_dir, params)
 
     checks += drawing_checks(model_dir)
 
