@@ -5480,7 +5480,7 @@ basis van die info een betere vorm hoes te genereren". The STEP files are in eac
   waiting at the Desk) still has the chaise falling to 17.8 cm at its end; it should be rebuilt from
   drawing-l1.json mirrored.
 
-## ADR-141 — Rens's fourth round on shape and pieces (15 Oct 2026): S43/S44's nose without a fold, their front skirt in one piece; the Nardo was the cached 3D
+## ADR-143 — Rens's fourth round on shape and pieces (15 Oct 2026): S43/S44's nose without a fold, their front skirt in one piece; the Nardo was the cached 3D
 
 Rens at the Desk, 15 Oct 2026 (staging `out/rejections4/shapes/`; each remark read with
 `scripts/desk_marks.py` and by looking, a second reading by Codex before building, `cover audit`
