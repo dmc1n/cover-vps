@@ -1,0 +1,43 @@
+{
+ "shape": "flat-bag",
+ "no_vents": true,
+ "params": {
+  "outline_cm": [
+   [
+    0,
+    0
+   ],
+   [
+    60,
+    0
+   ],
+   [
+    60,
+    180
+   ],
+   [
+    47,
+    244
+   ],
+   [
+    0,
+    244
+   ]
+  ],
+  "round_cm": [
+   [
+    3,
+    10
+   ],
+   [
+    4,
+    10
+   ]
+  ],
+  "panels": [
+   "front",
+   "back"
+  ]
+ },
+ "read": "Cover 115 (U2), a parasol cover: the drawing draws one flat panel, 244 cm high, 60 cm wide at the open bottom, the right side straight up to 180 cm and then leaning in to the top, which is 47 cm wide; both top corners R10 cm (written once, both drawn round; the program's own trace of the drawing gives about 8-10 cm at each). Rens, Desk 14 Oct 2026: the cover is just twice this panel, the two stitched together all round except the bottom line, which stays open. No air vents (the drawing draws none; \"just twice the panel\"). The fibreglass insertion pocket (185 cm long from 10.2 cm up, along the left side), the 7 waterproof zippers and the 100 cm parachute rope are not in the pattern."
+}

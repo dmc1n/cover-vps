@@ -254,8 +254,11 @@ def create_app(
             desk.gate(d, model_id, request, name=name)
         suffix = Path(name).suffix
         file, kind = _named(model_id, name)
+        # always asked again (304 while unchanged): a browser kept a cover's old panels.glb for
+        # hours and Rens marked pieces the rebuilt cover no longer had (D1, D2, 14 Oct 2026)
         return FileResponse(d / name, media_type=MEDIA.get(suffix, "application/octet-stream"),
-                            filename=file, content_disposition_type=kind)  # fmt: skip
+                            filename=file, content_disposition_type=kind,
+                            headers={"Cache-Control": "no-cache"})  # fmt: skip
 
     @app.get("/api/parameters")
     def parameters() -> list[dict[str, Any]]:

@@ -652,17 +652,21 @@ def place_vents(
     warnings += base_warnings
     w = _p(params, "features.vent_width_mm")
     allowance = _p(params, "stitching.allowance_mm")
-    # a piece whose bottom edge is too short for a vent hands it on (the count is kept)
-    room = {}
+    # a piece whose bottom edge is too short for a vent hands it on (the count is kept); that
+    # is said only when no piece at all has room (S43's 27 cm curve, 14 Oct 2026: a hand-on is
+    # no vent that does not fit, so the cover is not marked "check" for it)
+    room, short = {}, []
     for name, runs in bases.items():
         longest = max(r.length for r in runs)
         if longest - w >= 2 * allowance:
             room[name] = runs
         else:
-            warnings.append(
+            short.append(
                 f"no room for an air vent on {name}: {longest / MM_PER_CM:.0f} cm "
                 f"of hem, a vent needs {(w + 2 * allowance) / MM_PER_CM:g} cm"
             )
+    if not room:
+        warnings += short
     lengths = {n: sum(r.length for r in runs) for n, runs in room.items()}
     cos = math.cos(math.radians(_p(params, "features.vent_wall_angle_deg")))
 

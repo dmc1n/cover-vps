@@ -268,24 +268,26 @@ def read(
         reasons.append(f"a C or U shape: only {lengths['matched']} of {lengths['of']} lengths "
                        "along the back match the drawing")  # fmt: skip
 
-    # b2. one side view alone (U2, a parasol cover; Rens: "should be cylindrical, the drawing is
-    #     a side view"): a single picture with no 3D slant lines draws a round object from the
-    #     side; scaled by its largest written size (the height), taken when its width is a
-    #     written size too
+    # b2. one picture alone, a side view (U1, U2, parasol covers): a flat bag, twice the drawn
+    #     panel stitched all round but the open bottom (Rens, 14 Oct 2026: "just twice the panel
+    #     on the drawing"; on 8 Oct he called U2 "cylindrical": the bag goes round the parasol;
+    #     the round cover turned from the side view, ADR-102, was not what he meant). Scaled by
+    #     its largest written size (the height), taken when its width is a written size too.
     side = _side_view(views) if views is not None else None
     if side is not None:
         from coverengine import drawing_given
 
         tall = max(views["sizes_cm"])  # type: ignore[index]
-        prof = drawing_given.side_profile(side.outline * float(side.meta["scale"]), tall)
-        wide = 2 * max(r for r, _ in prof)
+        panel = drawing_given.side_outline(side.outline * float(side.meta["scale"]), tall)
+        floor = [x for x, z in panel if z == 0.0]
+        wide = max(floor) - min(floor) if floor else 0.0
         hit = [s for s in views["sizes_cm"] if abs(s - wide) <= SIDE_AGREE * s]  # type: ignore[index]
-        info["side_view"] = {"profile_cm": prof, "height_cm": tall, "width_cm": round(wide, 1),
+        info["side_view"] = {"outline_cm": panel, "height_cm": tall, "width_cm": round(wide, 1),
                              "width_written": bool(hit)}  # fmt: skip
         if hit:
-            return {"status": "built", "reader": "side view", "shape": "revolve",
-                    "pieces": drawing_given.revolve({"profile": prof}, roll), "info": info,
-                    "reasons": []}  # fmt: skip
+            return {"status": "built", "reader": "side view", "shape": "flat-bag",
+                    "pieces": drawing_given.flat_bag({"outline_cm": panel}), "info": info,
+                    "reasons": [], "no_vents": True}  # fmt: skip
         reasons.append(f"one side view: its width {wide:.1f} cm is no written size")
 
     # c. the views: the plan cut by the elevations, checked against the 3D view
@@ -452,6 +454,12 @@ def build(
         mine["features"].pop("vents_min", None)
     else:
         mine.get("features", {}).pop("vents_total", None)
+    if res.get("no_vents") or (given is not None and given.get("no_vents")):
+        # no air vents on a flat bag (U1/U2: "just twice the panel on the drawing", Rens 14 Oct
+        # 2026; the drawings draw none), or where a person decided so
+        fs = mine.setdefault("features", {})
+        fs.pop("vents_total", None)
+        fs["vents_min"], fs["vents_per_metre"] = 0, 0
     cj.write_text(json.dumps(cover_doc, indent=2) + "\n", encoding="utf-8")
     how = (res["info"].get("isofit", {}).get("how") if res["reader"] == "isofit" else None) or (
         res["info"].get("solid", {}).get("how") or ["the drawn outline straight up"]

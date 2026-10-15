@@ -21,6 +21,11 @@ The kinds, sizes in cm, x along the back, y towards the front, z up:
   the back over a half-round front, the rim 40 cm in the middle and higher at the sides);
 - "faces": flat pieces given corner by corner (`pieces`: {name: [[[x, y, z], ...], ...]});
 - "angled": two arms of one cross-section meeting at an angle (S21, an angled sofa);
+- "flat-bag": two equal flat panels of one outline, stitched all round but along the bottom,
+  which stays open (U1, U2, a parasol cover; Rens, 14 Oct 2026: "just twice the panel on the
+  drawing, the two stitched together all round except the bottom line"). `outline_cm`: the
+  panel's corners [[x, z], ...] as the drawing draws it, the open edge on its lowest line;
+  `round_cm`: [[corner number, radius], ...] for its rounded corners;
 - "revolve": a round cover from a side view (`profile`: [[radius, height], ...] from the hem up
   to the top; `gores`: pieces round each band). A side view alone draws a round object (U2);
 - `skirt_cm` in the params of any kind: the walls cut at that height all round, a level skirt
@@ -81,6 +86,8 @@ def build(
         pieces = faces(p)
     elif kind == "revolve":
         pieces = revolve(p, roll_mm)
+    elif kind == "flat-bag":
+        pieces = flat_bag(p)
     elif kind == "angled":
         pieces = angled(p, roll_mm)
     else:
@@ -641,3 +648,121 @@ def revolve(p: dict[str, Any], roll_mm: float = math.inf) -> list[Piece]:
                            (r1 * math.cos(a), r1 * math.sin(a), z1)])  # fmt: skip
             pieces.append(Piece(f"band-{k + 1}-{g + 1}", [_clean(f) for f in fs]))
     return pieces
+
+
+# --- flat bag --------------------------------------------------------------------------------
+
+BAG_STEP_CM = 3.0  # param-ok: a flat bag's panels meshed at about this spacing
+BAG_STAND_MM = 5.0  # param-ok: how far each panel of a flat bag stands off the middle inside, so
+#                      the 3D cover has an inside and a mouth; it costs well under 0.2 % length
+BAG_EASE_CM = 10.0  # param-ok: ... nearly reached this far from a stitched edge (where it is 0);
+#                     the first points inside already stand off (U1's round top merged them)
+ROUND_ARC_STEPS = 12  # param-ok: a rounded corner as this many straight bits
+
+
+def filleted(outline_cm: list[list[float]], rounds: list[list[float]] | None) -> np.ndarray:
+    """The outline [[x, z], ...] with the given corners rounded: [[corner number, radius], ...]
+    (the radius between the two tangent points; a corner whose round would not fit is left)."""
+    pts = np.asarray(outline_cm, dtype=float)
+    r_at = {int(i) % len(pts): float(r) for i, r in (rounds or [])}
+    out: list[np.ndarray] = []
+    for i, q in enumerate(pts):
+        r = r_at.get(i, 0.0)
+        a, b = pts[i - 1] - q, pts[(i + 1) % len(pts)] - q
+        la, lb = float(np.linalg.norm(a)), float(np.linalg.norm(b))
+        if r <= 0 or la < 1e-9 or lb < 1e-9:
+            out.append(q)
+            continue
+        ua, ub = a / la, b / lb
+        half = math.acos(float(np.clip(ua @ ub, -1.0, 1.0))) / 2
+        t = r / math.tan(half)
+        if half < 1e-6 or t > min(la, lb):
+            out.append(q)
+            continue
+        bis = (ua + ub) / np.linalg.norm(ua + ub)
+        c = q + bis * r / math.sin(half)
+        t1, t2 = q + ua * t, q + ub * t
+        a1, a2 = math.atan2(*(t1 - c)[::-1]), math.atan2(*(t2 - c)[::-1])
+        d = (a2 - a1 + math.pi) % (2 * math.pi) - math.pi  # the short way round
+        for k in range(ROUND_ARC_STEPS + 1):
+            ang = a1 + d * k / ROUND_ARC_STEPS
+            out.append(c + r * np.array([math.cos(ang), math.sin(ang)]))
+    return np.array(out)
+
+
+SIDE_TRACE_CM = (
+    0.5  # param-ok: a side view's traced outline straightened within this (keeps rounds)
+)
+
+
+def side_outline(outline_cm: np.ndarray, height_cm: float | None = None) -> list[list[float]]:
+    """A side view's outline as a flat bag's panel (U1, U2: Rens, 14 Oct 2026): scaled so its
+    height is the written height, from its lowest left point, the bottom made one level line
+    (the open edge)."""
+    import shapely
+
+    poly = shapely.Polygon(outline_cm).buffer(0)
+    x0, z0, x1, z1 = poly.bounds
+    k = height_cm / (z1 - z0) if height_cm else 1.0
+    poly = shapely.affinity.scale(poly, k, k, origin=(x0, z0)).simplify(SIDE_TRACE_CM)
+    poly = shapely.geometry.polygon.orient(poly, sign=1.0)
+    x0, z0, _, _ = poly.bounds
+    pts = [[round(x - x0, 2), round(z - z0, 2)] for x, z in list(poly.exterior.coords)[:-1]]
+    for q in pts:  # a bottom traced a hair off level is the level bottom
+        if q[1] < SIDE_SIMPLIFY_CM:
+            q[1] = 0.0
+    return pts
+
+
+def flat_bag(p: dict[str, Any]) -> list[Piece]:
+    """Two equal panels of one outline (x along, z up, cm), stitched to each other all round
+    but along the lowest line, which is the open bottom (the hem). In 3D the panels lie in one
+    plane at their stitched edges and stand off it by at most `BAG_STAND_MM` inside, so the
+    cover has an inside and an open mouth; flattened, each is the drawn outline."""
+    import shapely
+    from scipy.spatial import Delaunay
+
+    ring = filleted(p["outline_cm"], p.get("round_cm"))
+    poly = shapely.Polygon(ring)
+    if not poly.is_valid or poly.area <= 0:
+        raise CoverError("flat-bag: the outline is not one simple shape")
+    poly = shapely.geometry.polygon.orient(poly, sign=1.0)
+    ring = np.asarray(poly.exterior.coords)[:-1]
+    low = float(ring[:, 1].min())
+    edges = list(zip(ring, np.roll(ring, -1, axis=0), strict=True))
+    stitched = shapely.MultiLineString(
+        [(tuple(a), tuple(b)) for a, b in edges if not (abs(a[1] - low) < ON_EDGE_CM
+                                                       and abs(b[1] - low) < ON_EDGE_CM)]
+    )  # fmt: skip
+    if len(stitched.geoms) == len(edges):
+        raise CoverError("flat-bag: the outline has no open bottom line")
+    border = np.asarray(shapely.LinearRing(ring).segmentize(BAG_STEP_CM).coords)[:-1]
+    x0, z0, x1, z1 = poly.bounds
+    gx, gz = np.meshgrid(np.arange(x0, x1, BAG_STEP_CM), np.arange(z0, z1, BAG_STEP_CM))
+    inner = poly.buffer(-BAG_STEP_CM / 2)
+    grid = np.c_[gx.ravel(), gz.ravel()]
+    grid = grid[shapely.contains_xy(inner, grid[:, 0], grid[:, 1])]
+    uv = np.vstack([border, grid])
+    tri = Delaunay(uv).simplices
+    mid = uv[tri].mean(axis=1)
+    tri = tri[shapely.contains_xy(poly, mid[:, 0], mid[:, 1])]
+    # only triangles wholly inside: one across a rounded corner's chord made U1's panel no disk
+    tri = tri[shapely.contains(poly.buffer(ON_EDGE_CM), shapely.polygons(uv[tri]))]
+    # and none without area: points along a straight side make flat slivers there
+    a, b, c = uv[tri[:, 0]], uv[tri[:, 1]], uv[tri[:, 2]]
+    twice = np.abs(
+        (b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (b[:, 1] - a[:, 1]) * (c[:, 0] - a[:, 0])
+    )
+    tri = tri[twice > ON_EDGE_CM * BAG_STEP_CM]
+    d = np.array([stitched.distance(shapely.Point(q)) for q in uv])
+    stand = BAG_STAND_MM * (1.0 - np.exp(-d / BAG_EASE_CM * 3.0))  # param-ok: 0 on a stitched edge
+    names = list(p.get("panels") or ["front", "back"])
+    out = []
+    for name, sign in zip(names, (1.0, -1.0), strict=True):  # front towards the front (+y)
+        v = [
+            (float(x) * MM, sign * float(s), float(z) * MM)
+            for (x, z), s in zip(uv, stand, strict=True)
+        ]
+        faces_ = [[v[i], v[j], v[k]] for i, j, k in tri]
+        out.append(Piece(str(name), faces_))
+    return out

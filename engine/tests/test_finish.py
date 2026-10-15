@@ -229,11 +229,15 @@ def wall(
 
 def test_a_vent_on_a_too_short_piece_moves_to_a_roomy_one() -> None:
     """C27 (6 Oct 2026): a share of the drawing's vents fell on a 16 cm end piece and was lost;
-    it goes to a piece with room instead, so the count is kept."""
+    it goes to a piece with room instead, so the count is kept. Handed on, it is no vent that
+    does not fit: no warning (S43, 14 Oct 2026: its 27 cm curve marked the cover "check")."""
     d = doc(wall("skirt-front-1", 160, 400), wall("skirt-front-2", 2000, 400))
     vents, warnings = place_vents(d["panels"], params(**{"features.vents_total": 2}))
     assert len(vents["skirt-front-2"]) == 2 and "skirt-front-1" not in vents
-    assert any("a vent needs 28 cm" in w for w in warnings)
+    assert not any("air vent" in w for w in warnings)
+    by_hand = params(**{"features.vent_positions": "skirt-front-2@0.3, skirt-front-2@0.7"})
+    vents, warnings = place_vents(d["panels"], by_hand)
+    assert len(vents["skirt-front-2"]) == 2 and not warnings
 
 
 def test_vents_go_round_every_side_first_in_the_middle_of_each_piece() -> None:

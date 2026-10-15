@@ -749,7 +749,11 @@ function CardView({
   const [aiNote, setAiNote] = useState("");
   const textRef = useRef<HTMLTextAreaElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  // when the card was loaded: the 3D view asks for this cover's files again after a rebuild
+  // (D1, D2, 14 Oct 2026: Rens marked the pieces of a cached, older panels.glb)
+  const [stamp, setStamp] = useState(() => Date.now());
   const load = useCallback(() => {
+    setStamp(Date.now());
     getJSON<Card>(`/api/desk/${id}`)
       .then(setCard)
       .catch((e) => setMsg(String(e.message ?? e)));
@@ -1192,7 +1196,7 @@ function CardView({
             <Viewer
               id={card.id}
               files={model.files}
-              stamp={0}
+              stamp={stamp}
               snapshot={snap}
             />
           ) : card.has_picture ? (
