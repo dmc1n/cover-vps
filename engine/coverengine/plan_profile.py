@@ -165,7 +165,7 @@ def _ring_of(exterior: Any, rim: list[tuple[float, float]]) -> np.ndarray:
     along the rim. Sampled on its own (`_ring_with`), the outline's points fell between the
     top's (each piece's outline was sampled from its own start), the cut left the rim unjoined
     in stretches (the audit's open seams on C26/C28, ADR-140) and a wall's seam could stand a
-    few cm beside the top's (Rens on C28, 15 Oct 2026, ADR-141)."""
+    few cm beside the top's (Rens on C28, 15 Oct 2026, ADR-142)."""
     import shapely
 
     pts = sorted(set(rim), key=lambda q: exterior.project(shapely.Point(q)))
@@ -262,7 +262,7 @@ def build(p: dict[str, Any], roll_mm: float = math.inf, wall_max_mm: float = 0.0
             pieces.append(Piece(f"{kind}-{k}", faces))
 
     # the walls on the outline: the back wall where the outline runs along the back edge
-    # the walls' top edges are the top pieces' own rim points (ADR-141)
+    # the walls' top edges are the top pieces' own rim points (ADR-142)
     ring = _ring_of(plan.exterior, rim)
     near = (
         np.array([seams_back.distance(shapely.Point(x, y)) for x, y in ring]) < 1.0

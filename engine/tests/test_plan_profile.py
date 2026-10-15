@@ -143,7 +143,7 @@ def test_the_walls_meet_the_top_point_for_point() -> None:
     seams still not running on into the top's): the outline was sampled for the walls on its
     own, its points fell between the top pieces' points, and the rim was left unjoined in
     stretches. Every point a top piece has on the outline is now a wall's top corner and the
-    other way round, so the walls and the top meet point for point (ADR-141)."""
+    other way round, so the walls and the top meet point for point (ADR-142)."""
     shape = _c_shape()
     shape["plan_cm"] = shape["plan_cm"][:60] + [
         (40 + 151 * np.cos(t), 151 * np.sin(t)) for t in np.linspace(np.pi, 0, 60)

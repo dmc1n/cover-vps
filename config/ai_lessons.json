@@ -222,5 +222,25 @@
     "check": "engine/tests/test_drawing_given.py::test_a_chaise_longue_is_low_at_its_front_and_chamfered_to_a_band_outside; testdata/drawing_shapes/drawing-l1..l3.json.",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792068000,
+    "model_id": "drawing-c28",
+    "complaint": "At the crosses the skirt's seams still do not run on into the seams of the top panels (Rens at the Desk, 15 Oct 2026, C28, after the wall seams had been moved under the top seams).",
+    "cause": "plan_profile sampled the outline for the walls on its own while each top piece sampled its own outline from another start: the points fell between each other, the rim stayed unjoined in stretches and the walls' top edges were cut as 5 cm hems instead of seams.",
+    "rule": "A wall stands on exactly the points the top pieces have on the outline, so wall and top meet point for point along the whole rim. When reviewing a cover, a free edge above the hem where two pieces touch (the audit's open seams) is a fault, and a wall whose top edge is a hem under a top piece is one too.",
+    "check": "engine/tests/test_plan_profile.py::test_the_walls_meet_the_top_point_for_point; cover audit 'open seams'.",
+    "applies_to": "all",
+    "ai_model": "approver"
+  },
+  {
+    "time": 1792068001,
+    "model_id": "drawing-d1",
+    "complaint": "Move the side vents one panel up, onto the sloping side panels (Rens at the Desk, 15 Oct 2026, D1 and D2).",
+    "cause": "The 18 cm side wall kept its vent by the owner's low-side rule (1 Oct: a lower opening), shrunk to 25 x 11 cm; a person could not name the piece above, which has no bottom hem.",
+    "rule": "Where the approver wants a full vent above a low wall, name the piece above in features.vent_positions: its seam on top of the low wall is its bottom edge and the vent hangs 5 cm over it, full size. Never on a free top edge.",
+    "check": "engine/tests/test_finish.py::test_a_vent_by_hand_one_panel_up_over_the_low_wall.",
+    "applies_to": "all",
+    "ai_model": "approver"
   }
 ]

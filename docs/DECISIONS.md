@@ -5437,3 +5437,47 @@ basis van die info een betere vorm hoes te genereren". The STEP files are in eac
   proposed in the report. **Not done:** `drawing-cover-39-46-l1-l5-mirror` (the same product as L1,
   waiting at the Desk) still has the chaise falling to 17.8 cm at its end; it should be rebuilt from
   drawing-l1.json mirrored.
+
+## ADR-142 — Rens's fourth round on vents and seams (15 Oct 2026): walls joined to the top point for point, a vent by hand one panel up
+
+Rens at the Desk and in Questions, 15 Oct 2026 (staging `out/rejections4/vents/`; each picture read
+with `scripts/desk_marks.py` and by eye, read independently by Codex before building, `cover audit` and
+`scripts/fewer_check.py`, compare pictures and a size table in `compare/`, a Codex pass on those
+before live).
+
+- **C28** ("op de plekken van de kruisen lopen de seams van de skirt nog niet door in de seams van de
+  panelen op de top"), after ADR-138's fix: at his three crosses the wall seam's top and the two top
+  seams' end were already one point (0.0 cm, his picture shows the current cover). What was wrong
+  along that rim: the walls were **not joined** to the top. `plan_profile` sampled the outline for
+  the walls on its own (`_ring_with`, every 6 cm from the outline's start) while each top piece's
+  outline was sampled from its own start; their points fell between each other, `conform` joins
+  only points on a straight edge, so the cut left the rim free in stretches (ADR-140's open seams on
+  C26/C28: 11 and 16 piece pairs) and the walls' top edges were cut as hems (5 cm allowance) instead
+  of seams (1.5 cm). **Fix (general):** the walls stand on exactly the points the top pieces have on
+  the outline (`_ring_of`), so a wall's top edge is a top piece's edge point for point. C28 and C26
+  rebuilt (`fewer_build --codes`): open seams pass, wall cut heights 2-3.5 cm smaller, the cover the
+  same (444 x 366.6 x 86.4 / 439.3 x 241.1 x 86.4, front 38.1). Test `test_plan_profile.py`
+  `test_the_walls_meet_the_top_point_for_point` (fails on the old ring). If Rens means something
+  else by "doorlopen" (the top seam square to the front edge), the card asks him to draw it.
+- **C28, Q103** ("een 10e erbij, ik teken waar"): his cross on the long arm's inner wall near the tip
+  (skirt-left-1), circles in the middle of the central inner wall (skirt-front-1) and on the long
+  arm's inner wall between its upper vent and the tip (skirt-left-4): 10 vents, as the drawing.
+- **C26, Q104** (b: "vents verplaatsen zoals op mijn tekening van 9 okt, daarna opnieuw
+  goedkeuren"): the vents on the short inner walls beside the middle removed, one on each arm end at
+  his circles (front of the nose, 31 cm from the inner wall's seam); 8. Its approval of 14 Oct ends
+  with the new cut (reopened for a new one).
+- **D1, D2** ("vents aan de zijkanten een paneel omhoog, op de schuin aflopende panelen"): the 18 cm
+  side wall had its vent shrunk to 25 x 11 cm by the rule (owner, 1 Oct: a low side gets a lower
+  opening). `features.vent_positions` may now name a piece without a bottom hem whose seam is the
+  top of a piece standing on the hem (`finish._above_by_hand`; never a free edge, never a slanting
+  side seam): the vent goes over that seam like a low skirt's (ADR-101). D1/D2: full 25 x 22 cm in
+  the middle of top-4/top-3, 5 cm over the seam (bottom at 22.5 cm). The rule itself is unchanged
+  (only by hand). The audit's and fewer_check's "high up a wall" now measure a vent over a seam from
+  that seam (`vents3d.seam_under`). Test `test_finish.py`
+  `test_a_vent_by_hand_one_panel_up_over_the_low_wall`.
+- The audit's picture snaps its outline (`VIEW_GRID_MM`) when GEOS trips on near-coincident slivers
+  (C28 after the fix).
+- **Not swept:** C27 and S32 (plan-profile) keep their unjoined rims until built again; the isofit
+  covers of ADR-140's sweep (C1, C2, C3, C9, C24) have another cause, not looked at here. Whether a
+  low side wall should hand its vent up by the rule instead of shrinking it is the owner's (1 Oct
+  rule), not changed.

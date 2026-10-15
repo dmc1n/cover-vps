@@ -598,7 +598,7 @@ def _above_by_hand(
     """A piece a person names in `features.vent_positions` that has no bottom hem: its seam on
     top of a piece standing on the hem is its bottom edge, so the vent goes one panel up, over
     that seam (Rens on D1/D2, 15 Oct 2026: the side vents on the sloping side panels, not
-    shrunk to 11 cm on the 18 cm side wall; ADR-141). Only by hand: the rule keeps a low wall's
+    shrunk to 11 cm on the 18 cm side wall; ADR-142). Only by hand: the rule keeps a low wall's
     lower opening (owner, 1 Oct 2026). The seam must be the lower piece's top (within
     `features.vent_min_height_mm` of it), never a free edge and never a slanting side seam."""
     named = {x.partition("@")[0].strip() for x in str(params["features.vent_positions"]).split(",")}

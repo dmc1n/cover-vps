@@ -163,7 +163,7 @@ def views(furniture: trimesh.Trimesh, cover: trimesh.Trimesh, bad: Array, out: P
         shapes = [g for g in shapes if g.is_valid and g.area > 0]
         try:
             area = shapely.union_all(shapes)
-        except shapely.errors.GEOSException:  # many near-coincident slivers (C28's rim, ADR-141)
+        except shapely.errors.GEOSException:  # many near-coincident slivers (C28's rim, ADR-142)
             area = shapely.union_all(shapes, grid_size=VIEW_GRID_MM)
         for poly in getattr(area, "geoms", [area]):
             if hasattr(poly, "exterior"):

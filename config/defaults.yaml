@@ -215,7 +215,10 @@ features:                        # per-cover defaults, overridden per model
   vent_positions: ""             # per model, where the rule cannot reach (Rens's circles): places as
                                  # "piece@fraction" along its bottom edge, comma separated
                                  # ("skirt-back@0.5, top-2@0.25"); empty = the rule. Wins over
-                                 # vents_total and the per-metre rule (ADR-101)
+                                 # vents_total and the per-metre rule (ADR-101). A piece without a
+                                 # bottom hem whose seam is the top of a piece on the hem may be
+                                 # named too: the vent goes one panel up, over that seam (D1/D2,
+                                 # ADR-142)
   vent_on_corners: false         # Rens, 9 Oct 2026 (Casto daybed): "geen vents op afgeronde hoeken";
                                  # a vent on a rounded corner moves along its piece to the nearest
                                  # straight stretch (a round cover keeps its vents; ADR-134).
