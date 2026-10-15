@@ -380,7 +380,7 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
         vent_bases,
         vent_walls,
     )
-    from coverengine.finish.vents3d import ensure_vents
+    from coverengine.finish.vents3d import ensure_vents, seam_under
 
     path = ensure_vents(model_dir) if (model_dir / "panels.npz").is_file() else None
     if path is None:
@@ -420,7 +420,8 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
         reach = (2 * float(params["features.vent_above_hem_mm"])  # type: ignore[arg-type]
                  + float(params["features.vent_min_height_mm"])  # type: ignore[arg-type]
                  + float(params["stitching.allowance_mm"]))  # type: ignore[arg-type]  # fmt: skip
-        high = [x["piece"] for x in vents if min(c[2] for c in x["corners_mm"]) - low > reach]
+        high = [x["piece"] for x in vents
+                if min(c[2] for c in x["corners_mm"]) - low - seam_under(x) > reach]  # fmt: skip
         if high:
             problems.append("high up a wall (upside down?): " + ", ".join(high))
     if vents and not places and not params["features.vent_on_corners"]:

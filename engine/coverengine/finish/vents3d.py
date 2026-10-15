@@ -171,6 +171,16 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
     return {**head, "vents": out, "warnings": warnings}
 
 
+def seam_under(vent: dict[str, Any]) -> float:
+    """How high above the cover's lower edge a vent's own bottom edge lies (mm): 0 for a vent on
+    the hem; for one over a seam (a low skirt's top, or one panel up by hand) that seam's
+    height. "High up a wall" is measured from there (ADR-141)."""
+    if vent.get("bottom_edge") != "above":
+        return 0.0
+    lift = float(vent.get("above_hem_mm", 0.0)) - float(vent.get("above_piece_edge_mm", 0.0))
+    return max(lift, 0.0)
+
+
 def _r(p: Array) -> list[float]:
     return [round(float(x), 1) for x in p]
 
