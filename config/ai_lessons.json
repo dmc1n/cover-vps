@@ -182,5 +182,15 @@
     "check": "apps/api/tests/test_api.py::test_model_summary_and_files (no-cache) and engine/tests/test_desk_marks.py (the current vents drawn on the picture).",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792052000,
+    "model_id": "drawing-c28",
+    "complaint": "At the crosses the skirt's seams do not continue the seams of the top panels; make them continue (Rens at the Desk, 15 Oct 2026, C28).",
+    "cause": "plan_profile put each front wall bit in the stretch of the back edge it projects onto; where the front edge is not parallel to the back (a C's curled arms) the wall seams stood 10-40 cm beside the ends of the top's seams.",
+    "rule": "A wall's vertical seams continue the top's seams: the outline is cut exactly where a top seam meets it and each wall bit belongs to the top section above it. When reviewing a cover, a skirt seam that does not meet a top seam end is a fault.",
+    "check": "engine/tests/test_plan_profile.py::test_the_front_walls_continue_the_top_seams.",
+    "applies_to": "all",
+    "ai_model": "approver"
   }
 ]

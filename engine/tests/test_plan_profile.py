@@ -107,3 +107,32 @@ def test_written_lengths_trust_the_shape_and_find_a_typo(monkeypatch: pytest.Mon
     got = pp.check_lengths(None, {"seams_at_cm": [0, 178.7, 423.7, 590.0]})
     assert got["trusted"] and got["matched"] == 3
     assert got["typos"] == [{"written_cm": 235.1, "inch_gives_cm": 245.1, "measured_cm": 245.0}]
+
+
+def test_the_front_walls_continue_the_top_seams() -> None:
+    """Rens on C28 (15 Oct 2026): the skirt's seams did not continue the top's seams. A front
+    wall was cut by its distance along the back edge, so where the front is not parallel to the
+    back the wall seam stood 10-30 cm beside the top's. Now a wall seam is where a top seam
+    meets the outline."""
+    shape = _c_shape()
+    # the inner (front) edge off centre: a seam square to the back meets it at a slant
+    shape["plan_cm"] = shape["plan_cm"][:60] + [
+        (40 + 151 * np.cos(t), 151 * np.sin(t)) for t in np.linspace(np.pi, 0, 60)
+    ]
+    plan = shapely.Polygon(shape["plan_cm"])
+    cuts = pp._cuts(shapely.LineString(shape["back_cm"]), shape["seams_at_cm"], plan)
+    hits = [g for c in cuts for g in getattr(c.intersection(plan.exterior), "geoms", [])]
+    front_hits = [h for h in hits if np.hypot(h.x - 40, h.y) < 160]
+    assert len(front_hits) == 2
+    pieces = pp.build(shape)
+    walls = [p for p in pieces if p.name.startswith("front")]
+    assert len(walls) == 3
+    ends = []
+    for w in walls:  # each wall's floor points; its ends shared with a neighbour are seams
+        floor = np.array([q[:2] for f in w.faces for q in f if q[2] == 0.0]) / 10
+        ends.append({tuple(np.round(p, 3)) for p in floor})
+    shared = [np.array(a) for i, s in enumerate(ends) for j, t in enumerate(ends) if i < j
+              for a in s & t]  # fmt: skip
+    assert len(shared) == 2
+    for h in front_hits:
+        assert min(np.hypot(*(p - (h.x, h.y))) for p in shared) < 0.5  # cm

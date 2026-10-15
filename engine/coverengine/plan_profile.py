@@ -136,6 +136,27 @@ def height_edge(back: Any, depth_cm: float) -> Any:
     return shapely.LineString(pts[lo : hi + 1])
 
 
+def _ring_with(exterior: Any, lines: list[Any]) -> np.ndarray:
+    """The outline as points every `STEP_CM` or closer, with the points where the seam lines
+    cross it added, so a wall is cut exactly where a top seam meets it."""
+    import shapely
+
+    pts = np.asarray(shapely.segmentize(exterior, STEP_CM).coords)
+    at = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(pts, axis=0), axis=1))])
+    extra = []
+    for ln in lines:
+        hit = ln.intersection(exterior)
+        for g in getattr(hit, "geoms", [hit]):
+            if g.geom_type == "Point":
+                extra.append((exterior.project(g), g.x, g.y))
+    if not extra:
+        return pts
+    s = np.concatenate([at, [e[0] for e in extra]])
+    xy = np.vstack([pts, [[e[1], e[2]] for e in extra]])
+    order = np.argsort(s, kind="stable")
+    return xy[order]
+
+
 def _split(region: Any, lines: list[Any]) -> list[Any]:
     from shapely.ops import split
 
@@ -214,25 +235,39 @@ def build(p: dict[str, Any], roll_mm: float = math.inf, wall_max_mm: float = 0.0
             pieces.append(Piece(f"{kind}-{k}", faces))
 
     # the walls on the outline: the back wall where the outline runs along the back edge
-    ring = np.asarray(shapely.segmentize(plan.exterior, STEP_CM).coords)
+    ring = _ring_with(plan.exterior, cut_lines)
     near = (
         np.array([seams_back.distance(shapely.Point(x, y)) for x, y in ring]) < 1.0
     )  # param-ok: cm
-    cut_pts = [ln.intersection(plan.exterior) for ln in cut_lines]
+    seams_at = [float(c) for c in (p.get("seams_at_cm") or [])]
+
+    def stretch_at(s: float) -> int:
+        return sum(1 for c in seams_at if s > c)
+
+    # a wall's stretch is the top section it stands under: its vertical seams continue the
+    # top's seams (Rens on C28, 15 Oct 2026). Measured by the distance along the back edge,
+    # the front walls were cut 10-30 cm beside them.
+    regions = []
+    for r in _split(plan, cut_lines):
+        on_back = r.intersection(seams_back.buffer(1.0))  # param-ok: cm
+        at = on_back.centroid if not on_back.is_empty else r.centroid
+        regions.append((r, stretch_at(seams_back.project(at))))
     walls: dict[str, list[list[tuple[float, float, float]]]] = {}
     for i in range(len(ring) - 1):
         (x0, y0), (x1, y1) = ring[i], ring[i + 1]
+        if (x0, y0) == (x1, y1):
+            continue
         z0, z1 = (float(z) for z in zof(np.array([[x0, y0], [x1, y1]])))
         side = "back" if near[i] and near[i + 1] else "front"
         mid = shapely.Point((x0 + x1) / 2, (y0 + y1) / 2)
-        # which stretch between seam lines this wall bit is in
-        s = seams_back.project(mid)
-        stretch = sum(1 for c in (p.get("seams_at_cm") or []) if s > float(c))
+        if side == "back" or not regions:
+            stretch = stretch_at(seams_back.project(mid))
+        else:
+            stretch = min(regions, key=lambda rs: rs[0].distance(mid))[1]
         name = f"{side}-{stretch + 1}"
         walls.setdefault(name, []).append([
             (x0 * MM, y0 * MM, 0.0), (x1 * MM, y1 * MM, 0.0),
             (x1 * MM, y1 * MM, z1 * MM), (x0 * MM, y0 * MM, z0 * MM)])  # fmt: skip
-    del cut_pts
     if wall_max_mm > 0:
         walls = _band(walls, "back", wall_max_mm)
     pieces += [Piece(n, f) for n, f in sorted(walls.items())]

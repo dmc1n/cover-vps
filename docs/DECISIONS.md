@@ -5204,3 +5204,16 @@ vents projected on it, read twice: by us and independently by Codex).
   the card and in Questions (#104) whether the approval stands.
 - All by hand (`features.vent_positions`), so a rebuild keeps them. Checked twice (audit, fewer_check;
   Codex read the marks and the staged result independently and agreed); live 14 Oct, reopened.
+- **C28, 15 Oct 10:06** ("op de plekken van kruisjes lopen de seams van de skirt niet goed over
+  in de seams van de top panelen"): a general fault of `plan_profile`. A front wall was put in
+  the stretch of the back edge it projects onto, so where the front is not parallel to the back
+  (the curled arms of a C) its vertical seams stood 10–40 cm beside the ends of the top's seams.
+  Now the outline gets the points where the top's seam lines cross it (`_ring_with`) and each
+  front wall bit belongs to the top section it stands under. C28 rebuilt from its drawing
+  (`fewer_build --codes C28`): the top unchanged, the wall pieces split at the top seams (front
+  116 → 96, 51 → 66, 127 → 130 cm, the other arm 89 → 91, 71 → 89, 123 → 105 cm), the 9 vents
+  mapped onto the new pieces (two middle ones 9–12 cm to the middle of their new piece). Read
+  and checked by Codex too; live 15 Oct, reopened. Test: test_plan_profile.py
+  `test_the_front_walls_continue_the_top_seams` (fails on the old code). **Not swept:** the other
+  plan-profile covers have the same fault until built again: C27 (front walls up to 40 cm off;
+  waiting for Rens's round), C26 (approved; a rebuild needs a new approval), S32.
