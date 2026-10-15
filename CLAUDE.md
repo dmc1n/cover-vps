@@ -241,7 +241,8 @@ uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--o
                                              flat-bag: two panels of one outline stitched all round but the bottom, U1/U2, ADR-140)
 uv run python scripts/s43_shape.py testdata/drawing_shapes   S43/S44's pieces with the seams as drawn, as a "faces" shape (ADR-140)
 COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py [--out out/matchcards]   approved drawing covers as existing covers:
-                                             kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114)
+                                             kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114);
+                                             a wrong row of the uploaded list: prices/list_corrections.json (the Excel stays)
 Covers → Links (#/covers/links[?q=<cover>])   a drawing cover and a 3D-model cover of the same product: proposed with a
                                              score and reasons, a person confirms, rejects or chooses another; the product
                                              list's links are proposals too (D2 is not the Evora sunlounger); learning reads

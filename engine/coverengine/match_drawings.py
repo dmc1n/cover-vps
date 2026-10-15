@@ -278,6 +278,8 @@ def review(model_dir: Path, p: EffectiveParams, listing: Mapping[str, Any] | Non
             doubts.append(f"{r['code']}: {bad}")
             continue
         used.append(r)
+        if r.get("doubt"):  # a correction of the list that waits for a person (match_list)
+            doubts.append(f"{r['code']}: {r['doubt']}")
         k, d = row_kind(r, plan[0])
         if k:
             list_kinds.append(k)

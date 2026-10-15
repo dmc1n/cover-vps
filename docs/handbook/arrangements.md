@@ -51,7 +51,8 @@ outline; opened, they offer the default plan, and the page says the cover was bu
   running downhill. Settings: `arrange.footprint` (the default plan), `align_mm` (sides of
   neighbours this close are lined up), `close_mm` (gaps this narrow are closed), `top_faces`,
   `top_gain_pct`, `top_slopes` (front: tops slope only to each piece's front, so no diagonal
-  seams on top).
+  seams on top), `side_slopes` (on: a piece's top may also slope down to its own outside sides,
+  never towards a neighbour, keeping a wall at least as high as its front; Rens, 15 Oct 2026).
 - Each piece is covered as its plan rectangle: a rounded arm is covered square.
 - Air vents go round every side, the front walls of the inner corner included (ADR-110).
 - The skirt runs at one height all round; where a piece is lower (the chaise longue's back),

@@ -120,13 +120,15 @@ def test_s43_seams_as_drawn() -> None:
     """Rens, Desk 14 Oct 2026, S43 and S44: "seams beter volgen zoals op tekening". The strip
     ends on a line A-B, the leaning back band runs on round the nose's back to C on the rim, the
     slope runs on to D on the front of the nose, the walls are cut below C and D; every wall
-    40.64 cm high (the level seam of 9 Oct kept). S44 is the mirror."""
+    40.64 cm high (the level seam of 9 Oct kept). S44 is the mirror. Desk 15 Oct 2026: "rare knik
+    in paneel top 1 wijzigen. Ook de front skirts terugbrengen naar 1 paneel": the nose top has no
+    fold inside it, and the front wall is one piece from the straight end round to D."""
     spec = json.loads((SHAPES / "drawing-s43.json").read_text())
     assert spec["shape"] == "faces"
     pieces = dg.build(spec, ROLL, 3000.0)
     names = {p.name for p in pieces}
     assert names == {"back-band", "strip", "slope", "nose", "wall-end", "wall-back",
-                     "wall-front-1", "wall-front-2", "wall-front-3", "wall-nose"}  # fmt: skip
+                     "wall-front", "wall-nose"}  # fmt: skip
     pts = {p.name: _pts(pieces, p.name) for p in pieces}
 
     def shared(a: str, b: str) -> np.ndarray:
@@ -147,7 +149,16 @@ def test_s43_seams_as_drawn() -> None:
         if name.startswith("wall-") and name != "wall-end":
             assert p[:, 2].max() == pytest.approx(406.4, abs=0.1) and p[:, 2].min() == 0.0
     # the wall seams below D and C
-    assert len(shared("wall-front-3", "wall-nose")) and len(shared("wall-nose", "wall-back"))
+    assert len(shared("wall-front", "wall-nose")) and len(shared("wall-nose", "wall-back"))
+    assert len(shared("wall-front", "wall-end"))  # the front skirt runs from the straight end
+    # no fold inside the nose top: neighbouring facets meet at no more than the rim's steps
+    nose = next(p for p in pieces if p.name == "nose")
+    n = [np.cross(np.subtract(f[1], f[0]), np.subtract(f[2], f[0])) for f in nose.faces]
+    n = [v / np.linalg.norm(v) for v in n]
+    folds = [
+        math.degrees(math.acos(min(1.0, float(a @ b)))) for a, b in zip(n, n[1:], strict=False)
+    ]
+    assert max(folds) < 5.0
     mirrored = dg.build(json.loads((SHAPES / "drawing-s44.json").read_text()), ROLL, 3000.0)
     assert {p.name for p in mirrored} == names
     m = _pts(mirrored, "nose")
@@ -495,3 +506,28 @@ def test_a_chaise_longue_is_low_at_its_front_and_chamfered_to_a_band_outside() -
         side = _pts(pieces, "chaise-side")
         assert side[:, 0].min() == pytest.approx(0.0, abs=0.5)
         assert side[:, 2].min() == pytest.approx(band, abs=1.0)  # on the band, not the ground
+
+
+def test_the_audit_flags_a_sharp_fold_inside_a_piece(tmp_path: Path) -> None:
+    """S43's nose top, 15 Oct 2026 ("rare knik in paneel top 1"): a triangle folded 62 degrees
+    against the rest of its piece; a gentle bend passes."""
+    from coverengine.audit import kink_checks
+    from coverengine.params import Registry
+
+    params = Registry.load(None).resolve()
+
+    def piece(rise: float) -> None:
+        # one top piece of two 2 m x 1 m halves meeting along y = 1000, the second rising
+        v = np.array([[0, 0, 0], [2000, 0, 0], [2000, 1000, 0], [0, 1000, 0],
+                      [2000, 2000, rise], [0, 2000, rise]], float)  # fmt: skip
+        f = np.array([[0, 1, 2], [0, 2, 3], [3, 2, 4], [3, 4, 5]])
+        np.savez(tmp_path / "panels.npz", vertices=v, faces=f, labels=np.zeros(4, int),
+                 original_vertex=np.arange(6))  # fmt: skip
+
+    (tmp_path / "panels.json").write_text(json.dumps({"panels": [{"name": "top-1"}]}))
+    (tmp_path / "hull.json").write_text(json.dumps({"top": "given"}))
+    piece(100.0)  # about 6 degrees
+    assert kink_checks(tmp_path, params)[0]["ok"]
+    piece(1880.0)  # about 62 degrees, over 2 m
+    (check,) = kink_checks(tmp_path, params)
+    assert not check["ok"] and "top-1" in check["detail"]

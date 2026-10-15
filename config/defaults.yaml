@@ -114,6 +114,13 @@ seams:
                                  # by a seam the drawing does not draw; the audit flags
                                  # it when the two fit the roll together (Rens, 9 Oct 2026, D1/D2:
                                  # "crossed-out panels one panel"; ADR-131); 0 = no check
+  piece_kink_max_deg: 25         # a drawing cover (given surface): no fold inside one top piece
+                                 # sharper than this; the eye sees it as a crease (Rens, 15 Oct
+                                 # 2026, S43's nose top: "rare knik in paneel top 1"; ADR-142);
+                                 # the audit's "kinks"; 0 = no check
+  piece_kink_min_mm: 120         # ... when such folds inside one piece run at least this far
+                                 # together (single sliver facets of a traced outline are no
+                                 # crease; S43's ran 91 cm)
   given_crease_deg: 0            # a cover surface of its own (hull.top: given): its creases
                                  # sharper than this are the seams, the pieces are what they
                                  # enclose (Rens, 8 Oct 2026: "follow the original model's
@@ -589,6 +596,11 @@ arrange:                         # furniture placed together, one cover over the
                                  # the top of its back), so walls stand straight and every seam on the top
                                  # runs straight across the member; any: also down to its back and sides
                                  # (hip seams then run diagonally across the top)
+  side_slopes: true              # arrangements (arr-*): each member's roof may also slope down to its own
+                                 # outside sides (none to a side a neighbour stands against: no valley),
+                                 # each side when it takes away top_gain_pct of the room, both sides alike;
+                                 # a hip seam where it meets the front slope (Rens, 15 Oct 2026, QUESTIONS 59:
+                                 # "ja, ook naar de zijkanten"). Not for plan_members.json models (ADR-117)
   cell_mm: 20                    # follow and box: grid for the room and the water check (mm)
 
 suggest:                         # "start from a photo or a link" in the configurator (ADR-086)

@@ -533,14 +533,12 @@ def agent_on(auth: Any, request: Request) -> bool:
     owner's go), the preview website (preview.<domain> through the Worker's key, as the
     barbecues, ADR-119), or a logged-in colleague trying it on the studio."""
     from coverapi.security import SESSION_COOKIE
-    from coverapi.shop import SHOP_DEFAULTS, SHOP_SETTING, link_ok, merged
+    from coverapi.shop import SHOP_DEFAULTS, SHOP_SETTING, merged, preview_site
 
     s = merged(SHOP_DEFAULTS, auth.setting(SHOP_SETTING, {}) or {})
     if s.get("agent_api_enabled"):
         return True
-    if request.headers.get("x-forwarded-host", "").startswith("preview.") and link_ok(
-        auth, request
-    ):
+    if preview_site(auth, request):  # x-site-host: Caddy rewrites X-Forwarded-Host
         return True
     return auth.session_user(request.cookies.get(SESSION_COOKIE)) is not None
 
@@ -548,18 +546,18 @@ def agent_on(auth: Any, request: Request) -> bool:
 def site_root(auth: Any, request: Request) -> str:
     """The website the links open: the host the Worker answered for (the preview's own links
     stay on the preview), else the shop's domain or this server's /shop/."""
-    from coverapi.shop import link_ok, shop_root
+    from coverapi.shop import link_ok, shop_root, site_host
 
-    host = request.headers.get("x-forwarded-host", "")
+    host = site_host(request)
     if host and link_ok(auth, request) and re.fullmatch(r"[a-z0-9.-]+(:\d+)?", host):
         return f"https://{host}/"
     return shop_root(auth, request)
 
 
 def api_root(auth: Any, request: Request) -> str:
-    from coverapi.shop import link_ok
+    from coverapi.shop import link_ok, site_host
 
-    host = request.headers.get("x-forwarded-host", "")
+    host = site_host(request)
     if host and link_ok(auth, request) and re.fullmatch(r"[a-z0-9.-]+(:\d+)?", host):
         return f"https://{host}/api/v2"
     scheme = "https" if request.headers.get("x-forwarded-proto") == "https" else request.url.scheme
