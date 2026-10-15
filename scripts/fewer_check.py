@@ -228,9 +228,11 @@ def check(model: Path, vents_expected: int | None) -> dict[str, Any]:
         reach = (float(params["features.vent_above_hem_mm"]) * 2
                  + float(params["features.vent_min_height_mm"])
                  + float(params["stitching.allowance_mm"]))  # fmt: skip
+        from coverengine.finish.vents3d import seam_under  # over a seam: from that seam
+
         high = [f"{x['piece']} at {min(c[2] for c in x['corners_mm']) / 10:.0f} cm"
                 for x in json.loads(v3.read_text())["vents"]
-                if min(c[2] for c in x["corners_mm"]) - low > reach]  # fmt: skip
+                if min(c[2] for c in x["corners_mm"]) - low - seam_under(x) > reach]  # fmt: skip
         if high:
             bad.append("vents high up a wall: " + ", ".join(high))
 

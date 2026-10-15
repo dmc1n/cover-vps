@@ -30,6 +30,7 @@ CUT_REACH_CM = 400.0  # param-ok: a seam line reaches this far across the cover
 OVERSHOOT_CM = 0.5  # param-ok: a seam line runs on this far past the outline, to cut it clean
 CURL_STEP_CM = 2.0  # param-ok: the back edge resampled this fine to measure its curl
 CURL_WINDOW = 10  # param-ok: the curl measured over this many steps each way (40 cm)
+RIM_CM = 1e-6  # param-ok: a top point this close to the outline lies on it (float noise)
 
 
 def _height(profile: np.ndarray, d: np.ndarray) -> np.ndarray:
@@ -157,6 +158,30 @@ def _ring_with(exterior: Any, lines: list[Any]) -> np.ndarray:
     return xy[order]
 
 
+def _ring_of(exterior: Any, rim: list[tuple[float, float]]) -> np.ndarray:
+    """The outline as exactly the points the top pieces have on it, in order round it, closed.
+
+    A wall's top edge then is a top piece's edge point for point, so the two are joined all
+    along the rim. Sampled on its own (`_ring_with`), the outline's points fell between the
+    top's (each piece's outline was sampled from its own start), the cut left the rim unjoined
+    in stretches (the audit's open seams on C26/C28, ADR-140) and a wall's seam could stand a
+    few cm beside the top's (Rens on C28, 15 Oct 2026, ADR-141)."""
+    import shapely
+
+    pts = sorted(set(rim), key=lambda q: exterior.project(shapely.Point(q)))
+    if len(pts) < 3:  # param-ok: no ring
+        return _ring_with(exterior, [])
+    return np.array([*pts, pts[0]], dtype=float)
+
+
+def _on_outline(exterior: Any, v: np.ndarray) -> list[tuple[float, float]]:
+    """The points of a top piece's mesh (xy, cm) that lie on the plan's outline."""
+    import shapely
+
+    d = shapely.distance(exterior, shapely.points(v))
+    return [(float(x), float(y)) for (x, y), e in zip(v, d, strict=True) if e < RIM_CM]
+
+
 def _split(region: Any, lines: list[Any]) -> list[Any]:
     from shapely.ops import split
 
@@ -224,9 +249,11 @@ def build(p: dict[str, Any], roll_mm: float = math.inf, wall_max_mm: float = 0.0
     # `strip_whole`: the drawn seams stop at the back strip, the strip is one piece (Rens on S32,
     # 9 Oct 2026: "the struck-through panels on the top one panel"); it is level, so flat
     whole = bool(p.get("strip_whole"))
+    rim: list[tuple[float, float]] = []
     for a, band in bands:
         for part in [band] if whole and a == 0 else _split(band, cut_lines):
             v, f = _tri_region(part, STEP_CM)
+            rim += _on_outline(plan.exterior, v)
             z = zof(v)
             k += 1
             kind = "top" if a == 0 else "slope"
@@ -235,7 +262,8 @@ def build(p: dict[str, Any], roll_mm: float = math.inf, wall_max_mm: float = 0.0
             pieces.append(Piece(f"{kind}-{k}", faces))
 
     # the walls on the outline: the back wall where the outline runs along the back edge
-    ring = _ring_with(plan.exterior, cut_lines)
+    # the walls' top edges are the top pieces' own rim points (ADR-141)
+    ring = _ring_of(plan.exterior, rim)
     near = (
         np.array([seams_back.distance(shapely.Point(x, y)) for x, y in ring]) < 1.0
     )  # param-ok: cm

@@ -136,3 +136,28 @@ def test_the_front_walls_continue_the_top_seams() -> None:
     assert len(shared) == 2
     for h in front_hits:
         assert min(np.hypot(*(p - (h.x, h.y))) for p in shared) < 0.5  # cm
+
+
+def test_the_walls_meet_the_top_point_for_point() -> None:
+    """The audit's open seams on C26 and C28 (ADR-140), and Rens on C28 (15 Oct 2026, the skirt's
+    seams still not running on into the top's): the outline was sampled for the walls on its
+    own, its points fell between the top pieces' points, and the rim was left unjoined in
+    stretches. Every point a top piece has on the outline is now a wall's top corner and the
+    other way round, so the walls and the top meet point for point (ADR-141)."""
+    shape = _c_shape()
+    shape["plan_cm"] = shape["plan_cm"][:60] + [
+        (40 + 151 * np.cos(t), 151 * np.sin(t)) for t in np.linspace(np.pi, 0, 60)
+    ]
+    pieces = pp.build(shape)
+    plan = shapely.Polygon(shape["plan_cm"])
+
+    def key(q: tuple[float, float, float]) -> tuple[float, float, float]:
+        return (round(q[0], 6), round(q[1], 6), round(q[2], 6))
+
+    rim = plan.exterior
+    top = {key(q) for p in pieces if p.name.startswith(("top", "slope")) for f in p.faces
+           for q in f if rim.distance(shapely.Point(q[0] / 10, q[1] / 10)) < 1e-6}  # fmt: skip
+    wall = {key(q) for p in pieces if p.name.startswith(("front", "back")) for f in p.faces
+            for q in f if q[2] > 0}  # fmt: skip
+    assert len(top) > 100
+    assert top == wall

@@ -578,12 +578,48 @@ def vent_bases(
             # the low skirts handed their vents up; one that found no piece above is warned
             served = {e.get("mate") for p in panels if p["name"] in out for e in p["edges"]}
             low = {k: v for k, v in low.items() if k not in served}
+        out.update(_above_by_hand(panels, params, skip, out, lowest, reach))
     for name in sorted(low):
         side = side_of(name).removeprefix("skirt-") or "skirt"
         warnings.append(
             f"no air vent on the {side}: the skirt there is lower than {need / MM_PER_CM:.1f} cm"
         )
     return out, warnings
+
+
+def _above_by_hand(
+    panels: list[dict[str, Any]],
+    params: EffectiveParams,
+    skip: frozenset[str],
+    bases: dict[str, list[HemRun]],
+    lowest: float,
+    reach: float,
+) -> dict[str, list[HemRun]]:
+    """A piece a person names in `features.vent_positions` that has no bottom hem: its seam on
+    top of a piece standing on the hem is its bottom edge, so the vent goes one panel up, over
+    that seam (Rens on D1/D2, 15 Oct 2026: the side vents on the sloping side panels, not
+    shrunk to 11 cm on the 18 cm side wall; ADR-141). Only by hand: the rule keeps a low wall's
+    lower opening (owner, 1 Oct 2026). The seam must be the lower piece's top (within
+    `features.vent_min_height_mm` of it), never a free edge and never a slanting side seam."""
+    named = {x.partition("@")[0].strip() for x in str(params["features.vent_positions"]).split(",")}
+    top = {p["name"]: max(e["z_mm"][1] for e in p["edges"]) for p in panels if p["edges"]}
+    standing = {
+        p["name"]
+        for p in panels
+        if any(e["kind"] == "hem" and e["z_mm"][1] <= lowest + reach for e in p["edges"])
+    }
+    out: dict[str, list[HemRun]] = {}
+    for p in panels:
+        name = p["name"]
+        if name not in named or name in bases or name in skip:
+            continue
+        outline = np.asarray(p["outline_mm"], dtype=np.float64)
+        runs = [_run(outline, e, name, "above") for e in p["edges"]
+                if e["kind"] == "seam" and e.get("mate") in standing
+                and e["z_mm"][0] >= top[e["mate"]] - reach]  # fmt: skip
+        if runs:
+            out[name] = runs
+    return out
 
 
 def _explicit(

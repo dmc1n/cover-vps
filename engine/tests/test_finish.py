@@ -298,6 +298,26 @@ def test_a_skirt_too_low_hands_its_vents_to_the_piece_above() -> None:
     assert not vents and any("lower than 16.5 cm" in w for w in warnings)
 
 
+def test_a_vent_by_hand_one_panel_up_over_the_low_wall() -> None:
+    """Rens on D1/D2 (15 Oct 2026): "the side vents one panel up, on the sloping panels". The
+    18 cm side wall had a vent shrunk to 11 cm by the rule (owner, 1 Oct: a low side gets a
+    lower opening); named in `features.vent_positions`, the piece above gets a full vent over
+    its seam with that wall. The rule alone keeps the lower opening (ADR-141)."""
+    band = wall("skirt-left", 2200, 180, z0=0.0, mate="top-4")
+    side = wall("top-4", 2200, 480, z0=180.0, top="hem")
+    side["edges"][0].update({"kind": "seam", "mate": "skirt-left", "seam": "s", "lap_side": "x"})
+    panels = doc(band, side)["panels"]
+    vents, _ = place_vents(panels, params(**{"features.vents_total": 1}))
+    (low,) = vents["skirt-left"]
+    assert float(np.ptp(low[:, 1])) == pytest.approx(110.0)  # the rule: a lower opening
+    vents, warnings = place_vents(panels, params(**{"features.vent_positions": "top-4@0.5"}))
+    assert "skirt-left" not in vents and not warnings
+    (up,) = vents["top-4"]
+    assert float(np.ptp(up[:, 1])) == pytest.approx(220.0)  # full size
+    assert float(up[:, 1].min()) == pytest.approx(50.0)  # 5 cm over the seam, not the free top
+    assert float(up[:, 0].mean()) == pytest.approx(1100.0)
+
+
 def test_inner_walls_on_request_and_positions_by_hand() -> None:
     """The front (inner) walls get vents by default as Rens marked (ADR-110); off, ADR-093's
     outer walls only; `features.vent_positions` places them where the rule cannot reach."""

@@ -62,6 +62,7 @@ PERCENT = 100.0  # param-ok: ratio to percent
 GREY, BLUE, RED = "#7d828c", "#1f5fbf", "#e0302a"  # param-ok: display colours
 PALE = "#cfe0f7"  # param-ok: display colour (the cover's area)
 PAD_SHARE = 0.03  # param-ok: display margin
+VIEW_GRID_MM = 0.1  # param-ok: the picture's outline snapped this fine when GEOS trips
 ON_TOP = 10  # param-ok: drawing order (red dots over everything)
 SHORT_SIDE = 1.05  # param-ok: a seam this close to a piece's width runs along its short side
 HALF = 0.5  # param-ok: a winding number above a half is inside
@@ -159,7 +160,11 @@ def views(furniture: trimesh.Trimesh, cover: trimesh.Trimesh, bad: Array, out: P
         ftri = furniture.vertices[furniture.faces][:, :, [a, b]]
         ax.add_collection(PolyCollection(list(ftri), facecolors=GREY, edgecolors="none"))
         shapes = [shapely.Polygon(t) for t in ctri]
-        area = shapely.union_all([g for g in shapes if g.is_valid and g.area > 0])
+        shapes = [g for g in shapes if g.is_valid and g.area > 0]
+        try:
+            area = shapely.union_all(shapes)
+        except shapely.errors.GEOSException:  # many near-coincident slivers (C28's rim, ADR-141)
+            area = shapely.union_all(shapes, grid_size=VIEW_GRID_MM)
         for poly in getattr(area, "geoms", [area]):
             if hasattr(poly, "exterior"):
                 x, y = poly.exterior.xy
@@ -432,7 +437,7 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
         vent_bases,
         vent_walls,
     )
-    from coverengine.finish.vents3d import ensure_vents
+    from coverengine.finish.vents3d import ensure_vents, seam_under
 
     path = ensure_vents(model_dir) if (model_dir / "panels.npz").is_file() else None
     if path is None:
@@ -472,7 +477,8 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
         reach = (2 * float(params["features.vent_above_hem_mm"])  # type: ignore[arg-type]
                  + float(params["features.vent_min_height_mm"])  # type: ignore[arg-type]
                  + float(params["stitching.allowance_mm"]))  # type: ignore[arg-type]  # fmt: skip
-        high = [x["piece"] for x in vents if min(c[2] for c in x["corners_mm"]) - low > reach]
+        high = [x["piece"] for x in vents
+                if min(c[2] for c in x["corners_mm"]) - low - seam_under(x) > reach]  # fmt: skip
         if high:
             problems.append("high up a wall (upside down?): " + ", ".join(high))
     if vents and not places and not params["features.vent_on_corners"]:
