@@ -71,9 +71,10 @@ DROP = {
     "mcp-name",
 }
 CORS = {
-    "Access-Control-Allow-Origin": "*",
     "Access-Control-Expose-Headers": "Mcp-Protocol-Version, Mcp-Session-Id, Retry-After",
+    "Vary": "Origin",
 }
+MAX_CALLERS = 20000  # the protocol window forgets idle addresses beyond this many
 _current: ContextVar[Request | None] = ContextVar("mcp_http_request", default=None)
 
 
@@ -415,24 +416,38 @@ def _only(args: dict[str, Any], allowed: set[str]) -> types.CallToolResult | Non
 class Window:
     """The protocol's own messages per address an hour (in memory)."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_callers: int = MAX_CALLERS) -> None:
         self.hits: dict[str, deque[float]] = {}
         self.lock = threading.Lock()
+        self.max_callers = max_callers
+        self.swept = 0.0
 
     def hit(self, who: str, per_hour: int, now: float | None = None) -> int:
         """0 when allowed, else the seconds to wait."""
         now = time.time() if now is None else now
         with self.lock:
+            if len(self.hits) >= self.max_callers and who not in self.hits:
+                self._sweep(now)
             times = self.hits.setdefault(who, deque())
             while times and now - times[0] >= agent_api.HOUR_S:
                 times.popleft()
             if len(times) >= per_hour:
                 return int(times[0] + agent_api.HOUR_S - now) + 1
             times.append(now)
-            if len(self.hits) > 20000:  # noqa: PLR2004 - forget idle callers
-                for k in [k for k, v in self.hits.items() if not v]:
-                    del self.hits[k]
         return 0
+
+    def _sweep(self, now: float) -> None:
+        """Forget callers idle for an hour (their window is empty), at most once a minute
+        (Codex's review: idle callers were never forgotten); still full: the callers seen
+        longest ago go, so memory stays bounded whatever the number of addresses."""
+        if now - self.swept >= agent_api.HOUR_S / 60:
+            self.swept = now
+            for k in [k for k, v in self.hits.items() if not v or now - v[-1] >= agent_api.HOUR_S]:
+                del self.hits[k]
+        if len(self.hits) >= self.max_callers:
+            oldest = sorted(self.hits, key=lambda k: self.hits[k][-1] if self.hits[k] else 0.0)
+            for k in oldest[: len(self.hits) - self.max_callers + 1]:
+                del self.hits[k]
 
 
 def build_server(sub: FastAPI) -> Server[Any]:
@@ -543,6 +558,26 @@ def build_server(sub: FastAPI) -> Server[Any]:
     )
 
 
+def origin_ok(auth: Any, request: Request, origin: str) -> bool:
+    """An Origin is valid only when it is the site this request was made to: the website the
+    Worker answered for (its x-site-host, trusted with its key) or this server's own host.
+    MCP clients are not browsers and send none (ADR-145, the spec's DNS-rebinding rule)."""
+    from urllib.parse import urlsplit
+
+    from coverapi.shop import link_ok, site_host
+
+    try:
+        parts = urlsplit(origin)
+    except ValueError:
+        return False
+    if parts.scheme not in ("https", "http") or not parts.netloc:
+        return False
+    own = {request.headers.get("host", "")}
+    if link_ok(auth, request):
+        own.add(site_host(request))
+    return parts.netloc.lower() in {h.lower() for h in own if h}
+
+
 class McpEndpoint:
     """The ASGI app at /mcp: the agent API's gate, CORS, the protocol window, then the SDK's
     stateless Streamable HTTP handling (a fresh manager per request: nothing is kept between
@@ -557,11 +592,16 @@ class McpEndpoint:
         from coverapi.shop import shop_params
 
         request = Request(scope, receive)
+        origin = request.headers.get("origin")
+        allowed = origin is None or origin_ok(self.auth, request, origin)
+        cors = {**CORS, "Cache-Control": "no-store"}
+        if origin is not None and allowed:
+            cors["Access-Control-Allow-Origin"] = origin
 
         async def with_cors(message: MutableMapping[str, Any]) -> None:
             if message["type"] == "http.response.start":
                 hs = list(message.get("headers", []))
-                for k, v in {**CORS, "Cache-Control": "no-store"}.items():
+                for k, v in cors.items():
                     if not any(h[0].lower() == k.lower().encode() for h in hs):
                         hs.append((k.lower().encode(), v.encode()))
                 message = {**message, "headers": hs}
@@ -575,7 +615,17 @@ class McpEndpoint:
             await with_cors({"type": "http.response.start", "status": status, "headers": hs})
             await with_cors({"type": "http.response.body", "body": raw})
 
-        if request.method == "OPTIONS":  # CORS preflight; no cookies or credentials are used
+        if not allowed:  # the spec: an Origin present and not ours is a 403 (DNS rebinding)
+            await reply(
+                403,
+                agent_api.error_body(
+                    "forbidden_origin",
+                    "requests from this web page's origin are not accepted",
+                    "Call /mcp from an MCP client (server side), not from another site's page.",
+                ),
+            )
+            return
+        if request.method == "OPTIONS":  # CORS preflight (our own pages only); no credentials
             await reply(
                 204,
                 None,

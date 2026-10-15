@@ -362,13 +362,60 @@ def test_preview_exposure(factory: Any) -> None:
 
 
 def test_methods_and_cors(app: Any) -> None:
-    """GET is unsupported while OPTIONS advertises credential-free MCP CORS."""
+    """GET is unsupported; OPTIONS answers our own pages only, without credentials."""
     c = TestClient(app)
     assert c.get("/mcp").status_code == 405
-    response = c.options("/mcp")
+    own = {"origin": "http://testserver"}
+    response = c.options("/mcp", headers=own)
     assert response.status_code == 204
-    assert response.headers["access-control-allow-origin"] == "*"
+    assert response.headers["access-control-allow-origin"] == "http://testserver"
     assert "POST" in response.headers["access-control-allow-methods"]
     for header in ("Authorization", "Mcp-Protocol-Version", "Mcp-Method", "Mcp-Name"):
         assert header in response.headers["access-control-allow-headers"]
     assert "access-control-allow-credentials" not in response.headers
+
+
+def test_a_foreign_origin_is_refused(factory: Any) -> None:
+    """Codex's review: the spec's Origin rule (DNS rebinding). No Origin (an MCP client) and
+    the site's own origin pass; another site's page is a 403, on the preview too."""
+    a = factory(enabled=False)
+    key = _ok(_admin(a).post("/api/admin/shop/link-key"))["key"]
+    c = TestClient(a)
+    preview = {"x-site-host": "preview.s2dio.living", "x-link-key": key}
+    assert rpc(c, "tools/list", headers=preview).status_code == 200
+    ok = rpc(c, "tools/list", headers={**preview, "origin": "https://preview.s2dio.living"})
+    assert ok.status_code == 200
+    assert ok.headers["access-control-allow-origin"] == "https://preview.s2dio.living"
+    for origin in ("https://evil.example", "null", "https://preview.s2dio.living.evil.example"):
+        for r in (
+            rpc(c, "tools/list", headers={**preview, "origin": origin}),
+            c.options("/mcp", headers={**preview, "origin": origin}),
+        ):
+            assert r.status_code == 403, (origin, r.text)
+            assert "access-control-allow-origin" not in r.headers
+    # without the Worker's key the preview's origin is not ours either
+    r = rpc(
+        c,
+        "tools/list",
+        headers={"x-site-host": "preview.s2dio.living", "origin": "https://preview.s2dio.living"},
+    )
+    assert r.status_code in (403, 404)
+
+
+def test_the_protocol_window_forgets_idle_callers() -> None:
+    """Codex's review: idle addresses are forgotten after an hour and the window never holds
+    more than its cap, whatever the number of addresses."""
+    from coverapi.agent_mcp import Window
+
+    w = Window(max_callers=100)
+    for i in range(250):
+        assert w.hit(f"a{i}", 5, now=1000.0 + i) == 0
+        assert len(w.hits) <= 100
+    assert "a249" in w.hits and "a0" not in w.hits
+    assert w.hit("late", 5, now=1000.0 + 250 + 3600 + 61) == 0
+    assert len(w.hits) <= 100
+    assert all(w.hits[k] for k in w.hits)
+    assert set(w.hits) == {"late"}
+    for _ in range(5):
+        w.hit("busy", 5, now=9000.0)
+    assert w.hit("busy", 5, now=9000.0) > 0
