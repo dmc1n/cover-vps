@@ -29,7 +29,10 @@ def open_remarks(models: Path) -> list[dict]:
             continue
         st = desk.state(d)
         hist = st["history"]
-        last = max([h.get("time", 0) for h in hist if h.get("by") in STUDIO] or [0])
+        # answered by the studio, or settled by a person's own approval afterwards
+        last = max([h.get("time", 0) for h in hist
+                    if h.get("by") in STUDIO or h.get("action") in ("approve", "produced")]
+                   or [0])  # fmt: skip
         todo = [
             h for h in hist
             if h.get("by") not in STUDIO and h.get("action") in REMARKS
