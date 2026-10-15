@@ -649,7 +649,7 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   } | null>(null);
   const [stock, setStock] = useState<string | null>(start.get("stock"));
   const [matchToken, setMatchToken] = useState<string | null>(start.get("mt"));
-  // a link from the agent API (ADR-135) may also carry the colour, the vents, the support and
+  // a link from the agent API (ADR-139) may also carry the colour, the vents, the support and
   // checkout=1 (straight to the checkout once its price is on screen)
   const [colour, setColour] = useState(() => {
     const c = start.get("colour");
@@ -767,7 +767,7 @@ function Configure({ info, tx }: { info: Info; tx: Tx }) {
   const fresh = !!quote && quoteFor === choices;
   const stockQuote = stock && fresh ? quote : null;
   useEffect(() => {
-    // an order link (ADR-135): to the checkout once, when the price for its choices is here
+    // an order link (ADR-139): to the checkout once, when the price for its choices is here
     if (fresh && toCheckout.current) {
       toCheckout.current = false;
       setStep("checkout");

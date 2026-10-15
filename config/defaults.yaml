@@ -502,7 +502,7 @@ limits:                          # what a request or an uploaded file may hold (
   mail_retry_max_s: 21600        # ... but never longer apart than this (6 h)
   mail_keep_hours: 336           # a failed mail's text is kept this long (14 days) for "Send again", then
                                  # removed; the log of send attempts (no texts) stays this long too
-  # The API for AI agents (/api/v2, ADR-135): open without a key, with limits (owner, 14 Oct 2026)
+  # The API for AI agents (/api/v2, ADR-139): open without a key, with limits (owner, 14 Oct 2026)
   agent_per_hour: 60             # anonymous: requests per address an hour (IPv6 as its /64, ipv6_prefix)
   agent_anon_per_day: 1000       # ... and all anonymous callers together a day (UTC)
   agent_key_per_hour: 600        # a partner key (Settings → Website & API keys): requests an hour ...

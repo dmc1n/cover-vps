@@ -350,13 +350,13 @@ const WEBSITE: Field[] = [
   {
     key: "agent_api_enabled",
     label: "API for AI agents",
-    help: "On: /api/v2, llms-full.txt, the measuring guide and the cover pages on the live website (also set AGENT_API in the Worker). The preview site always has them (ADR-135).",
+    help: "On: /api/v2, llms-full.txt, the measuring guide and the cover pages on the live website (also set AGENT_API in the Worker). The preview site always has them (ADR-139).",
     kind: "bool",
   },
   {
     key: "custom_lead_time.nl",
     label: "Made-to-measure lead time, Dutch",
-    help: 'What the agent API says about a made-to-measure cover\'s lead time; empty: "confirmed after the order" (ADR-135).',
+    help: 'What the agent API says about a made-to-measure cover\'s lead time; empty: "confirmed after the order" (ADR-139).',
   },
   {
     key: "custom_lead_time.en",

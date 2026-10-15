@@ -1,4 +1,4 @@
-"""The public and company-scoped agent API, its limits and discoverable pages (ADR-135)."""
+"""The public and company-scoped agent API, its limits and discoverable pages (ADR-139)."""
 
 import io
 import json

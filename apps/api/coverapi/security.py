@@ -48,7 +48,7 @@ OPEN_PATHS = (
     "/api/public/",  # the webshop's API: its own key check and limits (webshop.py, ADR-061)
     "/api/shop/",  # the cover webshop: its own limits; payments only through Mollie (ADR-062)
     "/api/b2b/",  # the B2B shop: its own logins, sessions and CSRF (b2b.py, ADR-104)
-    "/api/v2/",  # the API for AI agents: no cookies used, its own keys and limits (ADR-135)
+    "/api/v2/",  # the API for AI agents: no cookies used, its own keys and limits (ADR-139)
 )
 # The workshop login (ADR-128, owner question 92): an allow-list, so a route added later stays
 # closed to it until it is named here. It reads Work → Workshop, the Desk (queue, card, drawing

@@ -39,7 +39,7 @@ PERCENT = 100.0  # param-ok: a share as a percentage
 # salted with the day (never the address itself), written on the ledger's line, so what one
 # visitor costs in a day can be capped
 _VISITOR: contextvars.ContextVar[str] = contextvars.ContextVar("spend_visitor", default="")
-# ADR-135: that caller's own day budget (EUR; 0: none), checked before every paid call (guard)
+# ADR-139: that caller's own day budget (EUR; 0: none), checked before every paid call (guard)
 _VISITOR_CAP: contextvars.ContextVar[float] = contextvars.ContextVar("spend_cap", default=0.0)
 
 
@@ -56,7 +56,7 @@ def visitor_tag(address: str, when: float | None = None) -> str:
 def for_visitor(address: str, cap_eur: float = 0.0) -> Iterator[str]:
     """Every paid call inside is written down for this visitor (see visitor_eur). Threads
     started inside must carry the context along (contextvars.copy_context). `cap_eur` > 0: every
-    paid call inside is refused (guard) once the visitor's day reaches it (ADR-135: a partner
+    paid call inside is refused (guard) once the visitor's day reaches it (ADR-139: a partner
     key's day budget holds at every stage of a recognition, not only at its start)."""
     token = _VISITOR.set(visitor_tag(address))
     cap = _VISITOR_CAP.set(float(cap_eur))

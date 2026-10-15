@@ -1,4 +1,4 @@
-"""The JSON-LD of the website's cover and measuring pages (ADR-135).
+"""The JSON-LD of the website's cover and measuring pages (ADR-139).
 
 These pure functions describe public products and measuring instructions using
 only the supplied public fields, ready for JSON serialization.

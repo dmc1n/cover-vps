@@ -954,7 +954,7 @@ export function EmbedAndKeys() {
   );
 }
 
-/** The API for AI agents (ADR-135): partner keys (optionally a B2B company's), the limits and
+/** The API for AI agents (ADR-139): partner keys (optionally a B2B company's), the limits and
  * the counts per day (no addresses, no contents). */
 export function AgentKeys() {
   const [st, setSt] = useState<AgentApiState | null>(null);

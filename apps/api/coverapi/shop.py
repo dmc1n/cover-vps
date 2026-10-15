@@ -140,9 +140,9 @@ SHOP_DEFAULTS: dict[str, Any] = {
     # owner has set their prices; the preview site (preview.<domain>) always has them
     "bbq_enabled": False,
     # the API for AI agents (/api/v2), llms-full.txt, the measuring guide and the cover pages
-    # (ADR-135): off on the live shop until the owner's go; the preview site always has them
+    # (ADR-139): off on the live shop until the owner's go; the preview site always has them
     "agent_api_enabled": False,
-    # a made-to-measure cover's lead time per language, as the agent API states it (ADR-135);
+    # a made-to-measure cover's lead time per language, as the agent API states it (ADR-139);
     # empty: the API says it is confirmed after the order (never a made-up time)
     "custom_lead_time": {"nl": "", "en": "", "de": "", "fr": ""},
     "fit_mail": {"enabled": False, "days": 14},
@@ -801,7 +801,7 @@ def b2c_cover_price(ps: dict[str, Any], sale_eur: float, stock_id: str | None,
     """A cover's consumer price incl. VAT and where it comes from: the published B2C list's
     fixed price for an existing cover (ADR-098, ADR-113), else for an existing cover the
     configurator's price for its own sizes minus the stock discount (ADR-114, ADR-118), else the
-    configurator's price ("custom"). The shop's quote and the agent API (ADR-135) both use it."""
+    configurator's price ("custom"). The shop's quote and the agent API (ADR-139) both use it."""
     from coverengine import costing
 
     fixed = costing.fixed_price(ps, stock_id, "b2c") if stock_id else None
@@ -2203,7 +2203,7 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
         from coverapi.agent_api import agent_on
 
         sub = getattr(app.state, "agent_api", None)
-        if sub is not None and agent_on(auth, request):  # ADR-135: where the agent API is open
+        if sub is not None and agent_on(auth, request):  # ADR-139: where the agent API is open
             from coverapi.agent_pages import agent_section
 
             lines += ["", *agent_section(sub.state.site_root(request), sub.state.api_root(request),

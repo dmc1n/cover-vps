@@ -550,7 +550,7 @@ export interface CustomerRequest {
     };
   } | null;
 }
-/** The API for AI agents (ADR-135): partner keys and the daily counts. */
+/** The API for AI agents (ADR-139): partner keys and the daily counts. */
 export interface AgentApiState {
   enabled_on_live: boolean;
   limits: Record<string, number>;

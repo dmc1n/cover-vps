@@ -1078,7 +1078,7 @@ async def run_suggestion(
     cap_eur: float = 0.0,
 ) -> dict[str, Any]:
     """The suggestion for these photos and/or this link, every paid call on `who`'s ledger line
-    (a visitor, or an agent API key: ADR-135), with the existing cover that fits. The caller has
+    (a visitor, or an agent API key: ADR-139), with the existing cover that fits. The caller has
     checked its limits. HTTPException 400/502/503 on a problem."""
     from coverengine import match as mt
     from coverengine import spend
@@ -1099,7 +1099,7 @@ async def run_suggestion(
     except CoverError as exc:  # the month's AI budget, or the AI did not answer
         msg = str(exc)
         log.warning("suggest: %s", msg)  # the reason only (no photo, no key)
-        if "caller's AI budget" in msg:  # a partner key's day (ADR-135)
+        if "caller's AI budget" in msg:  # a partner key's day (ADR-139)
             raise HTTPException(429, "this key's AI budget of today is used up") from None
         if "budget" in msg:
             raise HTTPException(503, "this service is resting for now; please choose by "

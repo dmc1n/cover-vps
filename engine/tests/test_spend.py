@@ -69,7 +69,7 @@ def test_one_visitor_s_day_is_capped_and_kept_apart(
 def test_a_callers_day_budget_holds_at_every_paid_call(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ADR-135 (Codex's review): inside for_visitor(..., cap_eur) every paid call is refused
+    """ADR-139 (Codex's review): inside for_visitor(..., cap_eur) every paid call is refused
     once that caller's day reaches the cap, not only at the start of a recognition."""
     monkeypatch.setenv("COVER_DATA_DIR", str(tmp_path))
     p = _params()

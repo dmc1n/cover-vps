@@ -1,4 +1,4 @@
-"""The website's pages for AI agents and the people they help (ADR-135): the measuring guide
+"""The website's pages for AI agents and the people they help (ADR-139): the measuring guide
 (/measure and /measure/<kind>), the existing covers (/covers and /covers/<code>), each with its
 schema.org JSON-LD, /llms-full.txt, and the API's docs (/api/v2/docs).
 

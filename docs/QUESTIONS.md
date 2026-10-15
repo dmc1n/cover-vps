@@ -381,7 +381,7 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
       catalogue photos, nearest neighbour for the customer's photo; no fee per photo, a few
       days' work, quality to measure.
 
-**The website for AI agents, phase 1** (ADR-135, docs/handbook/agent-api.md; asked 14 Oct
+**The website for AI agents, phase 1** (ADR-139, docs/handbook/agent-api.md; asked 14 Oct
 2026). Built on the preview only. To decide:
 - **The measuring texts** (`config/agent_kinds.json`, shown at /measure and in /api/v2/kinds):
   drafted from the configurator's fields. Right as written? Anything to add per kind?

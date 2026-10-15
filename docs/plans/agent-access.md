@@ -1,4 +1,4 @@
-# Agent access: the website for AI agents and models (ADR-135)
+# Agent access: the website for AI agents and models (ADR-139)
 
 The owner (14 Oct 2026): "AI passes the sizes and the best cover's result comes straight back
 into the CLI." An assistant (ChatGPT, Claude, Gemini, a shop's own bot, a coding agent in a
@@ -129,6 +129,6 @@ Until then: no endpoint creates a paid order, and the order link expires.
 
 ## Open questions for the owner
 
-See ADR-135 and the report of 14 Oct: the measuring texts, the left/right convention, the
+See ADR-139 and the report of 14 Oct: the measuring texts, the left/right convention, the
 made-to-measure lead time, the delivery promise on live, matching in shadow mode, partner keys
 for whom, and the live switch.

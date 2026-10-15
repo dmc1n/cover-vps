@@ -54,7 +54,7 @@ def scan(path: Path, defaults: dict[float, list[str]]) -> list[str]:
 
 def test_engine_has_no_default_literals() -> None:
     defaults = Registry.load().numeric_defaults()
-    # the agent API's request limits (ADR-135) are read by the web app only, never by the engine;
+    # the agent API's request limits (ADR-139) are read by the web app only, never by the engine;
     # their round numbers (600, 1000) would otherwise flag every unrelated 600 or 1000 here
     for value in list(defaults):
         defaults[value] = [k for k in defaults[value] if not k.startswith("limits.agent_")]

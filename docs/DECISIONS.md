@@ -4989,7 +4989,7 @@ minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
 - Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
   constants, so the registry test tells them from the new default.
 
-## ADR-135 — The website for AI agents: an open API with limits, discovery, a CLI; a person always pays
+## ADR-139 — The website for AI agents: an open API with limits, discovery, a CLI; a person always pays
 
 The owner (14 Oct 2026): "AI passes the sizes and the best cover's result comes straight back
 into the CLI." He approved a strategy in four layers (API, MCP server, discovery, CLI) and

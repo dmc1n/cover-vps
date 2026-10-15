@@ -568,7 +568,7 @@ function Configure({
   onAdd: (q: Quote, qty: number) => void;
 }) {
   const products = info.options.products;
-  // a link from the agent API (ADR-135): the product, sizes, colour, vents and an existing cover
+  // a link from the agent API (ADR-139): the product, sizes, colour, vents and an existing cover
   // of our range come in the address; the company's own price is asked as always
   const [product, setProduct] = useState(() => {
     const p = START.get("product");
@@ -1342,7 +1342,7 @@ function Account({ tx, me, onOut }: { tx: Tx; me: Me; onOut: () => void }) {
 
 type Tab =
   "catalogue" | "configure" | "cart" | "orders" | "addresses" | "account";
-// the page's address when it opened (an agent API link prefills the configurator, ADR-135)
+// the page's address when it opened (an agent API link prefills the configurator, ADR-139)
 const START = new URLSearchParams(window.location.search);
 
 function Shop({

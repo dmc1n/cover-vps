@@ -1,4 +1,4 @@
-"""covers: the S2DIO / SUNS agent API from the command line (ADR-135, docs/handbook/agent-api.md).
+"""covers: the S2DIO / SUNS agent API from the command line (ADR-139, docs/handbook/agent-api.md).
 
 Give the furniture's kind and sizes; get the best existing covers and the made-to-measure one,
 with prices and order links, as a table or as JSON for agents. Standard library only. A person

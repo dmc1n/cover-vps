@@ -1,4 +1,4 @@
-// The API for AI agents and its pages on the website (ADR-135): /api/v2/* (JSON, its OpenAPI and
+// The API for AI agents and its pages on the website (ADR-139): /api/v2/* (JSON, its OpenAPI and
 // docs), /llms-full.txt, the measuring guide (/measure, /measure/<kind>) and the existing covers
 // (/covers, /covers/<code>). They pass to the studio with the website's key, like the shop, but
 // only where they are switched on: the preview (preview.<domain>) always, the live site only with

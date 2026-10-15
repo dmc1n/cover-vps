@@ -1,4 +1,4 @@
-"""The API for AI agents and models (ADR-135, docs/plans/agent-access.md): /api/v2.
+"""The API for AI agents and models (ADR-139, docs/plans/agent-access.md): /api/v2.
 
 "AI passes the sizes and the best cover's result comes straight back" (owner, 14 Oct 2026). A
 versioned JSON API of its own, with stable English field names, mounted as a FastAPI sub-app

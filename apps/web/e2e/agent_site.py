@@ -1,4 +1,4 @@
-"""The website for AI agents in a real browser (ADR-135): llms.txt and llms-full.txt are served,
+"""The website for AI agents in a real browser (ADR-139): llms.txt and llms-full.txt are served,
 the measuring guide and a cover page carry their schema.org JSON-LD, the API's docs render
 under the website's CSP, and an order link opens the configurator at the checkout with nothing
 ordered.
