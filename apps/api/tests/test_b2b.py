@@ -17,7 +17,17 @@ PASSWORD = "a-long-dealer-password"
 
 @pytest.fixture()
 def app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
-    from coverapi import mailer
+    from io import BytesIO
+
+    from coverapi import mailer, vies
+
+    monkeypatch.setattr(
+        vies,
+        "urlopen",
+        lambda *a, **kw: BytesIO(
+            b'{"isValid": true, "name": "Registered dealer", "address": "Berlin"}'
+        ),
+    )
 
     a = create_app(tmp_path / "data", login_required=True)
     u = a.state.auth.add_user("rick", "Rick", "admin", "rick@example.com", True)
@@ -418,3 +428,59 @@ def test_a_scene_only_for_its_own_company_and_a_link_used_once(app: Any) -> None
     with pytest.raises(HTTPException) as same:
         store.check("nobody@nowhere.example", "wrong", "203.0.113.10")
     assert same.value.status_code == 429
+
+
+@pytest.mark.parametrize(
+    ("country", "valid", "expected"),
+    [
+        ("DE", True, True),
+        ("NL", True, False),
+        ("DE", False, False),
+        ("US", True, False),
+    ],
+)
+def test_vies_automatic_rule(
+    app: Any, monkeypatch: pytest.MonkeyPatch, country: str, valid: bool, expected: bool
+) -> None:
+    from io import BytesIO
+
+    from coverapi import vies
+
+    monkeypatch.setattr(
+        vies,
+        "urlopen",
+        lambda *a, **kw: BytesIO(
+            json.dumps({"isValid": valid, "name": "Registered dealer"}).encode()
+        ),
+    )
+    admin = _admin(app)
+    _, cid = _dealer(app, admin, country=country, vat_number="123456789")
+    company = app.state.b2b.company(cid)
+    assert company["reverse_charge"] is expected
+    assert company["vies"]["valid"] is (valid if country != "US" else False)
+
+
+def test_vies_outage_recheck_and_manual_override(app: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    from io import BytesIO
+
+    from coverapi import vies
+
+    admin = _admin(app)
+    _, cid = _dealer(app, admin, country="DE", vat_number="DE123456789")
+    path = f"/api/admin/b2b/companies/{cid}"
+    monkeypatch.setattr(
+        vies, "urlopen", lambda *a, **kw: BytesIO(b'{"userError":"MS_UNAVAILABLE"}')
+    )
+    c = admin.put(path, json={"vat_number": "DE987654321"}).json()["company"]
+    assert c["reverse_charge"] is True
+    assert c["vies"]["valid"] is None and c["vies"]["error"] == "MS_UNAVAILABLE"
+    c = admin.post(path + "/vies").json()["company"]
+    assert c["reverse_charge"] is True and c["vies"]["error"]
+    monkeypatch.setattr(vies, "urlopen", lambda *a, **kw: BytesIO(b'{"isValid":true}'))
+    c = admin.put(path, json={"vat_number": "DE111111111", "reverse_charge": False}).json()[
+        "company"
+    ]
+    assert c["reverse_charge"] is False and c["vies"]["manual_override"] is False
+    assert admin.post(path + "/vies").json()["company"]["reverse_charge"] is True
+    assert TestClient(app).post(path + "/vies").status_code == 401
+    assert any(a["action"] == "b2b vies checked" for a in app.state.auth.audit(50))

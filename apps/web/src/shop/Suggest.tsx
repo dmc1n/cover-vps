@@ -1,6 +1,7 @@
 // "Have a photo or a link to your furniture?" (ADR-086): the customer's photo(s) or a webshop
 // page, read by the AI into the configurator's product and sizes, to check before ordering.
 import { useEffect, useMemo, useState } from "react";
+import { Turnstile } from "./Turnstile";
 import { Icon } from "./Icons";
 
 export interface Suggestion {
@@ -38,13 +39,17 @@ export function Suggest({
   w,
   lang,
   productName,
+  siteKey,
   onUse,
 }: {
   w: (key: string, vars?: Record<string, string | number>) => string;
   lang: string;
+  siteKey?: string;
   productName: (key: string) => string;
   onUse: (s: Suggestion, photos: File[]) => void;
 }) {
+  const [turnstile, setTurnstile] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
@@ -82,6 +87,7 @@ export function Suggest({
     const body = new FormData();
     body.append("url", url.trim());
     body.append("lang", lang);
+    body.append("turnstile", turnstile);
     for (const p of photos) body.append("photos", p);
     try {
       const r = await fetch("/api/shop/suggest", { method: "POST", body });
@@ -92,6 +98,7 @@ export function Suggest({
       setError(String((e as Error).message ?? e));
     } finally {
       setBusy(false);
+      setAttempt((n) => n + 1);
     }
   };
 
@@ -130,9 +137,10 @@ export function Suggest({
         value={url}
         onChange={(e) => setUrl(e.target.value)}
       />
+      <Turnstile siteKey={siteKey} onToken={setTurnstile} refresh={attempt} />
       <button
         className="s-btn"
-        disabled={busy || (!url.trim() && !photos.length)}
+        disabled={busy || (!url.trim() && !photos.length) || (!!siteKey && !turnstile)}
         onClick={read}
       >
         {busy ? w("suggest_reading") : w("suggest_go")}

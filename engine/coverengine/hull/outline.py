@@ -167,6 +167,29 @@ def follow_plan(
     return _largest(_largest(plan).simplify(SIMPLIFY_MM))
 
 
+def back_arc(plan: Polygon, ease: float, radius: float, taper: float) -> Polygon:
+    """The back wall and the two back corners as one roomy arc seen from above (Rens, 14 Oct
+    2026, QUESTIONS 101, the Pico sofas): behind the plan's widest points (-y is the front) the
+    outline is filled out to its convex hull (no kink where a cushion stands out), grown by
+    `ease`, and its corners rounded to `radius` without coming closer to the furniture than the
+    plan did; along `taper` mm below the widest points the side walls lean out to meet it, so
+    there is no step. The plan is never made smaller."""
+    ring = np.asarray(plan.exterior.coords)
+    y_wide = float((ring[ring[:, 0].argmin(), 1] + ring[ring[:, 0].argmax(), 1]) / 2)
+    lo_x, lo_y, hi_x, hi_y = plan.bounds
+    far = (hi_x - lo_x) + (hi_y - lo_y)
+    behind = shapely.box(lo_x - far, y_wide, hi_x + far, hi_y + far)
+    back = _largest(plan.intersection(behind)).convex_hull
+    grown = back.buffer(ease, quad_segs=QUAD_SEGS)
+    if radius > ease:  # rounder corners, but never inside the plan + clearance itself
+        opened = grown.buffer(-radius, quad_segs=QUAD_SEGS).buffer(radius, quad_segs=QUAD_SEGS)
+        if not opened.is_empty:
+            grown = shapely.union_all([opened, back]).convex_hull
+    band = shapely.box(lo_x - far, y_wide - taper, hi_x + far, hi_y + far)
+    fill = shapely.union_all([grown, plan.intersection(band)]).convex_hull.intersection(band)
+    return _largest(shapely.union_all([plan, fill]).simplify(SIMPLIFY_MM))
+
+
 def box_plan(mesh: trimesh.Trimesh, hem: float) -> Polygon | None:
     """The floor a box cover stands on: its outline at the hem."""
     v = np.asarray(mesh.vertices)
@@ -224,6 +247,10 @@ def study(
     fill, centre, radius = roundness(foot)
     plan = follow_plan(foot, _p(params, "hull.clearance_mm"), _p(params, "hull.plan_round_mm"),
                        mirrors)  # fmt: skip
+    if params["hull.plan_back_arc"]:
+        plan = back_arc(plan, _p(params, "hull.plan_back_ease_mm"),
+                        _p(params, "hull.plan_back_round_mm"),
+                        _p(params, "hull.plan_back_taper_mm"))  # fmt: skip
     boxed = box_plan(box_mesh, hem)
     out = stands_out(boxed, plan, cell)
     extra_pct = PERCENT * (boxed.area / plan.area - 1) if boxed is not None and plan.area else 0.0

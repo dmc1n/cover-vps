@@ -55,6 +55,15 @@ hull:                            # the cover surface (drape hull)
   plan_round_mm: 500             # follow: bays and inner corners of the outline narrower than twice
                                  # this are rounded to this radius, so the seams along it are smooth
                                  # lines (rule 13; at least seams.min_weld_radius_mm)
+  plan_back_arc: false           # follow: the back wall and the two back corners as one roomy arc
+                                 # seen from above, a few cm looser round the cushions, no kink at
+                                 # the corners (Rens, 14 Oct 2026, QUESTIONS 101, the Pico sofas;
+                                 # per model). Behind the plan's widest points it is filled out to
+                                 # its convex hull, grown and rounded; never smaller
+  plan_back_ease_mm: 30          # to confirm: how much looser the back is ("een paar cm")
+  plan_back_round_mm: 150        # to confirm: the back corners rounded towards this radius where that
+                                 # stays outside the plan (seams.min_weld_radius_mm)
+  plan_back_taper_mm: 400        # the side walls lean out over this length to meet the wider back
   round_top_pieces: 0            # a round top in this many equal sectors; 0 = the fewest that fit
                                  # the roll (at least 2: a cone is not a flat disc)
   support: none                  # none | balloons | balloon | frame   support under the cover
@@ -218,7 +227,12 @@ features:                        # per-cover defaults, overridden per model
                                  # is no corner (to confirm)
   vent_seam_clearance_mm: 100    # to confirm; a vent keeps this far from a vertical seam; a short
                                  # side gets its vent centred, closer (owner: it must have one)
-  vent_hood_depth_mm: 80         # to confirm; the hood piece is this much deeper than the vent
+  vent_short_piece_ok: false     # a piece whose bottom edge is too short for a vent (shorter than
+                                 # the vent plus a seam allowance each side): false warns ("check");
+                                 # true: that piece simply has none, its side one vent fewer, the
+                                 # rest by the rule (owner, 12 Oct 2026, QUESTIONS 81: the BBQ
+                                 # covers' narrow strip beside the side tables; on in presets/bbq)
+  vent_hood_depth_mm: 80        # to confirm; the hood piece is this much deeper than the vent
   handles: 0
 
 fabric:
@@ -243,7 +257,8 @@ drape:                           # the drape simulation: the sewn cover falling 
   gpu: modal                     # modal: the Style3D fall on an NVIDIA GPU by API (ADR-069, ~7 min a sofa
                                  # instead of ~60); none: on this server. No keys or no answer: this server
   hem: held                      # held: the drawcord pulled tight and the corner elastics hold the hem in
-                                 # place (the owner, 2026-10-04: the cover must not ride up) | free
+                                 # place (the owner, 2026-10-04: the cover must not ride up; confirmed
+                                 # 11 Oct 2026, QUESTIONS 65: "strak getrokken") | free
   hem_band_mm: 15                # the hem: the open bottom edge's points this close to the lowest point
   style3d_stretch_weft: 5000.0   # to confirm: Style3D stretch stiffness across the roll (weft), N/m
   style3d_stretch_warp: 10000.0  # to confirm: along the roll (warp); Coverlast's warp is ~2x the weft
@@ -323,6 +338,18 @@ quote:                           # the webshop configurator's proposal and price
   bbq_slope_max_deg: 30          # between these two with the least fabric
   bbq_wall_min_cm: 35            # a barbecue cover's walls at least this high under the roof (a vent's
                                  # 22 cm plus its 5 cm above the hem, with room)
+shipping:                        # the consumer shop's delivery cost by carrier (owner, 11 Oct 2026,
+                                 # QUESTIONS 28/29: "a link with the carrier, DHL, by weight and box";
+                                 # docs/plans/shipping-carrier.md)
+  carrier: fixed                 # fixed | dhl   fixed: Shop settings → shipping, an amount per
+                                 # country; dhl: DHL's rate for the parcel once the account's keys are
+                                 # in deploy/.env (DHL_API_USER_ID, DHL_API_KEY), else fixed
+  fabric_g_per_m2: 300           # to confirm: Coverlast's weight per m² of cut fabric
+  pack_g: 450                    # to confirm: box, bag, drawcord, vents' inserts and the label
+  folded_l_per_m2: 2.5           # to confirm: litres a folded m² of cover takes in its box
+  boxes_cm: "40x30x15,50x40x20,60x40x30,80x60x40"   # to confirm: the workshop's boxes, L x W x H,
+                                 # smallest first; the first that holds the folded cover is used
+
 roll:
   width_mm: 1500
   usable_width_mm: 1480          # no panel wider than this in its narrowest orientation
@@ -507,7 +534,8 @@ import:
   max_plausible_size_mm: 6000    # ... or larger than this
 
 tolerance:
-  cover_mm: 5.0                  # overall fit target: ±5 mm
+  cover_mm: 5.0                  # overall fit target: ±5 mm; a measured size within this is good
+                                 # (owner, 11 Oct 2026, QUESTIONS 70: 0.5 cm, confirmed)
 
 ai:                              # AI advice on cover layouts (the key: DEEPSEEK_API_KEY in deploy/.env)
   provider: deepseek             # deepseek | gemini | none

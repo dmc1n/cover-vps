@@ -8,3 +8,7 @@ hull:
                                  # thermometers and hinges, so the cover slides on easily
   chairs: none                   # never chair space round a barbecue
   support: none                  # no balloons: the hood or the dome carries the top
+features:
+  vent_short_piece_ok: true      # owner, 12 Oct 2026 (QUESTIONS 81): a kamado with side tables gets a
+                                 # narrow strip beside the front; no vent fits there, so that side
+                                 # has one vent fewer and the rest follow the rule (no "check")

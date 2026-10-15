@@ -45,6 +45,7 @@ from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
+from coverapi import vies as vies_client
 from coverapi.auth import (
     LOCK_AFTER,
     LOCK_MINUTES,
@@ -60,10 +61,10 @@ from coverapi.match_list import STOCK_MODEL
 
 SETTING = "b2b"
 DEFAULTS: dict[str, Any] = {
-    "online_payment": False,  # later: Mollie for B2B too; now every order is on account
-    "min_order_eur": 0,  # ex VAT; 0: no minimum (to confirm, QUESTIONS 72)
+    "online_payment": False,  # later: Stripe (owner, QUESTIONS 52); now all on account
+    "min_order_eur": 0,  # ex VAT; 0: no minimum (owner, 11 Oct 2026, QUESTIONS 46)
     "shipping_eur": 0,  # ex VAT per order on top; 0: shipping is in the price list's extras
-    "payment_days": 30,  # the invoice's term, shown in the confirmation (to confirm)
+    "payment_days": 14,  # the invoice term in the confirmation (owner, 11 Oct, QUESTIONS 44)
     # no "auto_produce" since ADR-128: a line goes to production only by a click in the studio
 }
 COOKIE = "b2b_session"
@@ -291,6 +292,9 @@ class Store:
         with self._db() as db:
             db.executescript(SCHEMA)
             # app.db migrations follow the shop's additive PRAGMA/ALTER approach.
+            company_columns = {r[1] for r in db.execute("PRAGMA table_info(b2b_companies)")}
+            if "vies" not in company_columns:
+                db.execute("ALTER TABLE b2b_companies ADD COLUMN vies TEXT")
             have = {r[1] for r in db.execute("PRAGMA table_info(b2b_orders)")}
             if "idempotency_key" not in have:
                 db.execute("ALTER TABLE b2b_orders ADD COLUMN idempotency_key TEXT")
@@ -324,7 +328,7 @@ class Store:
     def add_company(self, fields: dict[str, Any], status: str) -> int:
         cols = {k: v for k, v in fields.items() if k in COMPANY_COLUMNS}
         cols = {**cols, "created": time.time(), "updated": time.time(), "status": status}
-        for k in ("addresses", "fixed", "request"):
+        for k in ("addresses", "fixed", "request", "vies"):
             if k in cols and not isinstance(cols[k], str):
                 cols[k] = json.dumps(cols[k])
         if "reverse_charge" in cols:
@@ -343,7 +347,7 @@ class Store:
             for k, v in changes.items():
                 if k not in COMPANY_COLUMNS:
                     continue
-                if k in ("addresses", "fixed"):
+                if k in ("addresses", "fixed", "vies"):
                     v = json.dumps(v)
                 elif k == "reverse_charge":
                     v = int(bool(v))
@@ -644,7 +648,7 @@ class Store:
 
 COMPANY_COLUMNS = (
     "name", "vat_number", "contact", "email", "phone", "street", "postcode", "city", "country",
-    "addresses", "price_list", "fixed", "reverse_charge", "status", "note", "request",
+    "addresses", "price_list", "fixed", "reverse_charge", "status", "note", "request", "vies",
 )  # fmt: skip
 
 
@@ -653,8 +657,29 @@ def _company(row: sqlite3.Row) -> dict[str, Any]:
     d["addresses"] = json.loads(d.get("addresses") or "[]")
     d["fixed"] = json.loads(d.get("fixed") or "{}")
     d["request"] = json.loads(d["request"]) if d.get("request") else None
+    d["vies"] = json.loads(d["vies"]) if d.get("vies") else None
     d["reverse_charge"] = bool(d.get("reverse_charge"))
     return d
+
+
+def reverse_charge_for(country: str, vies: dict[str, Any]) -> bool:
+    """VAT reverse-charged: a company in another EU country whose number VIES found valid."""
+    country, _ = vies_client.normalise(country, "")
+    return country in vies_client.EU_MEMBERS and country != "NL" and vies.get("valid") is True
+
+
+def _check_vies(company: dict[str, Any], changes: dict[str, Any]) -> None:
+    """VIES on a new or changed VAT number or country (QUESTIONS 50, ADR-136): reverse charge
+    by the rule, unless the admin changed the switch in the same request (a manual override,
+    noted). The form sends the switch every time, so only a change of it counts."""
+    effective = {**company, **changes}
+    result = vies_client.check(effective.get("country") or "NL", effective.get("vat_number") or "")
+    manual = changes.get("reverse_charge")
+    if manual is not None and bool(manual) != bool(company.get("reverse_charge")):
+        result["manual_override"] = bool(manual)
+    elif result["valid"] is not None:
+        changes["reverse_charge"] = reverse_charge_for(effective.get("country") or "NL", result)
+    changes["vies"] = result
 
 
 def invoice_address(c: dict[str, Any]) -> dict[str, Any]:
@@ -1380,9 +1405,19 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         fields.pop("status", None)
         if db.user_by_email(fields["email"]):
             raise HTTPException(400, f"{fields['email']} already has a business account")
+        _check_vies({}, fields)
         cid = db.add_company(fields, "invited")
         uid = db.add_user(cid, req.email, req.contact or "", req.lang)
-        auth.log(admin, "b2b company added", {"company": req.name, "id": cid})
+        auth.log(
+            admin,
+            "b2b company added",
+            {
+                "company": req.name,
+                "id": cid,
+                "vies": fields["vies"],
+                "reverse_charge": fields.get("reverse_charge", False),
+            },
+        )
         out = invite(uid, request, admin) if req.send_invite else {"link": None, "mailed": False}
         return {"company": company_doc(db.company(cid)), **out}
 
@@ -1390,10 +1425,29 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
     def admin_change_company(cid: int, req: CompanyIn, request: Request) -> dict[str, Any]:
         admin = require(request, "admin")
         changes = checked(req.model_dump(exclude_none=True))
+        previous = db.company(cid)
+        if any(k in changes and changes[k] != previous.get(k) for k in ("vat_number", "country")):
+            _check_vies(previous, changes)
+        elif "reverse_charge" in changes and bool(changes["reverse_charge"]) != bool(
+            previous.get("reverse_charge")
+        ):
+            changes["vies"] = {
+                **(previous.get("vies") or {}),
+                "manual_override": changes["reverse_charge"],
+            }
         c = db.change_company(cid, changes)
         auth.log(admin, "b2b company changed",
                  {"company": c["name"], **{k: ("…" if k in ("addresses", "fixed") else v)
                                            for k, v in changes.items()}})  # fmt: skip
+        return {"company": company_doc(c)}
+
+    @app.post("/api/admin/b2b/companies/{cid}/vies")
+    def admin_check_vies(cid: int, request: Request) -> dict[str, Any]:
+        admin = require(request, "admin")
+        changes: dict[str, Any] = {}
+        _check_vies(db.company(cid), changes)
+        c = db.change_company(cid, changes)
+        auth.log(admin, "b2b vies checked", {"id": cid, **changes})
         return {"company": company_doc(c)}
 
     @app.post("/api/admin/b2b/companies/{cid}/approve")

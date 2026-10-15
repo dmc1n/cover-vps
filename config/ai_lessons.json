@@ -150,6 +150,30 @@
     "ai_model": "approver"
   },
   {
+    "time": 1792008000,
+    "model_id": "suns-lounge-pico-bended-2-seater",
+    "complaint": "Back less tight, may be one continuous curve, smoother (Rens, 9 Oct 2026, both Pico covers); answered 14 Oct (QUESTIONS 101): the back wall plus the two back corners as one roomy arc from above, a few cm looser round the cushions, no kink at the corners.",
+    "cause": "A follow plan keeps the furniture's outline plus the clearance; where a back cushion stands out near a back corner the outline has a 1-2 cm dent and a tight corner.",
+    "rule": "On request per model (hull.plan_back_arc): behind the plan's widest points the outline is filled out to its convex hull, grown by hull.plan_back_ease_mm and its corners rounded (hull.plan_back_round_mm); the side walls lean out over hull.plan_back_taper_mm. When a reviewer asks for a smoother or looser back on a sofa with a curved back, propose this."
+  },
+  {
+    "time": 1792008001,
+    "model_id": "bbq-kamado-joe-classic-iii-cart",
+    "complaint": "On 4 BBQ covers with side tables one vent does not fit where the rule wants it (owner, 12 Oct 2026, QUESTIONS 81: one vent fewer on that side, the rest by the rule).",
+    "cause": "A kamado's handle stands in front of the side tables; the box's plan gets a 24-25 cm strip beside the front, shorter than a vent and its seam allowances.",
+    "rule": "features.vent_short_piece_ok (on in presets/bbq): a piece too short for a vent simply has none and it is no warning; elsewhere it stays a warning."
+  },
+  {
+    "time": 1792000100,
+    "model_id": "drawing-c8",
+    "complaint": "The main sizes do not match the drawing (Rens at the Desk, 14 Oct 2026, C4, C8 and C10, after their plan sizes had been made exact).",
+    "cause": "The size drawing (sizes.pdf) and the Sizes tab measured every height from hull.json's hem.height_mm, the hem parameter (5 cm). A drawing cover ends where the drawing ends, at the ground, so every height they showed was 5 cm short (84 cm drawn as 79, 31 as 26); the pieces, the 3D cover and the check list were right.",
+    "rule": "Sizes are measured on the cover itself: heights from the lowest point of its own hem, never from a parameter. hull.json for a cover surface of its own records the lower edge as built. A size drawing of an older format is made again when it is opened.",
+    "check": "The audit's 'written heights' check (an isofit drawing cover's shown height and arm-end height against the drawing's written back and end heights) and engine/tests/test_flatten.py::test_size_drawing_measures_from_the_covers_own_lower_edge.",
+    "applies_to": "all",
+    "ai_model": "approver"
+  },
+  {
     "time": 1792000600,
     "model_id": "drawing-c27",
     "complaint": "Crosses on vents the cover no longer has and circles where it already has vents (Rens at the Desk, 14 Oct 2026, C27 and S32, minutes after both were rebuilt).",
