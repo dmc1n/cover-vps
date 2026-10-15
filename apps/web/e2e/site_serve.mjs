@@ -116,7 +116,15 @@ createServer(async (req, res) => {
       const s = await stat(local).catch(() => null);
       if (s?.isFile()) return await media(req, res, local, s.size);
     }
-    if (/^\/(api|media)\//.test(url.pathname)) {
+    // as the preview's Worker (ADR-135): the agent pages and feeds from the studio, the
+    // measuring guide and the cover pages under its /shop/
+    const agentPage = /^\/(measure|covers)(\/|$)/.test(url.pathname);
+    if (
+      /^\/(api|media)\//.test(url.pathname) ||
+      agentPage ||
+      ["/llms.txt", "/llms-full.txt"].includes(url.pathname)
+    ) {
+      const upPath = agentPage ? `/shop${url.pathname}` : url.pathname;
       const headers = {};
       for (const h of ["range", "accept", "content-type"])
         if (req.headers[h]) headers[h] = req.headers[h];
@@ -124,10 +132,11 @@ createServer(async (req, res) => {
         req.method === "GET" || req.method === "HEAD"
           ? undefined
           : Buffer.concat(await req.toArray());
-      const up = await fetch(UPSTREAM + url.pathname + url.search, {
+      const up = await fetch(UPSTREAM + upPath + url.search, {
         method: req.method,
         headers,
         body,
+        redirect: "manual", // as the Worker: a redirect goes to the browser
       });
       const out = {};
       for (const [k, v] of up.headers)

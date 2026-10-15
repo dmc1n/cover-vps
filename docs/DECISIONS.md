@@ -4989,6 +4989,143 @@ minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
 - Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
   constants, so the registry test tells them from the new default.
 
+## ADR-135 — The website for AI agents: an open API with limits, discovery, a CLI; a person always pays
+
+The owner (14 Oct 2026): "AI passes the sizes and the best cover's result comes straight back
+into the CLI." He approved a strategy in four layers (API, MCP server, discovery, CLI) and
+decided: the API is open to everyone without a key, with limits (about 60 requests an hour per
+address, IPv6 per /64, and 1,000 a day for all anonymous use together); anonymous use gets no
+photo or AI recognition; a free partner key gives higher limits and photo recognition with a
+daily budget per key; paying is always done by a person (an agent gets an order link, never
+pays); no personal data in any answer. Later the same day: B2B too ("beide"): a partner key
+linked to a business customer, or that customer's B2B login, gets its own prices ex VAT and
+links into the B2B shop; one company's prices never reach another caller. This is **phase 1,
+on the preview only**. Plan: docs/plans/agent-access.md; handbook: docs/handbook/agent-api.md.
+
+- **The API** (`coverapi/agent_api.py`) is a FastAPI sub-app mounted at `/api/v2`, with its own
+  OpenAPI (`/api/v2/openapi.json`, descriptions written for models) and server-rendered docs
+  (`/api/v2/docs`: no scripts, so the CSP holds; Swagger UI would need a CDN). Endpoints:
+  `GET /kinds`, `POST /match`, `POST /quote`, `POST /order-link`, `GET /go/<token>` (the link a
+  person opens), `GET /covers`, `GET /covers/<code>` (+ `picture.jpg`, `preview.glb`),
+  `GET /preview.glb`, `POST /suggest` (key only). Stable English field names; sizes in cm (or
+  `"unit": "mm"`), answers in cm and mm. The same sub-app is mounted at `/api/b2b/v2`, where the
+  B2B session cookie (path `/api/b2b/`) arrives.
+- **Kinds** (`config/agent_kinds.json`, owner-editable): sofa, corner_sofa, chair, side_table,
+  footstool, lounger, daybed, dining_set, round_dining_set and the five barbecues (only while
+  barbecues are offered, ADR-119), each with aliases ("L-shape", "table", "sunbed") and its
+  sizes mapped onto a configurator product's fields: required or optional, the range from
+  config/quote_products.json, what it means and how to measure it (drafted from the
+  configurator's fields; the owner checks the texts). An optional size not given takes the
+  configurator's default and the answer lists it under `assumed`.
+- **Matching and prices are the shop's own**: `coverengine.match` (ADR-064, ADR-114: SUNS,
+  approved drawing covers, barbecues) and `quote.proposal`. The consumer price of an existing
+  cover (the published fixed B2C price, else its own sizes minus the stock discount, ADR-118)
+  moved into `shop.b2c_cover_price`, used by the shop's quote and the API alike; a business
+  caller's price is `b2b.unit_price` (its list, the list's fixed price, its own fixed price;
+  ex VAT, its VAT rate or 0 when reverse-charged). Results: existing covers with a fit of at
+  least `match.choice_pct`, "good" from `match.threshold_pct`, else "possible"; the
+  made-to-measure cover after the good ones and before the possible ones; notes say what is
+  unsure (no hand given for a corner sofa, matching in shadow mode, a table that holds rain,
+  no lead time set). Never a cost, labour, margin or the costing: the answers are built from a
+  whitelist, and a test walks every answer for those keys.
+- **Errors an agent can act on**: `{"error", "message", "hint", "field", "docs"}`, e.g.
+  `missing_size` "depth missing for kind sofa" with how to measure it and the range;
+  `unknown_kind` with the list; `unknown_size`, `out_of_range`, `conflicting_sizes`,
+  `unknown_colour`, `kind_mismatch`, `unknown_cover`, `rate_limited`, `daily_limit`,
+  `unknown_key`, `company_inactive`, `key_needed`. Request models forbid unknown fields: a
+  name, e-mail, phone or address is refused ("this API takes no personal data").
+- **Callers and limits** (all `limits.*`, `[server-only]`, defaults.yaml): anonymous
+  `agent_per_hour` 60 per address (the Worker's `x-client-ip`, IPv6 as its /64,
+  `limits.ipv6_prefix`) and `agent_anon_per_day` 1,000 together; a partner key
+  `agent_key_per_hour` 600 and `agent_key_per_day` 5,000; a B2B login counts like a key, per
+  company. Headers `RateLimit-Limit/Remaining/Reset` (+ `X-RateLimit-Scope`), a 429 with
+  `Retry-After`. Every proposal still counts against `limits.quotes_per_minute` (ADR-123).
+  The hourly window is in memory; the daily counts are the usage table (below), so a restart
+  keeps them.
+- **Partner keys** (`agent_keys` in app.db: a name, the SHA-256 of the key, its first 8
+  characters, who made it, an optional B2B company, revoked): made and revoked by an admin in
+  Settings → Website & API keys (`/api/admin/agent-api`), shown once (`cvk_…`), sent as
+  `X-Api-Key` (dropped from Caddy's log) or `Authorization: Bearer` (redacted by Caddy). A wrong
+  or revoked key is refused, never taken as anonymous; a key whose company is not active is
+  refused. The old webshop API's keys (`/api/public/v1`, ADR-123) are separate and unchanged.
+- **Photo and page recognition only with a key**: `POST /api/v2/suggest` runs the shop's
+  suggestion (`shop_suggest.run_suggestion`, moved out of the shop's route so both share it)
+  with every paid call on the key's own ledger line (`spend.for_visitor("agent:key:<id>")`):
+  at most `agent_key_photos_per_day` (20) a day and `agent_key_eur_day` (€1) of AI a day per
+  key; the month's budget (ADR-078) still stops everything. Codex's adversarial review found
+  that parallel requests could all pass the same checks: now one recognition runs at a time
+  per key (a second gets 429 `busy`, so the euro check sees every earlier call's cost) and the
+  day's slot is taken in one SQLite write transaction before any await. Its second round: a
+  B2B login alone may not start a paid recognition (a partner key only, individually
+  revocable), and a cover page (which computes a price) counts against the anonymous limits
+  and answers 429, not 404, over them. Round 3: a new 3D preview counts on the agents' work
+  cap and only the product's own sizes make its cache key. Round 4: the pipeline's paid
+  stages check only the month's budget, so a recognition starts only while a whole run's
+  worth (`limits.agent_key_eur_per_recognition`, €0.10; a run costs €0.03-0.05) of the key's
+  day is left. Round 5: a run can cost more than that estimate (grounded searches bill per
+  query), so the key's day cap now holds at every paid stage: `spend.for_visitor(who,
+  cap_eur)` makes `spend.guard` (called before every paid call) refuse once the key's day is
+  reached; only stages already in flight (the parallel searches) can still finish. Round 6:
+  that residue stays (a per-stage cost reservation inside the shop's recognition pipeline is
+  for later; it is bounded by the stages in flight, the 20 recognitions a day per key and the
+  month's budget); and every agent page (the guide, the covers, llms-full.txt) now counts
+  like an anonymous call.
+  Anonymous: 401 `key_needed`, and
+  `product_url` in a match is read as text only, never fetched. Its route has the shop's photo
+  body limit (bodylimit and the Caddyfile).
+- **A person always pays.** `order_url` opens the configurator with the product, the sizes,
+  the colour and (for an existing cover) `stock=<code>`; `POST /order-link` stores that address
+  behind a token for `limits.agent_link_hours` (24) and adds `checkout=1`: the configurator
+  goes to the checkout once its price for exactly those choices is on screen (ADR-129's fresh
+  quote). Opening it creates nothing; the person gives name and address, accepts the terms and
+  pays with Mollie as before. An expired link is a 410 page with a link to the configurator.
+  For a business caller the link is `/b2b/?…#configure` (the B2B configurator reads the same
+  address now, `stock_model` included): the person logs in and orders on account. No endpoint
+  writes an order, a request or a payment. Caddy's log redacts `/go/<token>`.
+- **Usage** (`agent_usage` in app.db: day, `anonymous` | `key:<id>` | `b2b:<company>`, endpoint,
+  count; nothing else) shown per day for 7 days in Settings → Website & API keys.
+- **Discovery** (`coverapi/agent_pages.py`, `agent_ld.py`): `/llms.txt` gets a "For AI agents"
+  section (API, OpenAPI, kinds, guide, covers, CLI, rules) where the API is on; `/llms-full.txt`
+  (who we are, the API, the measuring guide per kind, every existing cover with the furniture
+  sizes it fits, the rules); the measuring guide `/measure` and `/measure/<kind>` (schema.org
+  `Product` with the size ranges as `additionalProperty`, an `AggregateOffer` without a price,
+  and a `HowTo`); the covers `/covers` (`ItemList`) and `/covers/<code>` (`Product` with
+  `size`, the fitting sizes as `additionalProperty`, an `Offer` with the price as text, VAT
+  flag, `MadeToOrder`, the delivery promise as `shippingDetails` only when set; no invented
+  delivery time). Plain HTML without scripts. These cover pages are the "product pages" and
+  the sizes feed (the shop had no catalogue page yet, ADR-103's "better later").
+- **Preview only**: everything answers only where `agent_api.agent_on`: the new shop setting
+  `agent_api_enabled` (off; Settings → Website & API keys), or the preview website (its host
+  `preview.<domain>` and the Worker's key, as `bbq_enabled`), or a logged-in colleague. The
+  Worker (`apps/site/src/agent.ts`) passes `/api/v2/*`, `/api/b2b/v2/*`, `/llms-full.txt`,
+  `/measure*` and `/covers*` only on the preview or with `AGENT_API = "1"`; on the live site
+  they are a 404 at the edge, and the live `/llms.txt` is unchanged. Never cached at the edge,
+  no cookies through, the security headers on every answer, `noindex` on the preview. CORS:
+  `*` for GET and the POSTs, no credentials; the B2B mount has no CORS (its own pages only).
+  With the website link closed the studio answers these paths only through the website, as
+  the shop (ADR-066).
+- **The CLI** (`clients/cli/covers.py`, standard library, `uv tool install ./clients/cli`):
+  `covers find|quote|kinds|link|cover`, a table or `--json`, `--api` (default the preview),
+  `--key`; exit codes 0, 2 (the input), 3 (429), 1.
+- **Lead time**: a new shop setting `custom_lead_time` per language; empty (now): "confirmed
+  after the order". The delivery promise of an existing cover is ADR-118's
+  `stock_delivery_note` (empty on live; the preview's overlay sets it only for the shop's own
+  pages, so the API on the preview states none either).
+- **Security** (ADR-123 holds): the body limits apply (2 MiB for JSON; the photo limit for
+  `/suggest`), all new numbers are server-only, the workshop role is unaffected (`/api/v2/` is a
+  public path like `/api/shop/`; the key admin is admin-only), no studio data (no model files
+  but a cover's product photo and a 3D preview built from its sizes, no patterns, people or
+  orders), `Cache-Control: no-store` and `Vary: X-Api-Key, Authorization, Cookie` on the answers.
+- **Tests**: `apps/api/tests/test_agent_api.py` (match on known covers, errors with hints,
+  limits, keys, no personal data or costs, B2B scoping between two companies and anonymous, a
+  B2B login, order links and their expiry, nothing ordered, pages and JSON-LD, preview-only),
+  `test_agent_ld.py`, `apps/site/test/worker.test.ts` (preview vs live), `clients/cli/test_covers.py`
+  (a fake server and the real app).
+- **Better later** (phase 2, 3): an MCP server over the same API; agent payments (ACP, AP2/UCP)
+  once Mollie supports them (what to verify: docs/plans/agent-access.md); the guide's texts in
+  every language through the CMS; per-key limits set per partner; a price per B2B key in the
+  cover pages' JSON-LD is never wanted (public pages are B2C).
+
 ## ADR-136 — The Questions answered 11–14 Oct 2026, processed (QUESTIONS 27–101)
 
 Twenty-four questions in Work → Questions (ADR-109) were answered but never processed. Each

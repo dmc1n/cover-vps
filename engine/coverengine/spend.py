@@ -39,6 +39,8 @@ PERCENT = 100.0  # param-ok: a share as a percentage
 # salted with the day (never the address itself), written on the ledger's line, so what one
 # visitor costs in a day can be capped
 _VISITOR: contextvars.ContextVar[str] = contextvars.ContextVar("spend_visitor", default="")
+# ADR-135: that caller's own day budget (EUR; 0: none), checked before every paid call (guard)
+_VISITOR_CAP: contextvars.ContextVar[float] = contextvars.ContextVar("spend_cap", default=0.0)
 
 
 def _day(when: float | None = None) -> str:
@@ -51,25 +53,34 @@ def visitor_tag(address: str, when: float | None = None) -> str:
 
 
 @contextmanager
-def for_visitor(address: str) -> Iterator[str]:
+def for_visitor(address: str, cap_eur: float = 0.0) -> Iterator[str]:
     """Every paid call inside is written down for this visitor (see visitor_eur). Threads
-    started inside must carry the context along (contextvars.copy_context)."""
+    started inside must carry the context along (contextvars.copy_context). `cap_eur` > 0: every
+    paid call inside is refused (guard) once the visitor's day reaches it (ADR-135: a partner
+    key's day budget holds at every stage of a recognition, not only at its start)."""
     token = _VISITOR.set(visitor_tag(address))
+    cap = _VISITOR_CAP.set(float(cap_eur))
     try:
         yield _VISITOR.get()
     finally:
+        _VISITOR_CAP.reset(cap)
         _VISITOR.reset(token)
 
 
-def visitor_eur(address: str, now: float | None = None) -> float:
-    """What one visitor's requests cost the AI today (UTC), from the ledger."""
+def _tag_eur(tag: str, now: float | None = None) -> float:
     now = now or time.time()
-    tag, day = visitor_tag(address, now), _day(now)
+    day = _day(now)
     return sum(
         float(r.get("eur", 0))
         for r in _rows(now)
         if r.get("who") == tag and _day(float(r.get("t", 0))) == day
     )
+
+
+def visitor_eur(address: str, now: float | None = None) -> float:
+    """What one visitor's requests cost the AI today (UTC), from the ledger."""
+    now = now or time.time()
+    return _tag_eur(visitor_tag(address, now), now)
 
 
 def guard_visitor(params: EffectiveParams, address: str) -> None:
@@ -195,3 +206,6 @@ def guard(params: EffectiveParams) -> None:
             f"the AI budget for this month is used up (€{s['month_eur']} of €{s['budget_eur']}): "
             "raise spend.budget_eur_month to go on"
         )
+    cap, tag = _VISITOR_CAP.get(), _VISITOR.get()
+    if cap > 0 and tag and _tag_eur(tag) >= cap:
+        raise CoverError("this caller's AI budget for today is used up")

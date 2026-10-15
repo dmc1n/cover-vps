@@ -363,6 +363,16 @@ Settings → System & logs → Mail             the mail outbox: waiting and fai
 POST /api/jobs/<id>/rerun                   "Run again" for a job a restart interrupted (or a failed one; ADR-129)
 cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build
 cd apps/site && npm test | npm run check     the Worker's tests (security headers, no studio routes) and typecheck (ADR-103)
+<website>/api/v2 (docs, openapi.json, kinds, match, quote, order-link, covers, suggest)   the API for AI agents: open
+                                             with limits (limits.agent_*), partner keys (Settings → Website & API keys;
+                                             a B2B one gets that company's prices ex VAT; /api/b2b/v2 for a B2B login),
+                                             photo recognition only with a key, order links only (a person pays), no
+                                             personal data; /llms.txt, /llms-full.txt, /measure, /covers with JSON-LD;
+                                             preview only until the shop setting agent_api_enabled + the Worker's
+                                             AGENT_API (ADR-135, docs/handbook/agent-api.md, docs/plans/agent-access.md)
+uv tool install ./clients/cli; covers find --kind sofa --width 230 --depth 90 --height 85 [--json]
+                                             the agent API from the command line (quote, kinds, link, cover; --api, --key)
+config/agent_kinds.json                     the kinds an agent may name, their sizes and the measuring guide's texts
 ```
 
 Settings marked `[server-only]` in config/defaults.yaml (the AI's hosts, spending caps, `limits.*`)

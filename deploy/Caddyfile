@@ -13,11 +13,12 @@ covers.suns.nu {
 	# Uploads by logged-in people (3D models, drawings, references, lists, pictures): large.
 	@upload path /api/models /api/references /api/models/drawing /api/models/*/drawing /api/models/*/reference /api/desk-products /api/prices/import /api/desk/*/pictures /api/questions/*/pictures /api/admin/shop/photo-test
 	# The public shop's photos: 3 photos of at most 10 MiB (suggest.photo_max_bytes) and a margin.
-	@photos path /api/shop/suggest /api/shop/order/*/source /api/shop/fit/*/photo
+	# The agent API's photo recognition (partner keys only, ADR-135) takes the same.
+	@photos path /api/shop/suggest /api/shop/order/*/source /api/shop/fit/*/photo /api/v2/suggest /api/b2b/v2/suggest
 	# Everything else: small.
 	@small {
 		not path /api/models /api/references /api/models/drawing /api/models/*/drawing /api/models/*/reference /api/desk-products /api/prices/import /api/desk/*/pictures /api/questions/*/pictures /api/admin/shop/photo-test
-		not path /api/shop/suggest /api/shop/order/*/source /api/shop/fit/*/photo
+		not path /api/shop/suggest /api/shop/order/*/source /api/shop/fit/*/photo /api/v2/suggest /api/b2b/v2/suggest
 	}
 	request_body @upload {
 		max_size 2GiB
@@ -57,7 +58,7 @@ covers.suns.nu {
 				request>headers>X-Link-Key delete
 				request>headers>X-Api-Key delete
 				request>headers>Referer delete
-				request>uri regexp "(/(?:order|match|fit|token|invite|reset|welcome)/|[?&](?:preview|link|key|token)=)[^/?&#]+" "${1}REDACTED"
+				request>uri regexp "(/(?:order|match|fit|token|invite|reset|welcome|go)/|[?&](?:preview|link|key|token)=)[^/?&#]+" "${1}REDACTED"
 			}
 		}
 	}

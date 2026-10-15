@@ -502,6 +502,19 @@ limits:                          # what a request or an uploaded file may hold (
   mail_retry_max_s: 21600        # ... but never longer apart than this (6 h)
   mail_keep_hours: 336           # a failed mail's text is kept this long (14 days) for "Send again", then
                                  # removed; the log of send attempts (no texts) stays this long too
+  # The API for AI agents (/api/v2, ADR-135): open without a key, with limits (owner, 14 Oct 2026)
+  agent_per_hour: 60             # anonymous: requests per address an hour (IPv6 as its /64, ipv6_prefix)
+  agent_anon_per_day: 1000       # ... and all anonymous callers together a day (UTC)
+  agent_key_per_hour: 600        # a partner key (Settings → Website & API keys): requests an hour ...
+  agent_key_per_day: 5000        # ... and a day
+  agent_key_photos_per_day: 20   # photo or link recognition (a paid AI call) per partner key a day; never anonymous
+  agent_key_eur_day: 1.0         # ... and what one key's recognitions may cost the AI in a day (EUR, the ledger);
+                                 # the month's budget (spend.budget_eur_month) still stops everything
+  agent_key_eur_per_recognition: 0.1  # ... a recognition starts only while this much of the key's day is
+                                 # left (a run costs about €0.03-0.05: image search, identification, searches,
+                                 # comparison, sizing), so one run cannot carry the key over its day's budget
+  agent_link_hours: 24           # an order link (POST /api/v2/order-link) opens the configurator this long
+  agent_results_max: 5           # at most this many existing covers in one match answer
 
 spend:                           # what the AI costs, kept and guarded (owner, 6 Oct 2026; ADR-078)
                                  # [server-only] (ADR-123): no model, trial, rule or UI sets these

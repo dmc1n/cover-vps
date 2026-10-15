@@ -88,3 +88,67 @@ test("the preview is never indexed", async () => {
   assert.match(page.headers.get("x-robots-tag")!, /noindex/);
   assert.ok(page.headers.get("content-security-policy"));
 });
+
+const agentPaths = [
+  "/api/v2/match", "/api/v2/openapi.json", "/llms-full.txt", "/measure",
+  "/measure/sofa", "/covers/x", "/api/b2b/v2/match",
+];
+
+test("agent routes on live are closed by default while llms.txt still reaches studio", async () => {
+  for (const path of agentPaths) {
+    assert.equal((await get(path)).status, 404, path);
+  }
+  assert.deepEqual(reached, []);
+  await get("/llms.txt");
+  assert.deepEqual(reached, ["/llms.txt"]);
+});
+
+test("enabled live agent requests preserve JSON and strip cookies in both directions", async () => {
+  const seen: { path: string; headers: Headers; method: string; body: string }[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const req = new Request(input, { ...init, duplex: "half" } as RequestInit);
+    reached.push(new URL(req.url).pathname);
+    seen.push({ path: new URL(req.url).pathname, headers: req.headers,
+      method: req.method, body: await req.text() });
+    return new Response("{}", { headers: { "set-cookie": "cover_session=secret" } });
+  }) as typeof fetch;
+  const body = JSON.stringify({ kind: "sofa", width: 230, depth: 90, height: 85 });
+  for (const [path, target] of [
+    ["/api/v2/match", "/api/v2/match"],
+    ["/measure/sofa", "/shop/measure/sofa"],
+    ["/llms-full.txt", "/llms-full.txt"],
+  ]) {
+    const res = await worker.fetch(new Request(`https://shop.example${path}`, {
+      method: path.endsWith("match") ? "POST" : "GET",
+      headers: { cookie: "cover_session=private", "x-link-key": "forged",
+        "content-type": "application/json" },
+      body: path.endsWith("match") ? body : undefined,
+    }) as never, { ...env, AGENT_API: "1" } as never, ctx as never);
+    assert.equal(res.status, 200);
+    assert.equal(reached.at(-1), target);
+    assert.equal(res.headers.get("set-cookie"), null);
+    for (const k of Object.keys(SECURITY_HEADERS)) assert.ok(res.headers.get(k), k);
+    assert.equal(seen.at(-1)!.headers.get("cookie"), null);
+    assert.equal(seen.at(-1)!.headers.get("x-link-key"), env.LINK_KEY);
+  }
+  assert.equal(seen[0].method, "POST");
+  assert.equal(seen[0].body, body);
+  assert.equal(seen[0].headers.get("content-type"), "application/json");
+});
+
+test("preview agent routes and llms.txt always reach studio instead of assets", async () => {
+  let assetCalls = 0;
+  const penv = { ...env, PREVIEW: "1", ASSETS: {
+    fetch: async () => { assetCalls++; return new Response("shop.html asset"); },
+  } };
+  for (const path of [...agentPaths, "/llms.txt"]) {
+    const res = await worker.fetch(new Request(`https://preview.example${path}`) as never,
+      penv as never, ctx as never);
+    assert.equal(res.status, 200, path);
+    assert.equal(reached.at(-1), /^\/(measure|covers)(\/|$)/.test(path) ? `/shop${path}` : path);
+    assert.match(res.headers.get("x-robots-tag")!, /noindex/, path);
+    assert.equal(res.headers.get("set-cookie"), null);
+    for (const k of Object.keys(SECURITY_HEADERS)) assert.ok(res.headers.get(k), `${path}: ${k}`);
+  }
+  assert.equal(assetCalls, 0);
+});

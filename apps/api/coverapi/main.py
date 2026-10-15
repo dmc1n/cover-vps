@@ -156,6 +156,10 @@ def create_app(
     from coverapi import b2b
 
     b2b.install(app, auth, store.root, store)  # the B2B shop: logins, own prices (ADR-104)
+    from coverapi import agent_api, agent_pages
+
+    # the API for AI agents (/api/v2), its pages, llms-full.txt (ADR-135); after the B2B shop
+    agent_pages.install(app, auth, agent_api.install(app, auth, store.root, store))
 
     def model_or_404(model_id: str) -> Path:
         try:

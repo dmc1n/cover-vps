@@ -550,6 +550,24 @@ export interface CustomerRequest {
     };
   } | null;
 }
+/** The API for AI agents (ADR-135): partner keys and the daily counts. */
+export interface AgentApiState {
+  enabled_on_live: boolean;
+  limits: Record<string, number>;
+  keys: {
+    id: number;
+    name: string;
+    shown: string;
+    created: number;
+    created_by: string | null;
+    company_id: number | null;
+    company: string | null;
+    revoked: number | null;
+  }[];
+  usage: { day: string; who: string; endpoint: string; count: number }[];
+  companies: { id: number; name: string; status: string }[];
+}
+
 export interface WebshopSettings {
   keys: { name: string; created: number }[];
   embed_origins: string[];
@@ -855,6 +873,16 @@ export const admin = {
   newKey: (name: string) =>
     send("POST", "/api/admin/webshop/keys", { name }).then((r) =>
       json<{ name: string; key: string; note: string }>(r),
+    ),
+  agentApi: () =>
+    fetch("/api/admin/agent-api").then((r) => json<AgentApiState>(r)),
+  newAgentKey: (name: string, company_id: number | null) =>
+    send("POST", "/api/admin/agent-api/keys", { name, company_id }).then((r) =>
+      json<{ id: number; name: string; key: string; note: string }>(r),
+    ),
+  revokeAgentKey: (id: number) =>
+    send("POST", `/api/admin/agent-api/keys/${id}/revoke`, {}).then((r) =>
+      json<AgentApiState>(r),
     ),
   users: () =>
     fetch("/api/admin/users").then((r) =>

@@ -4,7 +4,14 @@
 // orders ("order again"). Every word comes from the site's content (ui.b2b, plus the shop's own
 // words for the configurator), in the shop's languages. Logins, the session and its CSRF token
 // are the studio's B2B API (apps/api/coverapi/b2b.py); nothing here is cached or indexed.
-import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  StrictMode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createRoot } from "react-dom/client";
 import "../shop.css";
 import "./b2b.css";
@@ -561,17 +568,39 @@ function Configure({
   onAdd: (q: Quote, qty: number) => void;
 }) {
   const products = info.options.products;
-  const [product, setProduct] = useState("dining_set");
+  // a link from the agent API (ADR-135): the product, sizes, colour, vents and an existing cover
+  // of our range come in the address; the company's own price is asked as always
+  const [product, setProduct] = useState(() => {
+    const p = START.get("product");
+    return p && products[p] ? p : "dining_set";
+  });
   const [sizes, setSizes] = useState<Record<string, number | boolean>>({});
-  const [colour, setColour] = useState(info.settings.colours[0] ?? "");
-  const [vents, setVents] = useState(true);
+  const [colour, setColour] = useState(() => {
+    const c = START.get("colour");
+    return c && info.settings.colours.includes(c)
+      ? c
+      : (info.settings.colours[0] ?? "");
+  });
+  const [vents, setVents] = useState(START.get("vents") !== "0");
   const [support, setSupport] = useState("none");
+  const [stock, setStock] = useState<string | null>(START.get("stock"));
   const [quote, setQuote] = useState<Quote | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const first = useRef(true);
   useEffect(() => {
     const d: Record<string, number | boolean> = {};
     for (const f of products[product].fields) d[f.key] = f.default;
+    if (first.current) {
+      first.current = false;
+      try {
+        Object.assign(d, JSON.parse(START.get("sizes") ?? "{}"));
+      } catch {
+        /* no sizes given */
+      }
+    } else {
+      setStock(null);
+    }
     setSizes(d);
     setSupport("none");
   }, [product, products]);
@@ -588,6 +617,7 @@ function Configure({
             colour,
             vents,
             support,
+            stock_model: stock,
           }),
         );
       } catch (e) {
@@ -597,7 +627,7 @@ function Configure({
       }
     }, 400);
     return () => clearTimeout(t);
-  }, [product, sizes, colour, vents, support]);
+  }, [product, sizes, colour, vents, support, stock]);
   const rain = quote?.rain;
   const supports = Object.entries(rain?.options ?? {}).filter(
     ([k]) => k !== "frame",
@@ -705,6 +735,7 @@ function Configure({
           />{" "}
           {tx.w("vents")}
         </label>
+        {stock && quote?.stock && <p className="s-muted">{quote.stock.name}</p>}
         {quote && (
           <PriceBox tx={tx} quote={quote} onAdd={(n) => onAdd(quote, n)} />
         )}
@@ -1311,6 +1342,8 @@ function Account({ tx, me, onOut }: { tx: Tx; me: Me; onOut: () => void }) {
 
 type Tab =
   "catalogue" | "configure" | "cart" | "orders" | "addresses" | "account";
+// the page's address when it opened (an agent API link prefills the configurator, ADR-135)
+const START = new URLSearchParams(window.location.search);
 
 function Shop({
   info,
