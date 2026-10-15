@@ -5395,3 +5395,45 @@ and `scripts/fewer_check.py`, compare sheets and a size table in `compare/`, Cod
   passed. Swept read-only over the live covers: C1, C2, C3, C9, C24, C26, C27, C28 and S32 have such
   unjoined edges (plan-profile and isofit covers); not changed here, for the next round. Tests:
   test_drawing_given.py (flat bag, rounded corner, side view, S43 seams, open seams); lessons in config/ai_lessons.json.
+
+
+## ADR-141 — L1, L2, L3 are chaise longues: the workshop's STEP files give the shape, the drawing the sizes
+
+Rens at the Desk, 15 Oct 2026, on L1, L2 and L3 (covers 39, 40, 41: Portofino, Evora and Aspen CL
+right): "ter referentie heb ik een STEP file geupload die de tekening zou moeten matchen, probeer op
+basis van die info een betere vorm hoes te genereren". The STEP files are in each model's
+`reference/surface.step` (the Desk's reference upload; SolidWorks, one closed solid each).
+
+- **What was wrong.** The L-shape reader built the short arm as a second sofa arm with its back
+  strip along the outer side: the chaise top fell sideways, its outer front corner stood at the
+  back height (83.8 / 83.8 / 81.3 cm) and the outer side was a full-height wall. The drawings write
+  the front height at the chaise's outer front corner too and a small size at the foot of the
+  outer side (7 in / 7 in / 3 in), which the reader dropped as a "band/hem detail".
+- **What the STEP shows** (imported in staging with `cover import`, `out/rejections4/step/step-lN`):
+  the chaise top is level and low along its front and inner side and rises to the back height only
+  at the outer back corner, a twisted (bilinear, ruled) surface between the mitre and the outer
+  edge; the outer side is a chamfer (8 / 10 / 7 in wide in plan) down to a vertical band; the
+  back strip and the seat as before. The faces shape below built with the STEP's own sizes lies
+  within 1.1 mm (mean, 1.8 mm p95) of the STEP's vertices.
+- **The STEP's sizes are not the drawing's.** Measured by me and, independently, by Codex: rounded to
+  1 cm and up to 3 cm off (L3 2240 deep for 221 cm, its band 10 cm for 7.6, L2's front 43 cm for
+  40.6, every back strip 30 cm for 27.9). Same products (names, plan, hand), not swapped or mirrored.
+  The drawing wins: the covers are the STEP's shape at the drawing's written sizes.
+- **How.** A `faces` shape per cover (`testdata/drawing_shapes/drawing-l1..l3.json`, ADR-102),
+  built by `scripts/given_build.py`: back strip, seat, chaise top (ruled), chamfer, the chamfer's
+  back end, band, back, end, front, chaise inner and chaise front walls, as the drawing draws them.
+  The band of L3 (7.6 cm) is joined to the chamfer by the usual join rule (`drawn.merge_fold_deg`).
+  Vents as before (6, the drawing's count); the outer side's vent on L1/L2 sits on the 17.8 cm band
+  as a lower opening (`features.vent_min_height_mm`, owner 1 Oct); page 2 of the drawing draws it on
+  the chamfer just above: asked.
+- **Checks.** `cover audit` ok, `scripts/fewer_check.py` PASS (seam pairs 2.4 / 3.3 / 3.1 mm as ease,
+  stretch at most 0.38 %); every written size within 1.1 mm (out/rejections4/step/sizes.txt);
+  compare pictures in out/rejections4/step/compare/. Test
+  `test_a_chaise_longue_is_low_at_its_front_and_chamfered_to_a_band_outside`; a lesson in
+  config/ai_lessons.json (a corner the drawing writes at the front height is never built at the
+  back height; a workshop 3D file of the same product gives the shape, the drawing the sizes).
+- **Links (ADR-132).** No catalogue model holds the STEP files (they are reference uploads), and a
+  `manual` link is a person's decision in links.py, so nothing was written to app.db; the pairs are
+  proposed in the report. **Not done:** `drawing-cover-39-46-l1-l5-mirror` (the same product as L1,
+  waiting at the Desk) still has the chaise falling to 17.8 cm at its end; it should be rebuilt from
+  drawing-l1.json mirrored.

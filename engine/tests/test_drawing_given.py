@@ -472,3 +472,26 @@ def test_the_audit_flags_two_pieces_left_unjoined(tmp_path: Path) -> None:
     np.savez(tmp_path / "panels.npz", vertices=v, faces=f, labels=labels, original_vertex=apart)
     (check,) = open_seam_checks(tmp_path, params)
     assert not check["ok"] and "skirt-back / top-1" in check["detail"]
+
+
+def test_a_chaise_longue_is_low_at_its_front_and_chamfered_to_a_band_outside() -> None:
+    """L1-L3 (Rens, 15 Oct 2026, with the workshop's STEP files): the short arm of these L covers
+    is a chaise longue, not a second sofa arm. Its top is low (the front height) along its front
+    and its inner side and rises to the back height only at the outer back corner; the outer side
+    is a chamfer down to a low band (the rear view's 7 / 3 in). The live covers had the chaise
+    falling sideways, its outer front corner at the back height and a full-height outer wall."""
+    for name, hb, hf, band in (("drawing-l1", 838.2, 431.8, 177.8),
+                               ("drawing-l2", 838.2, 406.4, 177.8),
+                               ("drawing-l3", 812.8, 355.6, 76.2)):  # fmt: skip
+        spec = json.loads((SHAPES / f"{name}.json").read_text())
+        pieces = dg.build(spec, ROLL)
+        top = _pts(pieces, "chaise-top")
+        front = top[np.isclose(top[:, 1], top[:, 1].max())]
+        assert np.allclose(front[:, 2], hf, atol=1.0)  # the chaise's front edge level and low
+        assert top[:, 2].max() == pytest.approx(hb, abs=1.0)
+        cf = _pts(pieces, "chaise-front")
+        assert cf[:, 2].max() == pytest.approx(hf, abs=1.0)  # no corner at the back height
+        assert _pts(pieces, "band")[:, 2].max() == pytest.approx(band, abs=1.0)
+        side = _pts(pieces, "chaise-side")
+        assert side[:, 0].min() == pytest.approx(0.0, abs=0.5)
+        assert side[:, 2].min() == pytest.approx(band, abs=1.0)  # on the band, not the ground
