@@ -2558,6 +2558,28 @@ Owner's answers (7 Oct 2026, QUESTIONS 69): the step where a longer top meets a 
 right (no blending); covering each piece as its plan rectangle is fine; an arrangement gets one
 cover over the whole, never covers zipped together (closes that question from ADR-089).
 
+**Side slopes (Rens, 15 Oct 2026, QUESTIONS 59: "ja, ook naar de zijkanten").** New key
+`arrange.side_slopes: true` (`top_slopes` stays `front`: no slopes to the back). For
+arrangements only (`arr-*`; a model built from its parts' plan, `plan_members.json`, keeps its
+approved roofs). After the front faces, each member's roof may also slope down to each of its
+*outside* sides (no other member within 2 x clearance + `align_mm` beyond it), never to a side
+a neighbour stands against, so no valley forms between two members (rule 12). The side face
+keeps the side a wall at least as high as the member's front: either a face resting on the
+furniture (an arm's top) that meets the side line above that height, or the face hinged on
+the side line at exactly that height and tipped up until it clears the furniture
+(`plan._hinged`: the least tip angle that clears, sampled from flat to upright and halved
+between two samples; Codex's review showed a fixed-point solution giving up on valid faces and
+refusing a low point just beyond the side line); a first version without this let the chaise's side face run down to the hem
+and its whole left wall vanished, rejected. A side is added when it takes away
+`top_gain_pct` (5 %) of the room, each side weighed against the same front-only top, so two
+outside sides of a member come out alike; a hip seam runs where a side face meets the front
+slope. Water still runs off (the drainage grid). Tests: engine/tests/test_arrange_sides.py.
+The live Portofino arrangements rebuilt in staging (out/q59/, checked twice, compare pictures,
+Codex's second look): unchanged. The Portofino has no arms; the chaise's best wall-keeping side
+face takes away 4.1 % (< 5 %), and the 2-seater's back cushions reach its outside end. Their
+hull pieces are identical and cut.dxf differs only in its revision label, so nothing was
+replaced live. A set with high arms or a back lower at its ends gets the side slopes.
+
 ## ADR-096 — Pictures at the Desk: the approver attaches and marks them himself
 
 The owner (7 October): "make an option so Rens can add a screenshot himself". Until now a

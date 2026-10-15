@@ -68,10 +68,10 @@ EDGE_MM = 40.0  # param-ok: geometric constant
 SLOPE_TOLERANCE_DEG = 1e-6  # param-ok: numerical tolerance
 # Gaps that stay open after closing: closed further, this many times at most.
 CLOSE_TRIES = 8  # param-ok: loop guard
-# The hinged side face (QUESTIONS 59): its slope found by fixed-point steps, at most this many,
-# until it changes less than this (rise per mm).
-HINGE_TRIES = 60  # param-ok: loop guard
-HINGE_TOLERANCE = 1e-7  # param-ok: numerical tolerance
+# The hinged side face (QUESTIONS 59): its tip angle sampled at this many angles from flat to
+# upright, the first that clears refined by this many halvings.
+HINGE_STEPS = 721  # param-ok: sampling of an angle (1/8 degree)
+HINGE_BISECT = 40  # param-ok: halvings of one sample step
 
 
 def _p(params: EffectiveParams, key: str) -> float:
@@ -250,27 +250,28 @@ def _hinged(m: Member, d: Array, edge: float, height: float, clearance: float) -
     """The face hinged on the member's side line (at `edge` along d, at `height`) and tipped up
     over the member until it clears every furniture point by the clearance: the steepest side
     slope that leaves the side a wall of that height. None when that would stand upright."""
-    s = m.points[:, :2] @ d
-    z = m.points[:, 2]
-    gap = edge - s
-    if (gap <= COPLANAR_MM).any():
-        return None
-    k = 0.0
-    for _ in range(HINGE_TRIES):  # k: the rise per mm inwards; the clearance is along the normal
-        nxt = max(0.0, float(((z - height + clearance * math.hypot(1.0, k)) / gap).max()))
-        if abs(nxt - k) < HINGE_TOLERANCE:
-            k = nxt
-            break
-        k = nxt
-    else:
-        return None
-    n = np.array([k * d[0], k * d[1], 1.0]) / math.hypot(1.0, k)
-    if k <= 0.0 or n[2] < UPRIGHT_NZ:
-        return None
-    plane = np.append(n, -(k * edge + height) / math.hypot(1.0, k))
-    if float((m.points @ n).max()) + clearance > -plane[3] + COPLANAR_MM:
-        return None  # not clear of the furniture after all
-    return plane
+    gap = edge - m.points[:, :2] @ d  # how far inside the side line each point lies (may be < 0)
+    rise = height - m.points[:, 2]
+
+    def slack(theta: float) -> float:
+        """The least distance (along the normal) from the face tipped up by theta to a point,
+        minus the clearance: >= 0 clears them all."""
+        return float((rise * math.cos(theta) + gap * math.sin(theta)).min()) - clearance
+
+    if slack(0.0) >= 0.0:
+        return None  # flat at that height clears the furniture: no side slope to make
+    top = math.acos(UPRIGHT_NZ)
+    steps = np.linspace(0.0, top, HINGE_STEPS)
+    ok = [t for t in steps if slack(float(t)) >= 0.0]
+    if not ok:
+        return None  # only an upright face would clear it
+    hi = float(ok[0])
+    lo = float(steps[int(np.searchsorted(steps, hi)) - 1])
+    for _ in range(HINGE_BISECT):  # the least tip that clears, between two samples
+        mid = (lo + hi) / 2
+        lo, hi = (lo, mid) if slack(mid) >= 0.0 else (mid, hi)
+    n = np.array([math.sin(hi) * d[0], math.sin(hi) * d[1], math.cos(hi)])
+    return np.append(n, -(math.sin(hi) * edge + math.cos(hi) * height))
 
 
 def roofs(

@@ -212,5 +212,15 @@
     "check": "engine/tests/test_plan_profile.py::test_the_front_walls_continue_the_top_seams.",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792069200,
+    "model_id": "arr-portofino-chaise-2seater",
+    "complaint": "Arrangements: should a piece's roof also slope down to its sides? Rens (Questions #59, 15 Oct 2026): \"ja, ook naar de zijkanten\".",
+    "cause": "Arrangement roofs (ADR-095) sloped only down to each member's front (arrange.top_slopes: front).",
+    "rule": "An arrangement member's roof may also slope down to its own outside sides (arrange.side_slopes), never towards a side a neighbour stands against (a valley there holds water), and each side keeps a wall at least as high as the member's front (a side face running down to the hem removes the wall: wrong). Both outside sides of a member alike. A piece without arms whose back reaches its end rightly gets no side slope.",
+    "check": "engine/tests/test_arrange_sides.py (outside sides only, both alike, the wall kept, water runs off).",
+    "applies_to": "box",
+    "ai_model": "approver"
   }
 ]

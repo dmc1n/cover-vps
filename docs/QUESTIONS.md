@@ -270,6 +270,8 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     **Answered (owner, 7 Oct 2026):** the step is good; a rectangle per piece is fine; an
     arrangement gets one cover over the whole (not zipped covers). Side slopes not asked: stays
     `front`.
+    **Answered (Rens, 15 Oct 2026, Questions #59):** "ja, ook naar de zijkanten":
+    `arrange.side_slopes: true` (ADR-095's side-slopes note); to outside sides only, the wall kept.
 70. **Prices & costing** (ADR-098, docs/plans/prices-costing.md; asked 8 Oct 2026). Everything
     on Admin → Prices & costing is a placeholder until you fill it in; please give (or type in
     and publish yourself):

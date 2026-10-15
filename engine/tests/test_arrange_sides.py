@@ -96,3 +96,22 @@ def test_a_side_against_a_neighbour_is_not_outside() -> None:
     sides = hp.outside_sides(m, [Polygon(_rect(2000))], 60.0)
     assert [float(d[0]) for d in sides] == [-1.0]  # only -x: the neighbour stands at +x
     assert len(hp.outside_sides(m, [], 60.0)) == 2
+
+
+def test_the_hinged_side_face_is_the_least_tip_that_clears() -> None:
+    """Codex's review: a point just inside the side line, or a low one just beyond it, must not
+    make the hinged face impossible; the face found clears every point by the clearance and
+    is (nearly) touching one of them."""
+    from shapely.geometry import Polygon
+
+    d = np.array([1.0, 0.0])
+    for pts in (
+        np.array([[0.0, 0.0, 600.0], [989.9, 0.0, 397.8]]),  # 10.1 mm inside, near the hinge
+        np.array([[0.0, 0.0, 600.0], [1001.0, 0.0, 300.0]]),  # 1 mm beyond, low
+    ):
+        m = hp.Member(Polygon([[-1000, -500], [1000, -500], [1000, 500], [-1000, 500]]), 0.0, pts)
+        plane = hp._hinged(m, d, 1000.0, 400.0, 10.0)
+        assert plane is not None and plane[2] >= hp.UPRIGHT_NZ
+        assert hp._edge_height(plane, d, 1000.0) == pytest.approx(400.0, abs=1e-6)
+        slack = -plane[3] - pts @ plane[:3] - 10.0
+        assert slack.min() >= -1e-6 and slack.min() < 0.5
