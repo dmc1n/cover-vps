@@ -18,3 +18,4 @@ deploy/.env
 testdata/models/*
 !testdata/models/README.md
 /models/
+.claude/
