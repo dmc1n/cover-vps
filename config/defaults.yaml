@@ -225,7 +225,9 @@ features:                        # per-cover defaults, overridden per model
                                  # vents_total and the per-metre rule (ADR-101). A piece without a
                                  # bottom hem whose seam is the top of a piece on the hem may be
                                  # named too: the vent goes one panel up, over that seam (D1/D2,
-                                 # ADR-142)
+                                 # ADR-142). "piece@fraction@cm": the vent's bottom that many cm
+                                 # above that edge instead of vent_above_hem_mm, off a fold in
+                                 # the piece (L3's band and chamfer in one piece, ADR-144)
   vent_on_corners: false         # Rens, 9 Oct 2026 (Casto daybed): "geen vents op afgeronde hoeken";
                                  # a vent on a rounded corner moves along its piece to the nearest
                                  # straight stretch (a round cover keeps its vents; ADR-134).

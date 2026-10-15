@@ -624,24 +624,33 @@ def _above_by_hand(
 
 def _explicit(
     text: str, bases: dict[str, list[HemRun]]
-) -> tuple[list[tuple[str, float]], list[str]]:
-    """`features.vent_positions`: "piece@fraction, ..." -> (piece, mm along its bottom edge)."""
-    out, warnings = [], []
+) -> tuple[list[tuple[str, float, float | None]], list[str]]:
+    """`features.vent_positions`: "piece@fraction[@cm], ..." -> (piece, mm along its bottom
+    edge, the vent's bottom this high above that edge in mm or None for the usual height).
+    The height by hand lifts a vent off a fold in its piece (Rens on L3, 15 Oct 2026: a 7.6 cm
+    band and the chamfer above it are one piece; the vent goes on the chamfer, ADR-144)."""
+    out: list[tuple[str, float, float | None]] = []
+    warnings: list[str] = []
     for item in (x.strip() for x in text.split(",")):
         if not item:
             continue
-        name, _, frac = item.partition("@")
+        name, _, rest = item.partition("@")
+        frac, _, high = rest.partition("@")
         name = name.strip()
         try:
             at = float(frac) if frac.strip() else 0.5  # param-ok: no fraction: the middle
+            lift = float(high) * MM_PER_CM if high.strip() else None
         except ValueError:
-            warnings.append(f"vent_positions: {item!r} is not piece@fraction")
+            warnings.append(f"vent_positions: {item!r} is not piece@fraction[@cm]")
+            continue
+        if lift is not None and lift < 0:
+            warnings.append(f"vent_positions: {item!r} has a height below its edge")
             continue
         if name not in bases:
             warnings.append(f"vent_positions: {name} has no bottom edge for a vent")
             continue
         total = sum(r.length for r in bases[name])
-        out.append((name, float(np.clip(at, 0.0, 1.0)) * total))
+        out.append((name, float(np.clip(at, 0.0, 1.0)) * total, lift))
     return out, warnings
 
 
@@ -711,10 +720,13 @@ def place_vents(
         return fa[0] * fb[0] + fa[1] * fb[1] >= cos
 
     places: list[tuple[str, float]] = []
+    lifts: dict[int, float] = {}  # a height by hand, per place
     text = str(params["features.vent_positions"]).strip()
     if text:
-        places, more = _explicit(text, room)
+        given, more = _explicit(text, room)
         warnings += more
+        places = [(n, at) for n, at, _ in given]
+        lifts = {i: h for i, (_, _, h) in enumerate(given) if h is not None}
     elif lengths:
         if int(params["features.vents_total"]) > 0:
             counts = per_side(lengths, params, same)
@@ -736,7 +748,7 @@ def place_vents(
         runs = room[name]
         for r in runs:
             if s_at <= acc + r.length or r is runs[-1]:
-                rect, problem = _vent_at(by_name[name], r, s_at - acc, params, k)
+                rect, problem = _vent_at(by_name[name], r, s_at - acc, params, k, lifts.get(k - 1))
                 if problem:
                     warnings.append(problem)
                 if rect is not None:
@@ -747,9 +759,15 @@ def place_vents(
 
 
 def _vent_at(
-    panel: dict[str, Any], r: HemRun, local: float, params: EffectiveParams, k: int
+    panel: dict[str, Any],
+    r: HemRun,
+    local: float,
+    params: EffectiveParams,
+    k: int,
+    lift_by_hand: float | None = None,
 ) -> tuple[Array | None, str]:
-    """One vent opening on `panel`, `local` mm along its bottom run `r`."""
+    """One vent opening on `panel`, `local` mm along its bottom run `r`; `lift_by_hand`: its
+    bottom this far above the run (`features.vent_positions` "piece@fraction@cm")."""
     w = _p(params, "features.vent_width_mm")
     full_h = _p(params, "features.vent_height_mm")
     above = _p(params, "features.vent_above_hem_mm")
@@ -771,6 +789,8 @@ def _vent_at(
     # the height of the piece where the vent goes (a sloping piece is lower at one end), over
     # the vent's whole width
     tall = _height_at(poly, centre, t, up, w)
+    if lift_by_hand is not None:
+        above = lift_by_hand
     room_h = tall - above - allowance
     h = min(full_h, math.floor(room_h / MM_PER_CM) * MM_PER_CM)  # whole cm
     if h < least_h:
@@ -778,7 +798,9 @@ def _vent_at(
     # where on the skirt's height (owner 30 Sep: 5 cm above the hem; a drawing's "at Top")
     lift = above
     align = params["features.vent_align"]
-    if r.kind == "hem" and align == "top":
+    if lift_by_hand is not None:
+        pass  # a person's height wins over the alignment
+    elif r.kind == "hem" and align == "top":
         lift = max(above, tall - _p(params, "features.vent_below_top_mm") - h)
     elif r.kind == "hem" and align == "middle":
         lift = max(above, (tall - h) / 2)

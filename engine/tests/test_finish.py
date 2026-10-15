@@ -318,6 +318,28 @@ def test_a_vent_by_hand_one_panel_up_over_the_low_wall() -> None:
     assert float(up[:, 0].mean()) == pytest.approx(1100.0)
 
 
+def test_a_vent_by_hand_at_a_height_off_the_fold() -> None:
+    """Rens on L3 (15 Oct 2026): the vent onto the chamfer, above the 7.6 cm band, while band and
+    chamfer are one piece. "piece@fraction@cm" sets the vent's bottom that far above the edge;
+    without it the usual 5 cm; a negative or unreadable height is warned (ADR-144)."""
+    d = doc(wall("top-2", 2200, 800))
+    plain, _ = place_vents(d["panels"], params(**{"features.vent_positions": "top-2@0.5"}))
+    assert float(plain["top-2"][0][:, 1].min()) == pytest.approx(50.0)
+    by_hand = params(**{"features.vent_positions": "top-2@0.25@12.6"})
+    vents, warnings = place_vents(d["panels"], by_hand)
+    (rect,) = vents["top-2"]
+    assert not warnings
+    assert float(rect[:, 1].min()) == pytest.approx(126.0)  # 7.6 cm band + 5 cm
+    assert float(np.ptp(rect[:, 1])) == pytest.approx(220.0)  # full size
+    assert float(rect[:, 0].mean()) == pytest.approx(550.0)
+    top = params(**{"features.vent_positions": "top-2@0.5@12.6", "features.vent_align": "top"})
+    (rect,) = place_vents(d["panels"], top)[0]["top-2"]
+    assert float(rect[:, 1].min()) == pytest.approx(126.0)  # the height by hand wins
+    bad = params(**{"features.vent_positions": "top-2@0.5@-3, top-2@0.5@x"})
+    vents, warnings = place_vents(d["panels"], bad)
+    assert not vents and len(warnings) == 2
+
+
 def test_inner_walls_on_request_and_positions_by_hand() -> None:
     """The front (inner) walls get vents by default as Rens marked (ADR-110); off, ADR-093's
     outer walls only; `features.vent_positions` places them where the rule cannot reach."""
