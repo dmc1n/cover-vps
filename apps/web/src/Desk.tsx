@@ -928,6 +928,8 @@ function CardView({
   const workshopLogin = isWorkshop(user); // no cover page, no product list (ADR-128)
   const [card, setCard] = useState<Card | null>(null);
   const [model, setModel] = useState<ModelDetail | null>(null);
+  // when the cover was loaded: its 3D files are asked for afresh after a rebuild (ADR-138)
+  const [stamp, setStamp] = useState(0);
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
   // the dialog at the bottom: a reject (reasons, words, pictures) or a comment (ADR-096)
@@ -953,19 +955,18 @@ function CardView({
   const [aiNote, setAiNote] = useState("");
   const textRef = useRef<HTMLTextAreaElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  // when the card was loaded: the 3D view asks for this cover's files again after a rebuild
-  // (D1, D2, 14 Oct 2026: Rens marked the pieces of a cached, older panels.glb)
-  const [stamp, setStamp] = useState(() => Date.now());
   const load = useCallback(
     () =>
       Promise.all([
-        setStamp(Date.now()),
         getJSON<Card>(`/api/desk/${id}`)
           .then(setCard)
           .catch((e) => setMsg(failText("Loading the card", e))),
         api
           .model(id)
-          .then(setModel)
+          .then((m) => {
+            setModel(m);
+            setStamp(Date.now());
+          })
           .catch(() => setModel(null)),
       ]),
     [id],
@@ -1463,7 +1464,7 @@ function CardView({
             />
           ) : card.has_picture ? (
             <img
-              src={`/api/models/${card.id}/files/cover.png`}
+              src={`/api/models/${card.id}/files/cover.png?v=${stamp}`}
               alt="our cover"
             />
           ) : (

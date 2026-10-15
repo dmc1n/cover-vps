@@ -5,11 +5,15 @@
 // 3D and the film for a while, so a busy day does not reach the studio; quotes, matches and
 // orders always do.
 
+import { AGENT, AGENT_B2B, agent, agentOn } from "./agent.ts"; // ADR-139
 import { B2B, b2b } from "./b2b.ts"; // .ts: node runs the tests on the sources
 
 export interface Env {
   ASSETS?: Fetcher; // the preview only: its own fresh build of the shop
   PREVIEW?: string;
+  // the API for AI agents and its pages (ADR-139): on the preview always, on the live site only
+  // with AGENT_API = "1" (after the owner's go; the studio's shop setting agent_api_enabled too)
+  AGENT_API?: string;
   STUDIO_URL: string;
   LINK_KEY: string;
   PAGE_TTL: string;
@@ -70,6 +74,14 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
       url.protocol = "https:";
       return Response.redirect(url.toString(), 301);
     }
+    // the API for AI agents, llms-full.txt, the measuring guide and the cover pages (ADR-139):
+    // only where they are switched on (the preview); elsewhere they do not exist
+    if (AGENT.test(url.pathname) || AGENT_B2B.test(url.pathname)) {
+      if (!agentOn(env)) return new Response("not here", { status: 404 });
+      if (AGENT.test(url.pathname)) return agent(req, url, env);
+    }
+    // the preview's llms.txt with its agent section (the live one is the studio's, unchanged)
+    if (url.pathname === "/llms.txt" && env.PREVIEW && env.ASSETS) return agent(req, url, env);
     if (B2B.test(url.pathname)) return b2b(req, url, env); // the B2B shop, its login (ADR-104)
     // the preview (preview.<domain>): this build's own pages and files, the studio's data,
     // never indexed; the live site changes only with a studio release

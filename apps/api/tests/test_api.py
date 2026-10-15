@@ -62,13 +62,12 @@ def test_model_summary_and_files(chair: dict[str, Any]) -> None:
     assert r.status_code == 200 and b"LWPOLYLINE" in r.content
     assert c.get(f"/api/models/{chair['id']}/files/sizes.pdf").content.startswith(b"%PDF")
     assert c.get(f"/api/models/{chair['id']}/files/secret.txt").status_code == 404
-    # a cover's files are asked again every time (a rebuilt panels.glb, D1/D2 14 Oct 2026)
-    assert (
-        c.get(f"/api/models/{chair['id']}/files/panels.glb").headers["cache-control"] == "no-cache"
-    )
     # the air vents in 3D for the viewer's "Show air vents" (ADR-073)
     assert "vents.json" in m["files"]
-    vents = c.get(f"/api/models/{chair['id']}/files/vents.json").json()["vents"]
+    r = c.get(f"/api/models/{chair['id']}/files/vents.json")
+    # never a cached old file after a rebuild (ADR-138: the Desk showed 9 Oct's vents on 14 Oct)
+    assert r.headers["cache-control"] == "no-cache"
+    vents = r.json()["vents"]
     hoods = next(p for p in m["finished"]["pieces"] if p["name"] == "vent-hood")
     assert len(vents) == hoods["quantity"] and len(vents[0]["corners_mm"]) == 4
     assert c.get("/api/models/../etc/files/model.json").status_code == 404

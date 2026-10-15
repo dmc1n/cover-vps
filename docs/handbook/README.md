@@ -83,6 +83,8 @@ The studio's buttons stay English (owner question #91, ADR-128).
   [webshop-api.md](webshop-api.md)
 - **Matches** (a part of Requests): [admin.md — Matches](admin.md#matches-which-existing-cover-fits-learning-mode)
 - **B2B customers:** [b2b.md](b2b.md)
+- **The API for AI agents** (/api/v2, partner keys, llms.txt, the measuring guide, the `covers`
+  command line; the preview only for now): [agent-api.md](agent-api.md)
 - **Website (AI)**, languages, the website on its own domain:
   [admin.md — The Shop pages](admin.md#the-shop-pages),
   [admin.md — Languages](admin.md#languages),

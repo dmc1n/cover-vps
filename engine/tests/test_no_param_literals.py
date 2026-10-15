@@ -54,6 +54,12 @@ def scan(path: Path, defaults: dict[float, list[str]]) -> list[str]:
 
 def test_engine_has_no_default_literals() -> None:
     defaults = Registry.load().numeric_defaults()
+    # the agent API's request limits (ADR-139) are read by the web app only, never by the engine;
+    # their round numbers (600, 1000) would otherwise flag every unrelated 600 or 1000 here
+    for value in list(defaults):
+        defaults[value] = [k for k in defaults[value] if not k.startswith("limits.agent_")]
+        if not defaults[value]:
+            del defaults[value]
     files = [p for p in sorted(ENGINE.rglob("*.py")) if "params" not in p.relative_to(ENGINE).parts]
     assert files
     problems = [msg for f in files for msg in scan(f, defaults)]

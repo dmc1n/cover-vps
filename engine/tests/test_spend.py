@@ -64,3 +64,23 @@ def test_one_visitor_s_day_is_capped_and_kept_apart(
     with pytest.raises(CoverError, match="today"):
         spend.guard_visitor(p, "203.0.113.9")
     spend.guard_visitor(p, "198.51.100.7")  # another visitor goes on
+
+
+def test_a_callers_day_budget_holds_at_every_paid_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-139 (Codex's review): inside for_visitor(..., cap_eur) every paid call is refused
+    once that caller's day reaches the cap, not only at the start of a recognition."""
+    monkeypatch.setenv("COVER_DATA_DIR", str(tmp_path))
+    p = _params()
+    one = {"prompt_tokens": 1_000_000, "completion_tokens": 100_000}  # €0.55
+    with spend.for_visitor("agent:key:1", cap_eur=1.0):
+        spend.guard(p)
+        spend.record(p, "gemini-3.8-flash", one)
+        spend.guard(p)  # €0.55 of €1: the next stage may run
+        spend.record(p, "gemini-3.8-flash", one)
+        with pytest.raises(CoverError, match="caller's AI budget"):
+            spend.guard(p)  # €1.10: no further stage
+    spend.guard(p)  # outside: only the month's budget
+    with spend.for_visitor("agent:key:2", cap_eur=1.0):
+        spend.guard(p)  # another key's day is its own

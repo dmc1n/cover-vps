@@ -39,7 +39,8 @@ def route_limits(p: EffectiveParams, max_photos: int) -> list[tuple[re.Pattern[s
         (r"/api/desk/[^/]+/pictures|/api/questions/[^/]+/pictures|/api/admin/shop/photo-test",
          pictures),
         # the public shop's photos
-        (r"/api/shop/suggest|/api/shop/order/[^/]+/source|/api/shop/fit/[^/]+/photo", photos),
+        (r"/api/shop/suggest|/api/shop/order/[^/]+/source|/api/shop/fit/[^/]+/photo"
+         r"|/api/v2/suggest|/api/b2b/v2/suggest", photos),  # and the agent API's (ADR-139)
     ]  # fmt: skip
     return [(re.compile(pattern), size) for pattern, size in table]
 

@@ -4989,6 +4989,143 @@ minder strak omvangen, mag één doorlopende curve zijn. Meer smooth".
 - Literals 25 elsewhere (compare.py's ICP rounds, drawing.py's width stations) became named
   constants, so the registry test tells them from the new default.
 
+## ADR-139 — The website for AI agents: an open API with limits, discovery, a CLI; a person always pays
+
+The owner (14 Oct 2026): "AI passes the sizes and the best cover's result comes straight back
+into the CLI." He approved a strategy in four layers (API, MCP server, discovery, CLI) and
+decided: the API is open to everyone without a key, with limits (about 60 requests an hour per
+address, IPv6 per /64, and 1,000 a day for all anonymous use together); anonymous use gets no
+photo or AI recognition; a free partner key gives higher limits and photo recognition with a
+daily budget per key; paying is always done by a person (an agent gets an order link, never
+pays); no personal data in any answer. Later the same day: B2B too ("beide"): a partner key
+linked to a business customer, or that customer's B2B login, gets its own prices ex VAT and
+links into the B2B shop; one company's prices never reach another caller. This is **phase 1,
+on the preview only**. Plan: docs/plans/agent-access.md; handbook: docs/handbook/agent-api.md.
+
+- **The API** (`coverapi/agent_api.py`) is a FastAPI sub-app mounted at `/api/v2`, with its own
+  OpenAPI (`/api/v2/openapi.json`, descriptions written for models) and server-rendered docs
+  (`/api/v2/docs`: no scripts, so the CSP holds; Swagger UI would need a CDN). Endpoints:
+  `GET /kinds`, `POST /match`, `POST /quote`, `POST /order-link`, `GET /go/<token>` (the link a
+  person opens), `GET /covers`, `GET /covers/<code>` (+ `picture.jpg`, `preview.glb`),
+  `GET /preview.glb`, `POST /suggest` (key only). Stable English field names; sizes in cm (or
+  `"unit": "mm"`), answers in cm and mm. The same sub-app is mounted at `/api/b2b/v2`, where the
+  B2B session cookie (path `/api/b2b/`) arrives.
+- **Kinds** (`config/agent_kinds.json`, owner-editable): sofa, corner_sofa, chair, side_table,
+  footstool, lounger, daybed, dining_set, round_dining_set and the five barbecues (only while
+  barbecues are offered, ADR-119), each with aliases ("L-shape", "table", "sunbed") and its
+  sizes mapped onto a configurator product's fields: required or optional, the range from
+  config/quote_products.json, what it means and how to measure it (drafted from the
+  configurator's fields; the owner checks the texts). An optional size not given takes the
+  configurator's default and the answer lists it under `assumed`.
+- **Matching and prices are the shop's own**: `coverengine.match` (ADR-064, ADR-114: SUNS,
+  approved drawing covers, barbecues) and `quote.proposal`. The consumer price of an existing
+  cover (the published fixed B2C price, else its own sizes minus the stock discount, ADR-118)
+  moved into `shop.b2c_cover_price`, used by the shop's quote and the API alike; a business
+  caller's price is `b2b.unit_price` (its list, the list's fixed price, its own fixed price;
+  ex VAT, its VAT rate or 0 when reverse-charged). Results: existing covers with a fit of at
+  least `match.choice_pct`, "good" from `match.threshold_pct`, else "possible"; the
+  made-to-measure cover after the good ones and before the possible ones; notes say what is
+  unsure (no hand given for a corner sofa, matching in shadow mode, a table that holds rain,
+  no lead time set). Never a cost, labour, margin or the costing: the answers are built from a
+  whitelist, and a test walks every answer for those keys.
+- **Errors an agent can act on**: `{"error", "message", "hint", "field", "docs"}`, e.g.
+  `missing_size` "depth missing for kind sofa" with how to measure it and the range;
+  `unknown_kind` with the list; `unknown_size`, `out_of_range`, `conflicting_sizes`,
+  `unknown_colour`, `kind_mismatch`, `unknown_cover`, `rate_limited`, `daily_limit`,
+  `unknown_key`, `company_inactive`, `key_needed`. Request models forbid unknown fields: a
+  name, e-mail, phone or address is refused ("this API takes no personal data").
+- **Callers and limits** (all `limits.*`, `[server-only]`, defaults.yaml): anonymous
+  `agent_per_hour` 60 per address (the Worker's `x-client-ip`, IPv6 as its /64,
+  `limits.ipv6_prefix`) and `agent_anon_per_day` 1,000 together; a partner key
+  `agent_key_per_hour` 600 and `agent_key_per_day` 5,000; a B2B login counts like a key, per
+  company. Headers `RateLimit-Limit/Remaining/Reset` (+ `X-RateLimit-Scope`), a 429 with
+  `Retry-After`. Every proposal still counts against `limits.quotes_per_minute` (ADR-123).
+  The hourly window is in memory; the daily counts are the usage table (below), so a restart
+  keeps them.
+- **Partner keys** (`agent_keys` in app.db: a name, the SHA-256 of the key, its first 8
+  characters, who made it, an optional B2B company, revoked): made and revoked by an admin in
+  Settings → Website & API keys (`/api/admin/agent-api`), shown once (`cvk_…`), sent as
+  `X-Api-Key` (dropped from Caddy's log) or `Authorization: Bearer` (redacted by Caddy). A wrong
+  or revoked key is refused, never taken as anonymous; a key whose company is not active is
+  refused. The old webshop API's keys (`/api/public/v1`, ADR-123) are separate and unchanged.
+- **Photo and page recognition only with a key**: `POST /api/v2/suggest` runs the shop's
+  suggestion (`shop_suggest.run_suggestion`, moved out of the shop's route so both share it)
+  with every paid call on the key's own ledger line (`spend.for_visitor("agent:key:<id>")`):
+  at most `agent_key_photos_per_day` (20) a day and `agent_key_eur_day` (€1) of AI a day per
+  key; the month's budget (ADR-078) still stops everything. Codex's adversarial review found
+  that parallel requests could all pass the same checks: now one recognition runs at a time
+  per key (a second gets 429 `busy`, so the euro check sees every earlier call's cost) and the
+  day's slot is taken in one SQLite write transaction before any await. Its second round: a
+  B2B login alone may not start a paid recognition (a partner key only, individually
+  revocable), and a cover page (which computes a price) counts against the anonymous limits
+  and answers 429, not 404, over them. Round 3: a new 3D preview counts on the agents' work
+  cap and only the product's own sizes make its cache key. Round 4: the pipeline's paid
+  stages check only the month's budget, so a recognition starts only while a whole run's
+  worth (`limits.agent_key_eur_per_recognition`, €0.10; a run costs €0.03-0.05) of the key's
+  day is left. Round 5: a run can cost more than that estimate (grounded searches bill per
+  query), so the key's day cap now holds at every paid stage: `spend.for_visitor(who,
+  cap_eur)` makes `spend.guard` (called before every paid call) refuse once the key's day is
+  reached; only stages already in flight (the parallel searches) can still finish. Round 6:
+  that residue stays (a per-stage cost reservation inside the shop's recognition pipeline is
+  for later; it is bounded by the stages in flight, the 20 recognitions a day per key and the
+  month's budget); and every agent page (the guide, the covers, llms-full.txt) now counts
+  like an anonymous call.
+  Anonymous: 401 `key_needed`, and
+  `product_url` in a match is read as text only, never fetched. Its route has the shop's photo
+  body limit (bodylimit and the Caddyfile).
+- **A person always pays.** `order_url` opens the configurator with the product, the sizes,
+  the colour and (for an existing cover) `stock=<code>`; `POST /order-link` stores that address
+  behind a token for `limits.agent_link_hours` (24) and adds `checkout=1`: the configurator
+  goes to the checkout once its price for exactly those choices is on screen (ADR-129's fresh
+  quote). Opening it creates nothing; the person gives name and address, accepts the terms and
+  pays with Mollie as before. An expired link is a 410 page with a link to the configurator.
+  For a business caller the link is `/b2b/?…#configure` (the B2B configurator reads the same
+  address now, `stock_model` included): the person logs in and orders on account. No endpoint
+  writes an order, a request or a payment. Caddy's log redacts `/go/<token>`.
+- **Usage** (`agent_usage` in app.db: day, `anonymous` | `key:<id>` | `b2b:<company>`, endpoint,
+  count; nothing else) shown per day for 7 days in Settings → Website & API keys.
+- **Discovery** (`coverapi/agent_pages.py`, `agent_ld.py`): `/llms.txt` gets a "For AI agents"
+  section (API, OpenAPI, kinds, guide, covers, CLI, rules) where the API is on; `/llms-full.txt`
+  (who we are, the API, the measuring guide per kind, every existing cover with the furniture
+  sizes it fits, the rules); the measuring guide `/measure` and `/measure/<kind>` (schema.org
+  `Product` with the size ranges as `additionalProperty`, an `AggregateOffer` without a price,
+  and a `HowTo`); the covers `/covers` (`ItemList`) and `/covers/<code>` (`Product` with
+  `size`, the fitting sizes as `additionalProperty`, an `Offer` with the price as text, VAT
+  flag, `MadeToOrder`, the delivery promise as `shippingDetails` only when set; no invented
+  delivery time). Plain HTML without scripts. These cover pages are the "product pages" and
+  the sizes feed (the shop had no catalogue page yet, ADR-103's "better later").
+- **Preview only**: everything answers only where `agent_api.agent_on`: the new shop setting
+  `agent_api_enabled` (off; Settings → Website & API keys), or the preview website (its host
+  `preview.<domain>` and the Worker's key, as `bbq_enabled`), or a logged-in colleague. The
+  Worker (`apps/site/src/agent.ts`) passes `/api/v2/*`, `/api/b2b/v2/*`, `/llms-full.txt`,
+  `/measure*` and `/covers*` only on the preview or with `AGENT_API = "1"`; on the live site
+  they are a 404 at the edge, and the live `/llms.txt` is unchanged. Never cached at the edge,
+  no cookies through, the security headers on every answer, `noindex` on the preview. CORS:
+  `*` for GET and the POSTs, no credentials; the B2B mount has no CORS (its own pages only).
+  With the website link closed the studio answers these paths only through the website, as
+  the shop (ADR-066).
+- **The CLI** (`clients/cli/covers.py`, standard library, `uv tool install ./clients/cli`):
+  `covers find|quote|kinds|link|cover`, a table or `--json`, `--api` (default the preview),
+  `--key`; exit codes 0, 2 (the input), 3 (429), 1.
+- **Lead time**: a new shop setting `custom_lead_time` per language; empty (now): "confirmed
+  after the order". The delivery promise of an existing cover is ADR-118's
+  `stock_delivery_note` (empty on live; the preview's overlay sets it only for the shop's own
+  pages, so the API on the preview states none either).
+- **Security** (ADR-123 holds): the body limits apply (2 MiB for JSON; the photo limit for
+  `/suggest`), all new numbers are server-only, the workshop role is unaffected (`/api/v2/` is a
+  public path like `/api/shop/`; the key admin is admin-only), no studio data (no model files
+  but a cover's product photo and a 3D preview built from its sizes, no patterns, people or
+  orders), `Cache-Control: no-store` and `Vary: X-Api-Key, Authorization, Cookie` on the answers.
+- **Tests**: `apps/api/tests/test_agent_api.py` (match on known covers, errors with hints,
+  limits, keys, no personal data or costs, B2B scoping between two companies and anonymous, a
+  B2B login, order links and their expiry, nothing ordered, pages and JSON-LD, preview-only),
+  `test_agent_ld.py`, `apps/site/test/worker.test.ts` (preview vs live), `clients/cli/test_covers.py`
+  (a fake server and the real app).
+- **Better later** (phase 2, 3): an MCP server over the same API; agent payments (ACP, AP2/UCP)
+  once Mollie supports them (what to verify: docs/plans/agent-access.md); the guide's texts in
+  every language through the CMS; per-key limits set per partner; a price per B2B key in the
+  cover pages' JSON-LD is never wanted (public pages are B2C).
+
 ## ADR-136 — The Questions answered 11–14 Oct 2026, processed (QUESTIONS 27–101)
 
 Twenty-four questions in Work → Questions (ADR-109) were answered but never processed. Each
@@ -5170,7 +5307,55 @@ refusal, an order's quick approval; counts, list and next card each time; the fi
 `apps/api/tests/test_desk.py`. Not done: making the approval itself faster (the size drawing
 could be made when the cover is built instead of at the approval).
 
-## ADR-138 — Rens's third round on pieces and seams (14 Oct 2026): a flat bag, S43/S44's seams as drawn, a stale 3D view
+## ADR-138 — The Desk shows a cover's current files; Rens's third round on vents (14 Oct 2026)
+
+Rens rejected C27, C28 and S32 again on 14 Oct 2026 on their vents ("kruisjes weg, cirkels erbij";
+staging `out/rejections3/vents/`, each picture mapped with `scripts/desk_marks.py`, the live
+vents projected on it, read twice: by us and independently by Codex).
+
+- **The cause on C27 and S32 was not the vents.** Both were rebuilt and reopened at 14:44 and
+  14:35; Rens marked them at 14:49 and 14:43 on pictures that show the vents (and on S32 the
+  split back strip) of 9 Oct. The Desk's 3D asked for a cover's files with a fixed `?v=0` and the
+  API sent no Cache-Control, so the browser kept its cached `vents.json` and panels. **Fix:**
+  `/api/models/{id}/files/*` answers with `Cache-Control: no-cache` (the browser asks again every
+  time; a 304 when nothing changed), and the Desk's viewer asks with the time the card was
+  loaded (`Desk.tsx`, also its cover.png). Test: test_api.py (no-cache on vents.json).
+  `scripts/desk_marks.py` now draws the cover's current vents (green facing, grey away,
+  numbered) on the picture and lists them in its JSON, so a picture of an older state shows at
+  once (test_desk_marks.py). An AI lesson. Any cover reopened after a rebuild may have been
+  judged on its old 3D the same way; not swept (the Desk keeps no record of what a browser drew).
+- **C27** (marks read on the 9 Oct state): the two vents of each inner wall pair (left arm
+  `skirt-right-2`/`-3`, right arm `skirt-front-1`/`-2`) crossed, one circle between them; circles
+  on both arm ends; the vents on `skirt-right-1` and `skirt-front-3` kept. Against the live
+  cover: the vent on skirt-right-2 moves from its middle to the circle (84 cm along, the seam
+  clearance stops it 6 cm short), the one on skirt-front-2 to the circle (23 cm from front-1),
+  the two arm-end vents onto the circles (15–23 cm). 10 vents, as the drawing.
+- **C28** (the picture shows the live vents): crosses on front-2, front-1 (the middle front) and
+  left-3; circles on both arm ends. 9 vents; the drawing writes 10: Rens is asked (Questions #103).
+- **S32** (marks read on the 9 Oct state, four front vents): all four crossed, one circle between
+  each pair, circles on both round ends. The two front vents move to the circles (from the
+  middles of the long front pieces, 1.0 m from the centre, to 0.7–0.8 m), the end vents onto the
+  circles (25 cm). 6 vents, as the drawing.
+- **C26:** not changed (approved 14 Oct 09:21 with the cut file of 9 Oct, after his remark of
+  9 Oct asking to move the inner vents to the arm ends, which that file does not do): asked on
+  the card and in Questions (#104) whether the approval stands.
+- All by hand (`features.vent_positions`), so a rebuild keeps them. Checked twice (audit, fewer_check;
+  Codex read the marks and the staged result independently and agreed); live 14 Oct, reopened.
+- **C28, 15 Oct 10:06** ("op de plekken van kruisjes lopen de seams van de skirt niet goed over
+  in de seams van de top panelen"): a general fault of `plan_profile`. A front wall was put in
+  the stretch of the back edge it projects onto, so where the front is not parallel to the back
+  (the curled arms of a C) its vertical seams stood 10–40 cm beside the ends of the top's seams.
+  Now the outline gets the points where the top's seam lines cross it (`_ring_with`) and each
+  front wall bit belongs to the top section it stands under. C28 rebuilt from its drawing
+  (`fewer_build --codes C28`): the top unchanged, the wall pieces split at the top seams (front
+  116 → 96, 51 → 66, 127 → 130 cm, the other arm 89 → 91, 71 → 89, 123 → 105 cm), the 9 vents
+  mapped onto the new pieces (two middle ones 9–12 cm to the middle of their new piece). Read
+  and checked by Codex too; live 15 Oct, reopened. Test: test_plan_profile.py
+  `test_the_front_walls_continue_the_top_seams` (fails on the old code). **Not swept:** the other
+  plan-profile covers have the same fault until built again: C27 (front walls up to 40 cm off;
+  waiting for Rens's round), C26 (approved; a rebuild needs a new approval), S32.
+
+## ADR-140 — Rens's third round on pieces and seams (14 Oct 2026): a flat bag, S43/S44's seams as drawn, a stale 3D view
 
 Rens rejected six covers again on 14 Oct 2026 (staging `out/rejections3/panels/`; each read with
 `scripts/desk_marks.py` and by looking, a second reading by Codex before building, `cover audit`
@@ -5178,15 +5363,13 @@ and `scripts/fewer_check.py`, compare sheets and a size table in `compare/`, Cod
 
 - **D1, D2** ("doorgekruiste panelen reduceren tot 1 paneel per afbeelding", two pictures each): his
   crosses straddle the 18 cm line on the front wall and on the back wall, but those walls have been
-  one piece each since 14 Oct 14:04 (ADR-131): the pictures show the 9 Oct cover. The Desk's 3D
-  view asked for `panels.glb?v=0` every time and the file route sent no cache header, so his
-  browser kept the old file (heuristic freshness: days for a file a week old). Now the Desk card
-  passes the time it was loaded as the stamp and every model file is sent `Cache-Control:
-  no-cache` (revalidated, 304 while unchanged; test in test_api.py). Nothing rebuilt; the cards
-  reopened with the sizes (front 266/230 x 40 cm, back 266/230 x 82 cm, both on the roll). The
-  owner's "these faces must fit on a roll" and question 64's 150 cm change nothing: the crossed
-  walls fit 148 already; the slope (not crossed) is 222 x 194.6 cm (D1) and 186 x 179 cm (D2),
-  wider than 150 cm both ways. `roll.usable_width_mm` stays 1480 (the questions round owns #64).
+  one piece each since 14 Oct 14:04 (ADR-131): the pictures show the 9 Oct cover, the Desk's 3D
+  view cached in his browser (the cause and fix of ADR-138, found here independently). Nothing
+  rebuilt; the cards reopened with the sizes (front 266/230 x 40 cm, back 266/230 x 82 cm, both on
+  the roll) and "reload with Ctrl+F5". The owner's "these faces must fit on a roll" and question
+  64's 150 cm change nothing: the crossed walls fit 148 already; the slope (not crossed) is
+  222 x 194.6 cm (D1) and 186 x 179 cm (D2), wider than 150 cm both ways. `roll.usable_width_mm`
+  stays 1480 (the questions round owns #64).
 - **S43, S44** ("seams beter volgen zoals op tekening"): the drawing ends the strip on a slanted
   line A-B before the nose, runs the leaning back band on round the back of the nose to C on the
   rim, the slope on to D on the front of the nose (A-D), and cuts the walls below C and D, where the
@@ -5211,5 +5394,4 @@ and `scripts/fewer_check.py`, compare sheets and a size table in `compare/`, Cod
   first faces left a 163 cm gap between the back band and the back wall that every other check
   passed. Swept read-only over the live covers: C1, C2, C3, C9, C24, C26, C27, C28 and S32 have such
   unjoined edges (plan-profile and isofit covers); not changed here, for the next round. Tests:
-  test_drawing_given.py (flat bag, rounded corner, side view, S43 seams, open seams), test_api.py
-  (no-cache); lessons in config/ai_lessons.json.
+  test_drawing_given.py (flat bag, rounded corner, side view, S43 seams, open seams); lessons in config/ai_lessons.json.

@@ -380,3 +380,24 @@ Last updated: 2026-10-01. Answered today: 22 (balloons). New: 24–27 (balloons 
     - **D. Our own matching**: an image embedding (e.g. CLIP / SigLIP on our server) of our
       catalogue photos, nearest neighbour for the customer's photo; no fee per photo, a few
       days' work, quality to measure.
+
+**The website for AI agents, phase 1** (ADR-139, docs/handbook/agent-api.md; asked 14 Oct
+2026). Built on the preview only. To decide:
+- **The measuring texts** (`config/agent_kinds.json`, shown at /measure and in /api/v2/kinds):
+  drafted from the configurator's fields. Right as written? Anything to add per kind?
+- **Left and right of a corner sofa:** the API takes `left_right` "as the maker names it"
+  (SUNS: "corner set left"). How do we explain to a customer which hand theirs is?
+- **Made-to-measure lead time:** what may the API say (Settings → Website & API keys, per
+  language)? Empty now: "confirmed after the order".
+- **Delivery promise:** on the live shop `stock_delivery_note` is empty, so the API states no
+  delivery for existing covers there (the preview's "ordered today, delivered tomorrow" is only
+  in the shop's own pages). Set it for live when it is true?
+- **Matching in learning mode:** the shop asks a colleague to confirm an existing-cover match
+  (shadow); the API answers at once with a note "our team still confirms…". Agree, or only
+  made to measure until matching is on auto?
+- **Daybeds** are measured like a flat lounger (at most 120 cm wide); a wider daybed is refused
+  with "ask us". Fine?
+- **Partner keys:** for whom (garden centres, SUNS dealers, AI platforms)? Are 600/h,
+  5,000/day, 20 photos and €1 of AI a day per key right?
+- **Live:** your go to switch it on for shop.s2dio.living (two switches, handbook).
+- **Phase 2 (MCP server)** next, or first see who uses the API?

@@ -228,7 +228,7 @@ uv run python scripts/drawing_rebuild.py OUT --pdfs DIR --dry-run   drawing cove
 uv run python scripts/drawing_merge.py [--only ...] --dry-run   free-form drawing covers in fewer pieces, compared only (ADR-076, 129)
 uv run python scripts/fewer_build.py OUT --codes C27,... | --merge all   drawing covers rebuilt in staging, slivers joined (ADR-097)
 uv run python scripts/fewer_check.py DIR ...   re-measure a built cover from its cut.dxf and patterns (ADR-097)
-uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT   the Desk picture's red marks mapped onto the cover's panels and 3D (camera fitted, ADR-100)
+uv run python scripts/desk_marks.py MODEL_DIR PICTURE OUT   the Desk picture's red marks mapped onto the cover's panels and 3D (camera fitted, ADR-100); the current vents drawn on it (ADR-138)
 uv run python scripts/fewer_compare.py OUT.png --pdf F --old DIR --new DIR   drawing, old and new cover side by side
 uv run python scripts/vents_compare.py OUT.png --old DIR --new DIR [--pics ...]   a cover's vents before/after, with the Desk's marked pictures (ADR-101)
 uv run python scripts/innerwalls_sweep.py LIST.json --out out/innerwalls [--staged DIR]   covers with inner walls rebuilt in staging, vents on the front walls, checked twice (ADR-110)
@@ -237,8 +237,8 @@ uv run python scripts/answers_stage.py SPECS.json --out out/answers [--only a,b]
 uv run python scripts/given_build.py OUT [--shapes testdata/drawing_shapes] [--only a,b]   drawing covers from a shape a person read
                                              (drawing_shape.json: hip, faces, revolve, plan-profile, flat-bag, level skirt, mirror; ADR-102;
                                              a person's vents_total there or in drawing_corrections.json survives a rebuild, ADR-116;
-                                             flat-bag: two panels of one outline stitched all round but the bottom, U1/U2, ADR-138)
-uv run python scripts/s43_shape.py testdata/drawing_shapes   S43/S44's pieces with the seams as drawn, as a "faces" shape (ADR-138)
+                                             flat-bag: two panels of one outline stitched all round but the bottom, U1/U2, ADR-140)
+uv run python scripts/s43_shape.py testdata/drawing_shapes   S43/S44's pieces with the seams as drawn, as a "faces" shape (ADR-140)
 COVER_DATA_DIR=~/cover-data uv run python scripts/matchcards.py [--out out/matchcards]   approved drawing covers as existing covers:
                                              kind (price list, product names, shape), sizes, doubts → review.csv (ADR-114)
 Covers → Links (#/covers/links[?q=<cover>])   a drawing cover and a 3D-model cover of the same product: proposed with a
@@ -365,6 +365,16 @@ Settings → System & logs → Mail             the mail outbox: waiting and fai
 POST /api/jobs/<id>/rerun                   "Run again" for a job a restart interrupted (or a failed one; ADR-129)
 cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build
 cd apps/site && npm test | npm run check     the Worker's tests (security headers, no studio routes) and typecheck (ADR-103)
+<website>/api/v2 (docs, openapi.json, kinds, match, quote, order-link, covers, suggest)   the API for AI agents: open
+                                             with limits (limits.agent_*), partner keys (Settings → Website & API keys;
+                                             a B2B one gets that company's prices ex VAT; /api/b2b/v2 for a B2B login),
+                                             photo recognition only with a key, order links only (a person pays), no
+                                             personal data; /llms.txt, /llms-full.txt, /measure, /covers with JSON-LD;
+                                             preview only until the shop setting agent_api_enabled + the Worker's
+                                             AGENT_API (ADR-139, docs/handbook/agent-api.md, docs/plans/agent-access.md)
+uv tool install ./clients/cli; covers find --kind sofa --width 230 --depth 90 --height 85 [--json]
+                                             the agent API from the command line (quote, kinds, link, cover; --api, --key)
+config/agent_kinds.json                     the kinds an agent may name, their sizes and the measuring guide's texts
 ```
 
 Settings marked `[server-only]` in config/defaults.yaml (the AI's hosts, spending caps, `limits.*`)

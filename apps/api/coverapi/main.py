@@ -156,6 +156,10 @@ def create_app(
     from coverapi import b2b
 
     b2b.install(app, auth, store.root, store)  # the B2B shop: logins, own prices (ADR-104)
+    from coverapi import agent_api, agent_pages
+
+    # the API for AI agents (/api/v2), its pages, llms-full.txt (ADR-139); after the B2B shop
+    agent_pages.install(app, auth, agent_api.install(app, auth, store.root, store))
 
     def model_or_404(model_id: str) -> Path:
         try:
@@ -254,8 +258,10 @@ def create_app(
             desk.gate(d, model_id, request, name=name)
         suffix = Path(name).suffix
         file, kind = _named(model_id, name)
-        # always asked again (304 while unchanged): a browser kept a cover's old panels.glb for
-        # hours and Rens marked pieces the rebuilt cover no longer had (D1, D2, 14 Oct 2026)
+        # a cover's files change when it is built again under the same address: the browser
+        # asks every time (ETag, 304) and never shows a cached old one. Rens judged C27 and S32
+        # on 14 Oct 2026 by the vents of 9 Oct, D1 and D2 by their pieces of 9 Oct, the Desk's
+        # 3D cached (ADR-138, ADR-140)
         return FileResponse(d / name, media_type=MEDIA.get(suffix, "application/octet-stream"),
                             filename=file, content_disposition_type=kind,
                             headers={"Cache-Control": "no-cache"})  # fmt: skip

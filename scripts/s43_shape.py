@@ -1,6 +1,6 @@
 """S43's (and S44's, mirrored) pieces as the drawing draws them, written as a "faces" shape
 (drawing_given) from the sizes and seam points read off the drawing (Rens, Desk 14 Oct 2026:
-"seams beter volgen zoals op tekening"; ADR-138).
+"seams beter volgen zoals op tekening"; ADR-140).
 
     uv run python scripts/s43_shape.py testdata/drawing_shapes
 

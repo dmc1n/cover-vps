@@ -2,6 +2,7 @@ import { Heading, Info, Icon, IconButton, IconLink, StatusChip } from "./icons";
 import { useCallback, useEffect, useState } from "react";
 import {
   admin,
+  AgentApiState,
   CustomerRequest,
   Invite,
   LearningBand,
@@ -950,6 +951,161 @@ export function EmbedAndKeys() {
         )}
       </section>
     </>
+  );
+}
+
+/** The API for AI agents (ADR-139): partner keys (optionally a B2B company's), the limits and
+ * the counts per day (no addresses, no contents). */
+export function AgentKeys() {
+  const [st, setSt] = useState<AgentApiState | null>(null);
+  const [name, setName] = useState("");
+  const [company, setCompany] = useState("");
+  const [newKey, setNewKey] = useState("");
+  const [msg, setMsg] = useState("");
+  const load = () =>
+    admin
+      .agentApi()
+      .then(setSt)
+      .catch((e) => setMsg(String(e)));
+  useEffect(() => {
+    load();
+  }, []);
+  const keyName = (who: string) => {
+    if (who === "anonymous") return "anonymous";
+    const [kind, id] = who.split(":");
+    if (kind === "key")
+      return st?.keys.find((k) => String(k.id) === id)?.name ?? who;
+    if (kind === "b2b")
+      return `B2B login: ${st?.companies.find((c) => String(c.id) === id)?.name ?? id}`;
+    return who;
+  };
+  const days = [...new Set((st?.usage ?? []).map((u) => u.day))];
+  const callers = [...new Set((st?.usage ?? []).map((u) => u.who))];
+  const total = (day: string, who: string) =>
+    (st?.usage ?? [])
+      .filter((u) => u.day === day && u.who === who)
+      .reduce((a, u) => a + u.count, 0);
+  return (
+    <section className="card">
+      <Heading
+        icon="keys"
+        infoLabel="About the API for AI agents"
+        info={
+          <>
+            /api/v2: AI agents pass the sizes and get the best covers back
+            (docs/handbook/agent-api.md). Open without a key within the limits
+            below; a partner key gives higher limits and photo recognition. A
+            key linked to a B2B customer gets that customer's prices ex VAT. A
+            key is shown once. Limits are set in config/defaults.yaml
+            (limits.agent_*).
+          </>
+        }
+      >
+        API for AI agents: partner keys
+      </Heading>
+      {msg && <p className="muted">{msg}</p>}
+      <p className="muted">
+        On the live website:{" "}
+        {st?.enabled_on_live ? "on" : "off (the preview only)"} · limits:{" "}
+        {st
+          ? Object.entries(st.limits)
+              .map(([k, v]) => `${k} ${v}`)
+              .join(", ")
+          : "…"}
+      </p>
+      <ul>
+        {(st?.keys ?? []).map((k) => (
+          <li key={k.id}>
+            {k.name} <code>{k.shown}</code>
+            {k.company ? ` · B2B: ${k.company}` : ""}{" "}
+            <span className="muted">{when(k.created)}</span>{" "}
+            {k.revoked ? (
+              <StatusChip status="revoked">revoked</StatusChip>
+            ) : (
+              <IconButton
+                icon="delete"
+                label={`revoke ${k.name}`}
+                className="link"
+                onClick={async () => setSt(await admin.revokeAgentKey(k.id))}
+              />
+            )}
+          </li>
+        ))}
+      </ul>
+      <div className="row">
+        <input
+          aria-label="Key name"
+          placeholder="partner, e.g. a garden centre's assistant"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <select
+          aria-label="B2B customer"
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+        >
+          <option value="">public prices (no B2B customer)</option>
+          {(st?.companies ?? [])
+            .filter((c) => c.status === "active")
+            .map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                B2B: {c.name}
+              </option>
+            ))}
+        </select>
+        <button
+          title="Make a partner key"
+          disabled={!name}
+          onClick={async () => {
+            try {
+              const r = await admin.newAgentKey(
+                name,
+                company ? Number(company) : null,
+              );
+              setNewKey(r.key);
+              setName("");
+              load();
+            } catch (e) {
+              setMsg(String(e));
+            }
+          }}
+        >
+          <Icon name="add" /> Create key
+        </button>
+      </div>
+      {newKey && (
+        <p>
+          New key (copy it now, it is not shown again): <code>{newKey}</code>
+        </p>
+      )}
+      <h3>Requests per day (last 7 days)</h3>
+      {days.length === 0 ? (
+        <p className="muted">No requests yet.</p>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Caller</th>
+                {days.map((d) => (
+                  <th key={d}>{d}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {callers.map((w) => (
+                <tr key={w}>
+                  <td>{keyName(w)}</td>
+                  {days.map((d) => (
+                    <td key={d}>{total(d, w) || ""}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -7,7 +7,15 @@
 // which ones the owner wants to change himself is open question 5).
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { admin, api, ParamSpec, Scalar, shopAdmin } from "./api";
-import { Audit, EmbedAndKeys, Mail, Sessions, System, Users } from "./Admin";
+import {
+  AgentKeys,
+  Audit,
+  EmbedAndKeys,
+  Mail,
+  Sessions,
+  System,
+  Users,
+} from "./Admin";
 import { Heading, Icon, Info } from "./icons";
 import { SETTINGS_TABS, visibleSettings } from "./nav";
 import { MailOutbox } from "./MailOutbox";
@@ -338,6 +346,32 @@ const WEBSITE: Field[] = [
     label: "Scroll story as the home page",
     help: "On: live; the preview site always shows it.",
     kind: "bool",
+  },
+  {
+    key: "agent_api_enabled",
+    label: "API for AI agents",
+    help: "On: /api/v2, llms-full.txt, the measuring guide and the cover pages on the live website (also set AGENT_API in the Worker). The preview site always has them (ADR-139).",
+    kind: "bool",
+  },
+  {
+    key: "custom_lead_time.nl",
+    label: "Made-to-measure lead time, Dutch",
+    help: 'What the agent API says about a made-to-measure cover\'s lead time; empty: "confirmed after the order" (ADR-139).',
+  },
+  {
+    key: "custom_lead_time.en",
+    label: "Made-to-measure lead time, English",
+    help: "",
+  },
+  {
+    key: "custom_lead_time.de",
+    label: "Made-to-measure lead time, German",
+    help: "",
+  },
+  {
+    key: "custom_lead_time.fr",
+    label: "Made-to-measure lead time, French",
+    help: "",
   },
 ];
 
@@ -1255,9 +1289,16 @@ function AdminTab({ tab }: { tab: string }) {
               { title: "The shop on this server", fields: WEBSITE },
               PAYMENT,
             ]}
-            owns={["website_link", "home_story", "payment"]}
+            owns={[
+              "website_link",
+              "home_story",
+              "payment",
+              "agent_api_enabled",
+              "custom_lead_time",
+            ]}
           />
           <EmbedAndKeys />
+          <AgentKeys />
         </>
       )}
       {tab === "ai" && <AiSpending specs={specs} />}

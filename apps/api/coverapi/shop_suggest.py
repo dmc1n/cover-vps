@@ -1055,6 +1055,73 @@ def read(
     return out, facts
 
 
+async def read_photos(p: Any, photos: list[UploadFile]) -> list[bytes]:
+    """The uploaded photos as PNGs, each within suggest.photo_max_bytes (SuggestError if not)."""
+    limit_bytes = int(p["suggest.photo_max_bytes"])
+    pngs = []
+    for ph in photos:
+        raw = await ph.read(limit_bytes + 1)
+        if len(raw) > limit_bytes:
+            raise SuggestError(f"a photo may be at most {limit_bytes // 1_000_000} MB")
+        pngs.append(photo_png(raw))
+    return pngs
+
+
+async def run_suggestion(
+    p: Any,
+    pngs: list[bytes],
+    url: str,
+    lang: str,
+    who: str,
+    models: Path,
+    data: Path,
+    cap_eur: float = 0.0,
+) -> dict[str, Any]:
+    """The suggestion for these photos and/or this link, every paid call on `who`'s ledger line
+    (a visitor, or an agent API key: ADR-139), with the existing cover that fits. The caller has
+    checked its limits. HTTPException 400/502/503 on a problem."""
+    from coverengine import match as mt
+    from coverengine import spend
+    from coverengine.errors import CoverError
+
+    from coverapi import match_list
+
+    # the web and the AI take up to a minute: off the event loop, so the rest of the app keeps
+    # answering meanwhile
+    def read_for_visitor() -> tuple[dict[str, Any], dict[str, Any] | None]:
+        with spend.for_visitor(who, cap_eur):  # every paid call on this visitor's line
+            return read(p, pngs, url, lang)
+
+    try:
+        out, facts = await run_in_threadpool(read_for_visitor)
+    except SuggestError as exc:
+        raise HTTPException(400, str(exc)) from None
+    except CoverError as exc:  # the month's AI budget, or the AI did not answer
+        msg = str(exc)
+        log.warning("suggest: %s", msg)  # the reason only (no photo, no key)
+        if "caller's AI budget" in msg:  # a partner key's day (ADR-139)
+            raise HTTPException(429, "this key's AI budget of today is used up") from None
+        if "budget" in msg:
+            raise HTTPException(503, "this service is resting for now; please choose by "
+                                     "hand below") from None  # fmt: skip
+        raise HTTPException(502, "we could not read it just now; please choose by hand"
+                            ) from None  # fmt: skip
+    out["source"] = {"url": facts["url"] if facts else None,
+                     "title": facts["title"] if facts else None,
+                     "photos": len(pngs)}  # fmt: skip
+    try:  # an existing cover that fits these sizes (ADR-064)
+        rec = out.get("recognised") or {}
+        hint = " ".join(str(x or "") for x in (out["source"]["title"], rec.get("name"),
+                                                 rec.get("title")))  # fmt: skip
+        r = mt.match(out["product"], out["sizes"], models, p, top=1,
+                     listing=match_list.for_data(data), hint=hint)  # fmt: skip
+        best = r["matches"][0] if r["matches"] else None
+        out["match"] = best if best and r["decision"] != "custom" else None
+    except (ValueError, CoverError, KeyError):
+        out["match"] = None
+    return out
+
+
 # ---- the endpoints ------------------------------------------------------------------------------
 
 
@@ -1084,11 +1151,8 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
         website: str = Form(""),  # noqa: B008 - the honeypot: people never see it (ADR-103)
     ) -> dict[str, Any]:
         """Sizes suggested from a photo and/or a link (nothing is stored)."""
-        from coverengine import match as mt
         from coverengine import spend
         from coverengine.errors import CoverError
-
-        from coverapi import match_list
 
         if website:
             raise HTTPException(400, "this could not be sent")
@@ -1114,54 +1178,12 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:
                 del asked[k]
         if len(photos) > MAX_PHOTOS:
             raise HTTPException(400, f"at most {MAX_PHOTOS} photos")
-        limit_bytes = int(p["suggest.photo_max_bytes"])  # type: ignore[arg-type]
         lang = lang if re.fullmatch(r"[a-z]{2}", lang or "") else "nl"
         try:
-            pngs = []
-            for ph in photos:
-                raw = await ph.read(limit_bytes + 1)
-                if len(raw) > limit_bytes:
-                    raise SuggestError(f"a photo may be at most {limit_bytes // 1_000_000} MB")
-                pngs.append(photo_png(raw))
-
-            # the web and the AI take up to a minute: off the event loop, so the rest of the
-            # app keeps answering meanwhile
-            def read_for_visitor() -> tuple[dict[str, Any], dict[str, Any] | None]:
-                with spend.for_visitor(who):  # every paid call on this visitor's line
-                    return read(p, pngs, url, lang)
-
-            out, facts = await run_in_threadpool(read_for_visitor)
+            pngs = await read_photos(p, photos)
         except SuggestError as exc:
             raise HTTPException(400, str(exc)) from None
-        except CoverError as exc:  # the month's AI budget, or the AI did not answer
-            msg = str(exc)
-            log.warning("suggest: %s", msg)  # the reason only (no photo, no key)
-            if "budget" in msg:
-                raise HTTPException(503, "this service is resting for now; please choose by "
-                                         "hand below") from None  # fmt: skip
-            raise HTTPException(502, "we could not read it just now; please choose by hand"
-                                ) from None  # fmt: skip
-        out["source"] = {"url": facts["url"] if facts else None,
-                         "title": facts["title"] if facts else None,
-                         "photos": len(photos)}  # fmt: skip
-        try:  # an existing cover that fits these sizes (ADR-064)
-            rec = out.get("recognised") or {}
-            hint = " ".join(str(x or "") for x in (out["source"]["title"], rec.get("name"),
-                                                     rec.get("title")))  # fmt: skip
-            r = mt.match(
-                out["product"],
-                out["sizes"],
-                store.models,
-                p,
-                top=1,
-                listing=match_list.for_data(data),
-                hint=hint,
-            )
-            best = r["matches"][0] if r["matches"] else None
-            out["match"] = best if best and r["decision"] != "custom" else None
-        except (ValueError, CoverError, KeyError):
-            out["match"] = None
-        return out
+        return await run_suggestion(p, pngs, url, lang, who, store.models, data)
 
     @app.post("/api/admin/shop/photo-test")
     async def photo_test(

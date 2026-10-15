@@ -139,6 +139,12 @@ SHOP_DEFAULTS: dict[str, Any] = {
     # the barbecues in the configurator, its quotes, matching and B2B (ADR-119): off until the
     # owner has set their prices; the preview site (preview.<domain>) always has them
     "bbq_enabled": False,
+    # the API for AI agents (/api/v2), llms-full.txt, the measuring guide and the cover pages
+    # (ADR-139): off on the live shop until the owner's go; the preview site always has them
+    "agent_api_enabled": False,
+    # a made-to-measure cover's lead time per language, as the agent API states it (ADR-139);
+    # empty: the API says it is confirmed after the order (never a made-up time)
+    "custom_lead_time": {"nl": "", "en": "", "de": "", "fr": ""},
     "fit_mail": {"enabled": False, "days": 14},
     # ADR-066: the website runs elsewhere (its own domain, on Cloudflare) and reaches this
     # server through a key; closed: the shop here answers only the website and colleagues
@@ -790,6 +796,22 @@ def payment_mismatch(pay: dict[str, Any], order: int, total_eur: float, mode: st
     return None
 
 
+def b2c_cover_price(ps: dict[str, Any], sale_eur: float, stock_id: str | None,
+                    discount_pct: float) -> tuple[float, str, float]:  # fmt: skip
+    """A cover's consumer price incl. VAT and where it comes from: the published B2C list's
+    fixed price for an existing cover (ADR-098, ADR-113), else for an existing cover the
+    configurator's price for its own sizes minus the stock discount (ADR-114, ADR-118), else the
+    configurator's price ("custom"). The shop's quote and the agent API (ADR-139) both use it."""
+    from coverengine import costing
+
+    fixed = costing.fixed_price(ps, stock_id, "b2c") if stock_id else None
+    if fixed:
+        return float(fixed["gross_eur"]), "fixed", 0.0
+    if stock_id:
+        return round(sale_eur * (1 - discount_pct / 100), 2), "stock", discount_pct  # noqa: PLR2004 - percent
+    return float(sale_eur), "custom", 0.0
+
+
 def shop_params(auth: Any) -> Any:
     """The engine's parameters with the owner's shop prices on top (when set)."""
     from coverengine.params import Registry
@@ -896,8 +918,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         from fastapi.responses import JSONResponse, RedirectResponse
 
         path = request.url.path
-        shop_path = path.startswith(("/api/shop/", "/media/", "/shop")) or path in (
-            "/sitemap.xml", "/llms.txt")  # fmt: skip
+        shop_path = path.startswith(("/api/shop/", "/media/", "/shop", "/api/v2/")) or path in (
+            "/sitemap.xml", "/llms.txt", "/llms-full.txt")  # fmt: skip
         # the old webshop API (ADR-061) too, except for a webshop's own key (checked there)
         if path.startswith("/api/public/") and not request.headers.get("x-api-key"):
             shop_path = True
@@ -1076,13 +1098,11 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
             glb = q.scene_glb(req.product, given, p, req.support)
         except CoverError as exc:
             raise HTTPException(400, str(exc)) from None
-        fixed = costing.fixed_price(ps, stock["model_id"], "b2c") if stock else None
-        off = 0.0
-        if fixed:  # the consumer list's fixed price for this cover wins (ADR-098, ADR-113)
-            full["price"]["sale_eur"] = fixed["gross_eur"]
-        elif stock:  # an existing cover: its own sizes, and the stock discount (when set)
-            off = float(settings()["matching"].get("stock_discount_pct") or 0)
-            full["price"]["sale_eur"] = round(full["price"]["sale_eur"] * (1 - off / 100), 2)  # noqa: PLR2004 - percent
+        sale, source, off = b2c_cover_price(
+            ps, full["price"]["sale_eur"], stock["model_id"] if stock else None,
+            float(settings()["matching"].get("stock_discount_pct") or 0))  # fmt: skip
+        fixed = source == "fixed"
+        full["price"]["sale_eur"] = sale
         extra = 0.0  # the support is sold next to the cover, at the consumer price list's price
         if req.support == "balloons":
             extra = full["balloons"] * costing.accessory_price(ps, "balloon", "b2c")["gross_eur"]
@@ -2180,4 +2200,12 @@ def install_pages(app: FastAPI, auth: Any, web_dir: Path) -> None:
                   f"- [Contact]({b}contact)", f"- [Warranty]({b}warranty)", "",
                   "## Languages",
                   "The shop is in " + ", ".join(site_languages(auth)) + "."]  # fmt: skip
+        from coverapi.agent_api import agent_on
+
+        sub = getattr(app.state, "agent_api", None)
+        if sub is not None and agent_on(auth, request):  # ADR-139: where the agent API is open
+            from coverapi.agent_pages import agent_section
+
+            lines += ["", *agent_section(sub.state.site_root(request), sub.state.api_root(request),
+                                         sub.state.feeds_root(request))]  # fmt: skip
         return PlainTextResponse("\n".join(lines) + "\n")
