@@ -521,14 +521,15 @@ def logo_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     hoods = [p for p in fin.get("pieces", []) if p.get("name") == "vent-hood"]
     if not hoods:
         return []
-    hood = hoods[0]
-    if not hood.get("logo_mm"):
+    if not all(h.get("logo_mm") for h in hoods):
         why = (
             "no logo frame in finished.json (exported before ADR-146, the logo on the "
             "hood's short top side): export again"
         )
         return [_check("vent logo", False, why)]
-    return [_check("vent logo", *logo_on_long_bottom_side(hood))]
+    results = [logo_on_long_bottom_side(h) for h in hoods]  # every hood piece
+    bad = [why for ok, why in results if not ok]
+    return [_check("vent logo", not bad, "; ".join(bad) or results[0][1])]
 
 
 def logo_on_long_bottom_side(hood: dict[str, Any]) -> tuple[bool, str]:
@@ -541,6 +542,9 @@ def logo_on_long_bottom_side(hood: dict[str, Any]) -> tuple[bool, str]:
     w, h = float(np.ptp(frame[:, 0])), float(np.ptp(frame[:, 1]))
     cx, cy = frame[:4].mean(axis=0)
     problems = []
+    if frame.min(axis=0)[0] < x0 or frame.min(axis=0)[1] < y0 or frame.max(axis=0)[0] > x1 \
+            or frame.max(axis=0)[1] > y1:  # fmt: skip
+        problems.append("not inside the hood")
     if w <= h:
         problems.append("standing on its short side")
     if abs(cx - (x0 + x1) / 2) > 1.0:  # param-ok: mm, centred

@@ -553,3 +553,6 @@ def test_the_vent_logo_sits_along_the_hoods_open_lower_edge_upright() -> None:
     on_end = dict(entry, logo_mm=[[120, 20], [160, 20], [160, 140], [120, 140], [120, 20]])
     ok, why = logo_on_long_bottom_side(on_end)
     assert not ok and "short side" in why
+    outside = dict(entry, logo_mm=[[80, -20], [200, -20], [200, 20], [80, 20], [80, -20]])
+    ok, why = logo_on_long_bottom_side(outside)
+    assert not ok and "not inside" in why

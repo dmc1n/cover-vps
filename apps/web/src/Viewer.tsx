@@ -460,6 +460,19 @@ export function Viewer({
     controls.enableDamping = true;
     cameraRef.current = camera;
     controlsRef.current = controls;
+    // for the browser check (e2e/vent_logo.py): look straight at a point from 1.2 m along its
+    // outward normal (engine mm, Z up)
+    (
+      renderer.domElement as HTMLCanvasElement & {
+        lookAtMm?: (p: number[], n: number[]) => void;
+      }
+    ).lookAtMm = (p: number[], n: number[]) => {
+      const at = toScene(p);
+      const dir = toScene([n[0] * 1000, n[1] * 1000, n[2] * 1000]);
+      camera.position.copy(at).addScaledVector(dir, 1.2);
+      controls.target.copy(at);
+      controls.update();
+    };
     setReady((n) => n + 1);
     const loader = new GLTFLoader();
     const box = new THREE.Box3();
@@ -801,10 +814,16 @@ export function Viewer({
         group = ventGroup(vents, showLogo);
         group.name = "vents";
         sceneRef.current.add(group);
+        // for the browser check (e2e/vent_logo.py): how many logos are drawn
+        if (canvasRef.current)
+          canvasRef.current.dataset.ventLogos = String(
+            group.children.filter((o) => o.name === "vent-logo").length,
+          );
       })
       .catch(() => undefined);
     return () => {
       alive = false;
+      if (canvasRef.current) canvasRef.current.dataset.ventLogos = "0";
       if (group) {
         scene.remove(group);
         disposeObject(group);
