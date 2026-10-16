@@ -14,7 +14,8 @@ flat triangle it lies in. Written by `cover export` as `vents.json`:
                                    "line_mm": [[x, y, z] x 2]}, "right": {...}},
                 "hood": {"seam_mm": [[x, y, z] x 2], "down": [x, y, z], "length_mm": l},
                 "logo": {"corners_mm": [[x, y, z] x 4], "centre_mm": [x, y, z],
-                         "below_seam_mm": [top, bottom], "size_mm": [w, h]} | null}],
+                         "below_seam_mm": [top, bottom], "size_mm": [w, h] (on the hood)}
+                         | null}],
      "warnings": [...]}
 
 Corners run bottom left, bottom right, top right, top left (as seen from outside); the normal
@@ -115,10 +116,10 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
     head: dict[str, Any] = {"format": VENTS_FORMAT, "lower_edge_z_mm": round(lower, 1)}
     if not vents:
         return {**head, "logo": "none", "vents": out, "warnings": warnings}
-    logos = _finished_logos(model_dir)
+    logos, logo_size = _finished_logos(model_dir)
     frame = logo_frame(params)
     a = float(params["stitching.allowance_mm"])  # type: ignore[arg-type]
-    hood_w, hood_h = hood_size(params)
+    hood_w, _ = hood_size(params)
     skip = frozenset() if params["features.vent_inner_walls"] else walls.inner
     bases, _ = vent_bases(doc["panels"], params, skip)
     panel_of = {p["name"]: p for p in doc["panels"]}
@@ -197,7 +198,7 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
 
                 vent |= vent_sizes(rect, runs, panel_of[name], to3d, lower, swapped)
             vent |= _hood_and_logo(rect, logos.get(name, []), v, f, uv, normal, swapped,
-                                   frame, a, hood_w, hood_h)  # fmt: skip
+                                   frame, a, hood_w, logo_size)  # fmt: skip
             out.append(vent)
     if frame is None:
         state = "none"
@@ -208,20 +209,24 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
     return {**head, "logo": state, "vents": out, "warnings": warnings}
 
 
-def _finished_logos(model_dir: Path) -> dict[str, list[tuple[Array, Array]]]:
+def _finished_logos(model_dir: Path) -> tuple[dict[str, list[tuple[Array, Array]]], list[float]]:
     """Per piece in finished.json: each opening with its logo frame on the cover (format 2 on;
-    an older export has none)."""
+    an older export has none); and the frame's size on the hood (`logo_mm`), [] without."""
     try:
         fin = json.loads((model_dir / FINISHED_JSON).read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {}
+        return {}, []
     out: dict[str, list[tuple[Array, Array]]] = {}
+    size: list[float] = []
     for pc in fin.get("pieces", []):
+        if pc.get("name") == "vent-hood" and pc.get("logo_mm"):
+            frame = np.asarray(pc["logo_mm"], dtype=np.float64)
+            size = [round(float(x), 1) for x in np.ptp(frame, axis=0)]
         openings, logos = pc.get("openings_mm") or [], pc.get("logos_mm") or []
         if len(openings) == len(logos):
             out[pc["name"]] = [(np.asarray(o, dtype=np.float64), np.asarray(lg, dtype=np.float64))
                                for o, lg in zip(openings, logos, strict=True)]  # fmt: skip
-    return out
+    return out, size
 
 
 def _hood_and_logo(
@@ -235,7 +240,7 @@ def _hood_and_logo(
     frame: Array | None,
     allowance: float,
     hood_w: float,
-    hood_h: float,
+    logo_size: list[float],
 ) -> dict[str, Any]:
     """The hood's top stitch line and the logo of one vent in 3D (see the module's docstring).
     The logo is the one finished.json gives for this opening (the same corners within
@@ -267,7 +272,7 @@ def _hood_and_logo(
     match = next((lg for o, lg in logos
                   if o.shape == rect.shape and float(np.abs(o - rect).max()) <= SAME_OUTLINE_MM),
                  None)  # fmt: skip
-    if match is None:
+    if match is None or not logo_size:
         return out
     pts = [_to_3d(v, f, uv, q)[0] for q in match[:4]]
     if swapped:
@@ -278,9 +283,8 @@ def _hood_and_logo(
         "corners_mm": [_r(p) for p in pts],
         "centre_mm": _r(np.mean(pts, axis=0)),
         "below_seam_mm": [round(float(below.min()), 1), round(float(below.max()), 1)],
-        "size_mm": [round(float(np.ptp(match[:4] @ along)), 1),
-                    round(float(np.ptp(match[:4] @ up)), 1)],
-    }  # fmt: skip
+        "size_mm": logo_size,  # on the hood (on the cover it hangs foreshortened)
+    }
     return out
 
 
