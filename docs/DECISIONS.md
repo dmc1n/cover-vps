@@ -5724,3 +5724,88 @@ aan de lange kant aan de onderkant van de airvent met het logo omhoog, graag imp
   person (the write to the live model was refused by the session's safety check).
 - **Not chosen:** a separate logos.json (finished.json already carries the pieces the DXF is
   drawn from); a sewing simulation of the hood's bulge (the 3D shows where, not how it folds).
+
+## ADR-147 — The cutting file in the browser: cut.dxf drawn on the server, viewing is not downloading (16 Oct 2026)
+
+The owner (16 Oct 2026): "we can now only download the DXF after approval, but Rens, Wout and I
+would like to see the DXF in the browser during the approval process".
+
+- **Where:** the Desk card's **Pieces** tab (full width, above the pieces and revisions) and
+  the cover page's **Pieces → Cutting file** (`#/model/<id>/pieces/cutfile`; a *Cutting file*
+  button beside the DXF on Cut pieces). One component, `apps/web/src/CutView.tsx`.
+- **Drawn from the DXF itself.** `coverengine/export/cutview.py` reads cut.dxf's bytes with
+  ezdxf (every modelspace entity, blocks exploded, arcs and bulges flattened within
+  `desk.preview_flatten_mm`, `$INSUNITS` scaled to mm) and writes its own SVG: the layers CUT,
+  PEN and other as separate groups, the pen texts as text (left-aligned TEXT fitted to the
+  stroke font's width, so it lands where the export placed it). An entity it cannot draw is
+  counted and named under the drawing, never silently left out. It never reads cut.svg or
+  finished.json, so the picture cannot differ from the file. Our own renderer rather than
+  ezdxf's drawing add-on: we need the layers as switchable groups, the pieces as clickable
+  shapes and stable output for the cache; the add-on draws text as glyph paths and gives
+  neither.
+- **Pieces from the file:** closed CUT rings nested by containment (a ring inside a piece is
+  its opening, a vent); PEN lines and texts belong to the piece around them; the name is the
+  largest "P<n> …" label inside it (a label at a thin piece's middle can fall just outside its
+  outline: then the clearly nearest piece without a label takes it). Edges run from corner to
+  corner (`desk.preview_corner_deg`), an edge under `desk.preview_min_edge_mm` (an allowance's
+  cut-off corner) joined to its shorter neighbour so the list shows the sides a person
+  measures; the lengths add up to the outline.
+- **The viewer:** toggles Cut, Pen, Texts and Names (remembered per browser); zoom (buttons,
+  wheel, a trackpad pinch, two fingers on an iPad: pointer events with `touch-action: none`),
+  pan, fit, keys + − 0 Esc; a scale bar in cm; a click or tap on a piece shows its box, area,
+  outline and each edge in cm, also on the drawing; a measuring tool (two clicks, corners snap).
+  The colours are tokens (`--cv-*`, 3:1 on the stage, in test_web_tokens.py).
+- **Revisions:** *Compare with* (or *compare* in the Revisions list) puts an older revision's
+  drawing beside the current one (stacked on an iPad). `compare()` matches pieces by name and
+  copy and marks each: added, removed, size (box moved more than `desk.preview_changed_mm`),
+  outline (same box, outline or openings moved), pen (every cut line the same, the pen marks or
+  texts changed), same; the export's revision stamp is not a change. On T1 r7 → now it says
+  "Pen marks only: every cut line the same", the six hoods with "+ OPEN EDGE, INSERT, TOP: SEW
+  TO COVER" (ADR-146's logo). A row zooms both drawings to the piece.
+- **Viewing is not downloading.** `GET /api/models/<id>/cutview` (the meta: sheet, names, boxes,
+  corners and edge lengths, never an outline), `/cutview.svg` (the drawing) and
+  `/cutview/diff?a=&b=`. The DXF's bytes are never sent; its download gate is unchanged. Until
+  the Desk approved this very fingerprint (the bytes read once: the fingerprint, the drawing
+  and the watermark agree; a revision: its fingerprint in `approved_fingerprints`), the
+  drawing carries **PREVIEW – NOT FOR CUTTING**: a red band above the sheet with the cover,
+  revision and fingerprint, the words across the sheet, the SVG's title, and the header
+  `X-Cutview-Watermark: 1`. The SVG is served inline with a sandboxing CSP.
+- **Rights:** admins, the Desk's approvers (`desk.approver`) and editors; the workshop login
+  only where `desk.dxf_allowed` (an approved cover, so the DXF is downloadable anyway; the
+  route added to `security.WORKSHOP_READ`, the check in the route); viewers never (403 before a
+  byte is read).
+- **Cache:** `<data>/cutview-cache/<fingerprint>-v<renderer>-<settings>.svg|json` (never in a
+  model folder), written atomically, at most two drawings made at a time, the oldest beyond
+  `desk.preview_cache_keep` removed; a DXF over `desk.preview_max_mb` is refused (413).
+  Measured on the server: the 1.5 MB cut.dxf of suns-lounge-blocchi (23 pieces, 699 PEN lines)
+  drawn in 0.5 s, 296 kB of SVG; T1 in 0.07 s; in the browser the big cover is on screen in
+  about 1.3 s.
+- **Codex** wrote the API tests (30, reviewed: rights matrix, the gate, no DXF bytes, the
+  watermark before and after an approval and after a changed cut, revisions and their
+  approval, the diff, 404s, the cache, 413, the workshop with the gate off, the allow-list).
+  Its adversarial review (focus: leaks before approval, rights, the watermark, big covers),
+  verdict *needs-attention*, one finding: "Unapproved SVG exposes the complete cutting
+  geometry … deleting that group yields the unobscured geometry, which can be imported or
+  converted for cutting." Held in part, fixed: the words across the sheet now lie inside the
+  CUT layer itself (a drawing converted for a cutter as it is would cut them), and an
+  unapproved SVG has no millimetre size (opened elsewhere it is not at the table's scale);
+  the workshop login no longer gets cut.svg (`files/cut.svg`, `pattern.svg`) before approval —
+  that was open before this change. Not taken: rasterising the preview. The owner asked for an
+  SVG that a screenshot or a saved copy cannot be confused with; the people who see it
+  (editors, approvers, admins) could already open cut.svg, pattern.json and finished.json with
+  the same outlines, and a raster would lose the sharp zoom the check needs. The gate is
+  against cutting an unapproved file by mistake, not against a deliberate copy by an editor.
+- **Tests:** `engine/tests/test_cutview.py` (a test model exported as `cover export` does:
+  every piece, name and size, the openings, a rectangle's edges, the layers' counts against
+  the DXF, the texts, determinism, the watermark in the cut layer and the band, a circle added
+  to the DXF by hand drawn as a piece, another layer, centimetre units, stroked texts, the
+  comparison: the logo moved is pen-only, a wider allowance a size change, a piece removed or
+  added; 60 wavy pieces in under 6 s); `apps/api/tests/test_cutview_api.py`. Browser:
+  `apps/web/e2e/dxf_view.py` on a scrubbed scratch copy (Chromium, 1440 with a mouse and 820 as
+  an iPad touch screen, light and dark; cover page and Desk card; watermark exactly on the
+  unapproved cover; each layer off and on; zoom, fit, wheel, drag, two-finger pinch; a piece's
+  size; measuring; T1 r7 beside the current; the workshop refused before and shown after
+  approval; a viewer refused): all good.
+- **Better later:** a server-rendered PNG at a bounded resolution for people outside the
+  studio, should the cutting file ever be shown to them; snapping the measuring tool to any
+  point of an outline, not only corners.

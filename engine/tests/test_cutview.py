@@ -106,6 +106,12 @@ def test_the_watermark_is_part_of_the_drawing(built: Any) -> None:
     assert "<title>PREVIEW – NOT FOR CUTTING</title>" in marked
     band = cv.band_mm(meta)
     assert f'viewBox="0 -{cv._num(band)} ' in marked  # the band above the drawing
+    # Codex's review: the words lie inside the CUT layer (a drawing converted for a cutter as it
+    # is would cut them), and the unapproved drawing has no millimetre size
+    cut_group = marked[marked.index('class="cv-cut"') : marked.index('class="cv-pen"')]
+    assert cv.WATERMARK in cut_group
+    assert 'height="' not in marked.split(">", 1)[0] and 'mm"' not in marked.split(">", 1)[0]
+    assert 'width="' in svg.split(">", 1)[0]  # the approved drawing keeps its scale
     clean = cv.clean(svg)
     assert cv.WATERMARK not in clean and "<!--WATERMARK" not in clean
 

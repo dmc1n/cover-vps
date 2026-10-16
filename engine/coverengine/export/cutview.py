@@ -39,7 +39,7 @@ from coverengine.export.strokefont import text_width
 
 Array = NDArray[np.float64]
 
-VERSION = 2  # param-ok: the renderer's version, part of the cache key
+VERSION = 3  # param-ok: the renderer's version, part of the cache key
 WATERMARK = "PREVIEW – NOT FOR CUTTING"
 GEOMETRY = "_geometry"  # the meta's private part: outlines for compare(), never sent
 PAD_MM = 20.0  # param-ok: the drawing's margin
@@ -410,6 +410,7 @@ def render(data: bytes, cut_layer: str, pen_layer: str, flatten_mm: float, corne
         if ln.kind == "cut" and i not in owner:
             out.append(f'<path class="cv-loose" vector-effect="non-scaling-stroke" '
                        f'd="{fr.d(ln.points, ln.closed)}"/>')  # fmt: skip
+    out.append("<!--WATERMARK-CUT-->")
     out.append("</g>")
     for kind, colour in (("pen", "#0047d4"), ("other", "#7a7a7a")):
         out.append(f'<g class="cv-{kind}" fill="none" stroke="{colour}" stroke-width="0.8" '
@@ -525,19 +526,23 @@ def watermarked(svg: str, meta: dict[str, Any], note: str = "") -> str:
     wm = (
         f'<g class="cv-watermark" pointer-events="none" font-family="Arial, Helvetica, '
         f'sans-serif" font-weight="700">'
-        f'<g fill="#c00000" fill-opacity="0.16" font-size="{_num(size)}">{"".join(marks)}</g>'
         f'<rect x="0" y="{_num(-band)}" width="{_num(w)}" height="{_num(band)}" fill="#c00000"/>'
         f'<text x="{_num(w / 2)}" y="{_num(-band * 0.32)}" text-anchor="middle" fill="#ffffff" '
         f'font-size="{_num(min(size * 0.9, w * 0.9 / (0.6 * len(label))))}">'  # param-ok: fit
         f"{escape(label)}</text></g>"
     )
+    # the words across the sheet sit inside the CUT layer: a drawing converted for a cutter as it
+    # is would cut them too (Codex's review: a separate group is deleted in a moment)
+    across = (f'<g class="cv-watermark cv-wm-cut" pointer-events="none" stroke="none" '
+              f'fill="#c00000" fill-opacity="0.16" font-family="Arial, Helvetica, sans-serif" '
+              f'font-weight="700" font-size="{_num(size)}">{"".join(marks)}</g>')  # fmt: skip
     title = f"<title>{escape(WATERMARK)}</title><desc>{escape(note)}</desc>"
     # the band goes above the drawing (the viewBox grows upwards), so it hides no piece; the
-    # meta's coordinates stay as they are
+    # meta's coordinates stay as they are. No millimetre size: an unapproved drawing opened in
+    # another program is not at the cutting table's scale
     head = f'viewBox="0 0 {_num(w)} {_num(h)}" width="{_num(w)}mm" height="{_num(h)}mm"'
-    grown = (f'viewBox="0 {_num(-band)} {_num(w)} {_num(h + band)}" width="{_num(w)}mm" '
-             f'height="{_num(h + band)}mm" data-watermark="1"')  # fmt: skip
-    out = svg.replace(head, grown, 1)
+    grown = f'viewBox="0 {_num(-band)} {_num(w)} {_num(h + band)}" data-watermark="1"'
+    out = svg.replace(head, grown, 1).replace("<!--WATERMARK-CUT-->", across, 1)
     return out.replace("<!--WATERMARK-TITLE-->", title, 1).replace("<!--WATERMARK-->", wm, 1)
 
 
@@ -553,7 +558,8 @@ def _wm_size(w: float, h: float) -> float:
 
 def clean(svg: str) -> str:
     """The rendering of an approved cut file: no watermark."""
-    return svg.replace("<!--WATERMARK-TITLE-->\n", "", 1).replace("<!--WATERMARK-->\n", "", 1)
+    out = svg.replace("<!--WATERMARK-TITLE-->\n", "", 1).replace("<!--WATERMARK-->\n", "", 1)
+    return out.replace("<!--WATERMARK-CUT-->\n", "", 1)
 
 
 def _hausdorff(a: Any, b: Any) -> float:

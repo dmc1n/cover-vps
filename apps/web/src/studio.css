@@ -6912,6 +6912,9 @@ a.icon-btn.ws-file {
   stroke: var(--cv-cut);
   stroke-width: 1.3px;
 }
+.cv .cv-wm-cut {
+  stroke: none; /* the watermark's words inside the CUT layer (ADR-147) */
+}
 .cv .cv-pen {
   stroke: var(--cv-pen);
   stroke-width: 0.9px;

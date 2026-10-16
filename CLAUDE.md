@@ -328,6 +328,12 @@ apps/web/e2e/bbq.py                         the configurator's barbecue option i
 3D view → Show ▾ → Logo                    each vent's logo on its sewn hood, from finished.json's logos_mm (vents.json
                                              format 3), the cover page and the Desk card (ADR-146)
 apps/web/e2e/vent_logo.py                   the Logo layer in a real browser, a cover's 3D tab and a Desk card (ADR-146)
+<cover> → Pieces → Cutting file; Desk card → Pieces   cut.dxf drawn on the server (layers CUT/PEN/texts, zoom, pinch,
+                                             piece sizes and edges, measure, an older revision beside it with what changed);
+                                             GET /api/models/<id>/cutview[.svg|/diff], cached in <data>/cutview-cache by
+                                             the cut fingerprint; watermarked until approved (ADR-147, `desk.preview_*`)
+apps/web/e2e/dxf_view.py                    the Cutting file view in a real browser: cover page and Desk card, 1440 and an
+                                             iPad (touch), light and dark, layers, rights (usage in its docstring)
 apps/web/e2e/uinav.py                       the studio's map (ADR-122, 124, 126): every menu item per role, every old address, a
                                              cover's and a Desk card's tabs, a cover's Price & shop, All covers' prices, All covers' filters, the search, the theme,
                                              1440/1024 (touch)/820 px, light and dark with a strict contrast check, field borders 3:1,
@@ -446,3 +452,8 @@ Historical DXFs require an approved fingerprint. Earlier approvals are grandfath
 with `uv run python scripts/desk_fingerprints.py --dry-run|--apply` (COVER_DATA_DIR/models).
 The workshop role's API access is an allow-list (`coverapi/security.py`): a new route stays closed
 to it until it is named there.
+Viewing is not downloading (ADR-147): the Cutting file view draws cut.dxf on the server
+(`coverengine/export/cutview.py`, `coverapi/cutview.py`) and serves only an SVG and a meta without
+outlines, with "PREVIEW – NOT FOR CUTTING" in the drawing until the Desk approved that very
+fingerprint; never the DXF's bytes, never cut.svg. Admins, approvers and editors see it; the
+workshop only where `desk.dxf_allowed`; viewers never.

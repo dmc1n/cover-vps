@@ -115,6 +115,8 @@ export function CutViewer({
         if (!live) return;
         const doc = new DOMParser().parseFromString(text, "image/svg+xml");
         const root = doc.documentElement;
+        if (root.nodeName !== "svg" || !root.getAttribute("viewBox"))
+          throw new Error("The drawing could not be read: reload the page");
         const [x, y, w, h] = (root.getAttribute("viewBox") ?? "0 0 1 1")
           .split(/\s+/)
           .map(Number);

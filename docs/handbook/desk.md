@@ -104,6 +104,42 @@ or marked produced is listed for the workshop, with its files and how it fitted,
 record earlier approvals' cutting files, and send the other built covers for approval.
 Rejected covers and approvals for another cut stay closed.
 
+## The cutting file in the browser (ADR-147)
+
+You can look at the cutting file while you decide, without downloading it. On a Desk card it
+is at the top of **Pieces**; on a cover's page under **Pieces → Cutting file** (also the
+*Cutting file* button next to the DXF on Cut pieces).
+
+- **What you see is the cutting table's file.** The studio reads the cover's own `cut.dxf`
+  and draws it: red is cut (outlines and the vent openings), blue is drawn by the pen (stitch
+  lines, ticks, the LOGO frames, TOP/UP arrows, labels). It never shows the separate
+  `cut.svg`, so the picture and the file cannot differ.
+- **PREVIEW – NOT FOR CUTTING.** Until the Desk approves this very cutting file, those words
+  run across the drawing and over its top, and the chip says *Preview*. A screenshot or a saved
+  picture keeps them. After approval the chip says *Approved* and the words go. The DXF itself
+  stays locked until approval, exactly as before: looking is not downloading.
+- **Layers:** *Cut*, *Pen*, *Texts* and *Names* switch each layer off and on (the browser
+  remembers your choice). *Names* are the big piece names drawn over the sheet when zoomed out;
+  they step aside once the file's own labels are readable.
+- **Moving around:** drag to move; scroll, use + and −, or pinch with two fingers on an iPad to
+  zoom; the square button (or the 0 key) fits the whole sheet. The bar at the bottom left is the
+  scale in cm.
+- **A piece's size:** click (tap) a piece. Its box (width × height on the sheet), area, outline
+  length and each edge from corner to corner (E1, E2, …, in cm) appear under the drawing and on
+  the piece. Tiny edges, such as an allowance's cut-off corner, are counted in the edge next to
+  them.
+- **Measuring:** the tape button, then two clicks; a click near a corner snaps to it. The
+  distance is shown in cm and mm.
+- **Compare with an older revision:** choose it under *Compare with* (or *compare* in the
+  Revisions list). Both drawings appear side by side (one above the other on an iPad) with a
+  list of what changed: new pieces (green), pieces gone (red), a size or outline change
+  (orange), and changes on the pen layer only (purple), for example the new vent logo
+  (ADR-146): then it says *Pen marks only: every cut line the same*. Click a row to zoom both
+  drawings to that piece.
+- **Who sees it:** admins, the Desk's approvers and editors, for every cover. The workshop
+  login sees it only once the cover is approved (then it can download the DXF anyway).
+  Viewers do not see it.
+
 ## Correct this cover (ADR-082)
 
 A correction changes the cover itself: it is saved on the cover, the cover is recalculated at

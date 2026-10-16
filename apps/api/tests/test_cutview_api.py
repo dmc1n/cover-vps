@@ -245,3 +245,14 @@ def test_workshop_allow_list_names_only_preview_routes() -> None:
     for suffix in ("", ".svg", "/diff"):
         assert workshop_may("GET", "/api/models/x/cutview" + suffix)
     assert not workshop_may("GET", "/api/models/x/cutview.dxf")
+
+
+def test_the_workshop_gets_no_flat_drawing_before_approval(app: Any) -> None:
+    """Codex's review of ADR-147: cut.svg is the cutting file's geometry at scale, so the workshop
+    login (which sees the Desk) gets it only where it may download the DXF; editors as before."""
+    workshop = _login(app, "bench")
+    assert workshop.get("/api/models/test-chair/files/cut.svg").status_code == 403
+    assert workshop.get("/api/models/test-chair/files/cover.json").status_code == 200
+    assert _login(app, "designer").get("/api/models/test-chair/files/cut.svg").status_code == 200
+    assert _login(app, "wout").post("/api/desk/test-chair", json={"action": "approve"}).is_success
+    assert workshop.get("/api/models/test-chair/files/cut.svg").status_code == 200

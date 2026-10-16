@@ -263,6 +263,16 @@ def create_app(
             raise HTTPException(404, f"no file {name!r}")
         if name.endswith(".dxf"):  # a cutting-table file: only an approved cover (ADR-079, 128)
             desk.gate(d, model_id, request, name=name)
+        elif name.endswith(".svg") and getattr(getattr(request.state, "user", None), "role",
+                                               None) == desk.WORKSHOP_ROLE:  # fmt: skip
+            # the workshop login sees a cover's pieces as a flat drawing only where it may cut
+            # them (Codex's review of ADR-147): cut.svg is the DXF's geometry at scale
+            from coverengine.params import Registry
+
+            if not desk.dxf_allowed(d, Registry.load(None).resolve()):
+                raise HTTPException(
+                    403, "the workshop sees the cut pieces once the Desk approved them"
+                )
         suffix = Path(name).suffix
         file, kind = _named(model_id, name)
         # a cover's files change when it is built again under the same address: the browser
