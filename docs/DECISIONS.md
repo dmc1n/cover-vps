@@ -5675,3 +5675,44 @@ preview is recognised the same way (`x-site-host` + the Worker's key), live stay
   off): the SDK client and the MCP Inspector CLI found, for a 230 × 90 × 85 cm sofa, drawing-s12
   (95.3 %, €599), suns-sofa-bench-tagia (90.6 %), made to measure (€1,043.95) and the Rios
   bended 2-seater as "possible".
+
+## ADR-146 — The vents' logo along the hood's lower edge, upright, and shown in 3D (16 Oct 2026)
+
+The owner (16 Oct 2026, T1): "for T1 the logo on the airvent is in the wrong position, can we
+make an option so we can see the logo as well on the 3d model so we can check before we
+accept", and then what was wrong: "het logo zit nu aan de korte kant van de airvent maar moet
+aan de lange kant aan de onderkant van de airvent met het logo omhoog, graag implementeren".
+
+- **What was wrong** (T1's cut.dxf read twice, once by Codex independently): the LOGO frame
+  (12 x 4 cm) sat on the hood piece P7 (28 x 31.5 cm) at y 24–28 cm, 3.5 cm under its top
+  edge: the short side sewn to the cover. It was centred across the hood and not mirrored,
+  but the hood carried no mark of which edge is sewn on (no UP arrow, no stitch line), and the
+  word LOGO started at the frame's middle (PEN text is placed by its baseline's start). The
+  same hood is on all 444 covers with logo vents; the code dated from 1 Oct 2026.
+- **The rule now** (`finish.logo_frame`, `features.vent_logo_above_edge_mm: 35`, to confirm
+  against the insert's channel): the frame centred along the hood's open lower edge, the 28 cm
+  edge that spans the vent's 25 cm long bottom side, upright, its bottom 3.5 cm above that edge
+  (Codex's proposal: the inset it had from the other edge). The hood also gets its stitch lines
+  (top and sides, open at the bottom), "TOP: SEW TO COVER", an UP arrow towards it and "OPEN
+  EDGE, INSERT"; "P7 VENT-HOOD" moves to the middle, out of the logo's way; every hood text is
+  centred on its place (`finish.centred`). Panels and CUT lines do not change.
+- **One frame for the DXF and the 3D.** `cover export` writes the hood's frame as `logo_mm`
+  and, per vent opening of a panel, where it lies on the cover once the hood is sewn on as
+  `logos_mm` (`finish.logo_on_cover`; finished.json format 2). On the cover the hood hangs
+  from its stitch line (the PEN ring a seam allowance above the opening), centred on the
+  opening; its sides are sewn down the ring, so its length shares out over the ring's height
+  and the logo lands in the opening's lower part. `vents.json` format 3 carries each vent's
+  `logo` (corners, centre, how far under the stitch line) and `hood` (the stitch line, down,
+  its reach) to 3D through the same flat triangles as the opening; a cover exported before has
+  `logo: "missing"` and the viewer says "Logo position not computed yet: run again". The 3D
+  never computes the logo itself, so it cannot disagree with the cutting file.
+- **The viewer.** Show ▾ → **Logo** (on by default when Vents is on, remembered per browser):
+  the hood drawn see-through from its stitch line, the frame in blue on it with the word LOGO,
+  readable from outside. The cover page's 3D tab and the Desk card share the one viewer.
+- **Audit.** The check "vent logo" fails a frame in the hood's upper half (the old place), one
+  standing on its short side, one off the middle, and an export without `logo_mm`.
+- **Not rebuilt live.** A re-export changes cut.dxf of every cover with vents (the hood's PEN
+  marks), so each returns to the Desk; which ones, and when, is the owner's decision. T1 is
+  rebuilt (staged, checked twice, Codex's pass on the comparison).
+- **Not chosen:** a separate logos.json (finished.json already carries the pieces the DXF is
+  drawn from); a sewing simulation of the hood's bulge (the 3D shows where, not how it folds).

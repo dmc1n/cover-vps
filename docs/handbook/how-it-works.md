@@ -111,7 +111,9 @@ the approval. Then seven tabs:
   shown on the cover.
 - **Air vents** in the 3D view (the Vents toggle, remembered in your browser): every air vent
   where it is cut in the cover, the opening dark with a red frame, its hood above it. They are
-  the same vents as on the cutting list (after each export).
+  the same vents as on the cutting list (after each export). Show ▾ → **Logo** adds each
+  vent's logo where it sits on the sewn hood: centred along the bottom of the vent, upright
+  (owner, 16 Oct 2026), the cutting file's own frame (ADR-146).
 - **The Desk.** Rens, Wout and the other approvers approve or reject every drawing cover and
   arrangement. The cutting table's DXF of such a cover is only available once its current cut
   is approved; a change after the approval puts it back at the Desk.

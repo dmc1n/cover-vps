@@ -272,5 +272,15 @@
     "check": "engine/tests/test_finish.py::test_a_vent_by_hand_at_a_height_off_the_fold.",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792138869,
+    "model_id": "drawing-t1",
+    "complaint": "The logo on the air vent is in the wrong position: it sits on the short side of the vent but must be on the long side, along the bottom of the vent, the logo upright (owner, 16 Oct 2026, T1: \"het logo zit nu aan de korte kant van de airvent maar moet aan de lange kant aan de onderkant van de airvent met het logo omhoog\").",
+    "cause": "The LOGO frame on the vent hood piece (P7, 28 x 31.5 cm) was drawn 3.5 cm under the hood's top edge, the short 28 cm side sewn to the cover, and the hood had no mark of which edge is sewn on (no UP arrow, no stitch line); the word LOGO started at the frame's middle. Every cover with vents had the same hood.",
+    "rule": "Every vent's logo frame lies centred along the hood's open lower edge, the vent's long bottom side, upright and readable from outside, its bottom features.vent_logo_above_edge_mm above that edge. The hood carries its stitch lines (top and sides, open at the bottom), TOP: SEW TO COVER, an UP arrow and OPEN EDGE, INSERT. Check the logo in the 3D view (Show > Logo) before approving.",
+    "check": "engine/tests/test_finish.py::test_the_vent_logo_sits_along_the_hoods_open_lower_edge_upright; audit check 'vent logo' (coverengine.audit.logo_checks).",
+    "applies_to": "all",
+    "ai_model": "approver"
   }
 ]

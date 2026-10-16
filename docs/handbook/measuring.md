@@ -30,6 +30,22 @@ Kies **Show ▾ → Vent sizes** in de 3D-balk. Bij elk gat staat op de hoes en 
 
 Dit zijn dezelfde getallen als in het snijbestand, niet opnieuw geschat.
 
+## Het logo op de vents
+
+Kies **Show ▾ → Logo** in de 3D-balk (staat aan zodra **Vents** aan staat; je browser onthoudt
+het). Op elke vent zie je de kap doorschijnend, met het blauwe kader en het woord LOGO waar het
+logo op de genaaide kap komt: midden langs de onderkant van de vent, rechtop, leesbaar van
+buiten. Het kader komt uit het snijbestand zelf (dezelfde maat en plek als op de kap P7 in de
+DXF), dus de 3D kan niet iets anders laten zien dan wat de snijtafel tekent.
+
+Op de kap in de DXF staan nu ook de stiklijnen (boven en opzij, onder open), **TOP: SEW TO
+COVER** met een pijl omhoog, en **OPEN EDGE, INSERT** aan de onderrand. Het kader zit 3,5 cm
+boven die onderrand (`features.vent_logo_above_edge_mm`, nog te bevestigen).
+
+Staat er **Logo position not computed yet: run again**, dan is de hoes gemaakt voordat het
+logo werd vastgelegd: bouw hem opnieuw (export). Een hoes met vents gaat daarna terug naar de
+Desk, omdat de kap in het snijbestand verandert.
+
 ## De checklist (PDF)
 
 **Check list (PDF)** in de 3D-balk, onder **More** op de Desk-kaart, bij **Pieces → Cut

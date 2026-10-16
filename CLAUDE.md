@@ -56,6 +56,9 @@ one-line edit there.
   (Rens, 2026-10-09, ADR-134; `features.vent_on_corners`, `vent_corner_max_deg`). By hand
   (`features.vent_positions`) a vent may go one panel up, over the seam on top of a low wall (D1/D2, ADR-142), or at a height given as "piece@fraction@cm" (L3, ADR-144). Built as a cut opening with a hood of extra fabric holding a plastic insert
   that keeps it open, and a membrane inside against dirt (`features.vent_*`, pieces in M5).
+  The logo's frame lies centred along the hood's open lower edge (the vent's long bottom side),
+  upright; the hood is marked TOP / OPEN EDGE with an UP arrow (owner, 16 Oct 2026, T1, ADR-146;
+  `features.vent_logo_*`). The 3D view shows it from finished.json (Show ▾ → Logo).
 - Machine make and model, and its DXF conventions (layer names, whether it draws TEXT entities
   or needs stroked lines, arc support). Learned in M0 by cutting a test sheet.
 - Sample models: 3 to 5 representative STEP or STL files in `testdata/models/` (git-ignored,
@@ -322,6 +325,9 @@ uv run python scripts/bbq_models.py OUT [--only a,b] [--steps build,cover,check]
                                              audited and re-measured (ADR-119; list and sources in docs/plans/bbq-covers.md)
 apps/web/e2e/bbq.py                         the configurator's barbecue option in a real browser (ADR-119; usage in its docstring)
 3D view → Measure | Vent sizes; <model>/files/checklist.pdf   measuring on the cover, the workshop's check list (ADR-111)
+3D view → Show ▾ → Logo                    each vent's logo on its sewn hood, from finished.json's logos_mm (vents.json
+                                             format 3), the cover page and the Desk card (ADR-146)
+apps/web/e2e/vent_logo.py                   the Logo layer in a real browser, a cover's 3D tab and a Desk card (ADR-146)
 apps/web/e2e/uinav.py                       the studio's map (ADR-122, 124, 126): every menu item per role, every old address, a
                                              cover's and a Desk card's tabs, a cover's Price & shop, All covers' prices, All covers' filters, the search, the theme,
                                              1440/1024 (touch)/820 px, light and dark with a strict contrast check, field borders 3:1,

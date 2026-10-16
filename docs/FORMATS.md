@@ -333,7 +333,7 @@ allowances, and the extra pieces (vent hoods and membranes).
 
 ```json
 {
-  "format_version": 1, "model_id": "chair", "construction": "double_stitch",
+  "format_version": 2, "model_id": "chair", "construction": "double_stitch",
   "pattern_parameter_hash": "…", "parameter_hash": "…",
   "pieces": [
     { "id": "P5", "name": "skirt-right", "quantity": 1,
@@ -348,7 +348,10 @@ allowances, and the extra pieces (vent hoods and membranes).
 ```
 
 `cut_mm` is the cut line (allowances included, counter-clockwise), `net_mm` the seam-to-seam
-outline (the stitch line) in the same coordinates, `openings_mm` the vent openings. `cut.dxf`:
+outline (the stitch line) in the same coordinates, `openings_mm` the vent openings. From format
+2 (ADR-146): the vent hood's `logo_mm` (its LOGO frame on the hood, closed, bottom left first;
+y up from the hood's open lower edge) and a panel's `logos_mm`, one per opening, where that
+frame lies on the panel once the hood is sewn on; `vents.json` (format 3) carries them to 3D. `cut.dxf`:
 CUT layer = `cut_mm` and `openings_mm`; PEN layer = stitch and hem fold lines, weld guides on
 under panels (welded), matching marks, UP arrows, "P5 SKIRT-RIGHT", "TO P2 WALL", the pattern
 revision (model id and parameter hash), vent hood outlines, cord exit marks.

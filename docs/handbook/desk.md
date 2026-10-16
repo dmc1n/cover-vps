@@ -32,7 +32,9 @@ or marked produced is listed for the workshop, with its files and how it fitted,
   your last remark is newer than the studio's last change). No chip: nobody left a remark.
 - **The card** (`#/work/desk/<cover>`) has four tabs, each with its own address:
   - **Check**: the latest rejection and what happened since; the drawing (click to enlarge)
-    beside our cover in 3D (the **Vents** toggle shows the air vents); the products; what the
+    beside our cover in 3D (the **Vents** toggle shows the air vents, Show ▾ → **Logo** each
+    vent's logo on its hood, from the cutting file: check it before you approve, ADR-146);
+    the products; what the
     program read from the drawing, with a green or red dot per line (vents, open bottom,
     pieces, DXF); what both AIs say;
   - **Pieces & revisions**: the pieces and the revisions ("cut this": the revision the
@@ -261,7 +263,8 @@ An arrangement (furniture placed together under one cover, see
 2. **Open de kaart.** Links de opstelling van bovenaf: elk meubel met een nummer, de rode lijn
    is de hoes. Onder de tekening de meubels zelf, met een link naar hun eigen model. Rechts de
    hoes in 3D; met **Measure** meet je, met **Show ▾ → Vent sizes** zie je de maten van de
-   vents.
+   vents, met **Show ▾ → Logo** waar het logo op elke kap komt (midden langs de onderkant van
+   de vent, rechtop).
 3. **Klopt het?** **Approve** (`a`). Dan pas kan de werkplaats de DXF downloaden (ook op
    Work → Workshop).
 4. **Klopt het niet?** **Reject** (`r`) met een reden en eventueel een plaatje. Wie hem maakte
