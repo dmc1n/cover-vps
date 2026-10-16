@@ -32,7 +32,7 @@ from coverengine.params import EffectiveParams
 
 Array = NDArray[np.float64]
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2  # 2: the vent logo's frame (logo_mm, logos_mm; ADR-146)
 FINISHED_JSON = "finished.json"
 # Cut outlines are simplified to this (mm); far below the machine's accuracy.
 SIMPLIFY_MM = 0.1  # param-ok: geometric tolerance
@@ -56,6 +56,10 @@ class Piece:
     pen_text: list[tuple[str, Array, float]] = field(default_factory=list)  # text, at, height
     edges: list[dict[str, Any]] = field(default_factory=list)
     note: str = ""
+    # the logo (ADR-146): on a vent hood its frame on the hood (`logo_frame`); on a panel, per
+    # opening, where that frame lies on the panel once the hood is sewn on (`logo_on_cover`)
+    logo: Array | None = None
+    logos: list[Array] = field(default_factory=list)
 
 
 def _p(params: EffectiveParams, key: str) -> float:
@@ -817,13 +821,65 @@ def _vent_at(
     return rect, ""
 
 
+def hood_size(params: EffectiveParams) -> tuple[float, float]:
+    """The vent hood piece (one size for every vent of a cover): the opening's width plus a seam
+    allowance each side, the opening's height plus `features.vent_hood_depth_mm` plus the top
+    seam's allowance (its lower edge is open)."""
+    a = _p(params, "stitching.allowance_mm")
+    return (
+        _p(params, "features.vent_width_mm") + 2 * a,
+        _p(params, "features.vent_height_mm") + _p(params, "features.vent_hood_depth_mm") + a,
+    )
+
+
+def logo_frame(params: EffectiveParams) -> Array | None:
+    """The logo's frame on the vent hood, in the hood piece's coordinates (x along its width,
+    y up from its open lower edge to its top edge, the one sewn to the cover); closed, five
+    points, bottom left first. None when the vents carry no logo (`features.vent_logo`).
+
+    The one place the frame is computed: the PEN layer of cut.dxf draws it on the hood
+    (`_vent_pieces`) and the 3D view shows it where the sewn hood puts it (`logo_on_cover`,
+    ADR-146)."""
+    if not params["features.vent_logo"]:
+        return None
+    width, height = hood_size(params)
+    a = _p(params, "stitching.allowance_mm")
+    depth = _p(params, "features.vent_hood_depth_mm")
+    lw, lh = _p(params, "features.vent_logo_width_mm"), _p(params, "features.vent_logo_height_mm")
+    cx, cy = width / 2, height - a - depth / 2 - lh / 2  # on the front of the hood
+    return np.array([[cx - lw / 2, cy], [cx + lw / 2, cy], [cx + lw / 2, cy + lh],
+                     [cx - lw / 2, cy + lh], [cx - lw / 2, cy]])  # fmt: skip
+
+
+def logo_on_cover(rect: Array, params: EffectiveParams) -> Array | None:
+    """Where a vent's logo frame (`logo_frame`) lies on the cover panel once its hood is sewn
+    on and hangs down over the opening `rect` (bottom start, bottom end, top end, top start, in
+    the panel's flat coordinates): the hood's top stitch line on the ring a seam allowance
+    above the opening (the PEN line where the hood's edge goes), the hood centred on the
+    opening, every point of the hood as far below that line, along the fabric, as on the hood
+    piece. The frame's points keep their order (bottom left first, as on the hood)."""
+    frame = logo_frame(params)
+    if frame is None:
+        return None
+    rect = np.asarray(rect, dtype=np.float64)
+    a = _p(params, "stitching.allowance_mm")
+    width, height = hood_size(params)
+    along = rect[1] - rect[0]
+    along = along / (np.linalg.norm(along) or 1.0)
+    up = rect[3] - rect[0]
+    up = up / (np.linalg.norm(up) or 1.0)
+    seam_mid = (rect[2] + rect[3]) / 2 + up * a  # the hood's top stitch line, its middle
+    below = (height - a) - frame[:, 1]  # under the hood's stitch line, along the fabric
+    out: Array = seam_mid + np.outer(frame[:, 0] - width / 2, along) - np.outer(below, up)
+    return out
+
+
 def _vent_pieces(count: int, params: EffectiveParams, start: int) -> list[Piece]:
     if count == 0:
         return []
     w = _p(params, "features.vent_width_mm")
     h = _p(params, "features.vent_height_mm")
     a = _p(params, "stitching.allowance_mm")
-    depth = _p(params, "features.vent_hood_depth_mm")
     label = _p(params, "pen.label_height_mm")
 
     def rect(name: str, i: int, width: float, height: float, note: str) -> Piece:
@@ -838,41 +894,18 @@ def _vent_pieces(count: int, params: EffectiveParams, start: int) -> list[Piece]
             note=note,
         )
 
-    def with_logo(piece: Piece, width: float, height: float) -> Piece:
-        """Every air vent carries the logo (owner, 1 Oct 2026): its place on the hood, in pen."""
-        lw, lh = (
-            _p(params, "features.vent_logo_width_mm"),
-            _p(params, "features.vent_logo_height_mm"),
-        )
-        cx, cy = width / 2, height - a - depth / 2 - lh / 2  # on the front of the hood
-        box = np.array([[cx - lw / 2, cy], [cx + lw / 2, cy], [cx + lw / 2, cy + lh],
-                        [cx - lw / 2, cy + lh], [cx - lw / 2, cy]])  # fmt: skip
-        piece.pen_lines.append(box)
-        piece.pen_text.append(("LOGO", np.array([cx, cy + lh / 2]), label * 0.8))
-        piece.pen_text[0] = (piece.pen_text[0][0], np.array([width / 2, a + label]), label)
-        piece.note = "vent hood with the logo; holds the plastic insert"
-        return piece
-
+    hw, hh = hood_size(params)
+    hood = rect("vent-hood", start, hw, hh, "vent hood, holds the plastic insert (to confirm)")
+    frame = logo_frame(params)
+    if frame is not None:
+        # every air vent carries the logo (owner, 1 Oct 2026): its place on the hood, in pen
+        hood.logo = frame
+        hood.pen_lines.append(frame)
+        hood.pen_text.append(("LOGO", frame[:4].mean(axis=0), label * 0.8))
+        hood.pen_text[0] = (hood.pen_text[0][0], np.array([hw / 2, a + label]), label)
+        hood.note = "vent hood with the logo; holds the plastic insert"
     return [
-        with_logo(
-            rect(
-                "vent-hood",
-                start,
-                w + 2 * a,
-                h + depth + a,
-                "vent hood, holds the plastic insert (to confirm)",
-            ),
-            w + 2 * a,
-            h + depth + a,
-        )
-        if params["features.vent_logo"]
-        else rect(
-            "vent-hood",
-            start,
-            w + 2 * a,
-            h + depth + a,
-            "vent hood, holds the plastic insert (to confirm)",
-        ),
+        hood,
         rect(
             "vent-membrane",
             start + 1,
@@ -951,6 +984,9 @@ def finish(
                 piece.pen_text.append(("FOLD", line.mean(axis=0), label * 0.6))
         for rect in vents.get(p["name"], []):
             piece.openings.append(rect)
+            on_cover = logo_on_cover(rect, params)
+            if on_cover is not None:
+                piece.logos.append(on_cover)
             # where the hood's edge goes: the opening grown by the seam allowance
             ring = shapely.Polygon(rect).buffer(
                 _p(params, "stitching.allowance_mm"), join_style="mitre"
@@ -1053,6 +1089,8 @@ def finished_set(
                 "size_mm": [round(float(v), 1) for v in np.ptp(pc.cut, axis=0)],
                 "area_m2": round(shapely.Polygon(pc.cut).area / 1e6, 4),
                 "note": pc.note,
+                **({"logo_mm": pts(pc.logo)} if pc.logo is not None else {}),
+                **({"logos_mm": [pts(o) for o in pc.logos]} if pc.logos else {}),
             }
             for pc in pieces
         ],

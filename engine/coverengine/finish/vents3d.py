@@ -6,12 +6,15 @@ The vents are placed on the flat skirt panels (`finish.place_vents`, in the coor
 against the stored outline) and each corner of the opening is carried back to 3D through the
 flat triangle it lies in. Written by `cover export` as `vents.json`:
 
-    {"format": 2, "lower_edge_z_mm": z,
+    {"format": 3, "lower_edge_z_mm": z, "logo": "placed" | "missing" | "none",
      "vents": [{"number": 1, "piece": "skirt-front", "centre_mm": [x, y, z],
                 "corners_mm": [[x, y, z] x 4], "normal": [x, y, z], "size_mm": [w, h],
                 "above_hem_mm": a, "bottom_z_mm": z, "height_line_mm": [[x, y, z] x 2],
                 "sides": {"left": {"to": "seam", "name": "skirt-left", "mm": d,
-                                   "line_mm": [[x, y, z] x 2]}, "right": {...}}}],
+                                   "line_mm": [[x, y, z] x 2]}, "right": {...}},
+                "hood": {"seam_mm": [[x, y, z] x 2], "down": [x, y, z], "length_mm": l},
+                "logo": {"corners_mm": [[x, y, z] x 4], "centre_mm": [x, y, z],
+                         "below_seam_mm": [top, bottom], "size_mm": [w, h]} | null}],
      "warnings": [...]}
 
 Corners run bottom left, bottom right, top right, top left (as seen from outside); the normal
@@ -27,6 +30,18 @@ nearest seam, or to a corner of the cover inside the piece (the bottom edge turn
 `bottom_z_mm` is the opening's bottom above the ground and `lower_edge_z_mm` the cover's lowest
 point, both in 3D. The `line_mm` and `height_line_mm` ends are the 3D points the viewer draws
 the dimension lines between.
+
+The logo (ADR-146) is the frame the PEN layer draws on each vent hood, where it lies on the
+cover once the hood is sewn on: `logos_mm` of the vent's piece in `finished.json`, written by
+`cover export` together with cut.dxf from the same frame (`finish.logo_frame`,
+`finish.logo_on_cover`), carried to 3D like the opening. So the 3D view shows what the cutting
+file says, never a second computation. `hood` is the hood's top stitch line (the PEN ring's top,
+a seam allowance above the opening), the direction down the cover there and the hood's length
+below that line; `below_seam_mm` the logo's top and bottom edge under it, along the fabric, so
+the viewer can stand them out with its hood. `logo` at the top is "placed" when every vent has
+its logo, "none" when the cover's vents carry none (`features.vent_logo`), "missing" when
+finished.json does not have them (exported before format 2, or out of step with pattern.json):
+export again. Corners of a logo run bottom left, bottom right, top right, top left, from outside.
 """
 
 from __future__ import annotations
@@ -39,14 +54,23 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial import cKDTree
 
-from coverengine.finish.finish import HemRun, _ends, place_vents, vent_bases, vent_walls
+from coverengine.finish.finish import (
+    FINISHED_JSON,
+    HemRun,
+    _ends,
+    hood_size,
+    logo_frame,
+    place_vents,
+    vent_bases,
+    vent_walls,
+)
 from coverengine.flatten.pattern import _panel_mesh, compensation
 from coverengine.flatten.solve import flatten
 from coverengine.params import EffectiveParams
 
 Array = NDArray[np.float64]
 VENTS_JSON = "vents.json"
-VENTS_FORMAT = 2  # 2: with the measurements (ADR-111); an older vents.json is made again
+VENTS_FORMAT = 3  # 2: the measurements (ADR-111); 3: the logo (ADR-146); an older one is made again
 CORNER_DEG = 45.0  # param-ok: measurement definition, the bottom edge turns this much at a corner
 CORNER_SPAN_MM = 100.0  # param-ok: measurement definition, over this length either side
 CORNER_STEP = 10  # param-ok: stations per CORNER_SPAN_MM where the turn is measured
@@ -87,9 +111,13 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
     warnings: list[str] = []
     data = np.load(model_dir / "panels.npz")
     lower = float(np.asarray(data["vertices"])[:, 2].min()) if len(data["vertices"]) else 0.0
-    head = {"format": VENTS_FORMAT, "lower_edge_z_mm": round(lower, 1)}
+    head: dict[str, Any] = {"format": VENTS_FORMAT, "lower_edge_z_mm": round(lower, 1)}
     if not vents:
-        return {**head, "vents": out, "warnings": warnings}
+        return {**head, "logo": "none", "vents": out, "warnings": warnings}
+    logos = _finished_logos(model_dir)
+    frame = logo_frame(params)
+    a = float(params["stitching.allowance_mm"])  # type: ignore[arg-type]
+    hood_w, hood_h = hood_size(params)
     skip = frozenset() if params["features.vent_inner_walls"] else walls.inner
     bases, _ = vent_bases(doc["panels"], params, skip)
     panel_of = {p["name"]: p for p in doc["panels"]}
@@ -167,8 +195,92 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
                     return _to_3d(v, f, uv, np.asarray(q, dtype=np.float64))[0]
 
                 vent |= vent_sizes(rect, runs, panel_of[name], to3d, lower, swapped)
+            vent |= _hood_and_logo(rect, logos.get(name, []), v, f, uv, normal, swapped,
+                                   frame, a, hood_w, hood_h)  # fmt: skip
             out.append(vent)
-    return {**head, "vents": out, "warnings": warnings}
+    if frame is None:
+        state = "none"
+    elif out and all(x.get("logo") for x in out):
+        state = "placed"
+    else:
+        state = "missing"
+    return {**head, "logo": state, "vents": out, "warnings": warnings}
+
+
+def _finished_logos(model_dir: Path) -> dict[str, list[tuple[Array, Array]]]:
+    """Per piece in finished.json: each opening with its logo frame on the cover (format 2 on;
+    an older export has none)."""
+    try:
+        fin = json.loads((model_dir / FINISHED_JSON).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    out: dict[str, list[tuple[Array, Array]]] = {}
+    for pc in fin.get("pieces", []):
+        openings, logos = pc.get("openings_mm") or [], pc.get("logos_mm") or []
+        if len(openings) == len(logos):
+            out[pc["name"]] = [(np.asarray(o, dtype=np.float64), np.asarray(lg, dtype=np.float64))
+                               for o, lg in zip(openings, logos, strict=True)]  # fmt: skip
+    return out
+
+
+def _hood_and_logo(
+    rect: Array,
+    logos: list[tuple[Array, Array]],
+    v: Array,
+    f: NDArray[np.int64],
+    uv: Array,
+    normal: Array,
+    swapped: bool,
+    frame: Array | None,
+    allowance: float,
+    hood_w: float,
+    hood_h: float,
+) -> dict[str, Any]:
+    """The hood's top stitch line and the logo of one vent in 3D (see the module's docstring).
+    The logo is the one finished.json gives for this opening (the same corners within
+    `SAME_OUTLINE_MM`), or None."""
+    along = rect[1] - rect[0]
+    along = along / (np.linalg.norm(along) or 1.0)
+    up = rect[3] - rect[0]
+    up = up / (np.linalg.norm(up) or 1.0)
+    seam_mid = (rect[2] + rect[3]) / 2 + up * allowance
+    ends = [seam_mid - along * hood_w / 2, seam_mid + along * hood_w / 2]
+    if swapped:
+        ends = ends[::-1]
+    seam3 = [_to_3d(v, f, uv, q)[0] for q in ends]
+    low3 = _to_3d(v, f, uv, (rect[0] + rect[1]) / 2)[0]
+    top3 = _to_3d(v, f, uv, (rect[2] + rect[3]) / 2)[0]
+    down = low3 - top3
+    down = down - normal * float(down @ normal)  # along the cover
+    down = down / (np.linalg.norm(down) or 1.0)
+    out: dict[str, Any] = {
+        "hood": {
+            "seam_mm": [_r(p) for p in seam3],
+            "down": [round(float(x), 4) for x in down],
+            "length_mm": round(hood_h - allowance, 1),
+        },
+        "logo": None,
+    }
+    if frame is None:
+        return out
+    match = next((lg for o, lg in logos
+                  if o.shape == rect.shape and float(np.abs(o - rect).max()) <= SAME_OUTLINE_MM),
+                 None)  # fmt: skip
+    if match is None:
+        return out
+    pts = [_to_3d(v, f, uv, q)[0] for q in match[:4]]
+    if swapped:
+        pts = [pts[1], pts[0], pts[3], pts[2]]
+    # measured on the exported frame itself, not on today's parameters
+    below = (match[:4] - seam_mid) @ -up
+    out["logo"] = {
+        "corners_mm": [_r(p) for p in pts],
+        "centre_mm": _r(np.mean(pts, axis=0)),
+        "below_seam_mm": [round(float(below.min()), 1), round(float(below.max()), 1)],
+        "size_mm": [round(float(np.ptp(match[:4] @ along)), 1),
+                    round(float(np.ptp(match[:4] @ up)), 1)],
+    }  # fmt: skip
+    return out
 
 
 def seam_under(vent: dict[str, Any]) -> float:
