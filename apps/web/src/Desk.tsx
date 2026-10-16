@@ -1564,7 +1564,7 @@ function CardView({
         )}
         {tab === "pieces" && (
           <>
-            <section className="d-panel">
+            <section className="d-panel d-wide d-cutfile">
               <CuttingFile
                 modelId={card.id}
                 revisions={card.revisions}

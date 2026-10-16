@@ -39,7 +39,7 @@ from coverengine.export.strokefont import text_width
 
 Array = NDArray[np.float64]
 
-VERSION = 1  # param-ok: the renderer's version, part of the cache key
+VERSION = 2  # param-ok: the renderer's version, part of the cache key
 WATERMARK = "PREVIEW – NOT FOR CUTTING"
 GEOMETRY = "_geometry"  # the meta's private part: outlines for compare(), never sent
 PAD_MM = 20.0  # param-ok: the drawing's margin
@@ -190,6 +190,7 @@ class Piece:
     pen: list[int] = field(default_factory=list)
     texts: list[int] = field(default_factory=list)
     name: str = ""
+    label_mm: float | None = None  # the height of its name's text
 
 
 def find_pieces(dr: Drawing) -> tuple[list[Piece], list[int]]:
@@ -233,7 +234,9 @@ def find_pieces(dr: Drawing) -> tuple[list[Piece], list[int]]:
         _assign(ordered, list(range(len(dr.texts))), [_text_point(t) for t in dr.texts], "texts")
         _labels_outside(dr, ordered)
     for n, pc in enumerate(ordered):
-        pc.name = _name(dr, pc) or f"#{n + 1}"
+        label = _name(dr, pc)
+        pc.name = label.text.strip() if label else f"#{n + 1}"
+        pc.label_mm = round(label.height, 1) if label else None
     return ordered, loose
 
 
@@ -282,13 +285,12 @@ def _labels_outside(dr: Drawing, pieces: list[Piece]) -> None:
             near.texts.sort()
 
 
-def _name(dr: Drawing, pc: Piece) -> str:
+def _name(dr: Drawing, pc: Piece) -> Text | None:
+    """The piece's label: its largest "P<n> ..." text, else its largest text but the stamp."""
     texts = [dr.texts[i] for i in pc.texts]
     labels = [t for t in texts if LABEL.match(t.text)]
     pick = labels or [t for t in texts if not STAMP.match(t.text)]
-    if not pick:
-        return ""
-    return max(pick, key=lambda t: t.height).text.strip()
+    return max(pick, key=lambda t: t.height) if pick else None
 
 
 def corners(ring: Array, corner_deg: float) -> list[int]:
@@ -451,6 +453,7 @@ def render(data: bytes, cut_layer: str, pen_layer: str, flatten_mm: float, corne
         meta_pieces.append({
             "index": n,
             "name": pc.name,
+            "label_mm": pc.label_mm,
             "size_mm": [round(float(hi[0] - lo[0]), 1), round(float(hi[1] - lo[1]), 1)],
             "box": [*fr.pt((lo[0], hi[1])), *fr.pt((hi[0], lo[1]))],  # x0 y0 x1 y1, y down
             "centre": list(fr.pt((lo + hi) / 2)),
@@ -525,7 +528,8 @@ def watermarked(svg: str, meta: dict[str, Any], note: str = "") -> str:
         f'<g fill="#c00000" fill-opacity="0.16" font-size="{_num(size)}">{"".join(marks)}</g>'
         f'<rect x="0" y="{_num(-band)}" width="{_num(w)}" height="{_num(band)}" fill="#c00000"/>'
         f'<text x="{_num(w / 2)}" y="{_num(-band * 0.32)}" text-anchor="middle" fill="#ffffff" '
-        f'font-size="{_num(size * 0.9)}">{escape(label)}</text></g>'
+        f'font-size="{_num(min(size * 0.9, w * 0.9 / (0.6 * len(label))))}">'  # param-ok: fit
+        f"{escape(label)}</text></g>"
     )
     title = f"<title>{escape(WATERMARK)}</title><desc>{escape(note)}</desc>"
     # the band goes above the drawing (the viewBox grows upwards), so it hides no piece; the
@@ -544,7 +548,7 @@ def band_mm(meta: dict[str, Any]) -> float:
 
 
 def _wm_size(w: float, h: float) -> float:
-    return max(30.0, min(250.0, min(w, h) / 12))  # param-ok: layout of the watermark
+    return max(30.0, min(300.0, (w * h) ** 0.5 / 14))  # param-ok: layout of the watermark
 
 
 def clean(svg: str) -> str:

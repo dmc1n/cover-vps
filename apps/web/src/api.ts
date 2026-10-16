@@ -1477,6 +1477,7 @@ export interface CutEdge {
 export interface CutPiece {
   index: number;
   name: string;
+  label_mm: number | null; // the height of the name in the DXF
   size_mm: [number, number];
   box: [number, number, number, number]; // x0 y0 x1 y1 in the drawing's millimetres (y down)
   centre: [number, number];

@@ -242,7 +242,11 @@ export function CutViewer({
   const pinch = useRef<{ d: number; mid: Pt } | null>(null);
   const onDown = (e: React.PointerEvent) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
-    stage.current?.setPointerCapture(e.pointerId);
+    try {
+      stage.current?.setPointerCapture(e.pointerId);
+    } catch {
+      /* a pointer the browser no longer tracks: follow it without capture */
+    }
     pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
     if (pointers.current.size === 1) moved.current = 0;
     pinch.current = null;
@@ -379,7 +383,10 @@ export function CutViewer({
   const names = useMemo(
     () =>
       meta?.pieces.filter(
-        (p) => (p.box[2] - p.box[0]) / mmPerPx > p.name.length * 7.5,
+        (p) =>
+          (p.box[2] - p.box[0]) / mmPerPx > p.name.length * 7.5 &&
+          // the DXF's own label is still too small to read at this zoom
+          (p.label_mm ?? 0) / mmPerPx < 9,
       ) ?? [],
     [meta, mmPerPx],
   );
@@ -530,20 +537,19 @@ export function CutViewer({
                     />
                   ) : null,
                 )}
-              {layers.names &&
-                names.map((p) => (
-                  <text
-                    key={`n${p.index}`}
-                    className="cv-name"
-                    x={p.centre[0]}
-                    y={p.centre[1]}
-                    fontSize={fs * 1.15}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                  >
-                    {p.name}
-                  </text>
-                ))}
+              {names.map((p) => (
+                <text
+                  key={`n${p.index}`}
+                  className="cv-name"
+                  x={p.centre[0]}
+                  y={p.centre[1]}
+                  fontSize={fs * 1.15}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
+                  {p.name}
+                </text>
+              ))}
               {picked && (
                 <g className="cv-pick">
                   <rect
