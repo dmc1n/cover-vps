@@ -134,6 +134,9 @@ def create_app(
     from coverapi import measure
 
     measure.install(app, store)  # measuring on the 3D cover, the check list (ADR-111)
+    from coverapi import cutview
+
+    cutview.install(app, store)  # the cutting file drawn from cut.dxf, behind no download (ADR-147)
     from coverapi import arrangements
 
     arrangements.install(app, store, jobs)  # furniture placed together, one cover (ADR-089)

@@ -53,7 +53,8 @@ OPEN_PATHS = (
 # The workshop login (ADR-128, owner question 92): an allow-list, so a route added later stays
 # closed to it until it is named here. It reads Work → Workshop, the Desk (queue, card, drawing
 # pages), its questions, a cover's files (cut.dxf still behind the Desk gate) and what the
-# Desk card's 3D view and check list need; it writes only a fit, a note and pictures on a Desk
+# Desk card's 3D view and check list need, and the Cutting file view (the route lets it see only
+# an approved cover's, ADR-147); it writes only a fit, a note and pictures on a Desk
 # card (the route refuses every other action), an answer to its own questions and a geodesic
 # measurement. Never prices, settings, orders, admin pages or paid AI runs.
 _MODEL = r"[a-z0-9][a-z0-9-]*"
@@ -61,7 +62,7 @@ WORKSHOP_READ = re.compile(
     r"^/api/(?:auth/me|desk|workshop|questions|questions/count|questions/\d+"
     r"|questions/\d+/pictures/[^/]+|desk/" + _MODEL + r"(?:/page/\d+|/correct)?"
     r"|models|models/" + _MODEL + r"(?:/(?:files/.+|revisions/\d+/[^/]+|approved/[^/]+"
-    r"|sizes|measure\.json|checkpoints))?|jobs/[a-z0-9]+)$"
+    r"|sizes|measure\.json|checkpoints|cutview(?:\.svg|/diff)?))?|jobs/[a-z0-9]+)$"
 )
 WORKSHOP_WRITE = re.compile(
     r"^/api/(?:auth/(?:logout|password)|desk/" + _MODEL + r"|desk/" + _MODEL + r"/pictures"

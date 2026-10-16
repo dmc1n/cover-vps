@@ -452,6 +452,16 @@ desk:                            # the drawing desk: people approve covers, AI o
                                  # at most this large as uploaded (ADR-096)
   pictures_max: 8                # at most this many pictures on one reject, comment or correction
   picture_max_side_px: 2400      # a larger picture is scaled down to this longest side when kept
+  preview_corner_deg: 30         # the Cutting file view (ADR-147): a piece's outline turns more than this
+                                 # at a corner; its edges are measured from corner to corner
+  preview_min_edge_mm: 50        # ... an edge shorter than this (an allowance's cut-off corner, a step of a
+                                 # curve) is joined to its shorter neighbour, so the list shows the sides
+  preview_flatten_mm: 0.025      # arcs and bulges of the DXF drawn as straight steps no further than this
+                                 # from the curve
+  preview_changed_mm: 1          # comparing two revisions: a piece whose box or outline moved more than
+                                 # this changed (as `cover diff`)
+  preview_max_mb: 60             # a cut.dxf larger than this is not drawn in the browser (download it)
+  preview_cache_keep: 400        # drawn cutting files kept in <data>/cutview-cache, the oldest go first
 
 questions:                       # questions for the owner and the workshop, answered at the Desk (ADR-109)
   owners: "rick"                 # who marks an answer final and a question processed (owner, 9 Oct 2026);
