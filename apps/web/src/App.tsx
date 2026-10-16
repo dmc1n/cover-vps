@@ -22,6 +22,7 @@ import {
 import { AiAdvice } from "./AiAdvice";
 import { ModelInfo, Revisions } from "./Catalogue";
 import { AllCovers, NewCover } from "./Covers";
+import { CuttingFile } from "./CutView";
 import { Heading, Icon, IconButton, IconLink, Info, StatusChip } from "./icons";
 import { Tpl } from "./layout";
 import { Search } from "./Search";
@@ -856,6 +857,9 @@ function ModelPage({
         {tab === "pieces" && sub === "cut" && (
           <CutPieces model={model} stamp={stamp} />
         )}
+        {tab === "pieces" && sub === "cutfile" && (
+          <CuttingFile modelId={model.id} revisions={model.revisions ?? []} />
+        )}
         {tab === "pieces" && sub === "flat" && (
           <Patterns model={model} stamp={stamp} />
         )}
@@ -1096,6 +1100,14 @@ function CutPieces({ model, stamp }: { model: ModelDetail; stamp: number }) {
             DXF
           </a>
         )}
+        <a
+          className="btn"
+          href={modelHref(model.id, "pieces", "cutfile")}
+          title="See the cutting file (cut.dxf drawn, not downloaded)"
+        >
+          <Icon name="cutting-file" />
+          Cutting file
+        </a>
         <a
           className="btn"
           href={fileUrl(model.id, "cutting-list.pdf")}

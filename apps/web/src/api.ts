@@ -1466,3 +1466,87 @@ export interface PriceImportReport {
   chosen: number;
   covers: { id: string; name: string; kind: string; code: string }[];
 }
+
+/** The Cutting file view (ADR-147): cut.dxf drawn on the server, never the DXF itself. */
+export interface CutEdge {
+  length_mm: number;
+  a: [number, number];
+  b: [number, number];
+  mid: [number, number];
+}
+export interface CutPiece {
+  index: number;
+  name: string;
+  size_mm: [number, number];
+  box: [number, number, number, number]; // x0 y0 x1 y1 in the drawing's millimetres (y down)
+  centre: [number, number];
+  area_m2: number;
+  perimeter_mm: number;
+  openings: number;
+  edges: CutEdge[];
+  texts: string[];
+}
+export interface CutMeta {
+  model_id: string;
+  revision: number | null;
+  fingerprint: string;
+  sheet_mm: [number, number];
+  band_mm: number;
+  approved: boolean;
+  watermark: boolean;
+  watermark_text: string | null;
+  downloadable?: boolean;
+  layers: {
+    cut: number;
+    pen: number;
+    other: number;
+    texts: number;
+    names: string[];
+  };
+  loose_cut: number;
+  skipped: Record<string, number>;
+  pieces: CutPiece[];
+}
+export type CutStatus =
+  "added" | "removed" | "size" | "outline" | "pen" | "same";
+export interface CutDiffRow {
+  name: string;
+  a: number | null;
+  b: number | null;
+  status: CutStatus;
+  before_mm: [number, number] | null;
+  after_mm: [number, number] | null;
+  texts_added?: string[];
+  texts_removed?: string[];
+  openings?: [number, number];
+}
+export interface CutDiff {
+  from: number;
+  to: number | null;
+  same_file: boolean;
+  cut_same: boolean;
+  pen_only: boolean;
+  counts: Record<CutStatus, number>;
+  pieces: CutDiffRow[];
+}
+const revQ = (revision: number | null | undefined) =>
+  revision == null ? "" : `?revision=${revision}`;
+export const cutview = {
+  meta: (id: string, revision?: number | null) =>
+    fetch(`/api/models/${id}/cutview${revQ(revision)}`).then((r) =>
+      json<CutMeta>(r),
+    ),
+  /** The drawing as text (put into the page, so its layers can be switched). */
+  svg: async (id: string, revision: number | null | undefined, fp: string) => {
+    const q = revQ(revision);
+    const r = await fetch(
+      `/api/models/${id}/cutview.svg${q}${q ? "&" : "?"}v=${fp}`,
+    );
+    if (!r.ok) await json(r);
+    return r.text();
+  },
+  diff: (id: string, a: number, b: number | null) =>
+    fetch(`/api/models/${id}/cutview/diff?a=${a}&b=${b ?? "current"}`).then(
+      (r) => json<CutDiff>(r),
+    ),
+};

@@ -61,6 +61,14 @@
   --code-bg: #2c2c2e;
   --code-ink: #f5f5f7;
   --stage: #ffffff; /* behind drawings, patterns and pictures: they are drawn on white */
+  --cv-cut: #c8001e; /* the Cutting file: CUT lines (ADR-147) */
+  --cv-pen: #0047d4; /* PEN lines and texts */
+  --cv-other: #6e6e73; /* other layers */
+  --cv-pick: #0062cc; /* the selected piece, its edges */
+  --cv-mark-add: #18753a; /* compared: a new piece */
+  --cv-mark-del: #d1001f; /* compared: a piece gone */
+  --cv-mark-size: #b04e00; /* compared: size or outline changed */
+  --cv-mark-pen: #7a3fa8; /* compared: pen marks changed */
   --overlay: rgba(0, 0, 0, 0.45);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
   --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.14);
@@ -145,6 +153,14 @@
     --code-bg: #000000;
     --code-ink: #e5e5ea;
     --stage: #ebebf0;
+    --cv-cut: #c8001e;
+    --cv-pen: #003fbd;
+    --cv-other: #636366;
+    --cv-pick: #0058b8;
+    --cv-mark-add: #156b34;
+    --cv-mark-del: #c2001c;
+    --cv-mark-size: #a34a00;
+    --cv-mark-pen: #6f3899;
     --overlay: rgba(0, 0, 0, 0.6);
     --shadow: none;
     --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.6);
@@ -196,6 +212,14 @@
   --code-bg: #000000;
   --code-ink: #e5e5ea;
   --stage: #ebebf0;
+  --cv-cut: #c8001e;
+  --cv-pen: #003fbd;
+  --cv-other: #636366;
+  --cv-pick: #0058b8;
+  --cv-mark-add: #156b34;
+  --cv-mark-del: #c2001c;
+  --cv-mark-size: #a34a00;
+  --cv-mark-pen: #6f3899;
   --overlay: rgba(0, 0, 0, 0.6);
   --shadow: none;
   --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.6);
@@ -6748,4 +6772,316 @@ a.icon-btn.ws-file {
   .lk-row.lk-alone {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---- the Cutting file view (ADR-147): cut.dxf drawn on the server ---- */
+.cutfile {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.cutfile-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.cutfile-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.cutfile-compare {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+.cutfile-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .cutfile-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.cutfile-sum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+.cutfile-row {
+  cursor: pointer;
+}
+.cutfile-texts {
+  font-size: var(--fs-small);
+}
+.cv {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.cv-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.cv-label {
+  font-weight: 600;
+}
+.cv-tools {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.cv-tools .icon-btn.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.cv-n {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+}
+.cv-swatch {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--cv-cut);
+}
+.cv-sw-pen {
+  background: var(--cv-pen);
+}
+.cv-sw-text {
+  height: 8px;
+  width: 8px;
+  background: none;
+  border: 1.5px solid var(--cv-pen);
+}
+.cv-sw-names {
+  background: var(--ink);
+}
+.cv-layers button:not(.on) .cv-swatch {
+  opacity: 0.35;
+}
+.cv-stage {
+  position: relative;
+  height: clamp(340px, 62vh, 760px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--stage);
+  overflow: hidden;
+  touch-action: none; /* the stage pans and pinches itself (an iPad) */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+.cv-stage:active {
+  cursor: grabbing;
+}
+.cv-stage.cv-measuring {
+  cursor: crosshair;
+}
+.cv-stage:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.cv-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.cv-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+}
+.cv .cv-cut {
+  stroke: var(--cv-cut);
+  stroke-width: 1.3px;
+}
+.cv .cv-pen {
+  stroke: var(--cv-pen);
+  stroke-width: 0.9px;
+}
+.cv .cv-other {
+  stroke: var(--cv-other);
+}
+.cv .cv-text {
+  fill: var(--cv-pen);
+}
+.cv .cv-piece {
+  fill: transparent;
+  pointer-events: visible;
+  cursor: pointer;
+}
+.cv-measuring .cv-piece {
+  cursor: crosshair;
+}
+.cv .cv-piece:hover {
+  fill: color-mix(in srgb, var(--cv-pick) 6%, transparent);
+}
+.cv .cv-piece.cv-on {
+  fill: color-mix(in srgb, var(--cv-pick) 12%, transparent);
+  stroke: var(--cv-pick);
+  stroke-width: 2.4px;
+}
+.cv .cv-piece.cv-m-added {
+  fill: color-mix(in srgb, var(--cv-mark-add) 14%, transparent);
+}
+.cv .cv-piece.cv-m-removed {
+  fill: color-mix(in srgb, var(--cv-mark-del) 14%, transparent);
+}
+.cv .cv-piece.cv-m-size,
+.cv .cv-piece.cv-m-outline {
+  fill: color-mix(in srgb, var(--cv-mark-size) 14%, transparent);
+}
+.cv .cv-piece.cv-m-pen {
+  fill: color-mix(in srgb, var(--cv-mark-pen) 12%, transparent);
+}
+.cv-mark {
+  fill: none;
+  stroke-width: 2.5px;
+  stroke-dasharray: 7 4;
+}
+.cv-mark-added {
+  stroke: var(--cv-mark-add);
+}
+.cv-mark-removed {
+  stroke: var(--cv-mark-del);
+}
+.cv-mark-size,
+.cv-mark-outline {
+  stroke: var(--cv-mark-size);
+}
+.cv-mark-pen {
+  stroke: var(--cv-mark-pen);
+}
+/* layers switched off: a hidden CUT layer keeps its pieces clickable */
+.cv-hide-cut .cv-cut {
+  stroke-opacity: 0;
+}
+.cv-hide-pen .cv-pen,
+.cv-hide-text .cv-text,
+.cv-hide-names .cv-name {
+  display: none;
+}
+.cv-name,
+.cv-edge,
+.cv-measure text {
+  font-family: var(--font);
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--stage);
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+}
+.cv-name {
+  fill: #1c1c1e; /* on the drawing's light stage in both themes */
+}
+.cv-pick-box {
+  fill: none;
+  stroke: var(--cv-pick);
+  stroke-width: 1px;
+  stroke-dasharray: 4 3;
+}
+.cv-corner,
+.cv-edge {
+  fill: var(--cv-pick);
+}
+.cv-measure line {
+  stroke: var(--cv-mark-pen);
+  stroke-width: 2px;
+}
+.cv-measure circle,
+.cv-measure text {
+  fill: var(--cv-mark-pen);
+}
+.cv-scale {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1c1c1e; /* on the drawing's light stage in both themes */
+  pointer-events: none;
+}
+.cv-scale-bar {
+  height: 6px;
+  border: 2px solid #1c1c1e;
+  border-top: 0;
+}
+.cv-readout {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cv-piece-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 10px 14px;
+}
+.cv-piece-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cv-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 14px;
+  margin: 6px 0;
+}
+.cv-facts dt {
+  color: var(--muted);
+}
+.cv-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.cv-edges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-variant-numeric: tabular-nums;
+}
+.cv-edges span {
+  color: var(--cv-pick);
+  font-weight: 600;
+}
+.cv-hint {
+  margin: 0;
+  font-size: var(--fs-small);
+}
+.cv-empty {
+  padding: 12px 0;
 }

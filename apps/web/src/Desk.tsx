@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type ModelDetail } from "./api";
 import { Viewer } from "./Viewer";
+import { CuttingFile } from "./CutView";
 import { Corrections, RulesBar } from "./DeskCorrect";
 import {
   MeasuredForm,
@@ -950,6 +951,9 @@ function CardView({
   }, [flash]);
   const [allDiffs, setAllDiffs] = useState(false);
   const [allRevs, setAllRevs] = useState(false);
+  // the Cutting file view: an older revision's drawing beside the current one (ADR-147)
+  const [cutWith, setCutWith] = useState<number | null>(null);
+  useEffect(() => setCutWith(null), [id]);
   // "let the AI read it": its job followed here, the outcome shown beside the button
   const [aiJob, setAiJob] = useState<string | null>(null);
   const [aiNote, setAiNote] = useState("");
@@ -1561,6 +1565,14 @@ function CardView({
         {tab === "pieces" && (
           <>
             <section className="d-panel">
+              <CuttingFile
+                modelId={card.id}
+                revisions={card.revisions}
+                compare={cutWith}
+                onCompare={setCutWith}
+              />
+            </section>
+            <section className="d-panel">
               <h3>Pieces</h3>
               <table className="d-table">
                 <tbody>
@@ -1595,6 +1607,20 @@ function CardView({
                           <td>r{r.number}</td>
                           <td>{when(r.time)}</td>
                           <td>{r.panels} panels</td>
+                          <td>
+                            <button
+                              className="d-link"
+                              aria-pressed={cutWith === r.number}
+                              title={`Put r${r.number}'s cutting file beside the current one`}
+                              onClick={() =>
+                                setCutWith(
+                                  cutWith === r.number ? null : r.number,
+                                )
+                              }
+                            >
+                              {cutWith === r.number ? "comparing" : "compare"}
+                            </button>
+                          </td>
                           <td>
                             {canAct && card.revisions.length > 1 && (
                               <button

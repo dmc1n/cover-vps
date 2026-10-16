@@ -59,6 +59,9 @@ import {
   Undo2,
   Upload,
   X,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
   Camera,
   Send,
   FileSpreadsheet,
@@ -103,6 +106,9 @@ const UTILITY = {
   lock: Lock,
   block: Ban,
   menu: ChevronDown,
+  "zoom-in": ZoomIn,
+  "zoom-out": ZoomOut,
+  fit: Maximize,
 } satisfies Record<string, LucideIcon>;
 
 /** Other names for our own glyphs, where the same drawing means the same thing. */

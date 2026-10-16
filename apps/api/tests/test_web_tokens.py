@@ -23,6 +23,10 @@ TEXT = [
 SHAPE = [
     ("line-strong", "surface"), ("line-strong", "bg"), ("line-strong", "sunken"),
     ("line-strong", "stone"), ("line-strong", "head"), ("focus", "surface"), ("focus", "bg"),
+    # the Cutting file's lines and marks on the drawing's stage (ADR-147)
+    ("cv-cut", "stage"), ("cv-pen", "stage"), ("cv-other", "stage"), ("cv-pick", "stage"),
+    ("cv-mark-add", "stage"), ("cv-mark-del", "stage"), ("cv-mark-size", "stage"),
+    ("cv-mark-pen", "stage"),
 ]  # fmt: skip
 WHITE_ON = ["count", "count-mine"]
 TILES = ["tile-blue", "tile-orange", "tile-green", "tile-teal", "tile-indigo", "tile-purple",

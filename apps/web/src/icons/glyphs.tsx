@@ -306,6 +306,14 @@ export const GLYPHS = {
       <path d="M8.5 11.5h7M8.5 14.5h7M8.5 17.5h4" />
     </>
   ),
+  // the Cutting file view (ADR-147): the cutting table's sheet with a piece and its pen line
+  "cutting-file": (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M6.5 16.5V8.5l5-1.5 5.5 2.5v7Z" />
+      <path d="M9 13.5h5.5" strokeDasharray="1.6 1.8" />
+    </>
+  ),
   "cut-svg": (
     <>
       <path d="M6.5 3h7.5l4.5 4.5V20a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />

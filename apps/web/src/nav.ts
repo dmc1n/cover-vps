@@ -232,6 +232,7 @@ export const MODEL_TABS: [string, string, IconName][] = [
 export const MODEL_SUBS: Record<string, [string, string][]> = {
   pieces: [
     ["cut", "Cut pieces"],
+    ["cutfile", "Cutting file"], // cut.dxf drawn on the server, behind no download (ADR-147)
     ["flat", "Flat patterns"],
     ["sizes", "Size drawing"],
     ["files", "Files"], // the downloads (a tab of its own before ADR-126)
