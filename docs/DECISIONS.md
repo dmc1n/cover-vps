@@ -5705,7 +5705,12 @@ aan de lange kant aan de onderkant van de airvent met het logo omhoog, graag imp
   `logo` (corners, centre, how far under the stitch line) and `hood` (the stitch line, down,
   its reach) to 3D through the same flat triangles as the opening; a cover exported before has
   `logo: "missing"` and the viewer says "Logo position not computed yet: run again". The 3D
-  never computes the logo itself, so it cannot disagree with the cutting file.
+  never computes the logo itself, so it cannot disagree with the cutting file. After Codex's
+  adversarial review: the logos are taken only when finished.json is the export of this
+  pattern.json with these settings (`pattern_parameter_hash`, `parameter_hash`), else
+  "missing"; vents.json is made again when finished.json, pattern.json, panels.* or cover.json
+  is newer; the hood's reach and the logo's distances are measured on the 3D surface (the flat
+  pattern may be compensated); the audit fails malformed logo data instead of crashing.
 - **The viewer.** Show ▾ → **Logo** (on by default when Vents is on, remembered per browser):
   the hood drawn see-through from its stitch line, the frame in blue on it with the word LOGO,
   readable from outside. The cover page's 3D tab and the Desk card share the one viewer.
