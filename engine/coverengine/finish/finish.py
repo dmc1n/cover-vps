@@ -821,6 +821,13 @@ def _vent_at(
     return rect, ""
 
 
+def centred(text: str, at: Array, height: float) -> tuple[str, Array, float]:
+    """Pen text centred on `at` (the PEN layer places text by its baseline's start)."""
+    from coverengine.export.strokefont import text_width
+
+    return text, at - [text_width(text, height) / 2, height / 2], height
+
+
 def hood_size(params: EffectiveParams) -> tuple[float, float]:
     """The vent hood piece (one size for every vent of a cover): the opening's width plus a seam
     allowance each side, the opening's height plus `features.vent_hood_depth_mm` plus the top
@@ -842,11 +849,11 @@ def logo_frame(params: EffectiveParams) -> Array | None:
     ADR-146)."""
     if not params["features.vent_logo"]:
         return None
-    width, height = hood_size(params)
-    a = _p(params, "stitching.allowance_mm")
-    depth = _p(params, "features.vent_hood_depth_mm")
+    width, _ = hood_size(params)
     lw, lh = _p(params, "features.vent_logo_width_mm"), _p(params, "features.vent_logo_height_mm")
-    cx, cy = width / 2, height - a - depth / 2 - lh / 2  # on the front of the hood
+    # owner, 16 Oct 2026 (T1): centred along the vent's long bottom side, upright; it sat by the
+    # hood's sewn top edge, the short side of the piece
+    cx, cy = width / 2, _p(params, "features.vent_logo_above_edge_mm")
     return np.array([[cx - lw / 2, cy], [cx + lw / 2, cy], [cx + lw / 2, cy + lh],
                      [cx - lw / 2, cy + lh], [cx - lw / 2, cy]])  # fmt: skip
 
@@ -856,8 +863,11 @@ def logo_on_cover(rect: Array, params: EffectiveParams) -> Array | None:
     on and hangs down over the opening `rect` (bottom start, bottom end, top end, top start, in
     the panel's flat coordinates): the hood's top stitch line on the ring a seam allowance
     above the opening (the PEN line where the hood's edge goes), the hood centred on the
-    opening, every point of the hood as far below that line, along the fabric, as on the hood
-    piece. The frame's points keep their order (bottom left first, as on the hood)."""
+    opening. Its sides are sewn down the ring's sides, so its open lower edge reaches the ring's
+    bottom and the extra length stands out as the hood's bulge: a point of the hood lies on the
+    cover that share of the ring's height under the stitch line that it lies of the hood's
+    length on the piece. The frame's points keep their order (bottom left first, as on the
+    hood)."""
     frame = logo_frame(params)
     if frame is None:
         return None
@@ -869,7 +879,8 @@ def logo_on_cover(rect: Array, params: EffectiveParams) -> Array | None:
     up = rect[3] - rect[0]
     up = up / (np.linalg.norm(up) or 1.0)
     seam_mid = (rect[2] + rect[3]) / 2 + up * a  # the hood's top stitch line, its middle
-    below = (height - a) - frame[:, 1]  # under the hood's stitch line, along the fabric
+    ring = float(np.linalg.norm(rect[3] - rect[0])) + 2 * a  # the PEN ring's height
+    below = ((height - a) - frame[:, 1]) * ring / (height - a)  # under the stitch line
     out: Array = seam_mid + np.outer(frame[:, 0] - width / 2, along) - np.outer(below, up)
     return out
 
@@ -896,13 +907,26 @@ def _vent_pieces(count: int, params: EffectiveParams, start: int) -> list[Piece]
 
     hw, hh = hood_size(params)
     hood = rect("vent-hood", start, hw, hh, "vent hood, holds the plastic insert (to confirm)")
+    # which way up it is sewn (T1, 16 Oct 2026: the hood had no mark of it): the stitch lines
+    # along its top and sides, open at the bottom; TOP, an UP arrow and OPEN EDGE; its name in
+    # the middle, out of the logo's way
+    hood.pen_lines.append(np.array([[a, 0.0], [a, hh - a], [hw - a, hh - a], [hw - a, 0.0]]))
+    hood.pen_text = [
+        centred(hood.pen_text[0][0], np.array([hw / 2, hh / 2]), label),
+        centred("TOP: SEW TO COVER", np.array([hw / 2, hh - a - label]), label * 0.6),
+        centred("OPEN EDGE, INSERT", np.array([hw / 2, label * 0.6]), label * 0.6),
+    ]
+    tail = np.array([hw / 2, hh / 2 + label])
+    tip = tail + [0.0, MARK_LENGTH * label]
+    head = MARK_LENGTH * label / 4
+    hood.pen_lines.append(np.array([tail, tip]))
+    hood.pen_lines.append(np.array([tip + [-head, -head], tip, tip + [head, -head]]))
     frame = logo_frame(params)
     if frame is not None:
         # every air vent carries the logo (owner, 1 Oct 2026): its place on the hood, in pen
         hood.logo = frame
         hood.pen_lines.append(frame)
-        hood.pen_text.append(("LOGO", frame[:4].mean(axis=0), label * 0.8))
-        hood.pen_text[0] = (hood.pen_text[0][0], np.array([hw / 2, a + label]), label)
+        hood.pen_text.append(centred("LOGO", frame[:4].mean(axis=0), label * 0.8))
         hood.note = "vent hood with the logo; holds the plastic insert"
     return [
         hood,

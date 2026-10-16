@@ -192,6 +192,12 @@ features:                        # per-cover defaults, overridden per model
                                  # marked LOGO on the hood, in pen
   vent_logo_width_mm: 120        # to confirm: the logo's size on the hood
   vent_logo_height_mm: 40        # to confirm
+  vent_logo_above_edge_mm: 35    # to confirm (the insert's channel): the logo's frame centred along
+                                 # the hood's open lower edge, the vent's long bottom side, upright,
+                                 # its bottom this far above that edge (owner, 16 Oct 2026, T1: "aan
+                                 # de lange kant aan de onderkant van de airvent met het logo
+                                 # omhoog"; ADR-146). The hood is marked TOP / OPEN EDGE with an UP
+                                 # arrow and its stitch lines, so it is sewn on the right way up
   middle_cord: false             # a second drawcord halfway up the cover (table covers, owner
                                  # 1 Oct 2026; on in the table preset): a pen line on the sides
   vent_min_height_mm: 100        # a low side gets a lower opening (same width, same insert,

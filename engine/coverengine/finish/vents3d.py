@@ -36,9 +36,10 @@ cover once the hood is sewn on: `logos_mm` of the vent's piece in `finished.json
 `cover export` together with cut.dxf from the same frame (`finish.logo_frame`,
 `finish.logo_on_cover`), carried to 3D like the opening. So the 3D view shows what the cutting
 file says, never a second computation. `hood` is the hood's top stitch line (the PEN ring's top,
-a seam allowance above the opening), the direction down the cover there and the hood's length
-below that line; `below_seam_mm` the logo's top and bottom edge under it, along the fabric, so
-the viewer can stand them out with its hood. `logo` at the top is "placed" when every vent has
+a seam allowance above the opening), the direction down the cover there and how far the hood
+reaches below that line (to the ring's bottom: its sides are sewn down the ring);
+`below_seam_mm` the logo's top and bottom edge under it, so the viewer can stand them out with
+its hood. `logo` at the top is "placed" when every vent has
 its logo, "none" when the cover's vents carry none (`features.vent_logo`), "missing" when
 finished.json does not have them (exported before format 2, or out of step with pattern.json):
 export again. Corners of a logo run bottom left, bottom right, top right, top left, from outside.
@@ -257,7 +258,7 @@ def _hood_and_logo(
         "hood": {
             "seam_mm": [_r(p) for p in seam3],
             "down": [round(float(x), 4) for x in down],
-            "length_mm": round(hood_h - allowance, 1),
+            "length_mm": round(float(np.linalg.norm(rect[3] - rect[0])) + 2 * allowance, 1),
         },
         "logo": None,
     }

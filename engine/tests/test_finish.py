@@ -493,9 +493,12 @@ def test_the_logo_on_the_cover_is_the_frame_the_hood_carries_in_the_cutting_file
     _, hh = hood_size(p)
     # the hood's x runs along the opening; centred on it
     assert on_cover[:4].mean(axis=0)[0] == pytest.approx(rect[:, 0].mean())
-    # as far under the stitch line on the cover as on the hood
+    # the hood's sides sewn down the ring: its length shares out over the ring's height
     seam_y = rect[:, 1].max() + a
-    assert seam_y - on_cover[:, 1] == pytest.approx((hh - a) - hood.logo[:, 1])
+    ring = np.ptp(rect[:, 1]) + 2 * a
+    assert seam_y - on_cover[:, 1] == pytest.approx(((hh - a) - hood.logo[:, 1]) * ring / (hh - a))
+    # owner, 16 Oct 2026 (T1): along the vent's bottom, inside the opening's lower part
+    assert rect[:, 1].min() < on_cover[:, 1].min() < on_cover[:, 1].max() < rect[:, 1].mean()
     assert np.ptp(on_cover[:, 0]) == pytest.approx(float(p["features.vent_logo_width_mm"]))
     fin = finished_set(d, pieces, [], p)
     by = {pc["name"]: pc for pc in fin["pieces"]}
@@ -506,3 +509,47 @@ def test_the_logo_on_the_cover_is_the_frame_the_hood_carries_in_the_cutting_file
     assert logo_frame(off) is None and logo_on_cover(rect, off) is None
     pieces, _ = finish(d, off)
     assert not next(pc for pc in pieces if pc.name == "skirt-front").logos
+
+
+def test_the_vent_logo_sits_along_the_hoods_open_lower_edge_upright() -> None:
+    """Owner, 16 Oct 2026 (T1): "het logo zit nu aan de korte kant van de airvent maar moet aan
+    de lange kant aan de onderkant van de airvent met het logo omhoog" (ADR-146). The frame lies
+    centred along the hood's open lower edge (the vent's 25 cm bottom side), wider than high,
+    `features.vent_logo_above_edge_mm` above it; the word LOGO centred in it; the hood says
+    which edge is sewn on (TOP, an UP arrow, the stitch lines open at the bottom) and its name
+    keeps out of the logo's way. The audit fails the old place by the top edge, and a frame on
+    its short side."""
+    from coverengine.audit import logo_on_long_bottom_side
+    from coverengine.export.strokefont import text_width
+    from coverengine.finish.finish import hood_size
+
+    d = doc(square("skirt-front", 1200, ["hem", "seam", "seam", "seam"], [False] * 4))
+    d["panels"][0]["outline_mm"] = [[0, 0], [1200, 0], [1200, 870], [0, 870]]
+    p = params()
+    pieces, _ = finish(d, p)
+    hood = next(pc for pc in pieces if pc.name == "vent-hood")
+    hw, hh = hood_size(p)
+    frame = hood.logo
+    assert frame is not None
+    assert frame[:, 1].min() == pytest.approx(float(p["features.vent_logo_above_edge_mm"]))
+    assert frame[:4].mean(axis=0) == pytest.approx([hw / 2, frame[:4, 1].mean()])
+    assert np.ptp(frame[:, 0]) > np.ptp(frame[:, 1])
+    texts = {t: (at, h) for t, at, h in hood.pen_text}
+    at, h = texts["LOGO"]
+    assert at + [text_width("LOGO", h) / 2, h / 2] == pytest.approx(frame[:4].mean(axis=0))
+    assert "TOP: SEW TO COVER" in texts and "OPEN EDGE, INSERT" in texts
+    assert texts["TOP: SEW TO COVER"][0][1] > hh / 2 > texts["OPEN EDGE, INSERT"][0][1]
+    name = next(t for t in texts if t.endswith("VENT-HOOD"))
+    assert texts[name][0][1] > frame[:, 1].max()  # the name is above the logo, not over it
+    up = [ln for ln in hood.pen_lines if len(ln) == 2 and ln[0][0] == ln[1][0] == hw / 2]
+    assert up and up[0][1][1] > up[0][0][1]  # the UP arrow points to the sewn top
+    fin = finished_set(d, pieces, [], p)
+    entry = next(pc for pc in fin["pieces"] if pc["name"] == "vent-hood")
+    ok, why = logo_on_long_bottom_side(entry)
+    assert ok, why
+    old = dict(entry, logo_mm=[[80, 240], [200, 240], [200, 280], [80, 280], [80, 240]])
+    ok, why = logo_on_long_bottom_side(old)
+    assert not ok and "upper half" in why
+    on_end = dict(entry, logo_mm=[[120, 20], [160, 20], [160, 140], [120, 140], [120, 20]])
+    ok, why = logo_on_long_bottom_side(on_end)
+    assert not ok and "short side" in why

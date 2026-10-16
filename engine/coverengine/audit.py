@@ -505,6 +505,56 @@ def vent_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]
     return [_check("vents", not problems, detail)]
 
 
+def logo_checks(model_dir: Path, params: EffectiveParams) -> list[dict[str, Any]]:
+    """The vents' logo (owner, 16 Oct 2026, T1: "het logo zit nu aan de korte kant van de
+    airvent maar moet aan de lange kant aan de onderkant van de airvent met het logo omhoog";
+    ADR-146): on the hood, centred along its open lower edge (the vent's long bottom side), its
+    long side along that edge, the right way up (the hood's top, the edge sewn to the cover,
+    above it). Read off finished.json's `logo_mm`, the frame cut.dxf draws; an export without
+    it (before ADR-146: the frame on the hood's top edge) fails until exported again."""
+    if not params["features.vent_logo"]:
+        return []
+    try:
+        fin = json.loads((model_dir / "finished.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    hoods = [p for p in fin.get("pieces", []) if p.get("name") == "vent-hood"]
+    if not hoods:
+        return []
+    hood = hoods[0]
+    if not hood.get("logo_mm"):
+        why = (
+            "no logo frame in finished.json (exported before ADR-146, the logo on the "
+            "hood's short top side): export again"
+        )
+        return [_check("vent logo", False, why)]
+    return [_check("vent logo", *logo_on_long_bottom_side(hood))]
+
+
+def logo_on_long_bottom_side(hood: dict[str, Any]) -> tuple[bool, str]:
+    """Whether a vent hood's logo frame (`logo_mm`) lies centred along the hood's lower edge,
+    upright: wider than high, centred across the hood, in the half by the open lower edge (the
+    hood's y runs up from that edge to the top edge sewn to the cover)."""
+    frame = np.asarray(hood["logo_mm"], dtype=np.float64)
+    cut = np.asarray(hood["cut_mm"], dtype=np.float64)
+    (x0, y0), (x1, y1) = cut.min(axis=0), cut.max(axis=0)
+    w, h = float(np.ptp(frame[:, 0])), float(np.ptp(frame[:, 1]))
+    cx, cy = frame[:4].mean(axis=0)
+    problems = []
+    if w <= h:
+        problems.append("standing on its short side")
+    if abs(cx - (x0 + x1) / 2) > 1.0:  # param-ok: mm, centred
+        problems.append(f"{abs(cx - (x0 + x1) / 2):.0f} mm off the hood's middle")
+    if cy > (y0 + y1) / 2:
+        problems.append("in the hood's upper half, by its top edge (the short side)")
+    if problems:
+        return False, "the logo is " + "; ".join(problems)
+    from coverengine.finish.finish import MM_PER_CM as CM
+
+    return True, (f"{w / CM:g} x {h / CM:g} cm, centred along the hood's lower edge, "
+                  f"{(frame[:, 1].min() - y0) / CM:g} cm above it")  # fmt: skip
+
+
 ANGLED_DEG = (100.0, 175.0)  # param-ok: two back arms meeting between these angles: an angled sofa
 MANY_PIECES = 60  # param-ok: a drawing cover in more pieces than this is a broken shape (7,846)
 
@@ -751,6 +801,7 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
     checks += fold_checks(model_dir, params)
     checks += plan_checks(model_dir, params)
     checks += vent_checks(model_dir, params)
+    checks += logo_checks(model_dir, params)
     checks += open_seam_checks(model_dir, params)
     checks += kink_checks(model_dir, params)
 
