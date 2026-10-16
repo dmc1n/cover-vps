@@ -112,7 +112,8 @@ function ventGroup(vents: Vent[], withLogo: boolean): THREE.Group {
     depthWrite: false,
   });
   const logoMat = new THREE.MeshBasicMaterial({
-    map: withLogo ? logoTexture() : null,
+    // only when one is drawn: disposeObject frees what the group holds
+    map: withLogo && vents.some((v) => v.logo && v.hood) ? logoTexture() : null,
     side: THREE.DoubleSide,
   });
   const logoLine = new THREE.LineBasicMaterial({ color: "#1d4fd8" });

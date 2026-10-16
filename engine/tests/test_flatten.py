@@ -512,8 +512,15 @@ def test_the_vents_logo_in_3d_is_the_cutting_files_frame(
         # the same way round as the opening, seen from outside
         right = opening[1] - opening[0]
         assert float((pts[1] - pts[0]) @ right) > 0
-    # an export from before format 2: the 3D says so instead of guessing
+    # a finished.json that is not this pattern's export with these settings: "missing"
     fin = json.loads((d / "finished.json").read_text())
+    good = fin["parameter_hash"]
+    (d / "finished.json").write_text(json.dumps(dict(fin, parameter_hash="other")))
+    (d / "vents.json").unlink()
+    doc = json.loads(ensure_vents(d).read_text())  # type: ignore[union-attr]
+    assert doc["logo"] == "missing"
+    fin["parameter_hash"] = good
+    # an export from before format 2: the 3D says so instead of guessing
     for pc in fin["pieces"]:
         pc.pop("logos_mm", None)
     (d / "finished.json").write_text(json.dumps(fin))

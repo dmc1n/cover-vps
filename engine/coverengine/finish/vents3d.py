@@ -116,7 +116,7 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
     head: dict[str, Any] = {"format": VENTS_FORMAT, "lower_edge_z_mm": round(lower, 1)}
     if not vents:
         return {**head, "logo": "none", "vents": out, "warnings": warnings}
-    logos, logo_size = _finished_logos(model_dir)
+    logos, logo_size = _finished_logos(model_dir, doc, params)
     frame = logo_frame(params)
     a = float(params["stitching.allowance_mm"])  # type: ignore[arg-type]
     hood_w, _ = hood_size(params)
@@ -209,12 +209,19 @@ def vents_3d(model_dir: Path, doc: dict[str, Any], params: EffectiveParams) -> d
     return {**head, "logo": state, "vents": out, "warnings": warnings}
 
 
-def _finished_logos(model_dir: Path) -> tuple[dict[str, list[tuple[Array, Array]]], list[float]]:
+def _finished_logos(
+    model_dir: Path, doc: dict[str, Any], params: EffectiveParams
+) -> tuple[dict[str, list[tuple[Array, Array]]], list[float]]:
     """Per piece in finished.json: each opening with its logo frame on the cover (format 2 on;
-    an older export has none); and the frame's size on the hood (`logo_mm`), [] without."""
+    an older export has none); and the frame's size on the hood (`logo_mm`), [] without. Only
+    when finished.json is the export of this pattern.json with these parameters (both hashes):
+    else the cutting file may say something else, and the logo is "missing" (export again)."""
     try:
         fin = json.loads((model_dir / FINISHED_JSON).read_text(encoding="utf-8"))
     except (OSError, ValueError):
+        return {}, []
+    if (fin.get("pattern_parameter_hash") != doc.get("parameter_hash")
+            or fin.get("parameter_hash") != params.hash()):  # fmt: skip
         return {}, []
     out: dict[str, list[tuple[Array, Array]]] = {}
     size: list[float] = []
@@ -254,16 +261,18 @@ def _hood_and_logo(
     if swapped:
         ends = ends[::-1]
     seam3 = [_to_3d(v, f, uv, q)[0] for q in ends]
-    low3 = _to_3d(v, f, uv, (rect[0] + rect[1]) / 2)[0]
-    top3 = _to_3d(v, f, uv, (rect[2] + rect[3]) / 2)[0]
-    down = low3 - top3
+    mid3 = _to_3d(v, f, uv, seam_mid)[0]
+    ring_low3 = _to_3d(v, f, uv, (rect[0] + rect[1]) / 2 - up * allowance)[0]
+    down = ring_low3 - mid3
     down = down - normal * float(down @ normal)  # along the cover
     down = down / (np.linalg.norm(down) or 1.0)
+    # on the 3D surface, as the logo's corners (the flat pattern may be compensated)
+    reach = float((ring_low3 - mid3) @ down)
     out: dict[str, Any] = {
         "hood": {
             "seam_mm": [_r(p) for p in seam3],
             "down": [round(float(x), 4) for x in down],
-            "length_mm": round(float(np.linalg.norm(rect[3] - rect[0])) + 2 * allowance, 1),
+            "length_mm": round(reach, 1),
         },
         "logo": None,
     }
@@ -277,8 +286,8 @@ def _hood_and_logo(
     pts = [_to_3d(v, f, uv, q)[0] for q in match[:4]]
     if swapped:
         pts = [pts[1], pts[0], pts[3], pts[2]]
-    # measured on the exported frame itself, not on today's parameters
-    below = (match[:4] - seam_mid) @ -up
+    # the exported frame's own corners, measured on the 3D surface like the hood's reach
+    below = np.array([float((p - mid3) @ down) for p in pts])
     out["logo"] = {
         "corners_mm": [_r(p) for p in pts],
         "centre_mm": _r(np.mean(pts, axis=0)),
@@ -400,7 +409,10 @@ def ensure_vents(model_dir: Path) -> Path | None:
     out = model_dir / VENTS_JSON
     if not (finished.is_file() and pattern.is_file()):
         return None
-    if out.is_file() and out.stat().st_mtime >= finished.stat().st_mtime:
+    inputs = [finished, pattern] + [model_dir / n for n in ("panels.npz", "panels.json",
+                                                             "cover.json")]  # fmt: skip
+    newest = max(p.stat().st_mtime for p in inputs if p.is_file())
+    if out.is_file() and out.stat().st_mtime >= newest:
         try:
             current = json.loads(out.read_text(encoding="utf-8")).get("format") == VENTS_FORMAT
         except (OSError, ValueError):

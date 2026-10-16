@@ -82,17 +82,23 @@ async def check(page: Page, model: str, tag: str, problems: list[str]) -> None:
     await expect(canvas).to_have_attribute("data-vent-logos", str(len(vents)), timeout=SLOW)
     if doc.get("logo") != "placed":
         problems.append(f"{tag}: vents.json logo is {doc.get('logo')!r}, not 'placed'")
+    checked = 0
     for v in vents:
+        await face(page, v)  # straight at it from outside: its logo must be on the screen
         lg = v["logo"]
         lx, ly = zip(*[await screen(page, c) for c in lg["corners_mm"]], strict=True)
         ox, oy = zip(*[await screen(page, c) for c in v["corners_mm"]], strict=True)
         cx, cy = sum(lx) / 4, sum(ly) / 4
+        checked += 1
         if not (min(ox) - 2 <= cx <= max(ox) + 2 and min(oy) - 2 <= cy <= max(oy) + 2):
-            continue  # a vent on the far side: its corners project anywhere
+            problems.append(f"{tag}: vent {v['number']}'s logo outside its opening")
+            continue
         if abs(cx - sum(ox) / 4) > max(3.0, (max(ox) - min(ox)) * 0.05):
             problems.append(f"{tag}: vent {v['number']}'s logo not centred on it")
         if cy < sum(oy) / 4:  # y grows down the screen: the lower half has the larger y
             problems.append(f"{tag}: vent {v['number']}'s logo in the upper half")
+    if checked != len(vents):
+        problems.append(f"{tag}: {checked} of {len(vents)} logos checked on the screen")
     await face(page, next((v for v in vents if v["piece"] == "skirt-front"), vents[0]))
     await page.screenshot(path=f"{SHOTS}/{tag}-logo-on.png")
     await logo_toggle(page, False)

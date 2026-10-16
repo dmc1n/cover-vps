@@ -556,3 +556,10 @@ def test_the_vent_logo_sits_along_the_hoods_open_lower_edge_upright() -> None:
     outside = dict(entry, logo_mm=[[80, -20], [200, -20], [200, 20], [80, 20], [80, -20]])
     ok, why = logo_on_long_bottom_side(outside)
     assert not ok and "not inside" in why
+    # malformed data fails, never crashes or passes (Codex's review)
+    for bad in ([1], [[80, 35], [200, 35]], [[80, 35], [200, 35], [200, 35], [80, 35]],
+                [[float("nan"), 35]] * 5):  # fmt: skip
+        ok, _ = logo_on_long_bottom_side(dict(entry, logo_mm=bad))
+        assert not ok, bad
+    ok, _ = logo_on_long_bottom_side({k: v for k, v in entry.items() if k != "cut_mm"})
+    assert not ok

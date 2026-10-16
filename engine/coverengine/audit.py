@@ -536,8 +536,17 @@ def logo_on_long_bottom_side(hood: dict[str, Any]) -> tuple[bool, str]:
     """Whether a vent hood's logo frame (`logo_mm`) lies centred along the hood's lower edge,
     upright: wider than high, centred across the hood, in the half by the open lower edge (the
     hood's y runs up from that edge to the top edge sewn to the cover)."""
-    frame = np.asarray(hood["logo_mm"], dtype=np.float64)
-    cut = np.asarray(hood["cut_mm"], dtype=np.float64)
+    try:
+        frame = np.asarray(hood["logo_mm"], dtype=np.float64)
+        cut = np.asarray(hood["cut_mm"], dtype=np.float64)
+    except (KeyError, TypeError, ValueError):
+        return False, "the logo frame or the hood's outline is not readable"
+    if (frame.ndim != 2 or frame.shape[0] < 4 or frame.shape[1] != 2 or cut.ndim != 2
+            or cut.shape[0] < 3 or cut.shape[1] != 2 or not np.isfinite(frame).all()
+            or not np.isfinite(cut).all()):  # fmt: skip
+        return False, "the logo frame or the hood's outline is not a closed outline"
+    if min(float(np.ptp(frame[:, 0])), float(np.ptp(frame[:, 1]))) <= 0:
+        return False, "the logo frame has no size"
     (x0, y0), (x1, y1) = cut.min(axis=0), cut.max(axis=0)
     w, h = float(np.ptp(frame[:, 0])), float(np.ptp(frame[:, 1]))
     cx, cy = frame[:4].mean(axis=0)

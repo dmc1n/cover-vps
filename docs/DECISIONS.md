@@ -5712,7 +5712,10 @@ aan de lange kant aan de onderkant van de airvent met het logo omhoog, graag imp
 - **Audit.** The check "vent logo" fails a frame in the hood's upper half (the old place), one
   standing on its short side, one off the middle, and an export without `logo_mm`.
 - **Not rebuilt live.** A re-export changes cut.dxf of every cover with vents (the hood's PEN
-  marks), so each returns to the Desk; which ones, and when, is the owner's decision. T1 is
-  rebuilt (staged, checked twice, Codex's pass on the comparison).
+  marks), so each returns to the Desk: all 454 covers with vent hoods (444 with the logo, 10
+  without, which get the new marks). Which ones, and when, is the owner's decision. T1 is
+  rebuilt in staging (checked twice: the DXF entity by entity, only the six hoods' PEN marks
+  changed, and the re-measure; Codex's pass on the comparison); putting it live waits for a
+  person (the write to the live model was refused by the session's safety check).
 - **Not chosen:** a separate logos.json (finished.json already carries the pieces the DXF is
   drawn from); a sewing simulation of the hood's bulge (the 3D shows where, not how it folds).
