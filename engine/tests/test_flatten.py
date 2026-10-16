@@ -480,6 +480,48 @@ def test_export_places_the_air_vents_on_the_cover_in_3d(
         assert float(np.dot(x["normal"][:2], out[:2])) > 0
 
 
+def test_the_vents_logo_in_3d_is_the_cutting_files_frame(
+    covers: dict[str, Any], tmp_path: Path
+) -> None:
+    """ADR-146: vents.json carries each vent's logo frame from finished.json (written with
+    cut.dxf), on the cover over its opening, under the hood's stitch line, corners from outside
+    like the opening's; an export from before (no logos_mm) says "missing", not a guess."""
+    import igl
+    from coverengine.finish.vents3d import ensure_vents
+
+    d = tmp_path / "box"
+    shutil.copytree(covers["root"] / "box_with_legs", d)
+    assert main(["flatten", str(d)]) == 0
+    assert main(["export", str(d)]) == 0
+    doc = json.loads(ensure_vents(d).read_text())  # type: ignore[union-attr]
+    assert doc["format"] == 3 and doc["logo"] == "placed"
+    data = np.load(d / "panels.npz")
+    v, f = data["vertices"].astype(np.float64), data["faces"].astype(np.int64)
+    for x in doc["vents"]:
+        logo, hood = x["logo"], x["hood"]
+        pts = np.asarray(logo["corners_mm"])
+        dist2, _, _ = igl.point_mesh_squared_distance(pts, v, f)
+        assert float(np.sqrt(dist2).max()) < 3.0  # param-ok: on the surface, within 3 mm
+        opening = np.asarray(x["corners_mm"])
+        # centred on the opening, under the hood's stitch line
+        assert np.linalg.norm(pts.mean(axis=0)[:2] - opening.mean(axis=0)[:2]) < 3.0  # param-ok
+        seam_z = np.asarray(hood["seam_mm"])[:, 2].mean()
+        top, bottom = logo["below_seam_mm"]
+        assert pts[2:, 2] == pytest.approx([seam_z - top] * 2, abs=3.0)  # param-ok: mm
+        assert pts[:2, 2] == pytest.approx([seam_z - bottom] * 2, abs=3.0)  # param-ok: mm
+        # the same way round as the opening, seen from outside
+        right = opening[1] - opening[0]
+        assert float((pts[1] - pts[0]) @ right) > 0
+    # an export from before format 2: the 3D says so instead of guessing
+    fin = json.loads((d / "finished.json").read_text())
+    for pc in fin["pieces"]:
+        pc.pop("logos_mm", None)
+    (d / "finished.json").write_text(json.dumps(fin))
+    (d / "vents.json").unlink()
+    doc = json.loads(ensure_vents(d).read_text())  # type: ignore[union-attr]
+    assert doc["logo"] == "missing" and all(x["logo"] is None for x in doc["vents"])
+
+
 def test_the_vents_on_the_inner_walls_of_an_l_face_the_open_corner(tmp_path: Path) -> None:
     """C23 (7 Oct 2026): on an L shaped cover two vents sat on the inner walls and were drawn
     inside the cover ("away from the middle" pointed into it). Out is where no cover is

@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from coverengine.cli import main
 from coverengine.export.checklist import ensure_checklist
-from coverengine.finish.vents3d import corners_along, ensure_vents
+from coverengine.finish.vents3d import VENTS_FORMAT, corners_along, ensure_vents
 from coverengine.hull.build import build_hull, write_hull
 from coverengine.io.model_io import import_model
 from coverengine.learned import measure_kind, measured_deviations
@@ -48,7 +48,7 @@ def test_vent_numbers_are_the_cutting_files(box: Path) -> None:
     as from the one on the right, both together with the opening the piece's hem length."""
     p = resolve_model(box)
     doc = json.loads(ensure_vents(box).read_text())  # type: ignore[union-attr]
-    assert doc["format"] == 2 and doc["warnings"] == []
+    assert doc["format"] == VENTS_FORMAT and doc["warnings"] == []
     vents = doc["vents"]
     assert [v["number"] for v in vents] == list(range(1, len(vents) + 1))
     assert sorted(v["piece"] for v in vents) == [
@@ -89,7 +89,7 @@ def test_an_old_vents_json_is_made_again(box: Path) -> None:
     path = box / "vents.json"
     path.write_text(json.dumps({"vents": [], "warnings": []}))  # format 1, newer than finished
     assert ensure_vents(box) == path
-    assert json.loads(path.read_text())["format"] == 2
+    assert json.loads(path.read_text())["format"] == VENTS_FORMAT
 
 
 def test_a_corner_inside_a_piece_is_found() -> None:

@@ -471,3 +471,38 @@ def test_a_round_wall_keeps_its_vents() -> None:
     assert bend_deg(circle, 400, 225) == pytest.approx(math.degrees(450 / 500), abs=3)
     straight = np.array([(0.0, 0.0), (1000.0, 0.0)])
     assert bend_deg(straight, 500, 225) == pytest.approx(0, abs=1e-6)
+
+
+def test_the_logo_on_the_cover_is_the_frame_the_hood_carries_in_the_cutting_file() -> None:
+    """ADR-146 (owner, 16 Oct 2026: "see the logo on the 3d model so we can check before we
+    accept"): one frame, drawn on the hood's PEN layer and placed on the cover where the sewn
+    hood hangs: centred on the opening, as far under the hood's stitch line (the ring a seam
+    allowance above the opening) as on the hood piece. Without the logo there is none."""
+    from coverengine.finish.finish import hood_size, logo_frame, logo_on_cover
+
+    d = doc(square("skirt-front", 1200, ["hem", "seam", "seam", "seam"], [False] * 4))
+    d["panels"][0]["outline_mm"] = [[0, 0], [1200, 0], [1200, 870], [0, 870]]
+    p = params()
+    pieces, _ = finish(d, p)
+    side = next(pc for pc in pieces if pc.name == "skirt-front")
+    hood = next(pc for pc in pieces if pc.name == "vent-hood")
+    assert hood.logo is not None and any(ln is hood.logo for ln in hood.pen_lines)
+    (rect,) = side.openings
+    (on_cover,) = side.logos
+    a = float(p["stitching.allowance_mm"])
+    _, hh = hood_size(p)
+    # the hood's x runs along the opening; centred on it
+    assert on_cover[:4].mean(axis=0)[0] == pytest.approx(rect[:, 0].mean())
+    # as far under the stitch line on the cover as on the hood
+    seam_y = rect[:, 1].max() + a
+    assert seam_y - on_cover[:, 1] == pytest.approx((hh - a) - hood.logo[:, 1])
+    assert np.ptp(on_cover[:, 0]) == pytest.approx(float(p["features.vent_logo_width_mm"]))
+    fin = finished_set(d, pieces, [], p)
+    by = {pc["name"]: pc for pc in fin["pieces"]}
+    assert fin["format_version"] >= 2
+    assert by["vent-hood"]["logo_mm"] == [[round(x, 2), round(y, 2)] for x, y in hood.logo]
+    assert len(by["skirt-front"]["logos_mm"]) == len(by["skirt-front"]["openings_mm"])
+    off = params(**{"features.vent_logo": False})
+    assert logo_frame(off) is None and logo_on_cover(rect, off) is None
+    pieces, _ = finish(d, off)
+    assert not next(pc for pc in pieces if pc.name == "skirt-front").logos

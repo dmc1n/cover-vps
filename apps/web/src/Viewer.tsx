@@ -40,10 +40,22 @@ interface Vent {
   corners_mm: number[][]; // bottom left, bottom right, top right, top left, from outside
   normal: number[];
   size_mm: number[];
+  // vents.json format 3 (ADR-146): the hood's top stitch line, and the logo frame from
+  // finished.json (the cutting file's own frame) where the sewn hood puts it
+  hood?: { seam_mm: number[][]; down: number[]; length_mm: number };
+  logo?: {
+    corners_mm: number[][]; // bottom left, bottom right, top right, top left, from outside
+    below_seam_mm: number[]; // its top and bottom edge under the hood's stitch line
+    size_mm: number[];
+  } | null;
 }
+// "placed": every vent has its logo; "missing": finished.json has none (export again);
+// "none": the vents carry no logo; undefined: a vents.json from before format 3
+type LogoState = "placed" | "missing" | "none" | undefined;
 const VENT_LIFT_MM = 4; // the opening sits this far outside the cover, so it is never hidden
 const HOOD_MM = 60; // how far the hood hint stands out at its lower edge
 const VENTS_KEY = "viewer.vents";
+const LOGO_KEY = "viewer.ventLogo"; // the vents' logo, on unless switched off (ADR-146)
 const ventsSaved = () => {
   try {
     return localStorage.getItem(VENTS_KEY) === "1";
@@ -51,8 +63,35 @@ const ventsSaved = () => {
     return false;
   }
 };
+const logoSaved = () => {
+  try {
+    return localStorage.getItem(LOGO_KEY) !== "0";
+  } catch {
+    return true;
+  }
+};
 
-function ventGroup(vents: Vent[]): THREE.Group {
+// how far the hood stands out of the cover this far down from its stitch line (0 to 1 of its
+// length): the same curve for the hood and the logo on it, so the logo lies on the hood
+const hoodOut = (s: number) =>
+  HOOD_MM * Math.sin((Math.min(Math.max(s, 0), 1) * Math.PI) / 2);
+
+function logoTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 384;
+  c.height = 128;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "rgba(255,255,255,0.9)";
+  g.fillRect(0, 0, 384, 128);
+  g.fillStyle = "#1d4fd8";
+  g.font = "700 84px 'Work Sans Variable', system-ui, sans-serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText("LOGO", 192, 68);
+  return new THREE.CanvasTexture(c);
+}
+
+function ventGroup(vents: Vent[], withLogo: boolean): THREE.Group {
   const group = new THREE.Group();
   const opening = new THREE.MeshBasicMaterial({
     color: "#26241f",
@@ -64,6 +103,19 @@ function ventGroup(vents: Vent[]): THREE.Group {
     roughness: 0.8,
   });
   const frame = new THREE.LineBasicMaterial({ color: "#d4472e" });
+  const seeThrough = new THREE.MeshStandardMaterial({
+    color: "#b89f74",
+    side: THREE.DoubleSide,
+    roughness: 0.8,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+  });
+  const logoMat = new THREE.MeshBasicMaterial({
+    map: withLogo ? logoTexture() : null,
+    side: THREE.DoubleSide,
+  });
+  const logoLine = new THREE.LineBasicMaterial({ color: "#1d4fd8" });
   for (const v of vents) {
     const n = v.normal;
     const at = (p: number[], out: number) =>
@@ -85,7 +137,74 @@ function ventGroup(vents: Vent[]): THREE.Group {
         frame,
       ),
     );
-    // the hood: from the opening's top edge, out and down over its upper part
+    const logo = withLogo ? v.logo : null;
+    if (logo && v.hood) {
+      // the hood as it hangs from its stitch line (vents.json format 3), see-through so the
+      // opening stays visible, the logo on it at the same stand-out
+      const [sl, sr] = v.hood.seam_mm;
+      const d = v.hood.down;
+      const len = v.hood.length_mm;
+      const rows = 8;
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i < rows; i++) {
+        const row = (k: number) => {
+          const s = k / rows;
+          const out = VENT_LIFT_MM + hoodOut(s);
+          return [sl, sr].map((p) =>
+            at(
+              [
+                p[0] + d[0] * s * len,
+                p[1] + d[1] * s * len,
+                p[2] + d[2] * s * len,
+              ],
+              out,
+            ),
+          );
+        };
+        const [a0, b0] = row(i);
+        const [a1, b1] = row(i + 1);
+        pts.push(a0, b0, b1, a0, b1, a1);
+      }
+      const hoodGeo = new THREE.BufferGeometry().setFromPoints(pts);
+      hoodGeo.computeVertexNormals();
+      group.add(new THREE.Mesh(hoodGeo, seeThrough));
+      const [top, bottom] = logo.below_seam_mm;
+      const lift = (p: number[], below: number) =>
+        at(p, VENT_LIFT_MM + 1 + hoodOut(below / len));
+      const [lbl, lbr, ltr, ltl] = logo.corners_mm;
+      const q = [
+        lift(lbl, bottom),
+        lift(lbr, bottom),
+        lift(ltr, top),
+        lift(ltl, top),
+      ];
+      const word = new THREE.BufferGeometry().setFromPoints([
+        q[0],
+        q[1],
+        q[2],
+        q[0],
+        q[2],
+        q[3],
+      ]);
+      word.setAttribute(
+        "uv",
+        new THREE.Float32BufferAttribute(
+          [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1],
+          2,
+        ),
+      );
+      const plate = new THREE.Mesh(word, logoMat);
+      plate.name = "vent-logo";
+      group.add(plate);
+      group.add(
+        new THREE.LineLoop(
+          new THREE.BufferGeometry().setFromPoints(q),
+          logoLine,
+        ),
+      );
+      continue;
+    }
+    // the hood hint: from the opening's top edge, out and down over its upper part
     const mid = (a: number[], b: number[], t: number) =>
       a.map((x, i) => x + (b[i] - x) * t);
     const [cbl, cbr, ctr, ctl] = v.corners_mm;
@@ -238,6 +357,8 @@ export function Viewer({
   const [drape, setDrape] = useState<Drape | null>(null);
   const [water, setWater] = useState(true); // the water heatmap over the draped cover
   const [showVents, setShowVents] = useState(ventsSaved);
+  const [showLogo, setShowLogo] = useState(logoSaved);
+  const [logoState, setLogoState] = useState<LogoState>("none");
   const [showDims, setShowDims] = useState(dimsSaved);
   const [unfolding, setUnfolding] = useState(false);
   const [measuring, setMeasuring] = useState(false);
@@ -673,9 +794,12 @@ export function Viewer({
     let group: THREE.Group | null = null;
     fetch(`${fileUrl(id, "vents.json")}?v=${stamp}`)
       .then((r) => (r.ok ? r.json() : { vents: [] }))
-      .then((doc: { vents: Vent[] }) => {
+      .then((doc: { vents: Vent[]; logo?: LogoState }) => {
         if (!alive || !sceneRef.current) return;
-        group = ventGroup(doc.vents ?? []);
+        const vents = doc.vents ?? [];
+        setLogoState(vents.length ? (doc.logo ?? "missing") : "none");
+        group = ventGroup(vents, showLogo);
+        group.name = "vents";
         sceneRef.current.add(group);
       })
       .catch(() => undefined);
@@ -686,7 +810,7 @@ export function Viewer({
         disposeObject(group);
       }
     };
-  }, [showVents, id, stamp, files]);
+  }, [showVents, showLogo, id, stamp, files]);
 
   // the overall dimensions, on request: measured on the cover (its pieces, else its surface)
   useEffect(() => {
@@ -827,6 +951,24 @@ export function Viewer({
                   }}
                 />
                 Air vents
+              </label>
+            )}
+            {files.includes("vents.json") && (
+              <label title="Each vent's logo frame where it sits on the sewn hood, from the cutting file: to check it before approving">
+                <input
+                  type="checkbox"
+                  data-testid="vent-logo-toggle"
+                  checked={showLogo && showVents}
+                  onChange={(e) => {
+                    setShowLogo(e.target.checked);
+                    remember(LOGO_KEY, e.target.checked);
+                    if (e.target.checked && !showVents) {
+                      setShowVents(true);
+                      remember(VENTS_KEY, true);
+                    }
+                  }}
+                />
+                Logo
               </label>
             )}
             {files.includes("vents.json") && (
@@ -1016,6 +1158,15 @@ export function Viewer({
         )}
       </div>
       <div className="canvas" ref={host}>
+        {showVents && showLogo && logoState === "missing" && (
+          <p
+            className="viewer-note"
+            role="status"
+            data-testid="vent-logo-missing"
+          >
+            Logo position not computed yet: run again
+          </p>
+        )}
         {glError && (
           <p className="gl-error" role="alert">
             The 3D view needs WebGL, which this browser does not give ({glError}

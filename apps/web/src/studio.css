@@ -2415,6 +2415,22 @@ td.bad {
   border-radius: var(--radius);
   overflow: hidden;
 }
+/* the vents' logo not in this cover's files yet (ADR-146) */
+.viewer .canvas {
+  position: relative;
+}
+.viewer .viewer-note {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  margin: 0;
+  padding: 6px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 14px;
+}
 .viewer .gl-error {
   margin: 0;
   padding: 24px;
