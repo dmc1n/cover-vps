@@ -50,9 +50,15 @@ fi
 snapshot_args=()
 [ ! -f "$SNAP/app.db" ] || snapshot_args=(-C "$SNAP" app.db)
 # follow the models link (the web app's models are the repository's models/ folder)
+# tar exits 1 when a file changed while it was read (the live app and agents keep writing):
+# a warning, the archive is complete and is tested below; 2 and up is a real failure (from
+# 13 Oct every night failed on tmp-agents changing; agent and release scratch is left out).
+rc=0
 tar -czhf "$PARTIAL" -C "$DATA" --exclude='*.tmp' --exclude='./app.db' --exclude='./app.db-*' \
-  --exclude='./backup-*' --exclude='*.log' . \
-  "${snapshot_args[@]}" || fail "tar stopped (disk full?)"
+  --exclude='./backup-*' --exclude='./tmp-agents' --exclude='./tmp-release' --exclude='./tmp-*' \
+  --exclude='*.log' --exclude='*.sock' --warning=no-file-changed --warning=no-file-ignored . \
+  "${snapshot_args[@]}" || rc=$?
+[ "$rc" -le 1 ] || fail "tar stopped with code $rc (disk full?)"
 gzip -t "$PARTIAL" || fail "the archive does not test"
 chmod 600 "$PARTIAL"
 mv "$PARTIAL" "$ARCHIVE"

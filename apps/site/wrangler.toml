@@ -10,9 +10,9 @@ routes = [{ pattern = "shop.s2dio.living", custom_domain = true }]
 STUDIO_URL = "https://covers.suns.nu"
 PAGE_TTL = "60"
 MEDIA_TTL = "86400"
-# the API for AI agents and its pages (ADR-135): off on the live site until the owner's go;
-# then AGENT_API = "1" here and the shop setting agent_api_enabled in the studio
-# AGENT_API = "1"
+# the API for AI agents and its pages (ADR-139/145): on since the owner's go of 20 Oct 2026
+# (#110), together with the shop setting agent_api_enabled in the studio
+AGENT_API = "1"
 
 # the preview at preview.s2dio.living: its own build (apps/web/dist), the studio's data
 [env.preview]
