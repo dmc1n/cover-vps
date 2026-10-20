@@ -68,7 +68,8 @@ def test_a_join_that_would_change_a_seam_beyond_the_fit_tolerance_is_refused() -
     kept = dg.build(spec, 1450.0, 3000.0, (15.0, 1.0, 5.0))
     tops = lambda ps: sorted(p.name for p in ps if p.name.startswith("top-"))  # noqa: E731
     assert len(tops(loose)) == 3  # without the limit two bands are joined
-    assert tops(kept) == ["top-1-1", "top-1-2", "top-1-3", "top-1-4"]  # as the drawing draws
+    # as the drawing draws (the band from the back's 40 cm seam up is `upper-`, ADR-149)
+    assert tops(kept) == ["top-1-2", "top-1-3", "top-1-4", "top-1-5"]
 
 
 def test_a_flat_join_keeps_its_outline() -> None:

@@ -5841,3 +5841,39 @@ picture and a size table, and Codex again on those before live).
 - **Not changed:** the rules. For S45 the corner rule (ADR-134) and the even spread pull apart on a
   free outline that is round all along but has short straighter stretches; whether a free-form
   pouf's vents ignore the corner rule is Rens's answer to #119, then a rule if he says so.
+
+## ADR-149 — S25: the walls 40 cm high all round as drawn, one skirt piece per wall (Rens, 20 Oct 2026)
+
+Rens at the Desk (20 Oct 2026, S25, a curved sofa): "Panelen op tekening komen niet overeen met
+het model", with a red line across the end wall at the front wall's height. The drawing draws a
+seam at 40.01 cm all round: the front, both ends and the back are 40 cm walls; above the back
+wall an upright band to 62.99 cm whose ends lean in; the ends are hipped from 40 cm up. The live
+cover had end walls sloping from 40 cm at the front to 63 cm at the back and the back in one
+piece to 63 cm (ADR-116's note had already named the difference). Codex read the same from the
+drawing independently, before the rebuild.
+
+- **The shape** (`testdata/drawing_shapes/drawing-s25.json`, a person's reading): a profile
+  point at the back at 40.01 cm below the 62.99 one, the 62.99 line 202.6 cm long (not written:
+  measured from the drawing's top and side views, where the 40 cm line runs the full 237.91;
+  the written 164.22 checks within 0.2 cm the same way), `skirt_cm: 40.01`.
+- **`skirt_per_wall`** (new, a drawing shape's params): the level skirt below `skirt_cm` is one
+  piece per wall, a seam at every corner as the drawing draws it. Without it whole walls are
+  packed into runs up to `seams.max_skirt_panel_mm` (S43's band), which on S25 wrapped the
+  front wall round the corner into an end wall.
+- **A fix in the same place:** a wall face's upper triangle (no floor edge) went to the skirt
+  run whose face shares most corners; at a corner the next wall's face shares as many, so the
+  back wall's first triangle went to the end wall and the corner seam ran slanted 5 cm. On a
+  tie it now stays with its own wall. No other shape uses `skirt_cm` today (S25 only), so no
+  live cover changes by it.
+- **Result:** 11 pieces instead of 10 (the back in two, 40 cm and 23 cm), the end walls
+  40 cm rectangles, the hips and the back chamfer band changed accordingly, the rest the same;
+  5 vents, same positions. Tests: `test_drawing_given.py` (one skirt piece per wall, straight
+  corner seams; S25's walls 40 cm and the back split).
+- **Learned (ADR-055):** when a drawing draws a line round the walls at one height, that line
+  is a seam and the walls stop there; a hip starts above it. Swept with hipped ends: check
+  whether the end walls are as high as the lowest wall (then `skirt_cm`) before letting them
+  follow the profile. No other swept shape with hipped ends has walls of different heights
+  (S25 was the only one).
+- **Better later:** the end hip's fold follows the fan from the back corner; the drawing folds
+  it along the line from the 62.99 back corner to the crease. One piece either way, flat within
+  0.0 % stretch; a fan from a chosen tip when a drawing needs the fold drawn.

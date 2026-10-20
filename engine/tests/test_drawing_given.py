@@ -531,3 +531,43 @@ def test_the_audit_flags_a_sharp_fold_inside_a_piece(tmp_path: Path) -> None:
     piece(1880.0)  # about 62 degrees, over 2 m
     (check,) = kink_checks(tmp_path, params)
     assert not check["ok"] and "top-1" in check["detail"]
+
+
+def _skirt_spec(per_wall: bool) -> dict:
+    spec = json.loads((SHAPES / "drawing-s25.json").read_text())
+    spec["params"]["skirt_per_wall"] = per_wall
+    return spec
+
+
+def test_a_skirt_per_wall_is_one_piece_per_wall_with_upright_corner_seams() -> None:
+    """Rens, Desk 20 Oct 2026, S25: "the panels on the drawing do not match the model": the walls
+    40 cm high all round, a seam at every corner as drawn (ADR-149). Without `skirt_per_wall`
+    the front wall is packed with an end wall into one run round the corner."""
+    pieces = dg.build(_skirt_spec(True), ROLL, 3000.0, (15.0, 1.0, 5.0))
+    skirt = [p for p in pieces if p.name.startswith("skirt-")]
+    assert len(skirt) == 4  # back, front and both ends
+    for p in skirt:
+        a = np.array([q for f in p.faces for q in f])
+        assert a[:, 2].max() == pytest.approx(400.1, abs=0.01)
+        # every corner seam upright: the piece's outline at the top is the one at the floor
+        top = {tuple(np.round(q[:2], 1)) for q in a if q[2] > 400}
+        floor = {tuple(np.round(q[:2], 1)) for q in a if q[2] < 1e-6}
+        ends = lambda s: {min(s), max(s)}  # noqa: E731
+        assert ends(top) == ends(floor)
+    packed = dg.build(_skirt_spec(False), ROLL, 3000.0, (15.0, 1.0, 5.0))
+    assert len([p for p in packed if p.name.startswith("skirt-")]) < 4
+
+
+def test_s25_walls_stop_at_40_cm_and_the_back_is_split_there() -> None:
+    """S25 as drawn: the end walls flat at 40 cm (not sloping up to 63), the back wall in a 40 cm
+    skirt and an upright band to 62.99 cm whose ends lean in (ADR-149)."""
+    spec = json.loads((SHAPES / "drawing-s25.json").read_text())
+    pieces = dg.build(spec, ROLL, 3000.0, (15.0, 1.0, 5.0))
+    upright = [p for p in pieces if dg._upright(p)]
+    for p in upright:
+        z = np.array([q for f in p.faces for q in f])[:, 2]
+        assert z.max() <= 400.1 + 0.01 or z.min() >= 400.1 - 0.01  # nothing upright crosses 40
+    band = next(p for p in pieces if p.name.startswith("upper-"))
+    a = np.array([q for f in band.faces for q in f])
+    assert a[:, 2].min() == pytest.approx(400.1, abs=0.01)
+    assert a[:, 2].max() == pytest.approx(629.9, abs=0.01)
