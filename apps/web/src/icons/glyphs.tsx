@@ -478,6 +478,14 @@ export const GLYPHS = {
       <path d="M2.5 20.5h19M7.5 8h3M7.5 11.5h3M7.5 15h3M16.5 13h.01M16.5 16.5h.01" />
     </>
   ),
+  // the dealer embed (ADR-150): our configurator inside another website's page
+  embed: (
+    <>
+      <path d="M4.5 4h15a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+      <path d="M2.5 8h19" />
+      <path d="m9.5 11.5-2.5 2.5 2.5 2.5M14.5 11.5l2.5 2.5-2.5 2.5" />
+    </>
+  ),
 } satisfies Record<string, ReactElement>;
 
 export type GlyphName = keyof typeof GLYPHS;

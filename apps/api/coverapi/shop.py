@@ -142,6 +142,9 @@ SHOP_DEFAULTS: dict[str, Any] = {
     # the API for AI agents (/api/v2), llms-full.txt, the measuring guide and the cover pages
     # (ADR-139): off on the live shop until the owner's go; the preview site always has them
     "agent_api_enabled": False,
+    # the dealer embed (ADR-150): our configurator on dealers' own websites; off on the live
+    # shop until the owner's go; the preview site and colleagues always have it
+    "dealer_embed_enabled": False,
     # a made-to-measure cover's lead time per language, as the agent API states it (ADR-139);
     # empty: the API says it is confirmed after the order (never a made-up time)
     "custom_lead_time": {"nl": "", "en": "", "de": "", "fr": ""},
@@ -934,7 +937,9 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         from fastapi.responses import JSONResponse, RedirectResponse
 
         path = request.url.path
-        shop_path = path.startswith(("/api/shop/", "/media/", "/shop", "/api/v2/")) or path in (
+        shop_path = path.startswith(
+            ("/api/shop/", "/media/", "/shop", "/api/v2/", "/api/embed/", "/embed/")  # ADR-150
+        ) or path in (
             "/sitemap.xml", "/llms.txt", "/llms-full.txt", "/mcp")  # fmt: skip
         # the old webshop API (ADR-061) too, except for a webshop's own key (checked there)
         if path.startswith("/api/public/") and not request.headers.get("x-api-key"):
@@ -1234,7 +1239,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         row, d = _order_data(oid)
         checkout, mid, problem = "", None, None
         if settings()["payment"].get("mollie_key"):
-            status_url = f"{shop_root(auth, request)}order/{row['token']}"
+            # a dealer site's order (ADR-150) comes back to its own status page, in its look
+            status_url = d.get("status_url") or f"{shop_root(auth, request)}order/{row['token']}"
             hook = shop_root(auth, request).removesuffix("shop/") + "api/shop/mollie"
             try:
                 pay = mollie("POST", "/payments", {
@@ -1280,7 +1286,7 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         if "checkout_url" not in d:
             raise HTTPException(409, "the payment is still being prepared; try again in a moment")
         stock = d.get("stock")
-        status_url = f"{shop_root(auth, request)}order/{row['token']}"
+        status_url = d.get("status_url") or f"{shop_root(auth, request)}order/{row['token']}"
         what = (f"EXISTING COVER {stock['name']} ({stock['model_id']}), "
                 f"EUR {d['quote']['quote']['price']['sale_eur']}" if stock
                 else json.dumps(d["quote"]["quote"]["sizes_cm"]))  # fmt: skip
@@ -1296,6 +1302,8 @@ def install(app: FastAPI, auth: Any, data: Path, jobs: Any, store: Any) -> None:
         if repeat:
             out["repeat"] = True
         return out
+
+    app.state.shop_finish_order = finish_order  # a dealer site's hosted checkout (ADR-150)
 
     @app.post("/api/shop/order")
     def shop_order(req: OrderIn, request: Request) -> dict[str, Any]:

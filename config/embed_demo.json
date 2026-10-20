@@ -1,0 +1,37 @@
+{
+ "_about": "The built-in demo dealers of the dealer embed (ADR-150): two made-up dealer sites for preview.<domain>/embed-demo. They answer only on the preview website or for a logged-in colleague, price at our B2B list (no company's own prices) plus their margin, and never make an order, a mail or a count.",
+ "sites": {
+  "dpk_demo_voorbeeld": {
+   "name": "Tuinhuis Voorbeeld (demo)",
+   "settings": {
+    "theme": {"primary": "#2f5d3a", "accent": "#b8893b", "text": "#1f2a1f", "background": "#fbf8f1", "surface": "#f0eadb", "border": "#cfc6b0", "radius_px": 2, "font": "Georgia, 'Times New Roman', serif", "heading_font": "Georgia, 'Times New Roman', serif", "logo_url": ""},
+    "lang": "nl",
+    "languages": ["nl", "en"],
+    "layout": "compact",
+    "view3d": false,
+    "kinds": ["sofa", "corner_sofa", "lounger"],
+    "colours": [],
+    "checkout": "dealer",
+    "end_action": "send_order",
+    "pricing": {"mode": "margin", "margin_pct": 45, "kind_margin_pct": {}, "rounding": "5", "show_vat": true},
+    "texts": {"nl": {"title": "Hoezen op maat, voor uw tuinset", "cta": ""}, "en": {"title": "Covers made to measure for your garden set"}}
+   }
+  },
+  "dpk_demo_exemple": {
+   "name": "Maison Exemple (demo)",
+   "settings": {
+    "theme": {"primary": "#c9a45c", "accent": "#e8d3a3", "text": "#f4efe6", "background": "#1b2230", "surface": "#252e40", "border": "#3d4a63", "radius_px": 18, "font": "'Helvetica Neue', Arial, sans-serif", "heading_font": "'Didot', 'Bodoni 72', Georgia, serif", "logo_url": ""},
+    "lang": "fr",
+    "languages": ["fr", "en", "de", "nl"],
+    "layout": "full",
+    "view3d": true,
+    "kinds": [],
+    "colours": [],
+    "checkout": "ours",
+    "end_action": "checkout",
+    "pricing": {"mode": "margin", "margin_pct": 60, "kind_margin_pct": {"dining_set": 50}, "rounding": "0.95", "show_vat": true},
+    "texts": {"fr": {"title": "La housse parfaite, sur mesure", "intro": "Protégez votre salon de jardin avec une housse taillée pour lui."}}
+   }
+  }
+ }
+}

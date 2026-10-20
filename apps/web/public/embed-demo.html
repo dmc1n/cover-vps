@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Dealer embed demo</title>
+    <link rel="stylesheet" href="/embed-demo.css" />
+    <script type="module" src="/embed/v1/configurator.js"></script>
+    <script type="module" src="/embed-demo.js"></script>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Dealer embed: demo</h1>
+      <p>
+        Two made-up dealer websites, each with our configurator in its own look, at its own
+        prices (our B2B price plus its margin; our B2B price never reaches this page). The first
+        sends the order to the dealer, the second pays in our checkout in its look. Nothing is
+        ordered here: these demo dealers never make an order. Below them: the frame for site
+        builders that refuse scripts, and the events a dealer's page receives.
+      </p>
+      <p class="small">ADR-150 · docs/plans/dealer-embed.md · preview only</p>
+    </div>
+
+    <section class="browser">
+      <div class="bar"><span></span><span></span><span></span><em>https://www.tuinhuis-voorbeeld.example/hoezen</em></div>
+      <div class="site voorbeeld">
+        <header>
+          <strong>Tuinhuis Voorbeeld</strong>
+          <nav><a>Tuinmeubelen</a><a>Parasols</a><a class="on">Hoezen op maat</a><a>Contact</a></nav>
+        </header>
+        <div class="hero">
+          <h2>Een hoes die past, voor elk tuinmeubel</h2>
+          <p>Wij laten uw hoes op maat maken van 100 % acryl, met ventilatie en een trekkoord.</p>
+        </div>
+        <s2dio-configurator class="cfg" dealer="dpk_demo_voorbeeld" lang="nl"></s2dio-configurator>
+        <footer>Tuinhuis Voorbeeld · Dorpsstraat 1 · Voorbeeldstad (a made-up dealer)</footer>
+      </div>
+    </section>
+
+    <section class="browser">
+      <div class="bar"><span></span><span></span><span></span><em>https://maison-exemple.example/housses</em></div>
+      <div class="site exemple">
+        <header>
+          <strong>MAISON EXEMPLE</strong>
+          <nav><a>Collections</a><a class="on">Housses sur mesure</a><a>Ateliers</a></nav>
+        </header>
+        <div class="hero">
+          <h2>L'art de protéger l'extérieur</h2>
+          <p>Chaque housse est taillée pour votre mobilier. Commandez et payez en ligne.</p>
+        </div>
+        <s2dio-configurator class="cfg" dealer="dpk_demo_exemple" lang="fr"></s2dio-configurator>
+        <footer>Maison Exemple · a made-up dealer</footer>
+      </div>
+    </section>
+
+    <section class="browser">
+      <div class="bar"><span></span><span></span><span></span><em>A site builder without scripts: the frame</em></div>
+      <div class="site plain">
+        <iframe
+          title="Cover configurator"
+          src="/embed/v1/frame?dealer=dpk_demo_voorbeeld&amp;lang=en"
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+        ></iframe>
+      </div>
+    </section>
+
+    <section class="events">
+      <h2>Events on this page</h2>
+      <p class="small">
+        <code>s2dio:ready</code>, <code>s2dio:priced</code>, <code>s2dio:checkout-started</code>,
+        <code>s2dio:order-sent</code>, <code>s2dio:added-to-cart</code>, <code>s2dio:error</code>;
+        from the frame as <code>postMessage</code>.
+      </p>
+      <ol id="log"></ol>
+    </section>
+  </body>
+</html>

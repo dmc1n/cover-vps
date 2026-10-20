@@ -6,7 +6,7 @@
     "dev": "wrangler dev --local",
     "deploy": "wrangler deploy --var BUILD:$(git describe --always --dirty)",
     "check": "tsc --noEmit",
-    "test": "node --test test/worker.test.ts",
+    "test": "node --test test/worker.test.ts test/embed.test.ts",
     "deploy:preview": "mkdir -p ../web/dist/preview && cp preview-overlay.json ../web/dist/preview/overlay.json && wrangler deploy --env preview --var BUILD:$(git describe --always --dirty)"
   },
   "devDependencies": {

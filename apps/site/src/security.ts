@@ -30,10 +30,11 @@ export const SECURITY_HEADERS: Record<string, string> = {
   "cross-origin-opener-policy": "same-origin",
 };
 
-export function secure(res: Response): Response {
+export function secure(res: Response, framed = false): Response {
   const out = new Response(res.body, res); // the headers of a fetched answer are immutable
   for (const [k, v] of Object.entries(SECURITY_HEADERS))
-    if (!out.headers.has(k)) out.headers.set(k, v);
+    if (!out.headers.has(k) && !(framed && k === "x-frame-options")) out.headers.set(k, v);
+  if (framed) out.headers.delete("x-frame-options"); // the dealer frame (ADR-150)
   out.headers.delete("x-powered-by");
   return out;
 }

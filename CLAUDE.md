@@ -395,6 +395,15 @@ cd apps/site && npm test | npm run check     the Worker's tests (security header
                                              /api/v2 request with the caller's headers (same limits, prices, refusals);
                                              limits.agent_mcp_per_hour for the protocol's own messages; behind the same two
                                              switches as /api/v2 (coverapi/agent_mcp.py; adding it: docs/handbook/agent-api.md)
+Shop → Dealer embeds (#/shop/dealers)       our configurator on a B2B dealer's own website (ADR-150): <s2dio-configurator
+                                             dealer="dpk_…"> from /embed/v1/configurator.js (apps/web/src/embed/, vite.embed.config.ts)
+                                             or the frame /embed/v1/frame; per site its domains (CORS and frame-ancestors per dealer),
+                                             look, texts nl/en/de/fr, kinds, fabrics, prices (B2B + margin or a price list, computed in
+                                             coverapi/dealer_embed.py only: never the purchase price in a page), our checkout in its look
+                                             or the order to the dealer (confirm → B2B order on account), events, secret key (verify),
+                                             counts; limits.embed_*; preview only (dealer_embed_enabled + the Worker's DEALER_EMBED);
+                                             demo dealers config/embed_demo.json at preview.<domain>/embed-demo; texts config/embed_texts.json
+apps/web/e2e/dealer_embed.py                the dealer embed in a real browser (seed: e2e/dealer_embed_seed.py; usage in its docstring)
 uv tool install ./clients/cli; covers find --kind sofa --width 230 --depth 90 --height 85 [--json]
                                              the agent API from the command line (quote, kinds, link, cover; --api, --key)
 config/agent_kinds.json                     the kinds an agent may name, their sizes and the measuring guide's texts

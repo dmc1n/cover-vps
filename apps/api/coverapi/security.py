@@ -47,6 +47,7 @@ OPEN_PATHS = (
     "/api/auth/invite/",
     "/api/public/",  # the webshop's API: its own key check and limits (webshop.py, ADR-061)
     "/api/shop/",  # the cover webshop: its own limits; payments only through Mollie (ADR-062)
+    "/api/embed/",  # the dealer embed: its own gate, origin check and limits (ADR-150)
     "/api/b2b/",  # the B2B shop: its own logins, sessions and CSRF (b2b.py, ADR-104)
     "/api/v2/",  # the API for AI agents: no cookies used, its own keys and limits (ADR-139)
 )
@@ -214,7 +215,7 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
                         {"detail": "the workshop login may not open this"}, status_code=403
                     )
                 if request.method in CHANGING and not path.startswith(
-                    ("/api/public/", "/api/shop/", "/api/b2b/", "/api/v2/")
+                    ("/api/public/", "/api/shop/", "/api/b2b/", "/api/v2/", "/api/embed/")
                 ):
                     origin = request.headers.get("origin")
                     host = request.headers.get("x-forwarded-host") or request.headers.get("host")
@@ -236,6 +237,8 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
                 "Content-Security-Policy",
                 csp.replace("frame-ancestors 'self'", "frame-ancestors 'self' " + " ".join(shops)),
             )
+        elif path == "/embed/v1/frame":  # the dealer frame lists its sites itself (ADR-150):
+            response.headers.setdefault("Content-Security-Policy", csp)  # no X-Frame-Options
         else:
             response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
             response.headers.setdefault("Content-Security-Policy", csp)

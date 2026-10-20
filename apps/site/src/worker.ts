@@ -7,6 +7,7 @@
 
 import { AGENT, AGENT_B2B, agent, agentOn } from "./agent.ts"; // ADR-139
 import { B2B, b2b } from "./b2b.ts"; // .ts: node runs the tests on the sources
+import { DEMO, EMBED, demo, embed, embedOn } from "./embed.ts"; // ADR-150
 
 export interface Env {
   ASSETS?: Fetcher; // the preview only: its own fresh build of the shop
@@ -14,6 +15,9 @@ export interface Env {
   // the API for AI agents and its pages (ADR-139): on the preview always, on the live site only
   // with AGENT_API = "1" (after the owner's go; the studio's shop setting agent_api_enabled too)
   AGENT_API?: string;
+  // the dealer embed (ADR-150): on the preview always, on the live site only with
+  // DEALER_EMBED = "1" (after the owner's go; the studio's shop setting dealer_embed_enabled too)
+  DEALER_EMBED?: string;
   // the commit this Worker was built from (`git describe`, set by `npm run deploy[:preview]`).
   // A secret change makes a new version from the last deployed code, so a stale Worker can look
   // fresh in the dashboard; every answer's x-site-build shows which code really answers.
@@ -69,7 +73,10 @@ function cacheFor(url: URL, method: string, env: Env): number {
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const out = secure(await route(req, env, ctx)); // ADR-103: every answer with the headers
+    // ADR-103: every answer with the headers; the dealer frame without X-Frame-Options (its
+    // own CSP lists the dealer's sites, ADR-150)
+    const framed = new URL(req.url).pathname === "/embed/v1/frame";
+    const out = secure(await route(req, env, ctx), framed);
     out.headers.set("x-site-build", env.BUILD || "unknown");
     return out;
   },
@@ -82,6 +89,11 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
       url.protocol = "https:";
       return Response.redirect(url.toString(), 301);
     }
+    // the dealer embed (ADR-150): its script, API and hosted pages, where it is switched on;
+    // the demo on the preview only
+    if (EMBED.test(url.pathname))
+      return embedOn(env) ? embed(req, url, env) : new Response("not here", { status: 404 });
+    if (DEMO.test(url.pathname)) return demo(req, url, env);
     // the API for AI agents, llms-full.txt, the measuring guide and the cover pages (ADR-139):
     // only where they are switched on (the preview); elsewhere they do not exist
     if (AGENT.test(url.pathname) || AGENT_B2B.test(url.pathname)) {

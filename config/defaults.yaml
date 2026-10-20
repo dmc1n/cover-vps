@@ -546,6 +546,13 @@ limits:                          # what a request or an uploaded file may hold (
   agent_mcp_per_hour: 600        # the MCP server (/mcp, ADR-145): its own protocol messages (initialize,
                                  # tools/list, ...) per address an hour; each tool call also counts as one
                                  # /api/v2 request on the limits above
+  # The dealer embed (/api/embed/v1, ADR-150): our configurator on a dealer's own website
+  embed_per_minute: 60           # one address on one dealer site: config, prices and 3D a minute
+  embed_site_quotes_per_day: 5000  # ... and all visitors of one dealer site together: prices a day (UTC)
+  embed_orders_per_hour: 5       # one address: orders sent to a dealer or checkouts started an hour ...
+  embed_site_orders_per_day: 50  # ... and all visitors of one dealer site together a day
+  embed_checkout_hours: 2        # our hosted checkout's link (in the dealer's look) works this long
+  embed_confirm_days: 14         # a dealer confirms (or declines) an order sent to it within this long
 
 spend:                           # what the AI costs, kept and guarded (owner, 6 Oct 2026; ADR-078)
                                  # [server-only] (ADR-123): no model, trial, rule or UI sets these

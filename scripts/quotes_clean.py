@@ -19,7 +19,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-DIRS = ("shop_quotes", "b2b_quotes", "quotes")
+DIRS = ("shop_quotes", "b2b_quotes", "quotes", "embed_quotes")  # embed: dealer sites, ADR-150
 NAME = re.compile(r"([0-9a-f]{16})(-[a-z]+)?\.(json|glb)")
 DAY_S = 86400
 
@@ -49,6 +49,8 @@ def referenced(db_path: Path) -> set[str]:
                     continue
                 out |= {str(r["quote_id"]) for r in rows
                         if isinstance(r, dict) and r.get("quote_id")}  # fmt: skip
+        if "dealer_orders" in tables:  # an order sent to a dealer, confirmed or not (ADR-150)
+            out |= {str(r[0]) for r in db.execute("SELECT quote_id FROM dealer_orders")}
         if "requests" in tables:
             out |= {str(r[0]) for r in db.execute("SELECT quote_id FROM requests")}
     finally:

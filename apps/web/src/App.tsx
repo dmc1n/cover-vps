@@ -29,6 +29,7 @@ import { Search } from "./Search";
 import { Workshop } from "./Workshop";
 import { Matches, Orders, Requests, Website } from "./Admin";
 import { B2BCustomers } from "./B2BCustomers";
+import { DealerEmbeds } from "./DealerEmbeds";
 import { CoverPrice, CoverSummary } from "./CoverPrice";
 import { Reference } from "./Reference";
 import {
@@ -375,6 +376,16 @@ function Page({ route, user }: { route: Route; user: User }) {
             </p>
             <Matches />
             <Requests />
+          </Tpl>
+        );
+      if (page === "dealers")
+        return (
+          <Tpl
+            kind="list"
+            title="Dealer embeds"
+            intro="Our configurator on a dealer's own website: its look, its domains, its prices and how its customers order. Preview only until the owner's go."
+          >
+            <DealerEmbeds />
           </Tpl>
         );
       if (page === "b2b")

@@ -167,6 +167,10 @@ def create_app(
     from coverapi import agent_mcp
 
     agent_mcp.install(app, auth, agent_sub)  # the MCP server at /mcp over the same API (ADR-145)
+    from coverapi import dealer_embed
+
+    # our configurator on dealers' own websites, at their prices (ADR-150); after the B2B shop
+    dealer_embed.install(app, auth, store.root, store)
 
     def model_or_404(model_id: str) -> Path:
         try:

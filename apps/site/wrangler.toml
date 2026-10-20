@@ -13,6 +13,10 @@ MEDIA_TTL = "86400"
 # the API for AI agents and its pages (ADR-139/145): on since the owner's go of 20 Oct 2026
 # (#110), together with the shop setting agent_api_enabled in the studio
 AGENT_API = "1"
+# the dealer embed (ADR-150): our configurator on dealers' own websites; the preview always has
+# it, the live site only after the owner's go (then DEALER_EMBED = "1" here and the shop setting
+# dealer_embed_enabled in the studio)
+# DEALER_EMBED = "1"
 
 # the preview at preview.s2dio.living: its own build (apps/web/dist), the studio's data
 [env.preview]

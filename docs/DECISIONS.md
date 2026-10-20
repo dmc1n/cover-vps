@@ -5877,3 +5877,67 @@ drawing independently, before the rebuild.
 - **Better later:** the end hip's fold follows the fan from the back corner; the drawing folds
   it along the line from the 62.99 back corner to the crease. One piece either way, flat within
   0.0 % stretch; a fan from a chosen tip when a drawing needs the fold drawn.
+
+## ADR-150 — The dealer embed: our configurator on a B2B dealer's own website, in its look, at its prices (preview only)
+
+The owner (Rick, 20 Oct 2026): B2B dealers put the configurator on their own sites, fully
+customised by the dealer. His decisions: a key per dealer linked to its company with
+allow-listed domains; checkout chosen per site (our checkout in the dealer's look, or the order
+sent to the dealer, who sells and invoices); the dealer's own prices (our B2B price ex VAT plus
+its margin, or a price list), our B2B price never in the page; colours, fonts, logo, texts and
+language, kinds and fabrics, layout, 3D and the end action all the dealer's. Preview only until
+his go. Plan: docs/plans/dealer-embed.md; handbook: docs/handbook/dealer-embed.md.
+
+- **A Web Component, an iframe as the fallback.** `<s2dio-configurator dealer="dpk_…">` from one
+  module script (`/embed/v1/configurator.js`, vanilla TS in `apps/web/src/embed/`, its own Vite
+  build `vite.embed.config.ts`; 18 kB, three.js only as a chunk where 3D is on). Shadow DOM;
+  themed by the saved theme, then attributes (a subset only), then the dealer's CSS
+  (`--s2dio-*` custom properties, `::part()`). The frame (`/embed/v1/frame`) hosts the same
+  component for site builders without scripts. Chosen over iframe-only: it inherits the page's
+  font, grows with its content, and hooks a cart with ordinary DOM events; one code path for both.
+- **Keys and origins.** `dealer_sites` (app.db): company, public key `dpk_…` (in the page; opens
+  only public things), secret key `dsk_…` (SHA-256; `GET /api/embed/v1/verify/<quote>` for the
+  dealer's server, with its purchase price), origins, settings. The public key is in every API
+  path, so CORS (and the preflight) is decided per dealer: `Access-Control-Allow-Origin` only
+  for a listed origin or our own website (frame, demo); any other Origin is a 403; a POST needs
+  an Origin; errors carry CORS for an allowed page. The frame's CSP lists exactly the site's
+  origins in `frame-ancestors` and has no X-Frame-Options (studio and Worker); everything else
+  stays unframeable.
+- **Prices on the server only** (`dealer_embed.dealer_price`): `b2b.unit_price` for the company
+  × (1 + margin %, per kind if set), or a channel of the published price set (never `b2b` or the
+  company's own list: refused on save and on pricing), the B2C VAT, the dealer's rounding,
+  incl. or ex VAT. The browser gets amount, currency, VAT included, VAT % and indicative, built
+  from a whitelist; purchase, net, gross and margin stay in `embed_quotes/<qid>.json`. Our
+  checkout refuses a price below the purchase price.
+- **Checkout.** Ours: `POST …/checkout` makes a 2-hour token; `/embed/v1/checkout/<t>` is a
+  server-rendered page in the dealer's look (its CSP: the logo's host, Turnstile, the form to
+  Mollie), the order is a normal shop order (`orders`, flagged `dealer` with the purchase price
+  and margin for settlement) paid through the shop's own `finish_order` (exposed as
+  `app.state.shop_finish_order`; an order's `status_url` now sends Mollie back to our status
+  page in the dealer's look, which links to the dealer's return address). Dealer's:
+  `POST …/order` stores `dealer_orders`, mails the dealer (with its purchase price) and the
+  customer (without); the dealer confirms or declines on `/embed/v1/confirm/<t>` (14 days),
+  which makes a B2B order on account at the purchase price, waiting for Send to production as
+  every order (ADR-128); with `dealer_confirms` off at once. Or the dealer's cart: an event only.
+- **Events**: `s2dio:ready|priced|added-to-cart|checkout-started (cancelable)|order-sent|error`,
+  bubbling out of the shadow root; the frame posts them to its parent's listed origin only.
+- **Limits** (`limits.embed_*`, server-only), analytics per site and day (`dealer_usage`:
+  load, quote, checkout, order, cart; paid orders from `orders`), no addresses, no cookies.
+- **Studio**: Shop → Dealer embeds (admins): domains, look with a live preview of the real
+  component (`preview` property: the draft look over the saved one), texts per language, range,
+  prices with an example (the purchase price shown only here), ordering, snippets, secret key,
+  30 days of counts, the orders sent to the dealer.
+- **Preview only**: the shop setting `dealer_embed_enabled` (off), the preview website or a
+  colleague; the Worker (`apps/site/src/embed.ts`) passes `/embed/*` and `/api/embed/*` only on
+  the preview or with `DEALER_EMBED = "1"`. Demo dealers (`config/embed_demo.json`, two made-up
+  sites) answer only on the preview or for a colleague and never order, mail or count;
+  `preview.<domain>/embed-demo` shows them (`apps/web/public/embed-demo.*`).
+- **Tests**: `apps/api/tests/test_dealer_embed.py` (gate, settings checks, CORS and preflight,
+  price = B2B + margin and no leak in any answer, the 3D file or the hosted pages, price list
+  and ex VAT, kinds/colours/languages, our checkout with a double click, dealer mode with
+  confirm and decline, the cart event and counts, verify with the secret, the frame's CSP,
+  inactive site and blocked company, order limits, the demo dealers), `apps/site/test/embed.test.ts`,
+  `apps/web/e2e/dealer_embed.py` (a real browser: the studio page and its preview, the demo,
+  a dealer's own origin through CORS, an unlisted origin).
+- **Better later**: existing covers (the match) in the embed; the dealer's own editor in the B2B
+  shop; a signed webhook to the dealer's server; the margin settlement report; per-dealer limits.

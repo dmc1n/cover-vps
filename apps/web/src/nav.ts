@@ -138,6 +138,13 @@ export const SECTIONS: Section[] = [
         hint: "Companies, their logins, own prices and orders",
       },
       {
+        id: "dealers",
+        icon: "embed",
+        label: "Dealer embeds",
+        who: "admin",
+        hint: "Our configurator on dealers' own websites: their look, domains, prices and checkout (preview only)",
+      },
+      {
         id: "website",
         icon: "website",
         label: "Website (AI)",
