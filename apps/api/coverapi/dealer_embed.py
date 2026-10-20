@@ -125,8 +125,10 @@ CREATE TABLE IF NOT EXISTS dealer_orders (
   price_eur REAL NOT NULL,
   purchase_eur REAL NOT NULL,
   b2b_order INTEGER,
-  decided REAL
+  decided REAL,
+  idempotency_key TEXT
 );
+CREATE UNIQUE INDEX IF NOT EXISTS dealer_orders_once ON dealer_orders(site_id, idempotency_key);
 """
 
 SITE_DEFAULTS: dict[str, Any] = {
@@ -441,6 +443,8 @@ class DealerOrderIn(_In):
     note: str = Field(default="", max_length=2000)
     lang: str = Field(default="nl", pattern=r"^[a-z]{2}$")
     website: str = Field(default="", max_length=200)  # the honeypot
+    # one form, one order: the page sends the same key again on a retry (Codex, round 1)
+    idempotency_key: str = Field(pattern=r"^[A-Za-z0-9_-]{8,128}$")
 
 
 class EventIn(_In):
@@ -759,6 +763,8 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         if path.startswith("/embed/v1/") and path.endswith(".js"):
             # the component's script for any page, as the Worker serves it (module scripts
             # need CORS)
+            if not embed_on(request):  # both switches, the script too (Codex, round 1)
+                return Response("not here", status_code=404)
             script: Response = await call_next(request)
             script.headers["Access-Control-Allow-Origin"] = "*"
             script.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
@@ -1033,6 +1039,16 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         if not EMAIL.match(req.email.strip()):
             raise HTTPException(400, "please give a valid e-mail address")
         rec = load_quote(site, req.quote_id)
+        if rec["embed"]["net_eur"] < rec["embed"]["purchase_eur"]:  # never under our B2B price
+            raise HTTPException(409, "this price cannot be ordered here; please contact the dealer")
+        if not site["demo"]:  # a retry of the same form: the order it made (Codex, round 1)
+            with db._db() as c:
+                done = c.execute(
+                    "SELECT id FROM dealer_orders WHERE site_id=? AND idempotency_key=?",
+                    (site["id"], req.idempotency_key),
+                ).fetchone()
+            if done:
+                return cors(JSONResponse({"reference": f"D{done['id']}", "repeat": True}), origin)
         order_limits(site, request)
         lg = lang_of(site, req.lang)
         if site["demo"]:
@@ -1041,27 +1057,36 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
                 origin,
             )
         token = secrets.token_urlsafe(24)
-        customer = req.model_dump(exclude={"website", "quote_id", "lang"})
+        customer = req.model_dump(exclude={"website", "quote_id", "lang", "idempotency_key"})
         customer["email"] = customer["email"].strip()
         customer["country"] = customer["country"].upper()
-        with db._db() as c:
-            cur = c.execute(
-                "INSERT INTO dealer_orders (created, site_id, company_id, token, status, quote_id,"
-                " customer, lang, price_eur, purchase_eur) VALUES (?, ?, ?, ?, 'sent', ?, ?, ?, "
-                "?, ?)",
-                (
-                    time.time(),
-                    site["id"],
-                    site["company_id"],
-                    token,
-                    req.quote_id,
-                    json.dumps(customer),
-                    lg,
-                    rec["embed"]["amount"],
-                    rec["embed"]["purchase_eur"],
-                ),
-            )
-            oid = int(cur.lastrowid or 0)
+        try:
+            with db._db() as c:
+                cur = c.execute(
+                    "INSERT INTO dealer_orders (created, site_id, company_id, token, status, "
+                    "quote_id, customer, lang, price_eur, purchase_eur, idempotency_key) VALUES "
+                    "(?, ?, ?, ?, 'sent', ?, ?, ?, ?, ?, ?)",
+                    (
+                        time.time(),
+                        site["id"],
+                        site["company_id"],
+                        token,
+                        req.quote_id,
+                        json.dumps(customer),
+                        lg,
+                        rec["embed"]["amount"],
+                        rec["embed"]["purchase_eur"],
+                        req.idempotency_key,
+                    ),
+                )
+                oid = int(cur.lastrowid or 0)
+        except sqlite3.IntegrityError:  # the same key at the same moment: the other one won
+            with db._db() as c:
+                done = c.execute(
+                    "SELECT id FROM dealer_orders WHERE site_id=? AND idempotency_key=?",
+                    (site["id"], req.idempotency_key),
+                ).fetchone()
+            return cors(JSONResponse({"reference": f"D{done['id']}", "repeat": True}), origin)
         count(site, "order")
         ref = f"D{oid}"
         company = company_of(site)
@@ -1157,11 +1182,15 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
             company = app.state.b2b.company(int(row["company_id"]))
             if company["status"] != "active":
                 raise HTTPException(409, "the business account is not active")
+            if not site["active"] or site["settings"]["checkout"] != "dealer":
+                raise HTTPException(409, "this dealer site does not take orders any more")
             rec = json.loads((quotes / f"{row['quote_id']}.json").read_text(encoding="utf-8"))
             cust = json.loads(row["customer"])
             ps = prices.current(auth)
             bs = shop_merged(b2b_mod.DEFAULTS, auth.setting(b2b_mod.SETTING, {}) or {})
             unit = float(rec["embed"]["purchase_eur"])
+            if float(rec["embed"]["net_eur"]) < unit:
+                raise HTTPException(409, "this price is under the purchase price")
             qd = rec["quote"]
             line = {
                 "quote_id": row["quote_id"],
@@ -1695,12 +1724,16 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         }.get(row["status"], "")
         if row["status"] == "sent" and not open_:
             state = t["expired"]
+        head = f"<h1>{esc(t['confirm_title'])} D{row['id']}</h1>" + (
+            f"<p><strong>{esc(msg or state)}</strong></p>" if (msg or state) else ""
+        )
+        if not open_:  # decided or expired: the link shows no customer and no price any more
+            return head
+        # the purchase price is only in the dealer's mail, never on a page a link opens
+        # (Codex, round 1: a forwarded link must not reveal it)
         return (
-            f"<h1>{esc(t['confirm_title'])} D{row['id']}</h1>"
-            + (f"<p><strong>{esc(msg or state)}</strong></p>" if (msg or state) else "")
-            + f'<div class="card"><p>{esc(describe(rec))}</p>'
-            f"<p>{esc(t['customer_price'])}: EUR {row['price_eur']:.2f}<br>"
-            f"{esc(t['your_price'])}: EUR {row['purchase_eur']:.2f}</p>"
+            head + f'<div class="card"><p>{esc(describe(rec))}</p>'
+            f"<p>{esc(t['customer_price'])}: EUR {row['price_eur']:.2f}</p>"
             f"<p>{esc(c['name'])} &lt;{esc(c['email'])}&gt; {esc(c.get('phone'))}<br>"
             f"{esc(c.get('street'))}, {esc(c.get('postcode'))} {esc(c.get('city'))}, "
             f"{esc(c.get('country'))}<br>{esc(c.get('note'))}</p></div>{buttons}"

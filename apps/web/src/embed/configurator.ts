@@ -190,6 +190,16 @@ class S2dioConfigurator extends HTMLElement {
   private viewerHost: HTMLElement | null = null;
   private shown = "";
   private timer = 0;
+  private orderKeys: Record<string, string> = {};
+
+  /** One key per price: a retry of the same order is the same order on the server. */
+  private orderKey(quote: string): string {
+    if (!this.orderKeys[quote])
+      this.orderKeys[quote] = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+        b.toString(16).padStart(2, "0"),
+      ).join("");
+    return this.orderKeys[quote];
+  }
   private asked = 0;
   private parentOrigin = "";
 
@@ -328,6 +338,8 @@ class S2dioConfigurator extends HTMLElement {
     this.colour = this.colours()[0] || "";
     this.support = "none";
     this.quote = null;
+    this.asked++;
+    this.busy = false;
     this.step = "configure";
     this.notice = "";
   }
@@ -734,6 +746,8 @@ class S2dioConfigurator extends HTMLElement {
   private changed(rerender: boolean): void {
     const had = this.quote !== null;
     this.quote = null;
+    this.asked++; // a price still on its way is for the old choices: dropped (Codex, round 1)
+    this.busy = false;
     this.notice = "";
     window.clearTimeout(this.timer);
     if (had) this.timer = window.setTimeout(() => void this.price(), 700);
@@ -839,6 +853,7 @@ class S2dioConfigurator extends HTMLElement {
         note: v("note"),
         lang: this.config?.lang || "nl",
         website: v("website"),
+        idempotency_key: this.orderKey(q.id),
       });
       this.reference = r.reference;
       this.step = "sent";

@@ -5939,5 +5939,15 @@ his go. Plan: docs/plans/dealer-embed.md; handbook: docs/handbook/dealer-embed.m
   inactive site and blocked company, order limits, the demo dealers), `apps/site/test/embed.test.ts`,
   `apps/web/e2e/dealer_embed.py` (a real browser: the studio page and its preview, the demo,
   a dealer's own origin through CORS, an unlisted origin).
+- **Codex's adversarial review**, round 1 ("not safe to merge … as written"), all fixed with
+  tests (`test_codex_round1`): (a) the dealer's confirm page showed the purchase price to anyone
+  holding the link: now only in the dealer's mail, and a decided or expired link shows neither
+  the customer nor a price; (b) a replayed `/order` made another order (and, with confirmation
+  off, another B2B order): an `idempotency_key` is required, unique per site, a retry gets the
+  first order; (c) dealer mode skipped the below-purchase check: now on submit and on confirm;
+  (d) a price still on its way could land after the choices changed: the component drops it;
+  (e) a confirm link still worked after the site was switched off: the site must be active and
+  in dealer mode; (f) the script answered with only the Worker's switch: the studio's gate
+  covers `/embed/v1/*.js` too (the Worker keeps the entry 5 minutes).
 - **Better later**: existing covers (the match) in the embed; the dealer's own editor in the B2B
   shop; a signed webhook to the dealer's server; the margin settlement report; per-dealer limits.

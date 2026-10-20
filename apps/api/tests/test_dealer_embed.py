@@ -397,7 +397,12 @@ def test_our_checkout_in_the_dealers_look(app: Any) -> None:
     # dealer mode is refused for this site
     r = c.post(
         f"/api/embed/v1/{key}/order",
-        json={"quote_id": q["id"], "name": "Eva", "email": "eva@example.com"},
+        json={
+            "quote_id": q["id"],
+            "name": "Eva",
+            "email": "eva@example.com",
+            "idempotency_key": "form-0001",
+        },
         headers=h,
     )
     assert r.status_code == 409
@@ -413,6 +418,7 @@ def test_order_sent_to_the_dealer_and_confirmed(app: Any) -> None:
     q = _ok(c.post(f"/api/embed/v1/{key}/quote", json=SOFA, headers=h))
     order = {
         "quote_id": q["id"],
+        "idempotency_key": "form-one-1",
         "name": "Eva",
         "email": "eva@example.com",
         "phone": "06",
@@ -444,7 +450,7 @@ def test_order_sent_to_the_dealer_and_confirmed(app: Any) -> None:
     assert f"{purchase:.2f}" in to["a@dealer.example"][2]  # the dealer sees what it buys at
     assert f"{purchase:.2f}" not in to["eva@example.com"][2]  # the customer never
     page = c.get(f"/embed/v1/confirm/{token}")
-    assert page.status_code == 200 and f"{purchase:.2f}" in page.text
+    assert page.status_code == 200 and f"{purchase:.2f}" not in page.text  # in its mail only
     assert (
         c.post(
             f"/embed/v1/confirm/{token}", data={"action": "confirm"}, headers={"origin": OTHER}
@@ -473,7 +479,12 @@ def test_decline_and_cart_event(app: Any) -> None:
     _ok(
         c.post(
             f"/api/embed/v1/{key}/order",
-            json={"quote_id": q["id"], "name": "Eva", "email": "eva@example.com"},
+            json={
+                "quote_id": q["id"],
+                "name": "Eva",
+                "email": "eva@example.com",
+                "idempotency_key": "form-0001",
+            },
             headers=h,
         )
     )
@@ -563,10 +574,83 @@ def test_order_limits(app: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     key = site["public_key"]
     q = _ok(c.post(f"/api/embed/v1/{key}/quote", json=SOFA, headers=h))
     order = {"quote_id": q["id"], "name": "Eva", "email": "eva@example.com"}
-    for _ in range(5):
-        _ok(c.post(f"/api/embed/v1/{key}/order", json=order, headers=h))
-    r = c.post(f"/api/embed/v1/{key}/order", json=order, headers=h)
+    for i in range(5):
+        _ok(
+            c.post(
+                f"/api/embed/v1/{key}/order",
+                json={**order, "idempotency_key": f"form-{i:04d}"},
+                headers=h,
+            )
+        )
+    r = c.post(
+        f"/api/embed/v1/{key}/order", json={**order, "idempotency_key": "form-9999"}, headers=h
+    )
     assert r.status_code == 429 and "retry-after" in r.headers
+    # a retry of an order already made is that order, not a new one (and not counted)
+    again = _ok(
+        c.post(
+            f"/api/embed/v1/{key}/order", json={**order, "idempotency_key": "form-0000"}, headers=h
+        )
+    )
+    assert again["repeat"] is True
+
+
+def test_codex_round1(app: Any) -> None:
+    """Codex's adversarial review, round 1: one form is one order; a forwarded confirm link shows
+    no purchase price; an order under the purchase price is refused; a site switched off takes
+    no confirmations; the script obeys the gate too."""
+    admin = _admin(app)
+    site = _site(app, admin, {"checkout": "dealer", "end_action": "send_order"})
+    key = site["public_key"]
+    c = TestClient(app)
+    assert c.get("/embed/v1/configurator.js").status_code == 404  # off: not even the script
+    _live(app)
+    h = {"origin": DEALER}
+    q = _ok(c.post(f"/api/embed/v1/{key}/quote", json=SOFA, headers=h))
+    order = {
+        "quote_id": q["id"],
+        "name": "Eva",
+        "email": "eva@example.com",
+        "idempotency_key": "form-same-1",
+    }
+    first = _ok(c.post(f"/api/embed/v1/{key}/order", json=order, headers=h))
+    second = _ok(c.post(f"/api/embed/v1/{key}/order", json=order, headers=h))
+    assert first["reference"] == second["reference"]
+    assert (
+        c.post(
+            f"/api/embed/v1/{key}/order",
+            json={k: v for k, v in order.items() if k != "idempotency_key"},
+            headers=h,
+        ).status_code
+        == 422
+    )
+    with sqlite3.connect(app.state.auth.path) as db:
+        assert db.execute("SELECT COUNT(*) FROM dealer_orders").fetchone()[0] == 1
+        token = db.execute("SELECT token FROM dealer_orders").fetchone()[0]
+        mails = db.execute("SELECT COUNT(*) FROM mail_outbox").fetchone()[0]
+    rec = json.loads((app.state.store.root / "embed_quotes" / f"{q['id']}.json").read_text())
+    purchase = rec["embed"]["purchase_eur"]
+    page = c.get(f"/embed/v1/confirm/{token}")
+    assert page.status_code == 200 and f"{purchase:.2f}" not in page.text
+    _ok(admin.put(f"/api/admin/embeds/{site['id']}", json={"active": False}))
+    assert c.post(f"/embed/v1/confirm/{token}", data={"action": "confirm"}).status_code == 409
+    _ok(admin.put(f"/api/admin/embeds/{site['id']}", json={"active": True}))
+    done = c.post(f"/embed/v1/confirm/{token}", data={"action": "confirm"})
+    assert done.status_code == 200 and "Eva" not in done.text  # decided: no customer any more
+    with sqlite3.connect(app.state.auth.path) as db:
+        assert db.execute("SELECT COUNT(*) FROM mail_outbox").fetchone()[0] == mails
+    # a price under the purchase price (a cheap price list) is never ordered
+    q2 = _ok(c.post(f"/api/embed/v1/{key}/quote", json=SOFA, headers=h))
+    p2 = app.state.store.root / "embed_quotes" / f"{q2['id']}.json"
+    r2 = json.loads(p2.read_text())
+    r2["embed"]["net_eur"] = r2["embed"]["purchase_eur"] - 1
+    p2.write_text(json.dumps(r2))
+    r = c.post(
+        f"/api/embed/v1/{key}/order",
+        json={**order, "quote_id": q2["id"], "idempotency_key": "form-cheap1"},
+        headers=h,
+    )
+    assert r.status_code == 409
 
 
 def test_demo_dealers_only_on_the_preview_and_never_order(app: Any) -> None:
@@ -589,7 +673,12 @@ def test_demo_dealers_only_on_the_preview_and_never_order(app: Any) -> None:
     sent = _ok(
         c.post(
             f"/api/embed/v1/{key}/order",
-            json={"quote_id": q["id"], "name": "E", "email": "e@example.com"},
+            json={
+                "quote_id": q["id"],
+                "name": "E",
+                "email": "e@example.com",
+                "idempotency_key": "form-demo1",
+            },
             headers=origin,
         )
     )
