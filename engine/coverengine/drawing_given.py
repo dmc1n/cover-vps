@@ -31,6 +31,9 @@ The kinds, sizes in cm, x along the back, y towards the front, z up:
 - `skirt_cm` in the params of any kind: the walls cut at that height all round, a level skirt
   seam (the domain rule 13; Rens on S43). A flat wall the drawing draws in one piece is not
   cut: D1 and D2 give their 18 cm side walls as pieces of their own instead (Rens, 9 Oct 2026);
+  with `skirt_per_wall`: true the skirt below it is one piece per wall, a seam at every corner
+  as the drawing draws it, instead of whole walls packed into runs round a corner (S25, Rens,
+  20 Oct 2026: "the panels on the drawing do not match the model"; ADR-148);
 - `round_end_apart` on a swept shape: its round end's top and wall are not joined to the rest
   (S43's nose, as drawn);
 - "mirror": true on any kind mirrors it left to right (the drawings "24 & 24B are mirrored of
@@ -100,7 +103,8 @@ def build(
             rest = [q for q in pieces if q not in apart]
             pieces = _joined(rest, roll_mm, *join) + apart
     if p.get("skirt_cm"):
-        pieces = level_skirt(pieces, float(p["skirt_cm"]) * MM, wall_max_mm)
+        pieces = level_skirt(pieces, float(p["skirt_cm"]) * MM, wall_max_mm,
+                             per_wall=bool(p.get("skirt_per_wall")))  # fmt: skip
     if spec.get("mirror"):
         pieces = mirror(pieces)
     return pieces
@@ -438,10 +442,12 @@ def _clip(face: Face, h: float, below: bool) -> Face:
     return _clean(out)
 
 
-def level_skirt(pieces: list[Piece], h_mm: float, wall_max_mm: float = 0.0) -> list[Piece]:
+def level_skirt(
+    pieces: list[Piece], h_mm: float, wall_max_mm: float = 0.0, per_wall: bool = False
+) -> list[Piece]:
     """The walls cut at one height all round (the domain rule 13, Rens on S43: "keep the skirt
-    height level all round"): below it one skirt band in runs no longer than `wall_max_mm`,
-    above it what is left of each wall."""
+    height level all round"): below it one skirt band in runs no longer than `wall_max_mm` (one
+    run per wall with `per_wall`), above it what is left of each wall."""
     tops: list[Piece] = []
     walls: list[Piece] = []
     for p in pieces:
@@ -459,7 +465,7 @@ def level_skirt(pieces: list[Piece], h_mm: float, wall_max_mm: float = 0.0) -> l
                     upper.setdefault(w.name, []).append(hi)
     out = list(tops)
     out += [Piece(f"upper-{n}", fs) for n, fs in sorted(upper.items())]
-    out += _skirt_runs(skirt, wall_max_mm)
+    out += _skirt_runs(skirt, wall_max_mm, per_wall)
     return conform(out)
 
 
@@ -483,14 +489,17 @@ def _floor(f: Face) -> tuple[tuple[float, float], tuple[float, float]] | None:
     return None
 
 
-def _skirt_runs(faces_: list[tuple[Face, int]], longest_mm: float) -> list[Piece]:
+def _skirt_runs(
+    faces_: list[tuple[Face, int]], longest_mm: float, per_wall: bool = False
+) -> list[Piece]:
     """The skirt faces chained in order round the outline (each one's floor edge ends where the
     next begins), cut where one wall ends and the next begins (where the seams above come down,
-    Rens's lines on S43), whole walls packed into runs no longer than `longest_mm`, a wall
-    longer than that in equal parts; at least two runs (a closed band needs a seam)."""
+    Rens's lines on S43), whole walls packed into runs no longer than `longest_mm` (not packed
+    with `per_wall`: every wall a run of its own), a wall longer than that in equal parts; at
+    least two runs (a closed band needs a seam)."""
     every = [(f, w, _floor(f)) for f, w in faces_]
     items = [(f, w, fl) for f, w, fl in every if fl is not None]
-    extra = [f for f, _, fl in every if fl is None]  # the upper triangle of a wall quad
+    extra = [(f, w) for f, w, fl in every if fl is None]  # the upper triangle of a wall quad
     if not items:
         return []
     key = lambda q: (round(q[0], 3), round(q[1], 3))  # noqa: E731
@@ -539,7 +548,7 @@ def _skirt_runs(faces_: list[tuple[Face, int]], longest_mm: float) -> list[Piece
             parts.append(chunk)
     runs: list[list[int]] = []
     for part in parts:  # whole walls packed together while they fit
-        if runs and length(runs[-1]) + length(part) <= limit:
+        if runs and not per_wall and length(runs[-1]) + length(part) <= limit:
             runs[-1] += part
         else:
             runs.append(list(part))
@@ -554,9 +563,12 @@ def _skirt_runs(faces_: list[tuple[Face, int]], longest_mm: float) -> list[Piece
     run_of = {i: r for r, run in enumerate(runs) for i in run}
     out_faces: dict[int, list[Face]] = {r: [items[i][0] for i in run] for r, run in enumerate(runs)}
     vkey = lambda q: tuple(round(c, 3) for c in q)  # noqa: E731
-    for f in extra:  # with the floor face it shares most corners with (its own quad)
+    for f, w in extra:  # with the floor face it shares most corners with (its own quad); on a
+        # tie its own wall's: at a corner the next wall's face shares as many (S25, 20 Oct 2026:
+        # the back wall's first triangle went to the end wall, a slanted corner seam)
         mine = {vkey(q) for q in f}
-        best = max(order, key=lambda i: len(mine & {vkey(q) for q in items[i][0]}))
+        best = max(order, key=lambda i: (len(mine & {vkey(q) for q in items[i][0]}),
+                                         items[i][1] == w))  # fmt: skip
         out_faces[run_of[best]].append(f)
     out = [Piece(f"skirt-{k + 1}", fs) for k, fs in sorted(out_faces.items()) if fs]
     return out

@@ -10,6 +10,10 @@
   "profile": [
    [
     0,
+    40.01
+   ],
+   [
+    0,
     62.99
    ],
    [
@@ -31,6 +35,7 @@
   ],
   "line_lengths_cm": [
    null,
+   202.6,
    164.22,
    141.77,
    147.63,
@@ -38,8 +43,10 @@
   ],
   "seams_cm": [],
   "start_end": "square",
-  "end_end": "square"
+  "end_end": "square",
+  "skirt_cm": 40.01,
+  "skirt_per_wall": true
  },
  "vents_total": 5,
- "read": "S25 (curved sofa): the back edge an arc of 237.91 cm over 45 degrees (radius 302.92 cm), the front edge 143.66 cm (radius 182.92: 120 cm deep, as written); side view: back wall 62.99 cm, a 19.99 cm chamfer up to 88.6 cm, a 31.02 cm flat strip (to 51.01 cm), a slope down to 62.99 cm at 95.52 cm, then a steeper front face to the 40.01 cm front at 120 cm (the 3D view draws these three bands and the crease at 62.99 cm; the live cover had a flat top to 95.52 cm and one slope to the front). The ends lean in (hipped): the lines along the cover are as written, 164.22, 141.77 and 147.63 cm, the back and front edges run full length. Vents: 5, all at the bottom (Rens, 9 Oct, QUESTIONS 14; the 3D view label points at 4)."
+ "read": "S25 (curved sofa): the back edge an arc of 237.91 cm over 45 degrees (radius 302.92 cm), the front edge 143.66 cm (radius 182.92: 120 cm deep, as written); side view: back wall 62.99 cm, a 19.99 cm chamfer up to 88.6 cm, a 31.02 cm flat strip (to 51.01 cm), a slope down to 62.99 cm at 95.52 cm, then a steeper front face to the 40.01 cm front at 120 cm (the 3D view draws these three bands and the crease at 62.99 cm; the live cover had a flat top to 95.52 cm and one slope to the front). Walls 40.01 cm high all round with a level seam there (front, both ends and the back; Rens, 20 Oct: the end walls are flat at 40 cm, not sloping up to the back wall's 62.99); above it the back band to 62.99 cm; the skirt one piece per wall as drawn (skirt_cm, skirt_per_wall). The ends lean in (hipped): the lines along the cover are as written, 202.6 (the back band's top at 62.99 cm, not written: measured in the drawing's top and side views), 164.22, 141.77 and 147.63 cm; the 40.01 cm lines at the back and the front run full length. Vents: 5, all at the bottom (Rens, 9 Oct, QUESTIONS 14; the 3D view label points at 4)."
 }
