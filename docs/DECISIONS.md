@@ -5809,3 +5809,35 @@ would like to see the DXF in the browser during the approval process".
 - **Better later:** a server-rendered PNG at a bounded resolution for people outside the
   studio, should the cutting file ever be shown to them; snapping the measuring tool to any
   point of an outline, not only corners.
+
+## ADR-148 — Rens's vent round of 20 Oct 2026: the Nardo pair four per cover, three covers asked first
+
+Rens in Questions (#116) and at the Desk, 20 Oct 2026 (staging `out/vents-2026-10-20/`; each picture
+mapped with `scripts/desk_marks.py` and read by eye, Codex read every remark, picture, drawing and the
+current cover independently before anything was built; after the build `cover audit`, a compare
+picture and a size table, and Codex again on those before live).
+
+- **Nardo S13 & S14** (`drawing-cover-44-45-s13-s14-nardo`, #116 b: "Elke hoes moet 4 vents hebben
+  (2 extra per hoes): ik geef aan waar", his circles in the middle of the back and of the low end):
+  the drawing's "4 Air pocket" for the pair (1+1) had been read as 2 per cover. Now 4 per cover, one
+  in the middle of every wall (`features.vent_positions` by hand: skirt-front, skirt-right = the arm
+  end, skirt-back, skirt-left = the 27 cm low end, where the rule gives a 25 x 20 cm opening); 8 for
+  the pair. Every piece the same size; the export also placed the vent logo (ADR-146, it predated
+  it). `vents_total` 4 in `testdata/drawing_shapes/drawing-cover-44-45-s13-s14-nardo.json`, so a
+  rebuild keeps it (ADR-116). Codex read the same and passed the result. Live, the Desk card reopened.
+  Swept: the other pair covers (24/24b, 25/25b, the L pairs) already have a vent on every wall (the
+  L pairs' outer one on the chamfer, ADR-144); nothing else to change.
+- **S22** ("zowel voor als achter airvents toevoegen", two circles on the long front wall), **S48**
+  ("meer airvents toevoegen zowel voor als achter", two circles) and **S45** ("airvents rondom
+  evenwichtiger plaatsen", no picture): **not live**. S22: Claude and Codex both read 8 (3 per long
+  wall, 1 per end) but Codex found the extra vents' places uncertain (his circles at about 1/4 and
+  4/5, evenly spread is 1/6 and 5/6): question #117. S48: Claude reads 8 (the middle one kept, two
+  added front and back), Codex 10 (one per full metre, 4 per 415 cm wall): question #118. S45: both
+  read 4 evenly round, 90 cm apart, but where the first goes is open: on the four rounded corners
+  (the proposal; only the front-left vent moves back from where the corner rule of ADR-134 pushed it,
+  which bunched two at the front) or as the drawing at front, back, left and right (the band's seams
+  are at left and right): question #119. Each question carries the staged proposal's compare
+  picture; each card a note by Claude.
+- **Not changed:** the rules. For S45 the corner rule (ADR-134) and the even spread pull apart on a
+  free outline that is round all along but has short straighter stretches; whether a free-form
+  pouf's vents ignore the corner rule is Rens's answer to #119, then a rule if he says so.

@@ -282,5 +282,15 @@
     "check": "engine/tests/test_finish.py::test_the_vent_logo_sits_along_the_hoods_open_lower_edge_upright; audit check 'vent logo' (coverengine.audit.logo_checks).",
     "applies_to": "all",
     "ai_model": "approver"
+  },
+  {
+    "time": 1792512000,
+    "model_id": "drawing-cover-44-45-s13-s14-nardo",
+    "complaint": "Each cover must have 4 vents (2 extra per cover) (Rens, 20 Oct 2026, question #116 b on the Nardo S13 & S14 pair: 'mist 2 airvents, check tekening'; his circles in the middle of the back and of the low end).",
+    "cause": "The pair drawing (quantity 1+1, mirror images) writes '4 Air pocket' for both covers together; the cover was built with 2 per cover (front and arm end), leaving the back and the low end without a vent.",
+    "rule": "On a pair drawing every cover still gets a vent on every wall (round every side, ADR-101): the written number is not split over the pair when that leaves a wall without one. Nardo: 4 per cover, the middle of each wall, the 27 cm low end a 25 x 20 cm opening.",
+    "check": "audit check 'decided vents' (vents_total 4 in the pair's drawing_shape.json, ADR-116); ADR-148.",
+    "applies_to": "all",
+    "ai_model": "approver"
   }
 ]
