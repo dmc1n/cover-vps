@@ -475,6 +475,10 @@ class Store:
         self.path = path
         self.lock = threading.Lock()
         with self._db() as db:
+            # a table made before its idempotency key (Codex, round 2): the column first
+            have = {r[1] for r in db.execute("PRAGMA table_info(dealer_orders)")}
+            if have and "idempotency_key" not in have:
+                db.execute("ALTER TABLE dealer_orders ADD COLUMN idempotency_key TEXT")
             db.executescript(SCHEMA)
 
     def _db(self) -> sqlite3.Connection:
@@ -1047,7 +1051,8 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
                     "SELECT id FROM dealer_orders WHERE site_id=? AND idempotency_key=?",
                     (site["id"], req.idempotency_key),
                 ).fetchone()
-            if done:
+            if done:  # it finishes what the first one may not have (Codex, round 2)
+                complete(int(done["id"]), site, request)
                 return cors(JSONResponse({"reference": f"D{done['id']}", "repeat": True}), origin)
         order_limits(site, request)
         lg = lang_of(site, req.lang)
@@ -1086,15 +1091,34 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
                     "SELECT id FROM dealer_orders WHERE site_id=? AND idempotency_key=?",
                     (site["id"], req.idempotency_key),
                 ).fetchone()
+            if done is None:
+                raise
+            complete(int(done["id"]), site, request)
             return cors(JSONResponse({"reference": f"D{done['id']}", "repeat": True}), origin)
         count(site, "order")
-        ref = f"D{oid}"
+        complete(oid, site, request)
+        return cors(JSONResponse({"reference": f"D{oid}"}), origin)
+
+    def complete(oid: int, site: dict[str, Any], request: Request) -> None:
+        """Everything after the stored order, safe to run again (a retry runs it): the
+        confirmation when the dealer does not confirm itself, the mails (each queued once by its
+        reference). A confirmation that cannot be made leaves the order "sent" and the dealer's
+        mail carries the confirm link, so nothing is lost."""
+        s = site["settings"]
+        with db._db() as c:
+            row = dict(c.execute("SELECT * FROM dealer_orders WHERE id=?", (oid,)).fetchone())
+        if row["status"] == "sent" and not s["dealer_confirms"]:
+            try:
+                row = decide(oid, "confirm", "auto (dealer_confirms off)")
+            except HTTPException:
+                pass  # stays "sent": the dealer's mail has the link
+        rec = json.loads((quotes / f"{row['quote_id']}.json").read_text(encoding="utf-8"))
+        customer = json.loads(row["customer"])
         company = company_of(site)
-        if not s["dealer_confirms"]:
-            decide(oid, "confirm", "auto (dealer_confirms off)")
-        mail_dealer(site, company, oid, ref, token, rec, customer, request)
+        ref = f"D{oid}"
+        mail_dealer(site, company, oid, ref, row, rec, customer, request)
         if s["customer_mail"]:
-            t = texts(lg, s["texts"])
+            t = texts(row["lang"], s["texts"])
             dealer = company["name"]
             send(
                 customer["email"],
@@ -1105,7 +1129,6 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
                 + "\n",
                 f"embed-customer:{oid}",
             )
-        return cors(JSONResponse({"reference": ref}), origin)
 
     # ---- mails ---------------------------------------------------------------------------------
     def send(to: str, subject: str, text: str, ref: str) -> None:
@@ -1127,7 +1150,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         company: dict[str, Any],
         oid: int,
         ref: str,
-        token: str,
+        row: dict[str, Any],
         rec: dict[str, Any],
         customer: dict[str, Any],
         request: Request,
@@ -1136,8 +1159,11 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
         t = texts(s["lang"], {})
         to = s["notify_email"] or company.get("email") or ""
         e = rec["embed"]
-        link = f"{site_base(request)}/embed/v1/confirm/{token}"
-        c = customer
+        link = f"{site_base(request)}/embed/v1/confirm/{row['token']}"
+        c = {
+            k: customer.get(k) or ""
+            for k in ("name", "email", "phone", "street", "postcode", "city", "country", "note")
+        }
         body = (
             f"{t['confirm_title']} ({site['name']}) {ref}\n\n{describe(rec)}\n\n"
             f"{t['customer_price']}: EUR {e['amount']:.2f} "
@@ -1147,7 +1173,7 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
             f"{c['city']}, {c['country']}\n{c['note']}\n\n"
             + (
                 f"{t['confirm_button']} / {t['decline_button']}: {link}\n"
-                if s["dealer_confirms"]
+                if row["status"] == "sent"
                 else ""
             )
         )
@@ -1567,6 +1593,8 @@ def install(app: FastAPI, auth: Any, data: Path, store: Any) -> None:  # noqa: C
             return page(theme, lang, t["checkout_title"], f"<p>{esc(t['expired'])}</p>", status=410)
         if site["demo"]:
             return again(t["demo"], 409)
+        if s["checkout"] != "ours" and not (row["order_id"] or 0):  # Codex, round 2
+            return page(theme, lang, t["checkout_title"], f"<p>{esc(t['expired'])}</p>", status=409)
         if v["website"]:
             return again(t["error"])
         required = ("name", "email", "street", "postcode", "city", "country")

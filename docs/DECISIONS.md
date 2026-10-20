@@ -5949,5 +5949,11 @@ his go. Plan: docs/plans/dealer-embed.md; handbook: docs/handbook/dealer-embed.m
   (e) a confirm link still worked after the site was switched off: the site must be active and
   in dealer mode; (f) the script answered with only the Worker's switch: the studio's gate
   covers `/embed/v1/*.js` too (the Worker keeps the entry 5 minutes).
+  Round 2 (round-1 fixes judged correct; three more): a checkout link made before the site left
+  our checkout made an order: refused unless the site still uses our checkout; a stored order
+  whose request stopped before its confirmation and mails stayed unfinished, and a retry only
+  answered its reference: `complete()` (the automatic confirmation, the mails each queued once
+  by reference, the confirm link while the order is still open) runs on every retry; the
+  idempotency column is added to a table made by the first commit before its index.
 - **Better later**: existing covers (the match) in the embed; the dealer's own editor in the B2B
   shop; a signed webhook to the dealer's server; the margin settlement report; per-dealer limits.

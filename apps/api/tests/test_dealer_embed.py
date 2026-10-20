@@ -732,3 +732,95 @@ def test_snippet() -> None:
 def test_shop_untouched_by_the_status_url(app: Any) -> None:
     """The shop's own orders still go to the shop's status page (no status_url in their data)."""
     assert shop.SHOP_DEFAULTS["dealer_embed_enabled"] is False
+
+
+def test_codex_round2_checkout_token_after_the_mode_changed(app: Any) -> None:
+    """A checkout link made while the site used our checkout makes no order once the site
+    sends its orders to the dealer."""
+    admin = _admin(app)
+    site = _site(app, admin, {"checkout": "ours", "end_action": "checkout"})
+    key = site["public_key"]
+    _live(app)
+    c = TestClient(app)
+    h = {"origin": DEALER}
+    q = _ok(c.post(f"/api/embed/v1/{key}/quote", json=SOFA, headers=h))
+    url = _ok(c.post(f"/api/embed/v1/{key}/checkout", json={"quote_id": q["id"]}, headers=h))
+    path = "/" + url["checkout_url"].split("/", 3)[3]
+    _ok(
+        admin.put(
+            f"/api/admin/embeds/{site['id']}",
+            json={"settings": {"checkout": "dealer", "end_action": "send_order"}},
+        )
+    )
+    form = {
+        "name": "Eva",
+        "email": "eva@example.com",
+        "street": "Laan 2",
+        "postcode": "1",
+        "city": "Utrecht",
+        "country": "NL",
+        "terms": "1",
+    }
+    assert c.post(path, data=form, follow_redirects=False).status_code == 409
+    with sqlite3.connect(app.state.auth.path) as db:
+        assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 0
+
+
+def test_codex_round2_a_retry_finishes_the_order(app: Any) -> None:
+    """The first request stored the order but stopped before its confirmation and mails (the
+    row as it was left, written here): the retry with the same key finishes them, once."""
+    admin = _admin(app)
+    site = _site(
+        app, admin, {"checkout": "dealer", "end_action": "send_order", "dealer_confirms": False}
+    )
+    key = site["public_key"]
+    _live(app)
+    c = TestClient(app)
+    h = {"origin": DEALER}
+    q = _ok(c.post(f"/api/embed/v1/{key}/quote", json=SOFA, headers=h))
+    order = {
+        "quote_id": q["id"],
+        "name": "Eva",
+        "email": "eva@example.com",
+        "idempotency_key": "form-crash-1",
+    }
+    rec = json.loads((app.state.store.root / "embed_quotes" / f"{q['id']}.json").read_text())
+    with sqlite3.connect(app.state.auth.path) as db:
+        db.execute(
+            "INSERT INTO dealer_orders (created, site_id, company_id, token, status, quote_id, "
+            "customer, lang, price_eur, purchase_eur, idempotency_key) VALUES (?, ?, ?, ?, 'sent',"
+            " ?, ?, 'nl', ?, ?, ?)",
+            (
+                1e9 * 1.8,
+                site["id"],
+                site["company_id"],
+                "t" * 32,
+                q["id"],
+                json.dumps({"name": "Eva", "email": "eva@example.com", "city": "Utrecht"}),
+                rec["embed"]["amount"],
+                rec["embed"]["purchase_eur"],
+                "form-crash-1",
+            ),
+        )
+    again = _ok(c.post(f"/api/embed/v1/{key}/order", json=order, headers=h))
+    assert again["repeat"] is True
+    _ok(c.post(f"/api/embed/v1/{key}/order", json=order, headers=h))
+    with sqlite3.connect(app.state.auth.path) as db:
+        assert db.execute("SELECT status FROM dealer_orders").fetchone()[0] == "confirmed"
+        assert db.execute("SELECT COUNT(*) FROM b2b_orders").fetchone()[0] == 1
+        refs = [r[0] for r in db.execute("SELECT ref FROM mail_outbox WHERE kind='embed'")]
+    assert len(refs) == len(set(refs)) == 3  # dealer, studio, customer: once each
+
+
+def test_codex_round2_the_table_of_the_first_commit_is_upgraded(tmp_path: Path) -> None:
+    db_path = tmp_path / "app.db"
+    with sqlite3.connect(db_path) as db:
+        db.executescript(
+            de.SCHEMA.split("CREATE UNIQUE INDEX")[0].replace(",\n  idempotency_key TEXT", "")
+        )
+        assert "idempotency_key" not in {
+            r[1] for r in db.execute("PRAGMA table_info(dealer_orders)")
+        }
+    de.Store(db_path)
+    with sqlite3.connect(db_path) as db:
+        assert "idempotency_key" in {r[1] for r in db.execute("PRAGMA table_info(dealer_orders)")}
