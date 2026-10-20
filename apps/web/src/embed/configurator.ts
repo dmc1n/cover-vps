@@ -202,6 +202,7 @@ class S2dioConfigurator extends HTMLElement {
   }
   private asked = 0;
   private parentOrigin = "";
+  private loadedFor = "";
 
   constructor() {
     super();
@@ -295,6 +296,10 @@ class S2dioConfigurator extends HTMLElement {
   private async load(): Promise<void> {
     if (!this.key) return;
     const lang = this.getAttribute("lang") || (navigator.language || "").slice(0, 2);
+    // an upgrade calls this for the element and each attribute: one load per dealer and language
+    const want = `${this.key}|${lang}`;
+    if (want === this.loadedFor) return;
+    this.loadedFor = want;
     try {
       this.config = await this.call<Config>(`config?lang=${encodeURIComponent(lang)}`);
       this.failed = "";
