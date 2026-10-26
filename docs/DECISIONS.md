@@ -5958,3 +5958,11 @@ his go. Plan: docs/plans/dealer-embed.md; handbook: docs/handbook/dealer-embed.m
   Round 3: "No material findings remain … Verdict: safe to merge to preview."
 - **Better later**: existing covers (the match) in the embed; the dealer's own editor in the B2B
   shop; a signed webhook to the dealer's server; the margin settlement report; per-dealer limits.
+
+## ADR-151 — Pictures: only web formats reach a decoder; Pillow 13, certifi and aiohttp updated (26 Oct 2026)
+
+**Context.** The weekly review (26 Oct) found Pillow 12.3.0 behind the anonymous shop photo upload and the Desk pictures, with advisories fixed only in 13.0.0 (among them GHSA-78g4-xqwv-q3g8, a heap overflow on just opening a crafted JPEG 2000). `safeimage.open_image` opened any format Pillow knows; the Desk checked the format only after decoding. certifi 2026.7.22 still trusted certificates with compromised keys (GHSA-6q48-6c7w-9gw2); aiohttp 3.14.3 had open advisories.
+
+**Decision.** `open_image` takes `formats` (default JPEG, PNG, WebP, AVIF, GIF) and passes it to `Image.open`, so any other format is refused before a decoder runs; the Desk passes its own `PICTURE_FORMATS` (JPEG, PNG, WebP) to the probe and to `open_image`. Pillow 13.0.0, certifi 2026.10.23, aiohttp 3.14.5.
+
+**Consequences.** A TIFF or JPEG 2000 upload now gets the existing "not a picture" answer. Test: `test_only_web_picture_formats_reach_a_decoder`.

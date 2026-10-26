@@ -154,6 +154,22 @@ def test_a_large_jpeg_is_decoded_at_a_reduced_scale() -> None:
     assert im.size == (4000, 3000)
 
 
+def test_only_web_picture_formats_reach_a_decoder() -> None:
+    """A TIFF (or JPEG 2000) is refused before Pillow decodes it: their decoders carried the
+    critical advisories of Oct 2026; JPEG, PNG, WebP, AVIF and GIF still open."""
+    from coverengine.safeimage import open_image
+    from PIL import Image, UnidentifiedImageError
+
+    buf = io.BytesIO()
+    Image.new("RGB", (40, 30), "white").save(buf, "TIFF")
+    with pytest.raises(UnidentifiedImageError):
+        open_image(buf.getvalue(), 40_000_000)
+    for fmt in ("JPEG", "PNG", "WEBP", "GIF"):
+        buf = io.BytesIO()
+        Image.new("RGB", (40, 30), "white").save(buf, fmt)
+        assert open_image(buf.getvalue(), 40_000_000).size == (40, 30)
+
+
 def test_a_desk_picture_bomb_is_refused(tmp_path: Path) -> None:
     from coverapi.desk import save_picture
     from coverengine.params import Registry

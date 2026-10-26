@@ -37,8 +37,15 @@ def max_pixels(params: Any | None = None) -> int:
     return int(float(params["limits.image_max_mp"]) * MEGA)
 
 
-def open_image(data: bytes, limit_px: int, draft_edge: int | None = None) -> Any:
-    """The picture in `data`, decoded, or TooLargeImage / OSError. A JPEG is decoded at 1/2, 1/4
+# only these formats are ever decoded (a crafted JPEG 2000 or TIFF reaches Pillow's riskier
+# decoders by just being opened; 26 Oct 2026, GHSA-78g4-xqwv-q3g8)
+FORMATS = ("JPEG", "PNG", "WEBP", "AVIF", "GIF")
+
+
+def open_image(data: bytes, limit_px: int, draft_edge: int | None = None,
+               formats: tuple[str, ...] = FORMATS) -> Any:  # fmt: skip
+    """The picture in `data`, decoded, or TooLargeImage / OSError (UnidentifiedImageError for a
+    format outside `formats`, before any decoder runs). A JPEG is decoded at 1/2, 1/4
     or 1/8 scale when that keeps it under the cap (a 50 MP phone photo is fine), and further
     while its long side stays at least `draft_edge` (the picture is made that small anyway)."""
     from PIL import Image
@@ -46,7 +53,7 @@ def open_image(data: bytes, limit_px: int, draft_edge: int | None = None) -> Any
     with warnings.catch_warnings():
         warnings.simplefilter("error", Image.DecompressionBombWarning)
         try:
-            im = Image.open(io.BytesIO(data))
+            im = Image.open(io.BytesIO(data), formats=list(formats))
             w, h = im.size
             if w <= 0 or h <= 0:
                 raise TooLargeImage("the picture has no size")

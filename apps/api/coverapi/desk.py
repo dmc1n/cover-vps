@@ -702,11 +702,12 @@ def save_picture(d: Path, data: bytes, params: Any, sub: str = PICTURES_DIR) -> 
         with warnings.catch_warnings():
             # a picture that unpacks to an enormous size is refused, not only warned about
             warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(io.BytesIO(data)) as probe:
+            with Image.open(io.BytesIO(data), formats=list(PICTURE_FORMATS)) as probe:
                 fmt = probe.format
                 probe.verify()
             # its size in pixels checked before decoding (limits.image_max_mp, ADR-123)
-            img = open_image(data, max_pixels(params), int(params["desk.picture_max_side_px"]))
+            img = open_image(data, max_pixels(params), int(params["desk.picture_max_side_px"]),
+                             PICTURE_FORMATS)  # fmt: skip
     except TooLargeImage as exc:
         raise HTTPException(413, str(exc)) from None
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError,

@@ -38,7 +38,7 @@ Note column.
 | python-multipart | 0.0.32 | Apache-2.0 | file uploads in the API (M6) |  |
 | httpx | 0.28.1 | BSD-3-Clause | API test client (M6) |  |
 | openpyxl | 3.1.5 | MIT |  |  |
-| pillow | 12.3.0 | MIT-CMU | pictures attached at the Desk, checked and re-encoded (ADR-096) |  |
+| pillow | 13.0.0 | MIT-CMU | pictures attached at the Desk, checked and re-encoded (ADR-096) |  |
 | mcp | 2.3.0 | MIT |  |  |
 <!-- END GENERATED -->
 
