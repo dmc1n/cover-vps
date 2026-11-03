@@ -8,7 +8,8 @@ The program measures, for each model:
 - balloons: a table has at least one balloon under its cover;
 - symmetric: a mirror-symmetric piece of furniture has a mirror-symmetric cover;
 - water: the cover sheds water;
-- pieces: the grade (stretch, seams, roll width) and no scrap pieces;
+- pieces: the grade (stretch, seams, roll width, air vents) and no scrap pieces; a piece too
+  short for a vent while its side keeps one is a note, not a fault (ADR-155);
 - drape: once the cover was dropped over the furniture, not too many folds, no deep sag;
 - slivers: no piece narrower than seams.min_piece_width_mm (ADR-055); a top that would fit
   the roll in one piece with folds is noted.
@@ -807,7 +808,9 @@ def measure(model_dir: Path, params: EffectiveParams) -> dict[str, Any]:
             g["grade"] == "ready" and not scrap,
             f"{len(pieces)} pieces, {g['grade']}"
             + (f"; scrap pieces: {', '.join(scrap)}" if scrap else "")
-            + (f"; {'; '.join(g.get('reasons', []))}" if g.get("reasons") else ""),
+            + (f"; {'; '.join(g.get('reasons', []))}" if g.get("reasons") else "")
+            # a piece too short for a vent while its side keeps one: a note (ADR-155)
+            + (f"; note: {'; '.join(g['vent_notes'])}" if g.get("vent_notes") else ""),
         )
     )
     checks += sliver_checks(model_dir, params)

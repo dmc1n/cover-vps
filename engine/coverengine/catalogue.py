@@ -209,6 +209,34 @@ def compare_files(a: Path, b: Path, threshold_mm: float = 1.0) -> dict[str, Any]
 # "check" with the reasons.
 
 
+def vent_problems(
+    model_dir: Path, panels: list[dict[str, Any]], finished: dict[str, Any]
+) -> tuple[list[str], list[str]]:
+    """finished.json's air vent warnings as (problems, notes) (ADR-155): a piece too short for
+    a vent whose side still has one is a note (`finish.vent_warnings_split`). The way pieces
+    face is read from panels.npz only when a piece is not named by its side (a drawing
+    cover's skirt-3); a piece neither named by its side nor with a known facing is a side
+    of its own; when reading fails, every warning stays a problem."""
+    from coverengine.finish.finish import SHORT_PIECE, SIDE_NAME, vent_warnings_split
+
+    warnings = [w for w in finished.get("warnings", []) if "air vent" in w]
+    if not any(SHORT_PIECE.match(w) for w in warnings):
+        return warnings, []
+    vented = {p["name"] for p in finished.get("pieces", []) if p.get("openings_mm")}
+    facing: dict[str, tuple[float, float]] = {}
+    short = [m.group(1) for w in warnings if (m := SHORT_PIECE.match(w))]
+    if not all(SIDE_NAME.match(n) for n in short):
+        try:
+            from coverengine.finish.finish import vent_walls
+            from coverengine.params.registry import Registry, resolve_model
+
+            params = resolve_model(model_dir, {}, Registry.load(None), None)
+            facing = vent_walls(model_dir, params).facing
+        except (CoverError, OSError, KeyError, ValueError):
+            return warnings, []
+    return vent_warnings_split(warnings, panels, vented, facing)
+
+
 def grade(model_dir: Path) -> dict[str, Any]:
     """How far a model's cover is: ready, check (with reasons) or failed (with the step)."""
     out: dict[str, Any] = {"id": model_dir.name, **info(model_dir)}
@@ -234,7 +262,7 @@ def grade(model_dir: Path) -> dict[str, Any]:
         reasons.append(f"an edge zig-zags {wiggle:.1f} mm")
     if ease > ease_limit:
         reasons.append(f"a seam's sides differ by {ease:.0f} mm")
-    vents = [w for w in finished.get("warnings", []) if "air vent" in w]
+    vents, notes = vent_problems(model_dir, panels, finished)
     if vents:
         reasons.append(f"{len(vents)} air vent(s) do not fit")
     if not all(p["fits_roll"] for p in panels):
@@ -243,6 +271,7 @@ def grade(model_dir: Path) -> dict[str, Any]:
     out.update(
         grade="ready" if not reasons else "check",
         reasons=reasons,
+        vent_notes=notes,
         panels=len(panels),
         max_stretch_pct=round(stretch, 2),
         max_ease_mm=round(ease, 1),

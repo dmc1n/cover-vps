@@ -473,6 +473,162 @@ def test_a_round_wall_keeps_its_vents() -> None:
     assert bend_deg(straight, 500, 225) == pytest.approx(0, abs=1e-6)
 
 
+def test_a_wiggly_straight_wall_is_no_rounded_corner() -> None:
+    """ADR-155: a cover's bottom edge from a mesh wiggles a few mm left and right; adding up
+    every small turn read 50-90 degrees on the Wadi sofa's straight sides and the Blocchi
+    moon's gently curved back, so their vents were pushed off as if on a corner. The bend is
+    the largest turn one way: the wiggle stays a few degrees, a real corner keeps its turn."""
+    import math
+
+    from coverengine.finish.finish import bend_deg, has_straight
+
+    x = np.arange(0.0, 1501.0, 12.5)
+    wiggly = np.stack([x, 4.0 * (np.arange(len(x)) % 2)], axis=1)  # 4 mm zig-zag
+    assert bend_deg(wiggly, 750, 225) < 5
+    assert has_straight(wiggly, 225, 25)
+    # a quarter circle of 200 mm radius between two straights: still a corner of 90 degrees
+    arc = [(600 + 200 * math.sin(a), 200 - 200 * math.cos(a))
+           for a in np.linspace(0, math.pi / 2, 24)]  # fmt: skip
+    corner = np.array([(0.0, 0.0), *arc, (800.0, 800.0)])
+    assert bend_deg(corner, 600 + math.pi * 50, 225) == pytest.approx(90, abs=1)
+    # a bump: up 31 degrees, then down 31: 62 degrees between its two directions
+    s = np.array([(0, 0), (200, 0), (300, 60), (400, 60), (500, 0), (700, 0)], dtype=float)
+    assert bend_deg(s, 350, 300) == pytest.approx(2 * math.degrees(math.atan2(60, 100)), abs=1)
+
+
+def test_a_cover_in_two_halves_knows_which_way_its_piece_runs(tmp_path: Path) -> None:
+    """ADR-155 (S37, the Fiora daybed): a piece whose bottom edge meets the same piece at both
+    ends could not tell which end its flat bottom edge starts at, so a vent had to stand on
+    a straight stretch both ways round and found none. The piece flattened again tells."""
+    import json
+    import math
+
+    from coverengine.finish.finish import Walls, vent_walls
+
+    # 3D: 400 mm straight, a quarter circle of 200 mm, 1286 mm straight: 2000 mm in all
+    arc = [(400 + 200 * math.sin(a), 200 - 200 * math.cos(a))
+           for a in np.linspace(0, math.pi / 2, 24)]  # fmt: skip
+    path = np.array([(0.0, 0.0), *arc, (600.0, 1486.0)])
+    panel = wall("skirt-front", 2000, 400)
+    panel["edges"][1]["mate"] = panel["edges"][3]["mate"] = "skirt-back"
+    vents = {}
+    for flipped in (False, True):
+        ends = (np.array([2000.0, 0.0]), np.array([0.0, 0.0]))
+        walls = Walls(hems={"skirt-front": (path, "skirt-back", "skirt-back")},
+                      flat_ends={"skirt-front": ends[::-1] if not flipped else ends})  # fmt: skip
+        got, warnings = place_vents([panel], params(**{"features.vents_total": 2}), walls)
+        assert not warnings
+        vents[flipped] = sorted(round(float(r[:2, 0].mean())) for r in got["skirt-front"])
+    # the corner lies 400-714 mm from the 3D start: the vent at flat 500 is on it when the flat
+    # edge starts there and moves off; at 1500 when it starts at the other end; the other
+    # vent keeps its middle
+    assert vents[False][1] == 1500 and vents[False][0] != 500
+    assert vents[True][0] == 500 and vents[True][1] != 1500
+    plain = Walls(hems={"skirt-front": (path, "skirt-back", "skirt-back")})
+    unknown, _ = place_vents([panel], params(**{"features.vents_total": 2}), plain)
+    assert sorted(round(float(r[:2, 0].mean())) for r in unknown["skirt-front"]) != vents[False]
+
+    # from the 3D cover: two walls closing a ring, both ends of each on the other
+    ring = [(0.0, 0.0), (2000.0, 0.0), (2000.0, 1000.0), (0.0, 1000.0)]
+    verts, faces, labels = [], [], []
+    for x, y in ring + ring[:1]:
+        verts += [(x, y, 0.0), (x, y, 400.0)]
+    for k in range(4):
+        a = 2 * k
+        faces += [(a, a + 2, a + 3), (a, a + 3, a + 1)]
+        labels += [0, 0] if k < 2 else [1, 1]  # noqa: PLR2004
+    verts[8:10] = verts[0:2]  # the ring closes on the same vertices
+    np.savez(tmp_path / "panels.npz", vertices=np.array(verts[:8]), faces=np.array(faces) % 8,
+             labels=np.array(labels))  # fmt: skip
+    (tmp_path / "panels.json").write_text(
+        json.dumps({"panels": [{"name": "skirt-front"}, {"name": "skirt-back"}]})
+    )
+    walls = vent_walls(tmp_path, params())
+    _, a, b = walls.hems["skirt-front"]
+    assert a == b == "skirt-back"
+    start, end = walls.flat_ends["skirt-front"]
+    assert float(np.linalg.norm(start - end)) == pytest.approx(3000.0, abs=5)  # flat and straight
+
+
+def _ring(*pieces: tuple[str, float]) -> list[dict[str, Any]]:
+    """Upright pieces joined in a ring, in order, each to the next by a vertical seam."""
+    panels = [wall(n, length, 400) for n, length in pieces]
+    names = [n for n, _ in pieces]
+    for i, p in enumerate(panels):
+        p["edges"][1].update(mate=names[(i + 1) % len(names)], seam=f"s{i}")
+        p["edges"][3].update(mate=names[i - 1], seam=f"s{i - 1}")
+    return panels
+
+
+def test_a_side_never_chains_round_an_angled_cover() -> None:
+    """ADR-155, the Vento angled hocker (Codex, 3 Nov 2026: "the back loses its vent"): pieces
+    that join and face within 45 degrees of the next were one side, piece by piece round its
+    angled corners, so its right and its back (115 degrees apart) were one side with one vent.
+    A side now never spans more than twice the angle: right, back, left and front each keep
+    theirs. The four sides by name (`quadrant`) tell the grade's vent notes."""
+    from coverengine.finish.finish import Walls, _facing_sides, quadrant
+
+    panels = _ring(("skirt-front", 1125), ("skirt-right-1", 664), ("skirt-right-2", 333),
+                   ("skirt-back-1", 383), ("skirt-back-2", 428), ("skirt-left", 571))  # fmt: skip
+    walls = Walls(facing={"skirt-front": (-0.28, -0.96), "skirt-right-1": (1.0, -0.02),
+                          "skirt-right-2": (0.83, 0.56), "skirt-back-1": (0.28, 0.96),
+                          "skirt-back-2": (-0.43, 0.9), "skirt-left": (-0.96, 0.28)})  # fmt: skip
+    vents, warnings = place_vents(panels, params(), walls)
+    assert not warnings
+    assert {k: len(v) for k, v in vents.items()} == {
+        "skirt-front": 1, "skirt-right-1": 1, "skirt-back-2": 1, "skirt-left": 1}  # fmt: skip
+    # pieces facing alike still make one side, the most alike first
+    sides = _facing_sides(sorted(walls.facing), panels, walls.facing, 0.7071)
+    want = [["skirt-back-1", "skirt-right-1", "skirt-right-2"], ["skirt-back-2"],
+            ["skirt-front"], ["skirt-left"]]  # fmt: skip
+    assert sorted(map(sorted, sides)) == want
+    # a piece the cut did not name by a side (a drawing cover's skirt-3) by the way it faces
+    assert quadrant("skirt-3", {"skirt-3": (0.73, 0.69)}) == "right"
+    assert quadrant("skirt-3", {"skirt-3": (0.21, 0.98)}) == "back"
+    assert quadrant("skirt-right-2", {"skirt-right-2": (0.21, 0.98)}) == "right"  # its name
+
+
+def test_a_short_end_piece_beside_a_vent_is_a_note_not_a_fault(tmp_path: Path) -> None:
+    """ADR-155 (owner, 3 Nov 2026: the false "pieces" alarm on 14 covers): the Casto high back's
+    27 cm pieces at the ends of its back have no room for a vent, while skirt-back-2 between
+    them has one: a note in the grade, not a reason. A side with no vent at all, and a vent on
+    a rounded corner (ADR-134), stay reasons."""
+    import json
+
+    from coverengine.catalogue import grade
+    from coverengine.finish.finish import vent_warnings_split
+
+    panels = _ring(("skirt-front", 1500), ("skirt-right", 700), ("skirt-back-1", 270),
+                   ("skirt-back-2", 1000), ("skirt-back-3", 270), ("skirt-left", 700))  # fmt: skip
+    short = [f"no room for an air vent on skirt-back-{k}: 27 cm of hem, a vent needs 28 cm"
+             for k in (3, 1)]  # fmt: skip
+    corner = "air vent 1 on skirt-front stands on a rounded corner: no free straight stretch"
+    all_sides = {"skirt-front", "skirt-right", "skirt-back-2", "skirt-left"}
+    assert vent_warnings_split(short, panels, all_sides, {}) == ([], short)
+    no_back = all_sides - {"skirt-back-2"}
+    assert vent_warnings_split(short, panels, no_back, {}) == (short, [])
+    assert vent_warnings_split([*short, corner], panels, all_sides, {}) == ([corner], short)
+
+    for p in panels:
+        p.update(stretch={"quantile_pct": 1.0}, fits_roll=True)
+    pattern = {"panels": panels, "parameters": {"fabric": {"max_allowed_stretch_pct": 5},
+               "seams": {"max_wiggle_mm": 3}, "tolerance": {"cover_mm": 5}}}  # fmt: skip
+    pieces = [{"name": n, "openings_mm": [[[0, 0]]] if n in all_sides else []}
+              for n in (p["name"] for p in panels)]  # fmt: skip
+    for name, body in (("model.json", {}), ("hull.json", {}), ("panels.json", {"panels": []}),
+                       ("pattern.json", pattern),
+                       ("finished.json", {"warnings": short, "pieces": pieces})):  # fmt: skip
+        (tmp_path / name).write_text(json.dumps(body))
+    g = grade(tmp_path)
+    assert g["grade"] == "ready" and g["vent_notes"] == short and not g["reasons"]
+    pieces[1]["openings_mm"] = []  # skirt-right
+    (tmp_path / "finished.json").write_text(
+        json.dumps({"warnings": [*short, corner], "pieces": pieces})
+    )
+    g = grade(tmp_path)
+    assert g["grade"] == "check" and g["reasons"] == ["1 air vent(s) do not fit"]
+
+
 def test_the_logo_on_the_cover_is_the_frame_the_hood_carries_in_the_cutting_file() -> None:
     """ADR-146 (owner, 16 Oct 2026: "see the logo on the 3d model so we can check before we
     accept"): one frame, drawn on the hood's PEN layer and placed on the cover where the sewn

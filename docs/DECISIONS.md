@@ -6036,3 +6036,73 @@ the banner (snoozed reminders), and the worktree's reports kept like a scratch w
 - Tests: `apps/api/tests/test_web_ipad.py` (the CSS rule, the tags and manifest, opaque icons at their sizes, no service worker, manifest and icons without a login, the pixel-ratio cap everywhere, the lost-context handling, three.js outside the studio's static import graph, the touch listeners passive). In a browser: `apps/web/e2e/ipad.py` (Chromium as an iPad Pro 11, and 1440 px with a mouse; a lost context rebuilt as a new canvas with its layers and the Dimensions overlay back, by the button and by the restore).
 
 **Better alternative, not built.** A per-control `Tip` component with an (i) next to each icon button would be easier to find than a long press. It means touching about 170 places; the one listener covers them all today.
+
+## ADR-155 — Air vents: a bend is the turn one way, a side never chains round the cover, a short piece beside its side's vent is a note (3 Nov 2026)
+
+**Context.** The owner (3 Nov 2026, "gewoon doen"): take the false "pieces" alarm out of the
+audit, and look at the seven vent covers held back from the logo round (ADR-146). The causes:
+
+- **The false alarm.** `catalogue.grade` made every air vent warning in finished.json a reason
+  ("N air vent(s) do not fit"), so the audit's "pieces" check failed. On 15 covers the only such
+  warning is "no room for an air vent on skirt-back-1/-3": the 13-28 cm end pieces of a back that
+  never had a vent, while skirt-back-2 between them has it (the Casto high back, the Pemba lounge
+  chairs, Rios, Santorini, ...).
+- **A wiggle read as a corner.** `finish.bend_deg` added up every small turn of a piece's bottom
+  edge. A bottom edge from a mesh wiggles a few mm left and right; on the Wadi sofa's straight
+  sides that added up to 55-60 degrees and on the Blocchi moon's gently curved back to 35-50
+  (limit 25, ADR-134), while the edge turned 5-15 degrees. Vents were pushed off "corners" that
+  are none, crowded the few spots left, and one stayed "on a rounded corner" (Wadi, Blocchi
+  2-seater moon right). `has_straight` also looked at stretches past the end of the edge, cut
+  short there and so straighter.
+- **Sides chained round the cover.** One per metre counts per side, a side being the pieces that
+  join and face within `vent_wall_angle_deg` (45) of each other (ADR-101). Pair by pair, that
+  chained round an angled cover: the Vento angled hocker's right, its diagonal and its back
+  (115 degrees apart) became one side with one vent, so the back lost its vent (4 to 3, no
+  warning).
+- **A cover in two halves.** When both ends of a piece's bottom edge meet the same piece (S37, the
+  Fiora daybed), `_off_corners` could not tell which end the flat edge starts at, so a vent had
+  to be straight both ways round, found no such place and stayed on the corner with a warning.
+
+**Decision.**
+
+- `bend_deg` is the largest turn one way between any two points of the stretch (the span of its
+  signed turns added up). A clean arc measures as before (L / R), so the 25 degrees keep their
+  meaning; a wiggle measures a few degrees; a bump counts both of its turns. `has_straight`
+  stops at the last whole stretch.
+- `_facing_sides`: pieces that join and face within the angle are one side, the most alike pair
+  first, and only while every piece of the side faces within twice the angle (90 degrees) of
+  every other. Swept over the 457 live covers this changes one cover's count: the Vento angled
+  hocker gets its back vent again, as it has live. (Tried and dropped: the cover's four named
+  sides alone, or the angle between every two pieces; they changed 8 to 19 covers, five of them
+  away from what is live and approved.)
+- `vent_walls` flattens a piece again (as `cover flatten` and `vents3d` do) when both ends of its
+  bottom edge meet the same piece (`Walls.flat_ends`); `_off_corners` uses it to know which way
+  round the piece runs.
+- `grade` splits the air vent warnings (`finish.vent_warnings_split`): "no room for an air vent
+  on <piece>" is a **note** (`vent_notes`, shown in the audit's pieces detail as "note: ...")
+  when a piece of its side has a vent, a side being the joined pieces on one of the cover's four
+  sides (`cover_sides`, `quadrant`: the side the cut named the piece by, else the way it faces
+  from panels.npz, else a side of its own). A side with no vent at all, a vent on a rounded
+  corner, a vent that does not fit: still reasons, so still a failure.
+
+**Effect** (read-only sweeps of the 457 live covers, release v2.10.1 against this code): the
+audit's pieces check goes from fail to pass on 15 covers, none the other way. On their next
+export: one cover's vent count changes (Vento angled hocker 3 to 4), 18 covers' vents move
+(off false corners, or off real ones now that straight room is seen), 6 covers lose "on a rounded
+corner" warnings (Blocchi 2-seater moon right, S37 one of two, S45, Blocchi 2-seater moon right
+SUNS, Fiora daybed, Wadi) and one gains one: the Pemba dining chair's 48 cm left side, whose
+vent stands on its rounded front corner (52 degrees) with a straight stretch only at its far end.
+Nothing was changed live: the held covers are staged in `~/cover-data/tmp-agents/held7/stage/`.
+
+**Still for a person (Rens, two questions).** Pieces curved along most of their length with one
+short straight stretch (moon and oval shapes): by the 25 degree rule a curve under about 1 m
+radius is a corner, so the second vent of such a piece either stays on the curve (Pienza
+moonshape left, vent 5 at 42 degrees; S37) or joins the first on the straight bit, 30 cm apart,
+leaving the curved front without one (Blocchi 2-seater moon right SUNS, the Fiora daybed). And
+the Pienza curved hocker, an octagon with three pieces too short for a vent: the rule gives
+4 vents (back, back-left, front, front-right) where it has 3 live (back-right, back-left, front).
+
+**Tests** (test_finish.py): `test_a_wiggly_straight_wall_is_no_rounded_corner`,
+`test_a_side_never_chains_round_an_angled_cover`,
+`test_a_cover_in_two_halves_knows_which_way_its_piece_runs`,
+`test_a_short_end_piece_beside_a_vent_is_a_note_not_a_fault`.

@@ -53,7 +53,8 @@ one-line edit there.
   at least one, round every side of the cover including the front walls in the inner corner of L, U and C
   shapes (owner, 2026-10-09, QUESTIONS 71, ADR-110; `features.vent_inner_walls`, default on). Round every side first,
   one in the middle of each piece, the drawing's count kept, never on a free top edge (Rens, 2026-10-08, ADR-101). Never on a rounded corner
-  (Rens, 2026-10-09, ADR-134; `features.vent_on_corners`, `vent_corner_max_deg`). By hand
+  (Rens, 2026-10-09, ADR-134; `features.vent_on_corners`, `vent_corner_max_deg`; the turn measured one way, a side
+  for one per metre never wider than 90 degrees, a short piece beside its side's vent a note, ADR-155). By hand
   (`features.vent_positions`) a vent may go one panel up, over the seam on top of a low wall (D1/D2, ADR-142), or at a height given as "piece@fraction@cm" (L3, ADR-144). Built as a cut opening with a hood of extra fabric holding a plastic insert
   that keeps it open, and a membrane inside against dirt (`features.vent_*`, pieces in M5).
   The logo's frame lies centred along the hood's open lower edge (the vent's long bottom side),

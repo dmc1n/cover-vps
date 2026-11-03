@@ -240,9 +240,10 @@ features:                        # per-cover defaults, overridden per model
                                  # vent_positions set by a person are kept as they are
   vent_corner_max_deg: 25        # a vent's bottom edge with vent_seam_clearance_mm either side (a
                                  # corner is kept clear like a seam: 45 cm) turning more than this
-                                 # in plan (its turns added up) stands on a rounded corner: a
-                                 # curve tighter than about 1 m radius; a gently curved back wall
-                                 # is no corner (to confirm)
+                                 # in plan (the largest turn one way, so a mesh hem's wiggle
+                                 # is no turn, ADR-155) stands on a rounded corner: a curve
+                                 # tighter than about 1 m radius; a gently curved back wall is
+                                 # no corner (to confirm)
   vent_seam_clearance_mm: 100    # to confirm; a vent keeps this far from a vertical seam; a short
                                  # side gets its vent centred, closer (owner: it must have one)
   vent_short_piece_ok: false     # a piece whose bottom edge is too short for a vent (shorter than

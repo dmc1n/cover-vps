@@ -166,16 +166,43 @@ def side_of(panel: str) -> str:
     return re.sub(r"-\d+$", "", panel)
 
 
+SIDE_NAME = re.compile(r"^(?:skirt|wall)-(front|right|back|left)(?:-\d+)?$")
+
+
+def quadrant(panel: str, facing: dict[str, tuple[float, float]]) -> str:
+    """Which of the cover's four sides (front, right, back, left) a piece is on: from its name
+    when the cut named it by the way it faces (`seams.build._side`: skirt-right-2 is on the
+    right), else from the way it faces (`vent_walls`; a drawing cover's skirt-3), else a
+    side of its own (its name: never joined to another without knowing)."""
+    m = SIDE_NAME.match(panel)
+    if m:
+        return m.group(1)
+    f = facing.get(panel)
+    if f is None:
+        return panel
+    angle = math.degrees(math.atan2(f[1], f[0]))
+    if -45 <= angle < 45:  # param-ok: quadrant bounds, as seams.build._side
+        return "right"
+    if 45 <= angle < 135:  # param-ok: quadrant bounds
+        return "back"
+    if -135 <= angle < -45:  # param-ok: quadrant bounds
+        return "front"
+    return "left"
+
+
 @dataclass(frozen=True)
 class Walls:
     """What the 3D cover tells about each piece, for the vents (`vent_walls`): the pieces on an
     inner wall, and the way each piece faces (a unit vector in plan, out of the cover); per
     piece its bottom edge in plan (points in order) with the pieces at its start and its end
-    ("" for none), to keep vents off rounded corners."""
+    ("" for none), to keep vents off rounded corners; for a piece whose bottom edge meets the
+    same piece at both ends (a cover in two halves), where its start and its end lie on the
+    flat piece (`flat_ends`, the piece flattened again as `cover flatten` does, ADR-155)."""
 
     inner: frozenset[str] = frozenset()
     facing: dict[str, tuple[float, float]] = field(default_factory=dict)
     hems: dict[str, tuple[Array, str, str]] = field(default_factory=dict)
+    flat_ends: dict[str, tuple[Array, Array]] = field(default_factory=dict)
 
 
 PROBE_MM = 50.0  # param-ok: a point this far beside a wall tells out from in (as vents3d)
@@ -234,6 +261,7 @@ def vent_walls(model_dir: Any, params: EffectiveParams) -> Walls:
         facing[name] = (float(d[0]), float(d[1]))
     original = data["original_vertex"] if "original_vertex" in data else np.arange(len(v))
     hems = {}
+    flat_ends: dict[str, tuple[Array, Array] | None] = {}
     for i, name in enumerate(names):
         hem = _bottom_path(v, f[labels == i], near)
         if hem is None:
@@ -246,7 +274,38 @@ def vent_walls(model_dir: Any, params: EffectiveParams) -> Walls:
             skirts = [m for m in mates if m.startswith("skirt")]
             ends.append((skirts or mates or [""])[0] if hem[0] != hem[-1] else "")
         hems[name] = (np.asarray(v[hem, :2], dtype=np.float64), ends[0], ends[1])
-    return Walls(frozenset(inner), facing, hems)
+        if ends[0] and ends[0] == ends[1]:
+            flat_ends[name] = _flat_ends(v, f[labels == i], (hem[0], hem[-1]), params)
+    return Walls(frozenset(inner), facing, hems,
+                 {k: e for k, e in flat_ends.items() if e is not None})  # fmt: skip
+
+
+def _flat_ends(
+    v: Array, faces: NDArray[np.int64], ends: tuple[int, int], params: EffectiveParams
+) -> tuple[Array, Array] | None:
+    """Where two vertices of a piece lie on the flat piece: the piece flattened again as
+    `cover flatten` does (the same solver and settings give the same flat piece, as
+    `vents3d` relies on), each vertex by the flat mesh's nearest one in 3D."""
+    from scipy.spatial import cKDTree
+
+    from coverengine.errors import CoverError
+    from coverengine.flatten.pattern import _panel_mesh, compensation
+    from coverengine.flatten.solve import flatten
+
+    mesh, _ = _panel_mesh(v, faces)
+    try:
+        flat = flatten(
+            mesh,
+            str(params["flatten.solver"]),
+            int(params["flatten.iterations"]),  # type: ignore[arg-type]
+            float(params["flatten.slim_tolerance"]),  # type: ignore[arg-type]
+            int(params["flatten.max_triangles"]),  # type: ignore[arg-type]
+        )
+    except (CoverError, ValueError, RuntimeError):
+        return None
+    uv = np.asarray(flat.uv, dtype=np.float64) * compensation(params)
+    _, idx = cKDTree(np.asarray(flat.vertices)).query(v[list(ends)])
+    return uv[int(idx[0])], uv[int(idx[1])]
 
 
 def _bottom_path(v: Array, faces: NDArray[np.int64], near: float) -> list[int] | None:
@@ -312,8 +371,12 @@ def _along(pts: Array, s: Any) -> Array:
 
 def bend_deg(pts: Array, t: float, half: float) -> float:
     """How much a line on the cover turns in plan between `t - half` and `t + half` (mm along
-    it): the sum of its turns, resampled every `BEND_STEP_MM` (0 on a straight wall; a
-    stretch of length L round a corner of radius R turns L / R)."""
+    it), resampled every `BEND_STEP_MM` (0 on a straight wall; a stretch of length L round a
+    corner of radius R turns L / R): the largest turn one way between any two points of the
+    stretch (its signed turns added up). Not the sum of every small turn: the bottom edge of
+    a cover made from a mesh wiggles by a few mm, and those wiggles, left and right, added up
+    to 50-90 degrees on a straight wall (the Wadi sofa's sides, the Blocchi moon's back,
+    ADR-155)."""
     length = float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum())
     lo, hi = max(t - half, 0.0), min(t + half, length)
     n = max(int(math.ceil((hi - lo) / BEND_STEP_MM)), 2)
@@ -324,7 +387,8 @@ def bend_deg(pts: Array, t: float, half: float) -> float:
         return 0.0
     ang = np.arctan2(d[:, 1], d[:, 0])
     turn = (np.diff(ang) + math.pi) % (2 * math.pi) - math.pi
-    return math.degrees(float(np.abs(turn).sum()))
+    heading = np.concatenate([[0.0], np.cumsum(turn)])
+    return math.degrees(float(heading.max() - heading.min()))
 
 
 def arc_position(pts: Array, p: Array) -> float:
@@ -344,6 +408,8 @@ def has_straight(pts: Array, half: float, limit: float) -> bool:
     degrees (a round cover's piece has none)."""
     length = float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum())
     stations = np.arange(half, length - half + CORNER_STEP_MM / 2, CORNER_STEP_MM)
+    # never past the end: there the stretch would be cut short and seem straighter (ADR-155)
+    stations = np.unique(np.minimum(stations, length - half))
     return any(bend_deg(pts, float(t), half) <= limit for t in stations)
 
 
@@ -385,10 +451,16 @@ def _off_corners(
             out.append((name, s_at))
             continue
         start, end = _ends(r, by_name[name])
+        # both ends meet the same piece (S37, the Fiora daybed: a cover in two halves): the
+        # flat piece tells which end of the 3D edge the flat bottom edge starts at (ADR-155)
+        flat = walls.flat_ends.get(name)
+        d0, d1 = (float(np.linalg.norm(q - r.points[0])) for q in flat) if flat else (0.0, 0.0)
         if a != b and (start, end) == (a, b):
             ways = [False]
         elif a != b and (start, end) == (b, a):
             ways = [True]
+        elif abs(d0 - d1) > r.length / 2:
+            ways = [d1 < d0]
         else:  # not known which way round: both must be straight
             ways = [False, True]
 
@@ -680,6 +752,89 @@ def _sides(names: list[str], panels: list[dict[str, Any]], same: Any) -> list[li
     return list(groups.values())
 
 
+def _facing_sides(
+    names: list[str],
+    panels: list[dict[str, Any]],
+    facing: dict[str, tuple[float, float]],
+    cos: float,
+) -> list[list[str]]:
+    """The sides of the cover for one per metre (ADR-101): pieces that join and face within
+    `vent_wall_angle_deg` of each other (`cos`), the most alike first, and a side never wider
+    than twice that angle: every piece of it faces within 90 degrees of every other (ADR-155).
+    Joined pair by pair, a side chained round an angled cover: the Vento angled hocker's right
+    and the back beside it, 115 degrees apart, were one side, so the back lost its vent.
+    Without the way a piece faces, the pieces of one named side (`side_of`)."""
+
+    def dot(a: str, b: str) -> float | None:
+        fa, fb = facing.get(a), facing.get(b)
+        return None if fa is None or fb is None else fa[0] * fb[0] + fa[1] * fb[1]
+
+    def alike(a: str, b: str, least: float) -> bool:
+        d = dot(a, b)
+        return side_of(a) == side_of(b) if d is None else d >= least - SAME_FACING
+
+    wide = math.cos(2 * math.acos(max(-1.0, min(1.0, cos))))
+    pairs = set()
+    for p in panels:
+        for e in p["edges"]:
+            a, b = p["name"], e.get("mate")
+            if e["kind"] == "seam" and a in names and b in names and a != b and alike(a, b, cos):
+                d = dot(a, b)
+                pairs.add((-(1.0 if d is None else d), *sorted((a, b))))
+    group = {n: [n] for n in names}
+    for _, a, b in sorted(pairs):
+        ga, gb = group[a], group[b]
+        if ga is not gb and all(alike(x, y, wide) for x in ga for y in gb):
+            ga.extend(gb)
+            for n in gb:
+                group[n] = ga
+    out: list[list[str]] = []
+    for n in names:
+        if not any(group[n] is g for g in out):
+            out.append(group[n])
+    return out
+
+
+def cover_sides(
+    panels: list[dict[str, Any]], facing: dict[str, tuple[float, float]]
+) -> list[list[str]]:
+    """The cover's sides for the vents (ADR-155): pieces that join on one of its four sides
+    (`quadrant`), as `place_vents` counts one per metre."""
+    names = sorted(p["name"] for p in panels)
+    return _sides(names, panels, lambda a, b: quadrant(a, facing) == quadrant(b, facing))
+
+
+SAME_FACING = 1e-9  # param-ok: rounding in comparing two directions
+
+
+SHORT_PIECE = re.compile(r"^no room for an air vent on (\S+): ")
+
+
+def vent_warnings_split(
+    warnings: list[str],
+    panels: list[dict[str, Any]],
+    vented: set[str],
+    facing: dict[str, tuple[float, float]],
+) -> tuple[list[str], list[str]]:
+    """The air vent warnings of an export as (problems, notes) (ADR-155). "No room for an air
+    vent on <piece>" (a piece too short for one, `place_vents`) is a note when another piece of
+    its side (`cover_sides`) has a vent: the side keeps its vent (the Casto high back's 27 cm
+    end pieces of the back beside skirt-back-2's vent). A side with no vent at all, a vent on a
+    rounded corner (ADR-134), a vent that does not fit: problems."""
+    side = {n: k for k, group in enumerate(cover_sides(panels, facing)) for n in group}
+    served = {side[n] for n in vented if n in side}
+    problems, notes = [], []
+    for w in warnings:
+        if "air vent" not in w:
+            continue
+        m = SHORT_PIECE.match(w)
+        if m and m.group(1) in side and side[m.group(1)] in served:
+            notes.append(w)
+        else:
+            problems.append(w)
+    return problems, notes
+
+
 def place_vents(
     panels: list[dict[str, Any]],
     params: EffectiveParams,
@@ -736,7 +891,7 @@ def place_vents(
             counts = per_side(lengths, params, same)
         else:
             counts = {}
-            for side in _sides(sorted(lengths), panels, same):
+            for side in _facing_sides(sorted(lengths), panels, walls.facing, cos):
                 n = vent_count(sum(lengths[k] for k in side), params)
                 counts.update(_spread(side, lengths, n, same))
         for name in sorted(counts, key=lambda k: (-lengths[k], k)):
