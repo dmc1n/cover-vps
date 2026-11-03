@@ -32,6 +32,7 @@ export function installTouchTips(): () => void {
   let shownThisTouch = false;
   let swallowUntil = 0;
   let held: HTMLElement | null = null; // the control whose card a hold showed
+  let touching = false; // a finger is down
 
   const hide = () => {
     if (!tip) return;
@@ -87,7 +88,8 @@ export function installTouchTips(): () => void {
     shownThisTouch = false;
     swallowUntil = 0; // a new touch: whatever it taps is meant
     held = null;
-    if (tip && !(e.target instanceof Node && tip.contains(e.target))) hide();
+    touching = true;
+    if (tip &&!(e.target instanceof Node && tip.contains(e.target))) hide();
     cancel();
     if (e.touches.length !== 1) return; // a pinch or a two-finger pan
     const el = titled(e.target);
@@ -109,10 +111,17 @@ export function installTouchTips(): () => void {
   };
   const onEnd = (e: TouchEvent) => {
     cancel();
+    touching = false;
     if (!shownThisTouch) return;
+    shownThisTouch = false; // the gesture is over: nothing of it may linger
     // the hold showed a card: this finger's lift is not a tap on the control
     if (e.cancelable) e.preventDefault();
     swallowUntil = Date.now() + 700;
+  };
+  const onCancel = () => {
+    cancel();
+    touching = false;
+    shownThisTouch = false;
   };
   const onClick = (e: MouseEvent) => {
     // only the held control's own click, only right after the hold: never the next tap
@@ -124,8 +133,11 @@ export function installTouchTips(): () => void {
     e.stopPropagation();
   };
   // Chrome on Android (and its touch emulation) opens the context menu on a long press
+  // only while that finger is down, only on the held control: a later right-click is the user's
   const onMenu = (e: Event) => {
-    if (pending || shownThisTouch) e.preventDefault();
+    const on = pending ?? (shownThisTouch ? held : null);
+    if (touching && on && e.target instanceof Node && on.contains(e.target))
+      e.preventDefault();
   };
   const onScroll = () => {
     cancel();
@@ -139,7 +151,7 @@ export function installTouchTips(): () => void {
   document.addEventListener("touchstart", onStart, passive);
   document.addEventListener("touchmove", onMove, passive);
   document.addEventListener("touchend", onEnd, { capture: true, passive: false });
-  document.addEventListener("touchcancel", cancel, passive);
+  document.addEventListener("touchcancel", onCancel, passive);
   document.addEventListener("click", onClick, true);
   document.addEventListener("contextmenu", onMenu, true);
   window.addEventListener("scroll", onScroll, passive);
@@ -151,7 +163,7 @@ export function installTouchTips(): () => void {
     document.removeEventListener("touchstart", onStart, passive);
     document.removeEventListener("touchmove", onMove, passive);
     document.removeEventListener("touchend", onEnd, { capture: true });
-    document.removeEventListener("touchcancel", cancel, passive);
+    document.removeEventListener("touchcancel", onCancel, passive);
     document.removeEventListener("click", onClick, true);
     document.removeEventListener("contextmenu", onMenu, true);
     window.removeEventListener("scroll", onScroll, passive);

@@ -44,6 +44,7 @@ USER = os.environ.get("COVER_E2E_USER", "e2e-admin")
 PASSWORD = os.environ.get("COVER_E2E_PASSWORD", "browser-test-password")
 SHOTS = os.environ.get("COVER_E2E_SHOTS", "/shots")
 MODEL = os.environ.get("COVER_E2E_MODEL", "")
+DRAPE = os.environ.get("COVER_E2E_DRAPE", "drawing-c3")  # a cover with drape.json
 SLOW = 90_000  # software WebGL in the container
 HOLD_MS = 500  # touchTips.ts
 
@@ -212,6 +213,40 @@ async def rebuilt(page: Page, before: int, what: str) -> None:
     )  # fmt: skip
 
 
+LAYERS = "document.querySelector('.viewer .canvas canvas').visibleLayers()"
+
+
+async def drape_rebuilt(page: Page) -> None:
+    """In Drape mode the designed surface and the panels make way for the draped cover; a scene
+    built anew (Reload 3D) keeps them hidden, though its layers load after the drape began."""
+    r = await page.request.get(f"{URL}/api/models/{DRAPE}")
+    if not r.ok:
+        check(False, f"no cover {DRAPE} with a drape in this data (COVER_E2E_DRAPE)")
+        return
+    await page.goto(f"{URL}/#/model/{DRAPE}/3d")
+    await page.locator(".viewer .canvas canvas").wait_for(timeout=SLOW)
+    await page.wait_for_timeout(3000)
+    design = await page.evaluate(LAYERS)
+    check("panels.glb" in design, f"Design shows the panels {design}")
+    await page.locator(".vbar").get_by_role("button", name="Drape", exact=True).tap()
+    await page.wait_for_timeout(4000)
+    layers = sorted(await page.evaluate(LAYERS))
+    hidden = ("preview.glb", "panels.glb")
+    check(not any(f in layers for f in hidden), f"Drape hides the designed layers {layers}")
+    await lose(page, "lose")
+    lost = page.locator("[data-testid=gl-lost]")
+    await expect(lost).to_be_visible(timeout=5000)
+    await lost.get_by_role("button", name="Reload 3D").tap()
+    await expect(lost).to_have_count(0, timeout=SLOW)
+    await page.wait_for_timeout(5000)
+    after = sorted(await page.evaluate(LAYERS))
+    check(
+        after == layers and not any(f in after for f in hidden),
+        f"Drape after Reload 3D: the same layers {after}, the designed ones still hidden",
+    )
+    await shot(page, "ipad-drape-after-reload")
+
+
 async def first_model(page: Page) -> str:
     if MODEL:
         return MODEL
@@ -298,6 +333,18 @@ async def ipad(pw: Any) -> None:
     await shot(page, "ipad-touch-tip")
     await page.keyboard.press("Escape")
     check(await tip.count() == 0, "Escape hides the card")
+    # after the hold, a right-click (an iPad with a trackpad) opens the menu as always
+    await page.evaluate(
+        """() => { window.__menu = null; window.addEventListener('contextmenu', e => {
+          window.__menu = e.defaultPrevented; e.preventDefault(); }, { once: true }); }"""
+    )
+    hx, hy = await center(page, ".d-card-head h2")
+    await page.mouse.click(hx, hy, button="right")
+    await page.wait_for_timeout(200)
+    check(
+        await page.evaluate("window.__menu") is False,
+        "after a hold, a later right-click is left alone",
+    )
     # the reject dialog: its remark is 16px here (14px with a mouse)
     await page.locator("[data-testid=desk-reject]").tap()
     remark = page.locator(".d-reject textarea")
@@ -338,6 +385,7 @@ async def ipad(pw: Any) -> None:
     await lose(page, "restore")
     await expect(lost).to_have_count(0, timeout=SLOW)
     await rebuilt(page, before, "a restored context")
+    await drape_rebuilt(page)
     await shot(page, "ipad-cover-3d-after")
 
     other = [e for e in errors if "WebGL" not in e]

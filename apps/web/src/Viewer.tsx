@@ -326,6 +326,9 @@ function dimGroup(box: THREE.Box3): THREE.Group {
   return g;
 }
 
+// the layers the draped cover takes the place of
+const DRAPE_HIDES = ["preview.glb", "panels.glb"];
+
 export function Viewer({
   id,
   files,
@@ -372,6 +375,13 @@ export function Viewer({
   // "Reload 3D"; `glGen` counts the scenes built anew for that reason (ADR-154)
   const [glLost, setGlLost] = useState(false);
   const [glGen, setGlGen] = useState(0);
+  // what hides layers for now, so a layer that loads later (a scene built anew) obeys it too:
+  // the drape hides the designed surface and the panels, the unfolded pieces hide them all
+  const hiddenBy = useRef({ drape: false, unfold: false });
+  const layerVisible = (file: string) =>
+    !!shownRef.current[file] &&
+    !hiddenBy.current.unfold &&
+    !(hiddenBy.current.drape && DRAPE_HIDES.includes(file));
   const frameHooks = useRef<FrameHook[]>([]);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -450,6 +460,16 @@ export function Viewer({
     renderer.setSize(el.clientWidth || 1, el.clientHeight || 1);
     el.appendChild(renderer.domElement);
     canvasRef.current = renderer.domElement;
+    // for the browser check (e2e/ipad.py): which layers show now
+    (
+      renderer.domElement as HTMLCanvasElement & {
+        visibleLayers?: () => string[];
+      }
+    ).visibleLayers = () =>
+      Object.entries(groups.current)
+        .filter(([, o]) => o.visible)
+        .map(([f]) => f)
+        .sort();
     // for the browser checks (e2e/measure.py): where an engine point (mm, Z up) is on screen
     (
       renderer.domElement as HTMLCanvasElement & {
@@ -515,7 +535,7 @@ export function Viewer({
           }
         });
         groups.current[layer.file] = root;
-        root.visible = !!shownRef.current[layer.file];
+        root.visible = layerVisible(layer.file);
         scene.add(root);
         // how many layers are in (the browser checks wait for the cover)
         const c = renderer.domElement.dataset;
@@ -788,10 +808,13 @@ export function Viewer({
         );
       })
       .catch(() => setDrape(null));
-    // the designed surface and the panels make way for the real cover
-    for (const f of ["preview.glb", "panels.glb"])
-      if (groups.current[f]) groups.current[f].visible = false;
+    // the designed surface and the panels make way for the real cover (also the layers of a
+    // scene built anew after a lost context, which load later: layerVisible)
+    hiddenBy.current.drape = true;
+    for (const [file, obj] of Object.entries(groups.current))
+      obj.visible = layerVisible(file);
     return () => {
+      hiddenBy.current.drape = false;
       alive = false;
       if (drapeAnim.current) drapeAnim.current.frames.length = 0;
       drapeAnim.current = null;
@@ -801,7 +824,7 @@ export function Viewer({
       }
       added.length = 0;
       for (const [file, obj] of Object.entries(groups.current))
-        obj.visible = !!shownRef.current[file];
+        obj.visible = layerVisible(file);
     };
   }, [draping, id, stamp, files, glGen]);
 
@@ -879,7 +902,8 @@ export function Viewer({
   shownRef.current = shown;
   useEffect(() => {
     for (const [file, obj] of Object.entries(groups.current))
-      obj.visible = !!shown[file];
+      obj.visible = layerVisible(file);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shown]);
 
   if (!available.length)
@@ -1252,8 +1276,9 @@ export function Viewer({
           camera={cameraRef.current}
           controls={controlsRef.current}
           hideLayers={(hide) => {
+            hiddenBy.current.unfold = hide;
             for (const [file, obj] of Object.entries(groups.current))
-              obj.visible = hide ? false : !!shownRef.current[file];
+              obj.visible = layerVisible(file);
           }}
         />
       )}
