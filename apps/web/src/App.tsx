@@ -26,6 +26,7 @@ import { CuttingFile } from "./CutView";
 import { Heading, Icon, IconButton, IconLink, Info, StatusChip } from "./icons";
 import { Tpl } from "./layout";
 import { Search } from "./Search";
+import { ProblemsBanner } from "./ProblemsBanner";
 import { Workshop } from "./Workshop";
 import { Matches, Orders, Requests, Website } from "./Admin";
 import { B2BCustomers } from "./B2BCustomers";
@@ -185,6 +186,7 @@ export function App() {
           onLogout={() => setUser(null)}
         />
         <main className={`m-${route.section}`}>
+          {user.role === "admin" && <ProblemsBanner />}
           <Page route={route} user={user} />
         </main>
       </div>

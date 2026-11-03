@@ -559,8 +559,15 @@ def install(app: FastAPI, auth: Auth, required: bool) -> None:
             "login_required": required,
             "alert_email": auth.setting("alert_email", "rick@s2dio.industries"),
             "alerts": _tail(store.root / "alerts.log", 15),
-            "open_problems": _problems(store.root / "watchdog.json"),
+            "open_problems": [p["text"] for p in open_problems(store.root / "watchdog.json")],
         }
+
+    @app.get("/api/admin/problems")
+    def problems(request: Request) -> dict[str, Any]:
+        """The watchdog's open problems with when each started: the admins' red banner
+        (ADR-153). Read from <data>/watchdog.json, which scripts/watchdog.py keeps."""
+        require(request, "admin")
+        return {"problems": open_problems(app.state.store.root / "watchdog.json")}
 
     @app.put("/api/admin/alert-email")
     def alert_email(req: TestMailRequest, request: Request) -> dict[str, Any]:
@@ -576,12 +583,33 @@ def _tail(path: Any, n: int) -> list[str]:
     return path.read_text(errors="ignore").splitlines()[-n:] if path.is_file() else []
 
 
-def _problems(path: Any) -> list[str]:
+def open_problems(path: Any) -> list[dict[str, Any]]:
+    """The watchdog's open problems, oldest first: key, kind, subject, text, since (epoch s).
+    Reads the state format of ADR-153 ({"version": 2, "problems": {...}}) and the one before
+    ({key: {since, told, text}}); a missing or broken file has none."""
     import json
 
-    if not path.is_file():
+    try:
+        raw = json.loads(path.read_text() or "{}") if path.is_file() else {}
+    except (OSError, ValueError):
         return []
-    return [v.get("text", k) for k, v in json.loads(path.read_text() or "{}").items()]
+    if not isinstance(raw, dict):
+        return []
+    items = raw.get("problems", {}) if raw.get("version") == 2 else raw
+    out = []
+    for k, v in (items if isinstance(items, dict) else {}).items():
+        if not isinstance(v, dict):
+            continue
+        out.append(
+            {
+                "key": str(k),
+                "kind": str(v.get("kind", str(k).split(":", 1)[0])),
+                "subject": str(v.get("subject", "")),
+                "text": str(v.get("text", k)),
+                "since": float(v.get("since", 0) or 0),
+            }
+        )
+    return sorted(out, key=lambda p: (p["since"], p["key"]))
 
 
 def env_value(name: str) -> str:

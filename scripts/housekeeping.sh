@@ -5,15 +5,28 @@
 # - the release folders (~/releases/vX.Y.Z) beyond the newest RELEASES_KEEP (8), never the one
 #   ~/releases/current points at; every release can be built again from its tag;
 # - price proposals (shop_quotes, b2b_quotes, quotes) older than limits.quotes_keep_days (60)
-#   that no order or request names (scripts/quotes_clean.py, ADR-123).
-# Prints what it removed; DRY_RUN=1 only prints.
+#   that no order or request names (scripts/quotes_clean.py, ADR-123);
+# - scratch older than TMP_DAYS (7) in cover-data/tmp-agents, cover-data/tmp-release and
+#   /tmp/pytest-of-$USER, keeping live processes' folders and the workspaces' reports, and the
+#   agents' git worktrees merged into main and unchanged for TMP_DAYS (scripts/tmp_clean.py,
+#   ADR-153; never forced).
+# Prints what it removed and the space freed; --dry-run (or DRY_RUN=1) only prints.
 set -euo pipefail
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=1 ;;
+    *) echo "usage: $0 [--dry-run]" >&2; exit 2 ;;
+  esac
+done
 DATA=${COVER_DATA_DIR:-$HOME/cover-data}
 RELEASES=${COVER_RELEASES:-$HOME/releases}
 SAFETY_DAYS=${SAFETY_DAYS:-14}
 RELEASES_KEEP=${RELEASES_KEEP:-8}
 REPO=$(cd "$(dirname "$0")/.." && pwd)
+TMP_DAYS=${TMP_DAYS:-7}
 cutoff=$(date -d "-$SAFETY_DAYS days" +%Y-%m-%d)
+avail_kb() { df -P -k "$DATA" | awk 'NR==2 {print $4}'; }
+before=$(avail_kb)
 run() { if [ "${DRY_RUN:-0}" = 1 ]; then echo "would: $*"; return 1; fi; "$@"; }
 for d in "$DATA"/backup-*; do
   [ -d "$d" ] || continue
@@ -32,4 +45,8 @@ PY="$REPO/.venv/bin/python"; [ -x "$PY" ] || PY=python3
 dry=(); [ "${DRY_RUN:-0}" = 1 ] && dry=(--dry-run)
 COVER_DATA_DIR="$DATA" "$PY" "$REPO/scripts/quotes_clean.py" --data "$DATA" "${dry[@]}" ||
   echo "proposals: clean-up failed"
-echo "$(date '+%Y-%m-%d %H:%M') housekeeping done; $(df -h --output=avail "$DATA" | tail -1 | tr -d ' ') free"
+"$PY" "$REPO/scripts/tmp_clean.py" --days "$TMP_DAYS" --repo "$REPO" "${dry[@]}" ||
+  echo "scratch: clean-up failed"
+freed_mb=$(( ($(avail_kb) - before) / 1024 ))
+echo "$(date '+%Y-%m-%d %H:%M') housekeeping done; ${freed_mb} MB freed on the data disk;" \
+  "$(df -h --output=avail "$DATA" | tail -1 | tr -d ' ') free"

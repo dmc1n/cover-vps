@@ -5974,3 +5974,44 @@ his go. Plan: docs/plans/dealer-embed.md; handbook: docs/handbook/dealer-embed.m
 **Decision.** Vite 6.4.5, the last 6.x: it fixes every advisory, so Vite 7 (Node 20.19+, new browser targets, a bigger change) is not needed now. Vite 6 brings esbuild 0.25.12; Rollup stays 4.63.5. `@vitejs/plugin-react` stays 4.7.0 (its peer range already includes Vite 6; 5.x is optional). Neither vite.config.ts nor vite.embed.config.ts needed a change: none of Vite 6's breaking changes (resolve.conditions, Sass API, library-mode CSS names, JSON stringify) touches them. wrangler 4.156.2 (miniflare 5.20261102.0-beta, undici 7.30.1, sharp 0.35.5, esbuild 0.28.2). `uv lock --upgrade-package filelock --upgrade-package virtualenv`: filelock 4.2.7, virtualenv 21.15.2 (adds packaging, already locked). docs/LICENSES.md lists direct dependencies only and is unchanged.
 
 **Consequences.** `npm audit`: 0 in apps/web and apps/site. The built pages differ by bytes (all JS/CSS/HTML +1.2 kB raw, +0.4 kB gzip, mostly react.js: the new esbuild and CommonJS handling, no development code); the embed +0.1 kB. The Worker's dry-run bundle is byte-identical. Vite 7 when 6 stops getting fixes.
+
+## ADR-153 — One mail per server problem, a red banner for admins, and a nightly clean-up of scratch and merged worktrees (3 Nov 2026)
+
+**Context.** The watchdog (ADR-048) mailed every open problem again every 6 hours: from 21 Oct
+53 "disk almost full" mails and about 30 on the failed backup. The disk check fired below 25 %
+free (40 GB of 161), while 36-40 GB was free and a backup archive is 4.4 GB (5 kept); on 3 Nov
+it also swung to "solved" and back within ten minutes. It sent with `mailer.send` directly, so
+a mail the server refused was lost. Meanwhile agent scratch (`~/cover-data/tmp-agents`,
+`tmp-release`, pytest's temp folders) and 37 agent worktrees under `.claude/worktrees` (most
+merged long ago, some holding 10 GB of staging copies) were never cleaned. The owner approved
+both changes (3 Nov 2026).
+
+**Decision.**
+- A problem's key is its kind plus its subject (`disk`, `backup`, `service:caddy`,
+  `failed-unit:x.service`, `ai:budget_80`). Per key: one mail when it starts, at most one
+  reminder per 24 h while it lasts ("nog steeds sinds <datum>"), one when resolved ("opgelost").
+  Resolved means two checks in a row without it. The state is `<data>/watchdog.json`
+  (`{"version": 2, "problems": {key: {kind, subject, text, since, last_mail, clear_runs}}}`);
+  the format before is read, so an open problem is not mailed again as new at the switch.
+- Mails go through the outbox (`mailer.queue`, kind `watchdog`, a reference per event so a
+  repeated round never queues one twice; ADR-129).
+- The disk's limit is what the next backup needs without removing an older archive:
+  `BACKUP_MIN_FREE_GB` (20, backup.sh's own floor) plus the newest archive (4.4 GB), about 25 GB;
+  an open disk problem lasts until 5 GB above that. With 36-40 GB free that is no problem.
+- `GET /api/admin/problems` (admins only) lists the open problems with when each started; the
+  studio shows them to admins as a red banner at the top of every page (`ProblemsBanner.tsx`).
+- `scripts/tmp_clean.py`, run by `housekeeping.sh` (which gains `--dry-run`): in the three
+  scratch roots an entry unchanged for 7 days goes, unless a folder in it holds a `*.pid` of a
+  live process; the reports at a workspace's top level (report.md, summary.md, *.txt, *.json)
+  stay. Hidden entries, links' targets and everything outside the roots are never touched.
+  Agent worktrees go by `git worktree remove` and `git branch -d` only, never forced, when
+  merged into main, clean, unlocked and unchanged for 7 days. It prints every removal and the
+  space freed.
+
+**Consequences.** One mail per problem a day at most instead of four; the disk mail of 21 Oct
+resolves itself. Admins see what is wrong without opening their mail. The first real run would
+free about 37 GB (dry run of 3 Nov: 0.6 GB scratch, 36 GB in 28 merged worktrees). A merged
+worktree's git-ignored output (out/) goes with it; what must stay belongs in the repository or
+in cover-data. Tests: `engine/tests/test_watchdog.py`, `engine/tests/test_tmp_clean.py`,
+`apps/api/tests/test_watchdog_problems.py`. Better later: a watchdog problem acknowledged from
+the banner (snoozed reminders), and the worktree's reports kept like a scratch workspace's.

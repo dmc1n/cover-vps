@@ -375,7 +375,11 @@ scripts/release.sh v1.2.3 "what is new"     test, tag, build ~/releases/v1.2.3 a
 scripts/rollback.sh [v1.2.3 | --list]       back to the release before (or a chosen one) in seconds
 sudo systemctl restart cover-web            the app as a service (runs ~/releases/current); Caddy serves https://covers.suns.nu
 make backup     the data directory to ~/backups (5 kept, room checked first; R2 when COVER_BACKUP_REMOTE is set, a failed copy
-                is FAILED in last_backup.txt, ADR-129); scripts/housekeeping.sh daily (safety copies > 14 days, releases beyond 8)
+                is FAILED in last_backup.txt, ADR-129); scripts/housekeeping.sh [--dry-run] daily (safety copies > 14 days,
+                releases beyond 8, scratch and merged agent worktrees unchanged for 7 days: scripts/tmp_clean.py, ADR-153)
+scripts/watchdog.py (cron, 10 min)          one mail per problem (kind + subject): at the start, a reminder a day at most,
+                                             "opgelost" when resolved; through the outbox; <data>/watchdog.json; admins see
+                                             the open ones as a red banner (GET /api/admin/problems, ADR-153)
 Settings → System & logs → Mail             the mail outbox: waiting and failed mails, Send again; every send attempt logged (ADR-129)
 POST /api/jobs/<id>/rerun                   "Run again" for a job a restart interrupted (or a failed one; ADR-129)
 cd apps/site && npm run dev | npm run deploy | npm run deploy:preview   the website's Worker (ADR-066); preview after make web-build

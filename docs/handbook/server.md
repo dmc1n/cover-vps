@@ -47,10 +47,33 @@ has waited more than a week. Reboot: `sudo reboot` (cover-web and Caddy start by
 
 `scripts/watchdog.py` checks every 10 minutes: the app and https answer, the services run,
 disk space, the certificate, the age of the backup, failed services, update errors, a waiting
-reboot. A problem is mailed to the alert address (Settings → Mail & notifications;
-rick@s2dio.industries) once, again every 6 hours while it lasts, and once more when it is
-solved; the last alerts are on Settings → System. It needs the mail server (Settings → Mail &
-notifications); until then the alerts are only in `~/cover-data/alerts.log`.
+reboot, the AI's spend. Each problem (its kind plus what it is about: `disk`, `backup`,
+`service:caddy`, `failed-unit:x.service`) is mailed to the alert address (Settings → Mail &
+notifications; rick@s2dio.industries) once when it starts, at most once a day while it lasts
+("nog steeds sinds <datum>"), and once when it is resolved ("opgelost"). Resolved means two
+checks in a row without it; the disk only once it is 5 GB above its limit, so a value round a
+limit does not mail on every swing. The mails go through the outbox (Settings → System & logs →
+Mail; retried until the mail server takes them, ADR-129). The disk's limit is what the next
+backup needs without removing an older archive: 20 GB plus the newest archive (about 25 GB
+with archives of 4.4 GB). The open problems are in `~/cover-data/watchdog.json`; admins see
+them as a red banner at the top of every studio page, each with when it started
+(`GET /api/admin/problems`), and the last alerts on Settings → System & logs. Without a mail
+server the alerts are only in `~/cover-data/alerts.log` (ADR-153).
+
+## Clean-up of scratch and worktrees
+
+`scripts/housekeeping.sh` (03:30) also runs `scripts/tmp_clean.py` (ADR-153). In
+`~/cover-data/tmp-agents`, `~/cover-data/tmp-release` and `/tmp/pytest-of-dev` every entry is a
+workspace; one that nothing changed in for 7 days goes, unless a folder in it holds a `*.pid`
+whose process is alive. Its reports stay: `report.md`, `summary.md`, `*.txt` and `*.json` at
+its top level; its `stage/`, `base/`, `work/` and the rest go. Hidden entries (a sandbox's mount
+points) and anything outside those three folders are never touched; links are removed as
+links. The agents' git worktrees under `.claude/worktrees` go with `git worktree remove` (never
+forced) and their branch with `git branch -d` when merged into main, clean (nothing
+uncommitted or untracked), not locked and unchanged for 7 days; their git-ignored files
+(`out/`, `.venv`) go with them. Every removal and the space freed is in
+`~/backups/housekeeping.log`. To see what would go: `scripts/housekeeping.sh --dry-run`, or
+`uv run python scripts/tmp_clean.py --dry-run --verbose` (also says what stays and why).
 
 ## Versions (to set up with the owner)
 
