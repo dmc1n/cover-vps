@@ -31,6 +31,7 @@ export function installTouchTips(): () => void {
   let tip: HTMLDivElement | null = null;
   let shownThisTouch = false;
   let swallowUntil = 0;
+  let held: HTMLElement | null = null; // the control whose card a hold showed
 
   const hide = () => {
     if (!tip) return;
@@ -78,11 +79,14 @@ export function installTouchTips(): () => void {
     t.style.top = `${Math.max(8, top)}px`;
     tip = t;
     shownThisTouch = true;
+    held = el;
     navigator.vibrate?.(10);
   };
 
   const onStart = (e: TouchEvent) => {
     shownThisTouch = false;
+    swallowUntil = 0; // a new touch: whatever it taps is meant
+    held = null;
     if (tip && !(e.target instanceof Node && tip.contains(e.target))) hide();
     cancel();
     if (e.touches.length !== 1) return; // a pinch or a two-finger pan
@@ -111,8 +115,11 @@ export function installTouchTips(): () => void {
     swallowUntil = Date.now() + 700;
   };
   const onClick = (e: MouseEvent) => {
+    // only the held control's own click, only right after the hold: never the next tap
     if (Date.now() > swallowUntil) return;
+    if (!held || !(e.target instanceof Node) || !held.contains(e.target)) return;
     swallowUntil = 0;
+    held = null;
     e.preventDefault();
     e.stopPropagation();
   };

@@ -133,6 +133,23 @@ async def touch_tips(page: Page, cdp: Any) -> None:
     await page.wait_for_timeout(HOLD_MS + 200)
     check(await tip.count() == 0, "the next touch hides the card; a short tap shows none")
     check(await page.evaluate("window.__taps") == 1, "a short tap still presses the control")
+    # a hold, then at once a tap on another control: that tap is meant and goes through
+    await page.evaluate(
+        """() => { const b = document.createElement('button'); b.id = 'e2e-next';
+          b.textContent = 'next'; b.style.cssText = 'position:fixed;left:300px;top:520px;z-index:5';
+          window.__next = 0; b.addEventListener('click', () => window.__next++);
+          document.body.appendChild(b); }"""
+    )
+    await hold(page, cdp, x, y, HOLD_MS + 300)
+    await expect(tip).to_be_visible(timeout=3000)
+    nx, ny = await center(page, "#e2e-next")
+    await page.touchscreen.tap(nx, ny)
+    await page.wait_for_timeout(300)
+    check(
+        await page.evaluate("window.__next") == 1 and await page.evaluate("window.__taps") == 1,
+        "a tap on another control right after a hold presses it (the held one stays unpressed)",
+    )
+    await page.evaluate("document.getElementById('e2e-next').remove()")
     # a swipe that starts on it is a scroll, not a hold
     await touch(cdp, "touchStart", x, y)
     for k in range(1, 6):
@@ -156,14 +173,43 @@ async def gl_info(page: Page) -> dict[str, Any]:
     )
 
 
-async def lose(page: Page, restore: bool) -> None:
+async def lose(page: Page, how: str) -> None:
+    """`lose`: the device takes the context (the old canvas is marked, to tell a rebuilt view
+    from the old one); `restore`: the device gives it back."""
     await page.evaluate(
-        """(restore) => { const c = document.querySelector('.viewer .canvas canvas');
+        """(how) => { const c = document.querySelector('.viewer .canvas canvas');
+          if (how === 'restore') { window.__ext.restoreContext(); return; }
+          c.dataset.e2eOld = '1';
           const gl = c.getContext('webgl2') || c.getContext('webgl');
-          const ext = gl.getExtension('WEBGL_lose_context');
-          ext.loseContext(); if (restore) setTimeout(() => ext.restoreContext(), 300); }""",
-        restore,
+          // kept: a lost context gives no extension any more
+          window.__ext = gl.getExtension('WEBGL_lose_context');
+          window.__ext.loseContext(); }""",
+        how,
     )
+
+
+async def rebuilt(page: Page, before: int, what: str) -> None:
+    """A new canvas (not the lost one), one renderer, and as many geometries as before the loss
+    (the layers and the overlays that were on, here Dimensions, are back)."""
+    end = time.monotonic() + SLOW / 1000
+    info: dict[str, Any] = {}
+    while time.monotonic() < end:
+        info = dict(
+            await page.evaluate(
+                """() => { const c = document.querySelector('.viewer .canvas canvas');
+                  return { canvas: !!c, old: !!(c && c.dataset.e2eOld),
+                           renderers: window.__three.renderers,
+                           geometries: window.__three.geometries }; }"""
+            )
+        )
+        if info["canvas"] and not info["old"] and info["geometries"] >= before:
+            break
+        await page.wait_for_timeout(500)
+    check(
+        info.get("canvas") and not info.get("old") and info.get("renderers") == 1
+        and info.get("geometries", 0) >= before,
+        f"{what}: a new view, one renderer, its layers and overlays back {info} (before {before})",
+    )  # fmt: skip
 
 
 async def first_model(page: Page) -> str:
@@ -274,23 +320,24 @@ async def ipad(pw: Any) -> None:
     )
     await fields(page, "cover page", True)
     await shot(page, "ipad-cover-3d")
-    # the device takes the context: Reload 3D, then one renderer again
-    await lose(page, restore=False)
+    # an overlay on (Dimensions), then the device takes the context: Reload 3D
+    await page.locator(".vbar").get_by_role("button", name="Dimensions").tap()
+    await page.wait_for_timeout(2500)
+    before = int(await page.evaluate("window.__three.geometries"))
+    await lose(page, "lose")
     lost = page.locator("[data-testid=gl-lost]")
     await expect(lost).to_be_visible(timeout=5000)
     check(True, "a lost context shows the Reload 3D card instead of an empty box")
     await shot(page, "ipad-gl-lost")
     await lost.get_by_role("button", name="Reload 3D").tap()
     await expect(lost).to_have_count(0, timeout=SLOW)
-    await page.wait_for_timeout(2000)
-    info = await gl_info(page)
-    check(info["canvas"] and info["renderers"] == 1, f"Reload 3D builds the view anew {info}")
-    # the browser gives it back by itself: built anew without a tap
-    await lose(page, restore=True)
+    await rebuilt(page, before, "Reload 3D")
+    # the device gives the context back by itself: built anew without a tap
+    await lose(page, "lose")
+    await expect(lost).to_be_visible(timeout=5000)
+    await lose(page, "restore")
     await expect(lost).to_have_count(0, timeout=SLOW)
-    await page.wait_for_timeout(2000)
-    info = await gl_info(page)
-    check(info["canvas"] and info["renderers"] == 1, f"a restored context rebuilds {info}")
+    await rebuilt(page, before, "a restored context")
     await shot(page, "ipad-cover-3d-after")
 
     other = [e for e in errors if "WebGL" not in e]

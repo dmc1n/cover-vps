@@ -684,7 +684,7 @@ export function Viewer({
       disposeObject(group);
       rainAnim.current = null;
     };
-  }, [raining, rain, id, stamp, files]);
+  }, [raining, rain, id, stamp, files, glGen]);
 
   useEffect(() => {
     if (!raining || !files.includes("rain.json")) return;
@@ -803,7 +803,7 @@ export function Viewer({
       for (const [file, obj] of Object.entries(groups.current))
         obj.visible = !!shownRef.current[file];
     };
-  }, [draping, id, stamp, files]);
+  }, [draping, id, stamp, files, glGen]);
 
   useEffect(() => {
     const fall = drapeAnim.current;
@@ -843,7 +843,7 @@ export function Viewer({
         disposeObject(group);
       }
     };
-  }, [showVents, showLogo, id, stamp, files]);
+  }, [showVents, showLogo, id, stamp, files, glGen]);
 
   // the overall dimensions, on request: measured on the cover (its pieces, else its surface)
   useEffect(() => {
@@ -873,7 +873,7 @@ export function Viewer({
         disposeObject(group);
       }
     };
-  }, [showDims, id, stamp, files]);
+  }, [showDims, id, stamp, files, glGen]);
 
   const shownRef = useRef(shown);
   shownRef.current = shown;
