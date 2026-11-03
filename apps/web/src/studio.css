@@ -7088,3 +7088,63 @@ a.icon-btn.ws-file {
 .cv-empty {
   padding: 12px 0;
 }
+
+/* ---- the iPad (ADR-154) ---- */
+/* a 3D view's code loads when the page shows one: its box keeps the view's height meanwhile */
+.loading-3d {
+  display: grid;
+  place-items: center;
+  min-height: 360px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+/* the device took the WebGL context away: a way back instead of an empty box */
+.gl-lost {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: center;
+}
+.gl-lost p {
+  margin: 0;
+  max-width: 36ch;
+  line-height: 1.5;
+}
+.cfg-preview {
+  position: relative;
+}
+/* a title= shown by a long press (touchTips.ts): the (i)'s card, never in the finger's way */
+.touch-tip {
+  pointer-events: none;
+  max-width: min(320px, calc(100vw - 24px));
+}
+@media (pointer: coarse) {
+  /* iPad Safari zooms into a field whose text is under 16px, and stays zoomed: never on a
+     touch screen. !important because every field's own size (the Desk's remark 14px, many
+     12-13px inputs, inline styles) must give way on a touch screen only; the desktop keeps
+     its sizes. Pinch-zoom stays (no maximum-scale in the viewport tag). */
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"], [type="image"], [type="hidden"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+  /* a long press on a control shows its explanation, not iOS's link menu or a text selection */
+  button[title],
+  a[title],
+  summary[title],
+  label[title],
+  [role="button"][title] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}

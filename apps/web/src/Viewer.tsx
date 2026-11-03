@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { Drape, fileUrl, Rain } from "./api";
+import { GlLost, pixelRatio, watchContext } from "./gl";
 
 // The 3D view: the furniture, the cover surface (water spots in red) and the panels, each a
 // layer that can be switched on and off. The GLB files are in metres, Y up.
@@ -367,6 +368,10 @@ export function Viewer({
   const [ready, setReady] = useState(0); // the scene exists (counts every new scene)
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [glError, setGlError] = useState("");
+  // the device took the WebGL context away (iPad Safari, short of memory): `glLost` shows
+  // "Reload 3D"; `glGen` counts the scenes built anew for that reason (ADR-154)
+  const [glLost, setGlLost] = useState(false);
+  const [glGen, setGlGen] = useState(0);
   const frameHooks = useRef<FrameHook[]>([]);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -434,7 +439,14 @@ export function Viewer({
     }
     const untrack = trackRenderer(renderer);
     setGlError("");
-    renderer.setPixelRatio(window.devicePixelRatio);
+    setGlLost(false);
+    const unwatch = watchContext(
+      renderer.domElement,
+      () => setGlLost(true),
+      // given back: build the scene anew rather than trust every buffer came back
+      () => setGlGen((g) => g + 1),
+    );
+    renderer.setPixelRatio(pixelRatio());
     renderer.setSize(el.clientWidth || 1, el.clientHeight || 1);
     el.appendChild(renderer.domElement);
     canvasRef.current = renderer.domElement;
@@ -611,6 +623,7 @@ export function Viewer({
       controls.dispose();
       disposeObject(scene);
       scene.clear();
+      unwatch(); // the forced loss below is ours, not the device's
       renderer.dispose();
       renderer.forceContextLoss();
       untrack();
@@ -619,7 +632,7 @@ export function Viewer({
       frameHooks.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, stamp, files.join(",")]);
+  }, [id, stamp, files.join(","), glGen]);
 
   // rain: the blue water surfaces (rain.glb) and drops running down their paths
   useEffect(() => {
@@ -1186,6 +1199,9 @@ export function Viewer({
           >
             Logo position not computed yet: run again
           </p>
+        )}
+        {glLost && !glError && (
+          <GlLost onReload={() => setGlGen((g) => g + 1)} />
         )}
         {glError && (
           <p className="gl-error" role="alert">

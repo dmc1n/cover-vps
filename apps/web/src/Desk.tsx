@@ -10,7 +10,7 @@
 // cover's plan from above instead of a drawing; their maker sends them, Rens or Wout approve.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type ModelDetail } from "./api";
-import { Viewer } from "./Viewer";
+import { Viewer } from "./lazy3d";
 import { CuttingFile } from "./CutView";
 import { Corrections, RulesBar } from "./DeskCorrect";
 import {

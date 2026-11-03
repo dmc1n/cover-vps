@@ -17,6 +17,21 @@ ssh -L 8080:localhost:8080 dev@cover-server
 
 then **http://localhost:8080** in the browser (see [server.md](server.md)).
 
+### On the iPad (ADR-154)
+
+- **As an app on the home screen:** open the studio in Safari, tap Share, then **Add to Home
+  Screen**. It opens full-screen with its own icon, and starts on your own start page (the Desk
+  for approvers). The app keeps its own login, apart from Safari, so you log in once more
+  inside it. It shows live data only: nothing is kept offline.
+- **Typing:** fields are at least 16 px on a touch screen, so Safari no longer zooms in when
+  you tap one. Pinching to zoom still works.
+- **What a button does:** hold it for half a second. Its explanation appears in a small card,
+  and the button is not pressed. A short tap presses it as usual. The next tap, a scroll or
+  Escape hides the card.
+- **3D:** if the iPad takes the 3D view's memory away (many views open, or the app was in the
+  background), the view says so and offers **Reload 3D** instead of an empty box. It also
+  comes back by itself once the iPad allows.
+
 ## The pages, along the map
 
 The four sections and their pages, with who sees what, the search, the theme button and every
