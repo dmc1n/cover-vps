@@ -438,7 +438,9 @@ export function Viewer({
       // no WebGL (switched off, blocked by a policy, no graphics driver): say so here,
       // instead of an error that blanks the whole page (8 Oct 2026, ADR-096)
       const why = e instanceof Error ? e.message : String(e);
-      setGlError(why);
+      // after a lost context the device may not have the memory back yet: Reload 3D again
+      if (glGen > 0) setGlLost(true);
+      else setGlError(why);
       if (snapshot)
         snapshot.current = () => {
           throw new Error(`3D (WebGL) does not work in this browser (${why})`);
@@ -466,10 +468,15 @@ export function Viewer({
         visibleLayers?: () => string[];
       }
     ).visibleLayers = () =>
-      Object.entries(groups.current)
-        .filter(([, o]) => o.visible)
-        .map(([f]) => f)
-        .sort();
+      [
+        ...Object.entries(groups.current)
+          .filter(([, o]) => o.visible)
+          .map(([f]) => f),
+        // the draped cover, once it lies in this scene
+        ...(drapeAnim.current?.mesh.parent || drapeAnim.current?.final?.parent
+          ? ["drape"]
+          : []),
+      ].sort();
     // for the browser checks (e2e/measure.py): where an engine point (mm, Z up) is on screen
     (
       renderer.domElement as HTMLCanvasElement & {

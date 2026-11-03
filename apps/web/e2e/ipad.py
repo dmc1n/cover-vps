@@ -216,33 +216,69 @@ async def rebuilt(page: Page, before: int, what: str) -> None:
 LAYERS = "document.querySelector('.viewer .canvas canvas').visibleLayers()"
 
 
+async def wait_layers(page: Page, loaded: int, want: str) -> list[str]:
+    """The canvas's layers once `loaded` of them are in and `want` shows (or the time is up)."""
+    end = time.monotonic() + SLOW / 1000
+    layers: list[str] = []
+    while time.monotonic() < end:
+        state = await page.evaluate(
+            """() => { const c = document.querySelector('.viewer .canvas canvas');
+              return c && c.visibleLayers ? [Number(c.dataset.loaded || 0), c.visibleLayers()]
+                                          : [0, []]; }"""
+        )
+        layers = list(state[1])
+        if state[0] >= loaded and want in layers:
+            break
+        await page.wait_for_timeout(300)
+    return layers
+
+
 async def drape_rebuilt(page: Page) -> None:
     """In Drape mode the designed surface and the panels make way for the draped cover; a scene
-    built anew (Reload 3D) keeps them hidden, though its layers load after the drape began."""
+    built anew (Reload 3D) keeps them hidden, though its layers load after the drape began (the
+    panels are held back 4 s here, so they arrive after the drape for sure)."""
     r = await page.request.get(f"{URL}/api/models/{DRAPE}")
     if not r.ok:
         check(False, f"no cover {DRAPE} with a drape in this data (COVER_E2E_DRAPE)")
         return
     await page.goto(f"{URL}/#/model/{DRAPE}/3d")
     await page.locator(".viewer .canvas canvas").wait_for(timeout=SLOW)
-    await page.wait_for_timeout(3000)
-    design = await page.evaluate(LAYERS)
-    check("panels.glb" in design, f"Design shows the panels {design}")
+    design = await wait_layers(page, 1, "panels.glb")
+    loaded = int(
+        await page.evaluate(
+            "Number(document.querySelector('.viewer .canvas canvas').dataset.loaded)"
+        )
+    )
+    check("panels.glb" in design, f"Design shows the panels {design} ({loaded} layers in)")
     await page.locator(".vbar").get_by_role("button", name="Drape", exact=True).tap()
-    await page.wait_for_timeout(4000)
-    layers = sorted(await page.evaluate(LAYERS))
+    layers = await wait_layers(page, loaded, "drape")
     hidden = ("preview.glb", "panels.glb")
-    check(not any(f in layers for f in hidden), f"Drape hides the designed layers {layers}")
+    check(
+        "drape" in layers and not any(f in layers for f in hidden),
+        f"Drape shows the draped cover and hides the designed layers {layers}",
+    )
+
+    async def slow(route: Any) -> None:
+        await asyncio.sleep(4)
+        await route.continue_()
+
+    await page.route("**/panels.glb*", slow)
     await lose(page, "lose")
     lost = page.locator("[data-testid=gl-lost]")
     await expect(lost).to_be_visible(timeout=5000)
     await lost.get_by_role("button", name="Reload 3D").tap()
     await expect(lost).to_have_count(0, timeout=SLOW)
-    await page.wait_for_timeout(5000)
-    after = sorted(await page.evaluate(LAYERS))
+    after = await wait_layers(page, loaded, "drape")
+    n = int(
+        await page.evaluate(
+            "Number(document.querySelector('.viewer .canvas canvas').dataset.loaded)"
+        )
+    )
+    await page.unroute("**/panels.glb*")
     check(
-        after == layers and not any(f in after for f in hidden),
-        f"Drape after Reload 3D: the same layers {after}, the designed ones still hidden",
+        n >= loaded and after == layers,
+        f"Drape after Reload 3D ({n} of {loaded} layers in, the panels last): {after}, "
+        "the draped cover back and the designed layers still hidden",
     )
     await shot(page, "ipad-drape-after-reload")
 

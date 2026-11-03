@@ -87,7 +87,15 @@ function Preview({ url }: { url: string | null }) {
       0.01,
       100,
     );
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch {
+      // no WebGL now (the device has not given the memory back yet): the card stays, with
+      // Reload 3D for another try, instead of an error that blanks the page
+      setLost(true);
+      return;
+    }
     const untrack = trackRenderer(renderer);
     setLost(false);
     const unwatch = watchContext(
