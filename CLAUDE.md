@@ -335,6 +335,11 @@ apps/web/e2e/vent_logo.py                   the Logo layer in a real browser, a 
                                              the cut fingerprint; watermarked until approved (ADR-147, `desk.preview_*`)
 apps/web/e2e/dxf_view.py                    the Cutting file view in a real browser: cover page and Desk card, 1440 and an
                                              iPad (touch), light and dark, layers, rights (usage in its docstring)
+apps/web/e2e/ipad.py                        the studio on an iPad (ADR-154): fields 16px on touch (no Safari zoom), a long press
+                                             shows a title (src/touchTips.ts), the home-screen app (public/manifest.webmanifest,
+                                             no service worker), 3D pixel ratio capped and "Reload 3D" after a lost context
+                                             (src/gl.tsx), three.js only with the first 3D view (src/lazy3d.tsx: import 3D views
+                                             from there); icons: scripts/app_icons.py
 apps/web/e2e/uinav.py                       the studio's map (ADR-122, 124, 126): every menu item per role, every old address, a
                                              cover's and a Desk card's tabs, a cover's Price & shop, All covers' prices, All covers' filters, the search, the theme,
                                              1440/1024 (touch)/820 px, light and dark with a strict contrast check, field borders 3:1,

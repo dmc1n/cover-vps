@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { Drape, fileUrl, Rain } from "./api";
+import { GlLost, pixelRatio, watchContext } from "./gl";
 
 // The 3D view: the furniture, the cover surface (water spots in red) and the panels, each a
 // layer that can be switched on and off. The GLB files are in metres, Y up.
@@ -325,6 +326,9 @@ function dimGroup(box: THREE.Box3): THREE.Group {
   return g;
 }
 
+// the layers the draped cover takes the place of
+const DRAPE_HIDES = ["preview.glb", "panels.glb"];
+
 export function Viewer({
   id,
   files,
@@ -367,6 +371,17 @@ export function Viewer({
   const [ready, setReady] = useState(0); // the scene exists (counts every new scene)
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [glError, setGlError] = useState("");
+  // the device took the WebGL context away (iPad Safari, short of memory): `glLost` shows
+  // "Reload 3D"; `glGen` counts the scenes built anew for that reason (ADR-154)
+  const [glLost, setGlLost] = useState(false);
+  const [glGen, setGlGen] = useState(0);
+  // what hides layers for now, so a layer that loads later (a scene built anew) obeys it too:
+  // the drape hides the designed surface and the panels, the unfolded pieces hide them all
+  const hiddenBy = useRef({ drape: false, unfold: false });
+  const layerVisible = (file: string) =>
+    !!shownRef.current[file] &&
+    !hiddenBy.current.unfold &&
+    !(hiddenBy.current.drape && DRAPE_HIDES.includes(file));
   const frameHooks = useRef<FrameHook[]>([]);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -423,7 +438,9 @@ export function Viewer({
       // no WebGL (switched off, blocked by a policy, no graphics driver): say so here,
       // instead of an error that blanks the whole page (8 Oct 2026, ADR-096)
       const why = e instanceof Error ? e.message : String(e);
-      setGlError(why);
+      // after a lost context the device may not have the memory back yet: Reload 3D again
+      if (glGen > 0) setGlLost(true);
+      else setGlError(why);
       if (snapshot)
         snapshot.current = () => {
           throw new Error(`3D (WebGL) does not work in this browser (${why})`);
@@ -434,10 +451,32 @@ export function Viewer({
     }
     const untrack = trackRenderer(renderer);
     setGlError("");
-    renderer.setPixelRatio(window.devicePixelRatio);
+    setGlLost(false);
+    const unwatch = watchContext(
+      renderer.domElement,
+      () => setGlLost(true),
+      // given back: build the scene anew rather than trust every buffer came back
+      () => setGlGen((g) => g + 1),
+    );
+    renderer.setPixelRatio(pixelRatio());
     renderer.setSize(el.clientWidth || 1, el.clientHeight || 1);
     el.appendChild(renderer.domElement);
     canvasRef.current = renderer.domElement;
+    // for the browser check (e2e/ipad.py): which layers show now
+    (
+      renderer.domElement as HTMLCanvasElement & {
+        visibleLayers?: () => string[];
+      }
+    ).visibleLayers = () =>
+      [
+        ...Object.entries(groups.current)
+          .filter(([, o]) => o.visible)
+          .map(([f]) => f),
+        // the draped cover, once it lies in this scene
+        ...(drapeAnim.current?.mesh.parent || drapeAnim.current?.final?.parent
+          ? ["drape"]
+          : []),
+      ].sort();
     // for the browser checks (e2e/measure.py): where an engine point (mm, Z up) is on screen
     (
       renderer.domElement as HTMLCanvasElement & {
@@ -503,7 +542,7 @@ export function Viewer({
           }
         });
         groups.current[layer.file] = root;
-        root.visible = !!shownRef.current[layer.file];
+        root.visible = layerVisible(layer.file);
         scene.add(root);
         // how many layers are in (the browser checks wait for the cover)
         const c = renderer.domElement.dataset;
@@ -611,6 +650,7 @@ export function Viewer({
       controls.dispose();
       disposeObject(scene);
       scene.clear();
+      unwatch(); // the forced loss below is ours, not the device's
       renderer.dispose();
       renderer.forceContextLoss();
       untrack();
@@ -619,7 +659,7 @@ export function Viewer({
       frameHooks.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, stamp, files.join(",")]);
+  }, [id, stamp, files.join(","), glGen]);
 
   // rain: the blue water surfaces (rain.glb) and drops running down their paths
   useEffect(() => {
@@ -671,7 +711,7 @@ export function Viewer({
       disposeObject(group);
       rainAnim.current = null;
     };
-  }, [raining, rain, id, stamp, files]);
+  }, [raining, rain, id, stamp, files, glGen]);
 
   useEffect(() => {
     if (!raining || !files.includes("rain.json")) return;
@@ -775,10 +815,13 @@ export function Viewer({
         );
       })
       .catch(() => setDrape(null));
-    // the designed surface and the panels make way for the real cover
-    for (const f of ["preview.glb", "panels.glb"])
-      if (groups.current[f]) groups.current[f].visible = false;
+    // the designed surface and the panels make way for the real cover (also the layers of a
+    // scene built anew after a lost context, which load later: layerVisible)
+    hiddenBy.current.drape = true;
+    for (const [file, obj] of Object.entries(groups.current))
+      obj.visible = layerVisible(file);
     return () => {
+      hiddenBy.current.drape = false;
       alive = false;
       if (drapeAnim.current) drapeAnim.current.frames.length = 0;
       drapeAnim.current = null;
@@ -788,9 +831,9 @@ export function Viewer({
       }
       added.length = 0;
       for (const [file, obj] of Object.entries(groups.current))
-        obj.visible = !!shownRef.current[file];
+        obj.visible = layerVisible(file);
     };
-  }, [draping, id, stamp, files]);
+  }, [draping, id, stamp, files, glGen]);
 
   useEffect(() => {
     const fall = drapeAnim.current;
@@ -830,7 +873,7 @@ export function Viewer({
         disposeObject(group);
       }
     };
-  }, [showVents, showLogo, id, stamp, files]);
+  }, [showVents, showLogo, id, stamp, files, glGen]);
 
   // the overall dimensions, on request: measured on the cover (its pieces, else its surface)
   useEffect(() => {
@@ -860,13 +903,14 @@ export function Viewer({
         disposeObject(group);
       }
     };
-  }, [showDims, id, stamp, files]);
+  }, [showDims, id, stamp, files, glGen]);
 
   const shownRef = useRef(shown);
   shownRef.current = shown;
   useEffect(() => {
     for (const [file, obj] of Object.entries(groups.current))
-      obj.visible = !!shown[file];
+      obj.visible = layerVisible(file);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shown]);
 
   if (!available.length)
@@ -1187,6 +1231,9 @@ export function Viewer({
             Logo position not computed yet: run again
           </p>
         )}
+        {glLost && !glError && (
+          <GlLost onReload={() => setGlGen((g) => g + 1)} />
+        )}
         {glError && (
           <p className="gl-error" role="alert">
             The 3D view needs WebGL, which this browser does not give ({glError}
@@ -1236,8 +1283,9 @@ export function Viewer({
           camera={cameraRef.current}
           controls={controlsRef.current}
           hideLayers={(hide) => {
+            hiddenBy.current.unfold = hide;
             for (const [file, obj] of Object.entries(groups.current))
-              obj.visible = hide ? false : !!shownRef.current[file];
+              obj.visible = layerVisible(file);
           }}
         />
       )}

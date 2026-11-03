@@ -5,7 +5,7 @@ import { Info, Icon, StatusChip } from "./icons";
 // On top, per upload, what the program did with it in plain words (ADR-074): received, read,
 // compared, double checked by two AIs, what changed; one verdict; earlier uploads below.
 import { useCallback, useEffect, useState } from "react";
-import { Scene } from "./shop/Scene";
+import { Scene } from "./lazy3d";
 
 interface Step {
   title: string;

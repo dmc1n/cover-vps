@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GlLost, pixelRatio, watchContext } from "./gl";
 
 interface Field {
   key: string;
@@ -72,6 +73,9 @@ async function post<T>(url: string, body: unknown): Promise<T> {
 
 function Preview({ url }: { url: string | null }) {
   const host = useRef<HTMLDivElement>(null);
+  // the device took the WebGL context away: "Reload 3D" builds the view anew (ADR-154)
+  const [lost, setLost] = useState(false);
+  const [gen, setGen] = useState(0);
   useEffect(() => {
     const el = host.current;
     if (!el || !url) return;
@@ -83,9 +87,23 @@ function Preview({ url }: { url: string | null }) {
       0.01,
       100,
     );
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch {
+      // no WebGL now (the device has not given the memory back yet): the card stays, with
+      // Reload 3D for another try, instead of an error that blanks the page
+      setLost(true);
+      return;
+    }
     const untrack = trackRenderer(renderer);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    setLost(false);
+    const unwatch = watchContext(
+      renderer.domElement,
+      () => setLost(true),
+      () => setGen((g) => g + 1),
+    );
+    renderer.setPixelRatio(pixelRatio());
     renderer.setSize(el.clientWidth, el.clientHeight);
     el.appendChild(renderer.domElement);
     scene.add(new THREE.HemisphereLight("#fffdf6", "#85886f", 1.6));
@@ -134,13 +152,18 @@ function Preview({ url }: { url: string | null }) {
       controls.dispose();
       disposeObject(scene);
       scene.clear();
+      unwatch();
       renderer.dispose();
       renderer.forceContextLoss();
       untrack();
       el.removeChild(renderer.domElement);
     };
-  }, [url]);
-  return <div className="cfg-preview" ref={host} />;
+  }, [url, gen]);
+  return (
+    <div className="cfg-preview" ref={host}>
+      {lost && <GlLost onReload={() => setGen((g) => g + 1)} />}
+    </div>
+  );
 }
 
 export default function Configure() {

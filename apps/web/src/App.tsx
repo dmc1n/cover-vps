@@ -2,7 +2,7 @@ import { Arrangements } from "./Arrangements";
 import { Desk } from "./Desk";
 import { Questions } from "./Questions";
 import { useCallback, useEffect, useState } from "react";
-import Configure from "./Configure";
+import { Configure, Viewer } from "./lazy3d";
 import Guide from "./Guide";
 import {
   api,
@@ -47,7 +47,6 @@ import { ProductsUpload } from "./DeskProducts";
 import { SeamEditor } from "./SeamEditor";
 import { Settings } from "./Settings";
 import { SettingsArea } from "./SettingsArea";
-import { Viewer } from "./Viewer";
 import { installUnsavedGuard, mayLeave } from "./unsaved";
 import {
   allowed,
